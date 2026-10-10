@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture Setup</title>
+<link rel="stylesheet" href="/css/setup.css">
+</head>
+<body>
+<header>
+  <h1><span>⚡</span> Fixture Setup</h1>
+  <a href="/">→ visualiser</a>
+  <span class="note" id="status"></span>
+</header>
+<main>
+  <section>
+    <h2>Set (which rig you are editing)</h2>
+    <div class="row">
+      <label>Set <select id="setSel"></select></label>
+      <button id="setCopy">Copy as new set…</button>
+      <button id="setNew">New empty set…</button>
+      <button id="setDel">Delete this set</button>
+    </div>
+    <p class="note" id="setNote"></p>
+    <details style="margin-top:8px"><summary class="note">Generate a set: many fixtures on a concert stage or a truss grid (for the visualiser)</summary>
+      <div class="row" style="margin-top:8px">
+        <label>Layout <select id="gLayout"><option value="concert">Concert stage (overhead, back, front edge, towers)</option>
+          <option value="grid">Truss grid (rows overhead)</option></select></label>
+        <label>Fixture <select id="gModel"></select></label>
+        <label>How many <input id="gCount" type="number" min="1" max="500" value="60"></label>
+        <label>Trusses <input id="gRows" type="number" min="1" max="10" value="3"></label>
+        <label>Width (m) <input id="gWidth" type="number" step="0.5" value="16"></label>
+        <label>Height (m) <input id="gHeight" type="number" step="0.5" value="7"></label>
+        <label>Depth (m) <input id="gDepth" type="number" step="0.5" value="6"></label>
+        <label>Lasers <input id="gLasers" type="number" min="0" max="40" value="10"></label>
+        <button id="gMake">Create set…</button>
+      </div>
+      <p class="note">Art-Net goes to 127.0.0.1 only: a generated set never drives your real lights. Fixtures from the QLC+ /
+        Open Fixture Library: add them to your library first (mobile page or <code>decisive library --add</code>).</p>
+    </details>
+  </section>
+
+  <section>
+    <h2>Decision model (the AI that designs the light show)</h2>
+    <div class="row">
+      <label>Director <select id="director"></select></label>
+      <span class="note" id="directorNote"></span>
+    </div>
+    <p class="note">Takes effect as soon as you pick one (no need to press Save). A running live show switches within
+      a second: tracks that already have a plan from this model switch instantly, others keep their current plan
+      until the new one is ready.</p>
+  </section>
+
+  <section>
+    <h2>DMX output</h2>
+    <div class="row">
+      <label>Protocol <select id="outType">
+        <option value="artnet">Art-Net (network node)</option>
+        <option value="sacn">sACN / E1.31 (network node)</option>
+        <option value="enttec_pro">USB: ENTTEC DMX USB Pro-compatible</option>
+      </select></label>
+    </div>
+    <div class="row" id="netRow">
+      <label>IP address <input id="ip" size="15" placeholder=""></label>
+      <label class="artnetOnly">Port <input id="port" type="number"></label>
+      <label class="sacnOnly">Priority <input id="prio" type="number" min="0" max="200"></label>
+      <label>Frames/s <input id="fps" type="number" min="10" max="44"></label>
+      <button id="find">Find node on the network</button>
+    </div>
+    <div class="row" id="usbRow">
+      <label>Interface <select id="usbPort"><option value="auto">first one found</option></select></label>
+      <label>Universe <input id="usbUni" type="number" min="1" value="1"></label>
+      <button id="findUsb">Find USB interfaces</button>
+    </div>
+    <div class="nodes" id="nodes"></div>
+    <div class="note" id="outNote"></div>
+  </section>
+
+  <section>
+    <h2>Fixtures</h2>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Id</th><th>Model</th><th>Mode</th><th>Universe</th><th>Address</th><th>Channels</th>
+        <th class="hide-sm">Mount</th><th class="hide-sm">Position (left → right)</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:12px">
+      <label>Add model <select id="addModel"></select></label>
+      <label>How many <input id="addCount" type="number" min="1" max="200" value="1"></label>
+      <button id="add">Add</button>
+      <button id="autopatch">Auto-address &amp; layout</button>
+    </div>
+    <p class="note">Set the same DMX mode and start address on each fixture's own display. "Identify" lights one fixture white for 2 s (stop a running show first).</p>
+  </section>
+
+  <section>
+    <h2>Stage &amp; safety</h2>
+    <div class="row">
+      <label>Stage width (m) <input id="width" type="number" step="0.1" min="0.5"></label>
+      <label>Ceiling (m) <input id="ceiling" type="number" step="0.1" min="1.5"></label>
+      <label>Room depth (m) <input id="depth" type="number" step="0.1" min="1"></label>
+      <label>Master brightness <input id="master" type="range" min="0" max="1" step="0.05"><span id="masterVal"></span></label>
+      <label><span><input id="strobe" type="checkbox"> Allow fast strobe</span><span class="note">full on/off at stutter speed (photosensitivity risk)</span></label>
+    </div>
+  </section>
+
+  <section>
+    <div class="row">
+      <button class="primary" id="save">Save rig</button>
+      <button id="reload">Discard changes</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+</main>
+<script src="/js/setup.js"></script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+{
+  "manufacturer": "Showtec",
+  "model": "Sunstrip Active",
+  "kind": "par_bar",
+  "source": "QLC+ fixture library (Showtec/Showtec-Sunstrip-Active.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Showtec/Showtec-Sunstrip-Active.qxf",
+    "type": "LED Bar (Pixels)",
+    "converter": 4
+  },
+  "physical": {
+    "beam_deg": 25.0,
+    "size_mm": [
+      1000,
+      130,
+      80
+    ],
+    "watts": 750,
+    "lumens": 15000,
+    "_lumens_note": "estimated from the power (20 lm/W)"
+  },
+  "modes": {
+    "1chMode": [
+      {
+        "attr": "dimmer"
+      }
+    ],
+    "2chMode": [
+      {
+        "attr": "dimmer",
+        "head": 1
+      },
+      {
+        "attr": "dimmer",
+        "head": 2
+      }
+    ],
+    "5chMode": [
+      {
+        "attr": "dimmer",
+        "head": 1
+      },
+      {
+        "attr": "dimmer",
+        "head": 2
+      },
+      {
+        "attr": "dimmer",
+        "head": 3
+      },
+      {
+        "attr": "dimmer",
+        "head": 4
+      },
+      {
+        "attr": "dimmer",
+        "head": 5
+      }
+    ],
+    "10chMode": [
+      {
+        "attr": "dimmer",
+        "head": 1
+      },
+      {
+        "attr": "dimmer",
+        "head": 2
+      },
+      {
+        "attr": "dimmer",
+        "head": 3
+      },
+      {
+        "attr": "dimmer",
+        "head": 4
+      },
+      {
+        "attr": "dimmer",
+        "head": 5
+      },
+      {
+        "attr": "dimmer",
+        "head": 6
+      },
+      {
+        "attr": "dimmer",
+        "head": 7
+      },
+      {
+        "attr": "dimmer",
+        "head": 8
+      },
+      {
+        "attr": "dimmer",
+        "head": 9
+      },
+      {
+        "attr": "dimmer",
+        "head": 10
+      }
+    ]
+  }
+}

@@ -1,0 +1,432 @@
+{
+  "manufacturer": "DTS",
+  "model": "Katana",
+  "kind": "moving_bar",
+  "source": "QLC+ fixture library (DTS/DTS-Katana.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "DTS/DTS-Katana.qxf",
+    "type": "LED Bar (Beams)",
+    "converter": 4
+  },
+  "physical": {
+    "pan_deg": 0,
+    "tilt_deg": 184,
+    "beam_deg": 3.5,
+    "size_mm": [
+      1118,
+      310,
+      204
+    ],
+    "beam_deg_max": 30.0,
+    "watts": 300,
+    "lumens": 9600
+  },
+  "modes": {
+    "Chase": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter",
+        "default": 14
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "linear_cto",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 128
+      },
+      {
+        "attr": "service",
+        "default": 0
+      },
+      {
+        "attr": "functions",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "reset",
+        "default": 0
+      },
+      {
+        "attr": "chase_1_select",
+        "default": 0
+      },
+      {
+        "attr": "chase_1_colour",
+        "default": 0
+      },
+      {
+        "attr": "chase_1_size_speed",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "chase_2_select",
+        "default": 0
+      },
+      {
+        "attr": "chase_2_colour",
+        "default": 0
+      },
+      {
+        "attr": "chase_2_size_speed",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      }
+    ],
+    "Standard": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter",
+        "default": 14
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "linear_cto",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 128
+      },
+      {
+        "attr": "service",
+        "default": 0
+      },
+      {
+        "attr": "functions",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "reset",
+        "default": 0
+      }
+    ],
+    "Extended": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter",
+        "default": 14
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "linear_cto",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 128
+      },
+      {
+        "attr": "service",
+        "default": 0
+      },
+      {
+        "attr": "functions",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "reset",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "white",
+        "head": 12
+      }
+    ]
+  },
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

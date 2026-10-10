@@ -1,0 +1,104 @@
+{
+  "manufacturer": "Cameo",
+  "model": "FLAT PRO 18",
+  "kind": "par",
+  "source": "QLC+ fixture library (Cameo/Cameo-FLAT-PRO-18.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Cameo/Cameo-FLAT-PRO-18.qxf",
+    "type": "Color Changer",
+    "converter": 4
+  },
+  "physical": {
+    "beam_deg": 30.0,
+    "size_mm": [
+      280,
+      280,
+      133
+    ],
+    "watts": 200,
+    "lumens": 4000,
+    "_lumens_note": "estimated from the power (20 lm/W)"
+  },
+  "modes": {
+    "2chMacro": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      }
+    ],
+    "3chMacro": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "stroboscobe",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      }
+    ],
+    "3chRGB": [
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      }
+    ],
+    "5chRGBWA": [
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      }
+    ],
+    "8ch": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "stroboscobe",
+        "default": 0
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      }
+    ]
+  }
+}

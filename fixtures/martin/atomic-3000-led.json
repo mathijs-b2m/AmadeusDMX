@@ -1,0 +1,109 @@
+{
+  "manufacturer": "Martin",
+  "model": "Atomic 3000 LED",
+  "kind": "strobe",
+  "source": "QLC+ fixture library (Martin/Martin-Atomic-3000-LED.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Martin/Martin-Atomic-3000-LED.qxf",
+    "type": "Strobe",
+    "converter": 4
+  },
+  "physical": {
+    "beam_deg": 110.0,
+    "size_mm": [
+      425,
+      240,
+      245
+    ],
+    "watts": 740,
+    "lumens": 180000
+  },
+  "modes": {
+    "3-ch": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "beam_flash_duration",
+        "default": 20
+      },
+      {
+        "attr": "shutter",
+        "default": 255
+      }
+    ],
+    "4-ch": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "beam_flash_duration",
+        "default": 20
+      },
+      {
+        "attr": "shutter",
+        "default": 255
+      },
+      {
+        "attr": "beam_special_effects",
+        "default": 0
+      }
+    ],
+    "Extended": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "beam_flash_duration",
+        "default": 20
+      },
+      {
+        "attr": "shutter",
+        "default": 255
+      },
+      {
+        "attr": "beam_special_effects",
+        "default": 0
+      },
+      {
+        "attr": "control_settings",
+        "default": 0
+      },
+      {
+        "attr": "fx_select",
+        "default": 0
+      },
+      {
+        "attr": "fx_adjustment",
+        "default": 126
+      },
+      {
+        "attr": "fx_synchronization",
+        "default": 37
+      },
+      {
+        "attr": "shutter",
+        "default": 20
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "aura_color_presets_color_wheel_effect",
+        "default": 0
+      }
+    ]
+  },
+  "strobe": {
+    "_note": "Intensity-gated: flash rate at maximum (16.7 Hz) and a short flash; the engine opens the intensity for each flash it wants (60–100 ms ≈ one flash), so the flashes land on the beat."
+  }
+}

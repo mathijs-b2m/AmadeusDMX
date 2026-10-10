@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "decisive-lightning"
+version = "0.1.0"
+description = "AI-directed sound-to-light: analyses a DJ's tracks, decides a light show per phrase, drives DMX."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.2",
+    "scipy>=1.14",
+    "soundfile>=0.13",
+    "sounddevice>=0.5",
+    "websockets>=14",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=2"]
+usb = ["pyserial>=3.5"]
+ml = ["beat-this>=1.1", "demucs>=4.1", "torch>=2.6", "torchaudio>=2.6"]
+dev = ["pytest>=8", "ruff>=0.9"]
+
+[project.scripts]
+decisive = "decisive.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["decisive*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["web/vendor", "vdj/sdk", "audio_downloader"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = [
+    "E731",  # small lambdas as local helpers read fine
+    "SIM108",  # ternaries are not always clearer
+    "SIM105",  # try/except/pass is as clear as contextlib.suppress
+    "B905",  # zip(strict=) everywhere would only add noise: the inputs are built side by side
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["decisive"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

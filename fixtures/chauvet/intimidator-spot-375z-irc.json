@@ -1,0 +1,268 @@
+{
+  "manufacturer": "Chauvet",
+  "model": "Intimidator Spot 375Z IRC",
+  "kind": "moving_head",
+  "source": "QLC+ fixture library (Chauvet/Chauvet-Intimidator-Spot-375Z-IRC.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Chauvet/Chauvet-Intimidator-Spot-375Z-IRC.qxf",
+    "type": "Moving Head",
+    "converter": 4
+  },
+  "physical": {
+    "pan_deg": 540,
+    "tilt_deg": 270,
+    "beam_deg": 10.0,
+    "size_mm": [
+      322,
+      466,
+      220
+    ],
+    "beam_deg_max": 23.0,
+    "watts": 270,
+    "lumens": 5400,
+    "_lumens_note": "estimated from the power (20 lm/W)"
+  },
+  "modes": {
+    "15ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed_fast_to_slow",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 1
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter",
+        "default": 5
+      },
+      {
+        "attr": "control_functions",
+        "default": 0
+      },
+      {
+        "attr": "movement_macros",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 255,
+        "wide": 0
+      }
+    ],
+    "9ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 1
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 5
+      },
+      {
+        "attr": "zoom",
+        "tight": 255,
+        "wide": 0
+      }
+    ]
+  },
+  "color_wheel": {
+    "verified": true,
+    "_note": "Slot colours from the QLC+ library.",
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 7,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "orange",
+        "from": 8,
+        "to": 15,
+        "rgb": [
+          1.0,
+          0.647,
+          0.0
+        ]
+      },
+      {
+        "name": "lime green",
+        "from": 16,
+        "to": 23,
+        "rgb": [
+          0.196,
+          0.804,
+          0.196
+        ]
+      },
+      {
+        "name": "cyan",
+        "from": 24,
+        "to": 31,
+        "rgb": [
+          0.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "red",
+        "from": 32,
+        "to": 39,
+        "rgb": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "green",
+        "from": 40,
+        "to": 47,
+        "rgb": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "magenta",
+        "from": 48,
+        "to": 55,
+        "rgb": [
+          1.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "yellow",
+        "from": 56,
+        "to": 63,
+        "rgb": [
+          1.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "white",
+        "from": 64,
+        "to": 64,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "beam_fx": {
+    "open": {},
+    "gobo": {
+      "gobo": [
+        11,
+        19,
+        27,
+        35,
+        43,
+        51,
+        59
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        67,
+        75,
+        83,
+        91,
+        99,
+        107,
+        115
+      ]
+    },
+    "gobo_spin": {
+      "gobo": {
+        "range": [
+          1,
+          63
+        ]
+      }
+    },
+    "prism": {
+      "prism": 5
+    }
+  },
+  "gobo_names": [
+    "Gobo 1",
+    "Gobo 2",
+    "Gobo 3",
+    "Gobo 4",
+    "Gobo 5",
+    "Gobo 6",
+    "Gobo 7"
+  ],
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

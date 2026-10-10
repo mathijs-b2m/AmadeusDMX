@@ -1,0 +1,646 @@
+{
+  "manufacturer": "Chauvet",
+  "model": "ColorBand Pix-M",
+  "kind": "moving_bar",
+  "source": "QLC+ fixture library (Chauvet/Chauvet-ColorBand-Pix-M.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Chauvet/Chauvet-ColorBand-Pix-M.qxf",
+    "type": "LED Bar (Beams)",
+    "converter": 4
+  },
+  "physical": {
+    "pan_deg": 0,
+    "tilt_deg": 270,
+    "beam_deg": 20.0,
+    "size_mm": [
+      1040,
+      188,
+      67
+    ],
+    "beam_deg_max": 34.0,
+    "watts": 113,
+    "lumens": 2321
+  },
+  "modes": {
+    "5ch": [
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "6ch": [
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "8ch": [
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "10ch": [
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "color_macros",
+        "default": 0
+      },
+      {
+        "attr": "speed_strobe",
+        "default": 255
+      },
+      {
+        "attr": "auto_programs",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "dimmer_mode",
+        "default": 0
+      }
+    ],
+    "11ch": [
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "14ch": [
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "20ch": [
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "38ch": [
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      }
+    ],
+    "42ch": [
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "speed_strobe",
+        "default": 255
+      },
+      {
+        "attr": "auto_programs",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "dimmer_mode",
+        "default": 0
+      }
+    ]
+  },
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

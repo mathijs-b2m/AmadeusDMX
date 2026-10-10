@@ -1,0 +1,634 @@
+{
+  "manufacturer": "Robe",
+  "model": "Pointe",
+  "kind": "moving_head",
+  "source": "QLC+ fixture library (Robe/Robe-Pointe.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Robe/Robe-Pointe.qxf",
+    "type": "Moving Head",
+    "converter": 4
+  },
+  "physical": {
+    "pan_deg": 540,
+    "tilt_deg": 270,
+    "beam_deg": 5.0,
+    "size_mm": [
+      364,
+      575,
+      260
+    ],
+    "beam_deg_max": 20.0,
+    "watts": 470,
+    "lumens": 9400,
+    "_lumens_note": "estimated from the power (20 lm/W)"
+  },
+  "modes": {
+    "Main": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "special_functions",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "colour_wheel_fine",
+        "default": 0
+      },
+      {
+        "attr": "effect_speed",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "rot_gobo_indexing_and_rotation",
+        "default": 0
+      },
+      {
+        "attr": "rot_gobo_indexing_and_rotation_fine",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 212
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "zoom_fine",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "autofocus",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 47
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      }
+    ],
+    "16ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "special_functions",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "effect_speed",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "rot_gobo_indexing_and_rotation",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 212
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 47
+      },
+      {
+        "attr": "dimmer"
+      }
+    ],
+    "30ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "special_functions",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "colour_wheel_fine",
+        "default": 0
+      },
+      {
+        "attr": "effect_speed",
+        "default": 0
+      },
+      {
+        "attr": "frost_time",
+        "default": 0
+      },
+      {
+        "attr": "color_time",
+        "default": 0
+      },
+      {
+        "attr": "static_gobo_time",
+        "default": 0
+      },
+      {
+        "attr": "prism_time",
+        "default": 0
+      },
+      {
+        "attr": "zoom_time",
+        "default": 0
+      },
+      {
+        "attr": "focus_time",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "rot_gobo_indexing_and_rotation",
+        "default": 0
+      },
+      {
+        "attr": "rot_gobo_indexing_and_rotation_fine",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 212
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "zoom_fine",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "autofocus",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 47
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      }
+    ]
+  },
+  "color_wheel": {
+    "verified": true,
+    "_note": "Slot colours from the QLC+ library.",
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 0,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "deep red",
+        "from": 9,
+        "to": 9,
+        "rgb": [
+          1.0,
+          0.0,
+          0.016
+        ]
+      },
+      {
+        "name": "deep blue",
+        "from": 18,
+        "to": 18,
+        "rgb": [
+          0.149,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "yellow",
+        "from": 27,
+        "to": 27,
+        "rgb": [
+          1.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "green",
+        "from": 37,
+        "to": 37,
+        "rgb": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "magenta",
+        "from": 46,
+        "to": 46,
+        "rgb": [
+          1.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "azure",
+        "from": 55,
+        "to": 55,
+        "rgb": [
+          0.941,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "red",
+        "from": 64,
+        "to": 64,
+        "rgb": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "dark green",
+        "from": 73,
+        "to": 73,
+        "rgb": [
+          0.0,
+          0.392,
+          0.0
+        ]
+      },
+      {
+        "name": "amber",
+        "from": 82,
+        "to": 82,
+        "rgb": [
+          1.0,
+          0.702,
+          0.224
+        ]
+      },
+      {
+        "name": "blue",
+        "from": 91,
+        "to": 91,
+        "rgb": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "orange",
+        "from": 101,
+        "to": 101,
+        "rgb": [
+          1.0,
+          0.647,
+          0.0
+        ]
+      },
+      {
+        "name": "cto",
+        "from": 110,
+        "to": 110,
+        "rgb": [
+          1.0,
+          0.784,
+          0.0
+        ]
+      },
+      {
+        "name": "uv",
+        "from": 119,
+        "to": 119,
+        "rgb": [
+          0.533,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "white",
+        "from": 128,
+        "to": 129,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "deep red",
+        "from": 130,
+        "to": 134,
+        "rgb": [
+          1.0,
+          0.0,
+          0.016
+        ]
+      },
+      {
+        "name": "deep blue",
+        "from": 135,
+        "to": 138,
+        "rgb": [
+          0.149,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "yellow",
+        "from": 139,
+        "to": 143,
+        "rgb": [
+          1.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "green",
+        "from": 144,
+        "to": 147,
+        "rgb": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "magenta",
+        "from": 148,
+        "to": 152,
+        "rgb": [
+          1.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "azure",
+        "from": 153,
+        "to": 157,
+        "rgb": [
+          0.941,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "red",
+        "from": 158,
+        "to": 161,
+        "rgb": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "dark green",
+        "from": 162,
+        "to": 166,
+        "rgb": [
+          0.0,
+          0.392,
+          0.0
+        ]
+      },
+      {
+        "name": "amber",
+        "from": 167,
+        "to": 171,
+        "rgb": [
+          1.0,
+          0.702,
+          0.224
+        ]
+      },
+      {
+        "name": "blue",
+        "from": 172,
+        "to": 176,
+        "rgb": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "orange",
+        "from": 177,
+        "to": 180,
+        "rgb": [
+          1.0,
+          0.647,
+          0.0
+        ]
+      },
+      {
+        "name": "cto",
+        "from": 181,
+        "to": 185,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "uv",
+        "from": 186,
+        "to": 189,
+        "rgb": [
+          0.533,
+          0.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "beam_fx": {
+    "open": {},
+    "gobo": {
+      "gobo": [
+        6,
+        12,
+        18,
+        24,
+        30,
+        36,
+        42,
+        48,
+        54,
+        60
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        91,
+        99,
+        107,
+        115,
+        123,
+        131,
+        139,
+        147,
+        155,
+        163
+      ]
+    }
+  },
+  "gobo_names": [
+    "Gobo 1",
+    "Gobo 2",
+    "Gobo 3",
+    "Gobo 4",
+    "Gobo5",
+    "Gobo 6",
+    "Gobo 7",
+    "Gobo 8",
+    "Gobo 9",
+    "Gobo 10"
+  ],
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

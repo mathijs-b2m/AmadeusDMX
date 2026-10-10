@@ -1,0 +1,58 @@
+{
+  "manufacturer": "beamZ",
+  "model": "SB200 Stage Blinder 2x50W",
+  "kind": "blinder",
+  "source": "QLC+ fixture library (beamZ/beamZ-SB200-Stage-Blinder-2x50w.qxf), as a blinder: the master dimmer is driven, the two LED dimmers stay full, strobe and macros off",
+  "qlc": {
+    "key": "beamZ/beamZ-SB200-Stage-Blinder-2x50w.qxf",
+    "type": "Color Changer",
+    "converter": 3
+  },
+  "physical": {
+    "beam_deg": 60.0,
+    "size_mm": [
+      275,
+      275,
+      125
+    ],
+    "watts": 50,
+    "lumens": 1000,
+    "_lumens_note": "estimated from the power (20 lm/W)",
+    "light": "2 x 50 W warm white COB",
+    "colour_rgb": [
+      1.0,
+      0.72,
+      0.42
+    ]
+  },
+  "modes": {
+    "6ch": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter",
+        "default": 0,
+        "_note": "0-1 no strobe"
+      },
+      {
+        "attr": "macro",
+        "default": 0
+      },
+      {
+        "attr": "macro_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_dimmer",
+        "default": 255,
+        "_note": "LED 1 full: the master dimmer dims"
+      },
+      {
+        "attr": "led_dimmer",
+        "default": 255,
+        "_note": "LED 2 full"
+      }
+    ]
+  }
+}

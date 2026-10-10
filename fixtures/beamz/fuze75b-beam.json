@@ -1,0 +1,415 @@
+{
+  "manufacturer": "beamZ",
+  "model": "Fuze75B Beam",
+  "kind": "moving_head",
+  "source": "beamZ Fuze75 Beam quick start guide 150.384 V5, DMX channel table",
+  "physical": {
+    "lumens": 1500,
+    "_lumens_note": "estimated: 75 W LED at ~20 lm/W",
+    "size_mm": [250, 350, 150],
+    "pan_deg": 540,
+    "tilt_deg": 270,
+    "beam_deg": 2,
+    "light": "75 W white LED + colour wheel"
+  },
+  "motion": {
+    "_note": "Measured with `decisive motion` (per axis). Used to size per-beat moves and to predict where the head is; DMX gets the target slightly ahead and the fixture moves at its own speed.",
+    "estimated": false,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 374,
+    "_measured_tilt": "40\u00b0 full swing per beat at 145 BPM (decisive motion)",
+    "_measured_pan": "20\u00b0 full swing per beat at 145 BPM (decisive motion)",
+    "tilt_accel_dps2": 748,
+    "pan_accel_dps2": 374
+  },
+  "color_wheel": {
+    "_note": "Slot colours as seen on the real fixture (decisive colors).",
+    "verified": true,
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 9,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "seen": "white"
+      },
+      {
+        "name": "colour 1",
+        "from": 10,
+        "to": 19,
+        "rgb": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "seen": "red"
+      },
+      {
+        "name": "colour 2",
+        "from": 20,
+        "to": 29,
+        "rgb": [
+          0.0,
+          0.2,
+          1.0
+        ],
+        "seen": "blue"
+      },
+      {
+        "name": "colour 3",
+        "from": 30,
+        "to": 39,
+        "rgb": [
+          0.0,
+          0.2,
+          1.0
+        ],
+        "seen": "blue"
+      },
+      {
+        "name": "colour 4",
+        "from": 40,
+        "to": 49,
+        "rgb": [
+          1.0,
+          0.9,
+          0.0
+        ],
+        "seen": "yellow"
+      },
+      {
+        "name": "colour 5",
+        "from": 50,
+        "to": 59,
+        "rgb": [
+          0.5,
+          0.0,
+          1.0
+        ],
+        "seen": "purple"
+      },
+      {
+        "name": "colour 6",
+        "from": 60,
+        "to": 69,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "seen": "white"
+      },
+      {
+        "name": "colour 7",
+        "from": 70,
+        "to": 79,
+        "rgb": [
+          0.0,
+          0.2,
+          1.0
+        ],
+        "seen": "blue"
+      },
+      {
+        "name": "colour 8",
+        "from": 80,
+        "to": 89,
+        "rgb": [
+          1.0,
+          0.45,
+          0.0
+        ],
+        "seen": "orange"
+      },
+      {
+        "name": "colour 9",
+        "from": 90,
+        "to": 99,
+        "rgb": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "seen": "green"
+      },
+      {
+        "name": "colour 10",
+        "from": 100,
+        "to": 109,
+        "rgb": [
+          0.5,
+          0.0,
+          1.0
+        ],
+        "seen": "purple"
+      },
+      {
+        "name": "colour 11",
+        "from": 110,
+        "to": 119,
+        "rgb": [
+          1.0,
+          0.9,
+          0.0
+        ],
+        "seen": "yellow"
+      },
+      {
+        "name": "colour 12",
+        "from": 120,
+        "to": 127,
+        "rgb": [
+          0.0,
+          0.2,
+          1.0
+        ],
+        "seen": "blue"
+      }
+    ]
+  },
+  "modes": {
+    "12ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0,
+        "_note": "000-004 open"
+      },
+      {
+        "attr": "shutter",
+        "default": 40,
+        "_note": "032-063 open; strobe is never driven"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "prism",
+        "default": 64,
+        "_note": "006-127 prism off"
+      },
+      {
+        "attr": "frost",
+        "default": 0,
+        "_note": "000-199 frost out"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0,
+        "_note": "0 = fastest"
+      },
+      {
+        "attr": "special",
+        "default": 0,
+        "_note": "000-079 no function; 080+ resets/programs"
+      }
+    ],
+    "10ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 40
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "prism",
+        "default": 64
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "special",
+        "default": 0
+      }
+    ]
+  },
+  "beam_fx": {
+    "_note": "DMX values per beam effect (from the manual's channel table). Lists are per gobo; {range: [slow, fast], reverse: [slow, fast]} is a rotation whose speed follows the energy.",
+    "open": {},
+    "gobo": {
+      "gobo": [
+        7,
+        12,
+        17,
+        22,
+        27,
+        32,
+        37,
+        42,
+        47,
+        52,
+        57,
+        62,
+        67,
+        72,
+        77,
+        82,
+        87
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        95,
+        103,
+        111,
+        119,
+        127,
+        135,
+        143,
+        151,
+        159,
+        167,
+        175,
+        183,
+        191,
+        199,
+        207,
+        215,
+        223
+      ]
+    },
+    "gobo_spin": {
+      "gobo": {
+        "range": [
+          226,
+          255
+        ]
+      }
+    },
+    "prism": {
+      "prism": 2
+    },
+    "prism_spin": {
+      "prism": {
+        "range": [
+          194,
+          255
+        ],
+        "reverse": [
+          189,
+          128
+        ]
+      }
+    },
+    "frost": {
+      "frost": 230
+    },
+    "gobo_rotate": {
+      "gobo": [
+        7,
+        12,
+        17,
+        22,
+        27,
+        32,
+        37,
+        42,
+        47,
+        52,
+        57,
+        62,
+        67,
+        72,
+        77,
+        82,
+        87
+      ],
+      "prism": {
+        "range": [
+          194,
+          255
+        ],
+        "reverse": [
+          189,
+          128
+        ]
+      }
+    }
+  },
+  "gobo_names": [
+    "raster",
+    "triangles",
+    "snowflake",
+    "circles",
+    "halfcircle",
+    "triangles2",
+    "circledots",
+    "trianglessmall",
+    "focuscircles",
+    "dots",
+    "curves",
+    "flakes",
+    "dotssmall",
+    "curves2",
+    "same",
+    "focus",
+    "circleoutfocus"
+  ],
+  "gobo_groups": {
+    "_note": "Gobo numbers (1-based) per style, from the gobo_names the user gave by projecting them.",
+    "dots": [
+      1,
+      3,
+      7,
+      10,
+      12,
+      13
+    ],
+    "shapes": [
+      2,
+      5,
+      6,
+      8
+    ],
+    "rings": [
+      4,
+      9,
+      16,
+      17
+    ],
+    "curves": [
+      11,
+      14,
+      15
+    ]
+  }
+}

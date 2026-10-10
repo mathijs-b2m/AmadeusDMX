@@ -1,0 +1,65 @@
+{
+  "artnet": {
+    "fps": 40,
+    "ip": "127.0.0.1",
+    "port": 6454
+  },
+  "director": "rules",
+  "fixtures": [
+    {
+      "address": 1,
+      "fixture": "beamz/fuze75b-beam",
+      "id": "fuze1",
+      "mode": "12ch",
+      "mount": "floor",
+      "pan_home_deg": 360,
+      "pan_invert": true,
+      "universe": 1,
+      "x": 0.2,
+      "y_m": -0.4,
+      "z_m": 0.3
+    },
+    {
+      "address": 14,
+      "fixture": "beamz/fuze75b-beam",
+      "id": "fuze2",
+      "mode": "12ch",
+      "mount": "floor",
+      "pan_home_deg": 360,
+      "pan_invert": true,
+      "universe": 1,
+      "x": 0.8,
+      "y_m": -0.4,
+      "z_m": 0.3
+    },
+    {
+      "address": 27,
+      "aim": [
+        -75,
+        90
+      ],
+      "fixture": "ayra/compar-kit-2",
+      "id": "compar1",
+      "mode": "16ch",
+      "mount": "stand",
+      "rot_deg": -5,
+      "universe": 1,
+      "width": 0.6,
+      "x": 0.5,
+      "y_m": -0.6,
+      "z_m": 1.8
+    }
+  ],
+  "safety": {
+    "allow_fast_strobe": true,
+    "master": 0.5,
+    "max_flash_hz": 3
+  },
+  "stage": {
+    "ceiling_m": 2.6,
+    "eye_safety": false,
+    "room_depth_m": 4,
+    "width_m": 1.7
+  },
+  "description": "A small room: two beam heads and a par bar."
+}

@@ -1,0 +1,208 @@
+"""Scene engine: turns (time, decisions, analysis) into fixture states and DMX.
+
+The engine is stateless with respect to time: `render(t)` only reads
+precomputed arrays, so seeking and real-time playback behave identically.
+All white flashes and strobe hits go through one precomputed, rate-limited
+flash timeline (see `safety.max_flash_hz`).
+
+The work is split by concern: `timing` (beats, bars, phrases), `looks` (colours,
+levels, hits), `motion` (where heads point and how their motors get there) and
+`lasers` (shapes and the laser guard). `Engine` ties them together.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+from decisive.audio.model import DROP_THRESHOLD, Analysis
+from decisive.director import Decision
+from decisive.engine import zones
+from decisive.engine.lasers import LasersMixin
+from decisive.engine.looks import STUTTER_ON, XFADE, LooksMixin
+from decisive.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
+from decisive.engine.state import State
+from decisive.engine.timing import TimingMixin, _ease
+from decisive.library import fixtures as fxlib
+from decisive.rig import geometry
+
+
+class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin):
+    def __init__(self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False):
+        """`real_output`: the DMX goes to real lights, so the laser guard insists on laser zones."""
+        self.a = analysis
+        self.real_output = real_output
+        self.plan = plan
+        self.rig = rig
+        self.starts = [d.start for d in plan]
+        self.pars = sorted([e for e in rig["elements"] if e["kind"] == "par"], key=lambda e: e["x"])
+        self.heads = sorted([e for e in rig["elements"] if e["kind"] == "head"], key=lambda e: e["x"])
+        defs = {f["id"]: fxlib.get(f["fixture"]) for f in rig["fixtures"]}
+        self.wheels = {e["id"]: defs[e["fixture"]] for e in rig["elements"] if fxlib.has_wheel(defs[e["fixture"]])}
+        self.order = {f["id"]: i for i, f in enumerate(self.pars)}
+        self.beats = analysis.beats
+        self.downbeat_times = analysis.beats[analysis.downbeats] if len(analysis.downbeats) else analysis.beats[::4]
+        self.downbeat_s = np.ones(len(self.downbeat_times), dtype=np.float32)
+        # subdivisions of the beat grid: exact 1/8 and 1/16 notes (accent slightly on the beat itself)
+        b = analysis.beats
+        if len(b) > 1:
+            steps = np.diff(b)
+            self.eighth_t = np.sort(np.concatenate([b, b[:-1] + steps / 2]))
+            self.sixteenth_t = np.sort(np.concatenate([b, *(b[:-1] + steps * q / 4 for q in (1, 2, 3))]))
+        else:
+            self.eighth_t = self.sixteenth_t = b
+        on_beat = lambda ts: np.where(np.isin(ts, b), 1.0, 0.75).astype(np.float32)  # noqa: E731
+        self.eighth_s, self.sixteenth_s = on_beat(self.eighth_t), on_beat(self.sixteenth_t)
+        # synth riff: melodic onsets snapped onto the 1/16 grid; off-grid notes (vocals, loose notes) dropped
+        lt, ls = analysis.onsets.get("lead", (np.zeros(0), np.zeros(0)))
+        if len(lt) and len(self.sixteenth_t):
+            k = np.clip(np.searchsorted(self.sixteenth_t, lt), 1, len(self.sixteenth_t) - 1)
+            near = np.where(np.abs(self.sixteenth_t[k - 1] - lt) < np.abs(self.sixteenth_t[k] - lt), k - 1, k)
+            ok = np.abs(self.sixteenth_t[near] - lt) < 0.02  # only notes that really sit on the grid
+            snapped, idx = np.unique(self.sixteenth_t[near[ok]], return_index=True)
+            self.synth_t, self.synth_s = snapped, np.asarray(ls)[ok][idx].astype(np.float32)
+        else:
+            self.synth_t, self.synth_s = np.zeros(0), np.zeros(0, np.float32)
+        self.kick_t, self.kick_s = analysis.onsets["kick"]
+        self.snare_t, self.snare_s = analysis.onsets["snare"]
+        self.hat_t, self.hat_s = analysis.onsets["hat"]
+        self.acc_t, self.acc_s = analysis.onsets["accent"]
+        self.lead_t, self.lead_s = analysis.onsets.get("lead", (np.zeros(0), np.zeros(0)))
+        n = len(analysis.rms_db)
+        self.lead_pitch = analysis.lead_pitch if analysis.lead_pitch is not None else np.full(n, 0.5, np.float32)
+        self.lead_pc = analysis.lead_pc if analysis.lead_pc is not None else np.full(n, -1, np.int8)
+        self.stut_gate = analysis.stutter_gate if analysis.stutter_gate is not None else np.zeros(n, np.float32)
+        self.stut_str = analysis.stutter_strength if analysis.stutter_strength is not None else np.zeros(n, np.float32)
+        # Full on/off chopping is a fast strobe (photosensitive epilepsy risk): only with explicit opt-in.
+        self.stut_depth = 1.0 if rig["safety"].get("allow_fast_strobe") else 0.5
+        self.lead_env = self._local_envelope(
+            np.maximum(analysis.bands_db["mid"], analysis.bands_db["high"]), analysis.fps
+        )
+        # Light doesn't follow the volume syllable by syllable: an operator rides the fader per bar, in
+        # straight lines. breath: the loudness per bar, ramped linearly from bar to bar. chop: whether the
+        # light chops with a stuttering synth, decided per bar (the chop itself still follows the gate).
+        self.breath = self._bar_ramp(
+            np.maximum(analysis.bands_db["mid"], analysis.bands_db["high"]), deadband=0.08, relative_bars=8
+        )
+        self.chop = self._bar_ramp(np.clip(self.stut_str * 1.5, 0, 1), deadband=0.15, snap=0.5)
+        self.chop_overlay = self._bar_ramp(
+            np.clip((self.stut_str - STUTTER_ON) / (1 - STUTTER_ON) * 2.0, 0, 1), snap=0.5
+        )
+        self.low = np.maximum(analysis.band_norm("sub"), analysis.band_norm("bass"))
+        self.level = analysis.band_norm("mid") * 0.5 + self.low * 0.5
+        self.flash_t, self.flash_s = self._flash_timeline(rig["safety"]["max_flash_hz"])
+        self.stage = geometry.stage(rig)
+        fixtures = {f["id"]: f for f in rig["fixtures"]}
+        self.head_pos = [np.array(geometry.position(rig, e, fixtures[e["fixture"]])) for e in self.heads]
+        self.zones = zones.Zones(rig)  # where beams may (not) go: drawn in the rig editor
+        self.head_fx = [(fixtures[e["fixture"]], fxlib.get(fixtures[e["fixture"]]["fixture"])) for e in self.heads]
+        self._init_groups(rig)
+        self._init_lasers(rig, fixtures)
+        # synth/melody notes for the lasers to play: from the separated synth instrument when available
+        if analysis.synth_notes is not None and len(analysis.synth_notes[0]):
+            self.syn_t, self.syn_s, self.syn_p = (np.asarray(x, float) for x in analysis.synth_notes)
+        else:  # fallback: the band-based melody onsets, pitch from the lead contour
+            lt, ls = analysis.onsets.get("lead", (np.zeros(0), np.zeros(0)))
+            self.syn_t, self.syn_s = np.asarray(lt, float), np.asarray(ls, float)
+            lp = analysis.lead_pitch if analysis.lead_pitch is not None else np.zeros(1)
+            self.syn_p = np.array([float(lp[min(int(x * analysis.fps), len(lp) - 1)]) for x in lt])
+        self.gobo_groups = [
+            {k: v for k, v in defn.get("gobo_groups", {}).items() if not k.startswith("_")} for _, defn in self.head_fx
+        ]
+        self.gobo_all = [
+            list(range(1, len(defn.get("beam_fx", {}).get("gobo", {}).get("gobo", [0])) + 1))
+            for _, defn in self.head_fx
+        ]
+        self.drop_idx = {i for i, d in enumerate(plan) if getattr(d, "drop_score", 0) >= DROP_THRESHOLD}
+        self.drops = [plan[i].start for i in sorted(self.drop_idx)]
+        self.goals: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        self._reach_uv = (1.0, 1.0)
+        self.move_beats: dict[int, tuple[int, int]] = {}
+        self.move_travel: dict[int, tuple[float, float]] = {}
+        self.reach_uv = [self._reach(j) for j in range(len(self.heads))]
+        self._move_beats = (1, 1)
+        self._move_travel = (0.9, 0.9)
+        self.traj = self._cached_trajectories()
+        self._share_motors()
+        self.traj_n = len(next(iter(self.traj.values()))[0]) if self.traj else 2
+
+    def _init_groups(self, rig: dict):
+        """Each head's place: its group (overhead, back, front, tower ...), index and count in the group."""
+        from decisive.rig.groups import head_groups
+
+        self.groups = head_groups(rig)
+        self.multi = len(self.groups) > 1
+        self._z_median = float(np.median([p[2] for p in self.head_pos])) if self.head_pos else 0.0
+        idx = {e["id"]: j for j, e in enumerate(self.heads)}
+        n = len(self.heads)
+        self.hgroup = [
+            {"g": 0, "k": j, "m": n, "cls": "all", "name": "all", "kind": "row", "gside": 0.0} for j in range(n)
+        ]
+        self.group_centre, self.group_width = [], []
+        for gi, g in enumerate(self.groups):
+            P = np.array([self.head_pos[idx[h]] for h in g["ids"] if h in idx]) if g["ids"] else np.zeros((1, 3))
+            self.group_centre.append(P.mean(0))
+            self.group_width.append(float(np.ptp(P[:, 0])) if len(P) > 1 else 0.0)
+            for k, hid in enumerate(g["ids"]):
+                if hid in idx:
+                    self.hgroup[idx[hid]] = {
+                        "g": gi,
+                        "k": k,
+                        "m": len(g["ids"]),
+                        "cls": g["cls"],
+                        "name": g["name"],
+                        "kind": g["kind"],
+                        "gside": g["side"],
+                    }
+
+    # ------------------------------------------------------------ public
+
+    def render(self, t: float) -> tuple[int, dict[str, State]]:
+        i, d = self.decision_at(t)
+        states = self._scene(d, t)
+        ahead = self._drop_ahead(i, t)
+        if ahead is not None:  # heads take the drop's colour/gobo/prism while dark, so the wheels are ready
+            drop_look = self._scene(self.plan[ahead], t)
+            for e in self.heads:
+                s = drop_look[e["id"]]
+                s.dimmer, s.white = 0.0, 0.0
+                states[e["id"]] = s
+        if i > 0 and t - d.start < XFADE and i not in self.drop_idx:  # drops are a hard cut, no fade
+            prev = self._scene(self.plan[i - 1], t)
+            k = _ease((t - d.start) / XFADE)
+            states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
+        f = t * MOTION_FPS
+        i0 = int(min(max(f, 0), self.traj_n - 2))
+        k = min(max(f - i0, 0.0), 1.0)
+        self._stutter_overlay(t, i, states)
+        self._drop_moment(t, states)
+        fl = (t + DMX_LEAD_S) * MOTION_FPS
+        g0 = int(min(max(fl, 0), self.traj_n - 2))
+        gk = min(max(fl - g0, 0.0), 1.0)
+        for j, (eid, (pan, tilt)) in enumerate(self.traj.items()):
+            s = states[eid]
+            s.pan = float(pan[i0] + (pan[i0 + 1] - pan[i0]) * k)  # where the head actually is (predicted)
+            s.tilt = float(tilt[i0] + (tilt[i0 + 1] - tilt[i0]) * k)
+            gp, gt = self.goals[eid]  # where we tell it to go, a little early
+            s.dmx_pan = float(gp[g0] + (gp[g0 + 1] - gp[g0]) * gk)
+            s.dmx_tilt = float(gt[g0] + (gt[g0 + 1] - gt[g0]) * gk)
+            # Targets are eye-safe, but the path between them may cross the audience's eye band
+            # (e.g. sky → crowd). Like "blackout by movement" on real heads: dark while crossing.
+            fx, defn = self.head_fx[j]
+            if geometry.in_eye_band(geometry.fk(fx, defn, s.pan, s.tilt), self.head_pos[j][2], self.stage):
+                s.dimmer, s.white = 0.0, 0.0
+        for eid, defn in self.wheels.items():  # show only colours the wheel can actually make
+            s = states[eid]
+            # A mechanical wheel can't follow 70 ms white flashes: those become a dimmer bump instead.
+            slot = fxlib.nearest_slot(defn, (s.r, s.g, s.b))
+            s.r, s.g, s.b = slot["rgb"]
+            s.dimmer, s.white = max(s.dimmer, s.white), 0.0
+        if self.lasers:  # the very last word: nothing after this may light a laser again
+            self._laser_guard(states, t)
+        return i, states
+
+    def dmx(self, states: dict[str, State]) -> dict[int, bytearray]:
+        """Patch element states into one 512-byte buffer per universe."""
+        unis: dict[int, bytearray] = {}
+        for f in self.rig["fixtures"]:
+            fxlib.patch(unis.setdefault(f["universe"], bytearray(512)), f, states)
+        return unis

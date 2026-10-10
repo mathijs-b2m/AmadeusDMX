@@ -1,0 +1,389 @@
+{
+  "manufacturer": "Clay Paky",
+  "model": "Sharpy",
+  "kind": "moving_head",
+  "source": "QLC+ fixture library (Clay_Paky/Clay-Paky-Sharpy.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Clay_Paky/Clay-Paky-Sharpy.qxf",
+    "type": "Moving Head",
+    "converter": 4
+  },
+  "physical": {
+    "pan_deg": 540,
+    "tilt_deg": 250,
+    "beam_deg": 1.9,
+    "size_mm": [
+      405,
+      450,
+      330
+    ],
+    "beam_deg_max": 3.8,
+    "watts": 200,
+    "lumens": 7950
+  },
+  "modes": {
+    "Standard": [
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "shutter",
+        "default": 105
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "effects_movement",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "function",
+        "default": 0
+      },
+      {
+        "attr": "reset",
+        "default": 0
+      },
+      {
+        "attr": "lamp_control",
+        "default": 0
+      }
+    ],
+    "Vector": [
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "shutter",
+        "default": 105
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "effects_movement",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "function",
+        "default": 0
+      },
+      {
+        "attr": "reset",
+        "default": 0
+      },
+      {
+        "attr": "lamp_control",
+        "default": 0
+      },
+      {
+        "attr": "pan_tilt_time",
+        "default": 0
+      },
+      {
+        "attr": "colour_time",
+        "default": 0
+      },
+      {
+        "attr": "beam_time",
+        "default": 0
+      },
+      {
+        "attr": "gobo_time",
+        "default": 0
+      }
+    ]
+  },
+  "color_wheel": {
+    "verified": true,
+    "_note": "Slot colours from the QLC+ library.",
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 4,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "red",
+        "from": 9,
+        "to": 12,
+        "rgb": [
+          0.769,
+          0.11,
+          0.102
+        ]
+      },
+      {
+        "name": "orange",
+        "from": 18,
+        "to": 21,
+        "rgb": [
+          0.929,
+          0.51,
+          0.161
+        ]
+      },
+      {
+        "name": "aquamarine",
+        "from": 26,
+        "to": 29,
+        "rgb": [
+          0.478,
+          0.741,
+          0.51
+        ]
+      },
+      {
+        "name": "green",
+        "from": 35,
+        "to": 38,
+        "rgb": [
+          0.02,
+          0.51,
+          0.169
+        ]
+      },
+      {
+        "name": "light green",
+        "from": 43,
+        "to": 46,
+        "rgb": [
+          0.62,
+          0.761,
+          0.2
+        ]
+      },
+      {
+        "name": "lavender",
+        "from": 52,
+        "to": 55,
+        "rgb": [
+          0.561,
+          0.451,
+          0.678
+        ]
+      },
+      {
+        "name": "pink",
+        "from": 60,
+        "to": 63,
+        "rgb": [
+          0.929,
+          0.502,
+          0.502
+        ]
+      },
+      {
+        "name": "yellow",
+        "from": 69,
+        "to": 72,
+        "rgb": [
+          1.0,
+          0.929,
+          0.0
+        ]
+      },
+      {
+        "name": "magenta",
+        "from": 77,
+        "to": 81,
+        "rgb": [
+          0.89,
+          0.0,
+          0.51
+        ]
+      },
+      {
+        "name": "cyan",
+        "from": 86,
+        "to": 89,
+        "rgb": [
+          0.0,
+          0.651,
+          0.922
+        ]
+      },
+      {
+        "name": "cto 260",
+        "from": 94,
+        "to": 98,
+        "rgb": [
+          0.961,
+          0.78,
+          0.271
+        ]
+      },
+      {
+        "name": "cto 190",
+        "from": 103,
+        "to": 106,
+        "rgb": [
+          0.961,
+          0.851,
+          0.522
+        ]
+      },
+      {
+        "name": "ctb 8000",
+        "from": 111,
+        "to": 115,
+        "rgb": [
+          0.588,
+          0.78,
+          0.722
+        ]
+      },
+      {
+        "name": "blue",
+        "from": 120,
+        "to": 123,
+        "rgb": [
+          0.0,
+          0.31,
+          0.6
+        ]
+      }
+    ]
+  },
+  "beam_fx": {
+    "open": {},
+    "gobo": {
+      "gobo": [
+        1,
+        5,
+        9,
+        13,
+        17,
+        21,
+        25,
+        29,
+        33,
+        37,
+        41,
+        45,
+        49,
+        53,
+        57,
+        61,
+        65,
+        69
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        163,
+        169,
+        176,
+        182,
+        188,
+        195,
+        201,
+        208,
+        214,
+        220,
+        227,
+        233,
+        240,
+        246,
+        252
+      ]
+    }
+  },
+  "gobo_names": [
+    "White",
+    "Gobo 1",
+    "Gobo 2",
+    "Gobo 3",
+    "Gobo 4",
+    "Gobo 5",
+    "Gobo 6",
+    "Gobo 7",
+    "Gobo 8",
+    "Gobo 9",
+    "Gobo 10",
+    "Gobo 11",
+    "Gobo 12",
+    "Gobo 13",
+    "Gobo 14",
+    "Gobo 15",
+    "Gobo 16",
+    "Gobo 17"
+  ],
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

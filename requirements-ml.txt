@@ -1,0 +1,6 @@
+# Optional: trained instrument separation (Demucs) for synth/melody notes; ~2 GB, runs locally.
+# Without these the analysis works as before. Install with: pip install -r requirements-ml.txt
+beat-this==1.1.0
+demucs==4.1.0
+torch==2.14.1
+torchaudio==2.11.0

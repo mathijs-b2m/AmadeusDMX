@@ -1,0 +1,507 @@
+{
+  "manufacturer": "Martin",
+  "model": "MAC Encore Performance",
+  "kind": "moving_head",
+  "source": "QLC+ fixture library (Martin/Martin-MAC-Encore-Performance.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Martin/Martin-MAC-Encore-Performance.qxf",
+    "type": "Moving Head",
+    "converter": 3
+  },
+  "physical": {
+    "pan_deg": 540,
+    "tilt_deg": 268,
+    "beam_deg": 12.0,
+    "size_mm": [
+      480,
+      740,
+      452
+    ],
+    "beam_deg_max": 48.0,
+    "watts": 585,
+    "lumens": 11600
+  },
+  "modes": {
+    "CLD": [
+      {
+        "attr": "shutter",
+        "default": 34
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "cyan"
+      },
+      {
+        "attr": "magenta"
+      },
+      {
+        "attr": "yellow"
+      },
+      {
+        "attr": "cto",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo_indexing_angle",
+        "default": 128
+      },
+      {
+        "attr": "gobo_indexing_angle_fine",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel_function",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel_indexing_angle",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "iris",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 255,
+        "wide": 0
+      },
+      {
+        "attr": "zoom_fine",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 128
+      },
+      {
+        "attr": "focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "fixture_control",
+        "default": 0
+      },
+      {
+        "attr": "fx1_selection",
+        "default": 0
+      },
+      {
+        "attr": "fx1_speed",
+        "default": 126
+      },
+      {
+        "attr": "fx2_selection",
+        "default": 0
+      },
+      {
+        "attr": "fx2_speed",
+        "default": 126
+      },
+      {
+        "attr": "fx_synchronization",
+        "default": 0
+      }
+    ],
+    "WRM": [
+      {
+        "attr": "shutter",
+        "default": 34
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "cyan"
+      },
+      {
+        "attr": "magenta"
+      },
+      {
+        "attr": "yellow"
+      },
+      {
+        "attr": "ctb",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo_indexing_angle",
+        "default": 128
+      },
+      {
+        "attr": "gobo_indexing_angle_fine",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel_function",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel_indexing_angle",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "iris",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 255,
+        "wide": 0
+      },
+      {
+        "attr": "zoom_fine",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 128
+      },
+      {
+        "attr": "focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "shutter",
+        "default": 127
+      },
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "fixture_control",
+        "default": 0
+      },
+      {
+        "attr": "fx1_selection",
+        "default": 0
+      },
+      {
+        "attr": "fx1_speed",
+        "default": 126
+      },
+      {
+        "attr": "fx2_selection",
+        "default": 0
+      },
+      {
+        "attr": "fx2_speed",
+        "default": 126
+      },
+      {
+        "attr": "fx_synchronization",
+        "default": 0
+      }
+    ]
+  },
+  "color_wheel": {
+    "verified": true,
+    "_note": "Slot colours from the QLC+ library.",
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 0,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "blue 101 sp",
+        "from": 14,
+        "to": 14,
+        "rgb": [
+          0.2,
+          0.333,
+          0.678
+        ]
+      },
+      {
+        "name": "green 203 sp",
+        "from": 28,
+        "to": 28,
+        "rgb": [
+          0.361,
+          0.745,
+          0.286
+        ]
+      },
+      {
+        "name": "orange 311 sp",
+        "from": 42,
+        "to": 42,
+        "rgb": [
+          1.0,
+          0.592,
+          0.247
+        ]
+      },
+      {
+        "name": "magenta 522 sp",
+        "from": 56,
+        "to": 56,
+        "rgb": [
+          0.753,
+          0.365,
+          0.682
+        ]
+      },
+      {
+        "name": "congo blue 108 sp",
+        "from": 70,
+        "to": 70,
+        "rgb": [
+          0.137,
+          0.227,
+          0.624
+        ]
+      },
+      {
+        "name": "red 310 sp",
+        "from": 84,
+        "to": 84,
+        "rgb": [
+          0.922,
+          0.239,
+          0.2
+        ]
+      },
+      {
+        "name": "open",
+        "from": 98,
+        "to": 160,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "blue 101 sp",
+        "from": 161,
+        "to": 163,
+        "rgb": [
+          0.2,
+          0.333,
+          0.678
+        ]
+      },
+      {
+        "name": "green 203 sp",
+        "from": 164,
+        "to": 166,
+        "rgb": [
+          0.361,
+          0.745,
+          0.286
+        ]
+      },
+      {
+        "name": "orange 311 sp",
+        "from": 167,
+        "to": 169,
+        "rgb": [
+          1.0,
+          0.592,
+          0.247
+        ]
+      },
+      {
+        "name": "magenta 522 sp",
+        "from": 170,
+        "to": 172,
+        "rgb": [
+          0.753,
+          0.365,
+          0.682
+        ]
+      },
+      {
+        "name": "congo blue 108 sp",
+        "from": 173,
+        "to": 175,
+        "rgb": [
+          0.137,
+          0.227,
+          0.624
+        ]
+      },
+      {
+        "name": "red 310 sp",
+        "from": 176,
+        "to": 178,
+        "rgb": [
+          0.922,
+          0.239,
+          0.2
+        ]
+      },
+      {
+        "name": "open",
+        "from": 179,
+        "to": 192,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "beam_fx": {
+    "open": {},
+    "gobo": {
+      "gobo": [
+        12,
+        17,
+        22,
+        27,
+        32
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        74,
+        104,
+        134,
+        164,
+        194
+      ]
+    }
+  },
+  "gobo_names": [
+    "Gobo 1 (indexed)",
+    "Gobo 2 (indexed)",
+    "Gobo 3 (indexed)",
+    "Gobo 4 (indexed)",
+    "Gobo 5 (indexed)"
+  ],
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisive Lightning</title>
+<link rel="stylesheet" href="/css/visualiser.css">
+</head>
+<body>
+<header>
+  <h1><span>⚡</span> Decisive Lightning</h1>
+  <span class="meta" id="track">—</span>
+  <span class="meta" id="clock">0:00 / 0:00</span>
+  <span class="meta" id="bpm"></span>
+  <span class="badge" id="director">director</span>
+  <a href="/setup.html" style="color:var(--muted);font-size:13px">setup</a>
+  <span class="status" id="status">connecting…</span>
+</header>
+<div class="decks" id="decks"></div>
+
+<main>
+  <div class="stage">
+    <canvas id="stage"></canvas>
+    <div class="waiting" id="waiting">Waiting for the player…<br>run <code>python -m decisive play SET.wav</code></div>
+  </div>
+
+  <div class="side">
+    <section class="panel">
+      <h2>Director decision</h2>
+      <div class="row"><span class="k">Section</span><span class="v" id="d-section">—</span></div>
+      <div class="row"><span class="k">Palette</span><span class="v" id="d-palette">—</span></div>
+      <div class="row"><span class="k">Pars between hits</span><span class="v" id="d-par_base">—</span></div>
+      <div class="row"><span class="k">Pars on a hit</span><span class="v" id="d-par_accent">—</span></div>
+      <div class="row"><span class="k">A hit is</span><span class="v" id="d-trigger">—</span></div>
+      <div class="row"><span class="k">Heads light</span><span class="v" id="d-head_light">—</span></div>
+      <div class="row"><span class="k">Heads pulse on</span><span class="v" id="d-head_trigger">—</span></div>
+      <div class="row"><span class="k">Heads path</span><span class="v" id="d-movement">—</span></div>
+      <div class="row"><span class="k">Heads formation</span><span class="v" id="d-formation">—</span></div>
+      <div class="row"><span class="k">Heads aim</span><span class="v" id="d-aim">—</span></div>
+      <div class="row"><span class="k">Heads colour</span><span class="v" id="d-head_color">—</span></div>
+      <div class="row"><span class="k">Heads beam</span><span class="v" id="d-beam_fx">—</span></div>
+      <div class="row"><span class="k">Gobo style</span><span class="v" id="d-gobo_style">—</span></div>
+      <div class="row"><span class="k">Energy curve</span><span class="v" id="d-dynamics">—</span></div>
+      <div class="row"><span class="k">Intensity</span><span class="v" id="d-intensity">—</span></div>
+      <div class="row"><span class="k">Source</span><span class="v" id="d-source">—</span></div>
+      <div class="probs" id="probs"></div>
+      <details><summary>What the model was told</summary><pre id="prompt">—</pre></details>
+    </section>
+    <section class="panel">
+      <h2>Spectrum</h2>
+      <div class="meters" id="meters"></div>
+    </section>
+  </div>
+
+  <section class="panel timeline-wrap">
+    <h2>Show timeline</h2>
+    <div class="timeline" id="timeline"><canvas id="energy"></canvas><div class="playhead" id="playhead"></div></div>
+    <div class="legend" id="legend"></div>
+  </section>
+</main>
+
+<script src="/vendor/butterchurn.js"></script>
+<script src="/vendor/butterchurnPresets.min.js"></script>
+<script src="/vendor/butterchurnPresetsExtra.min.js"></script>
+<script src="/js/screen.js"></script>
+<script src="/js/visualiser.js"></script>
+</body>
+</html>

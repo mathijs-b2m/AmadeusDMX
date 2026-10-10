@@ -1,0 +1,561 @@
+{
+  "artnet" : {
+    "fps" : 40,
+    "ip" : "127.0.0.1",
+    "port" : 6454
+  },
+  "description" : "Showcase: 10 popular fixtures (Sharpy, Pointe, MAC Aura, Intimidator Spot, Katana, COLORband PiX-M, PIXBAR 600, Atomic 3000 LED, FLAT PRO 18, Sunstrip) on four trusses",
+  "director" : "openai",
+  "fixtures" : [
+    {
+      "address" : 1,
+      "fixture" : "claypaky/sharpy",
+      "id" : "sharpy1",
+      "mode" : "Vector",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : -4.5,
+      "universe" : 1,
+      "x" : 0.125,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 21,
+      "fixture" : "claypaky/sharpy",
+      "id" : "sharpy2",
+      "mode" : "Vector",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : -1.5,
+      "universe" : 1,
+      "x" : 0.375,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 41,
+      "fixture" : "claypaky/sharpy",
+      "id" : "sharpy3",
+      "mode" : "Vector",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : 1.5,
+      "universe" : 1,
+      "x" : 0.625,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 61,
+      "fixture" : "claypaky/sharpy",
+      "id" : "sharpy4",
+      "mode" : "Vector",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : 4.5,
+      "universe" : 1,
+      "x" : 0.875,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 81,
+      "fixture" : "martin/mac-aura",
+      "id" : "aura1",
+      "mode" : "Extended",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : -3,
+      "universe" : 1,
+      "x" : 0.25,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 106,
+      "fixture" : "martin/mac-aura",
+      "id" : "aura2",
+      "mode" : "Extended",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : 3,
+      "universe" : 1,
+      "x" : 0.75,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 103,
+      "aim" : [
+        0,
+        -25
+      ],
+      "fixture" : "martin/atomic-3000-led",
+      "id" : "strobe1",
+      "mode" : "Extended",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : -2,
+      "universe" : 2,
+      "x" : 0.3333,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 117,
+      "aim" : [
+        0,
+        -25
+      ],
+      "fixture" : "martin/atomic-3000-led",
+      "id" : "strobe2",
+      "mode" : "Extended",
+      "mount" : "hang",
+      "truss" : "front",
+      "truss_pos_m" : 2,
+      "universe" : 2,
+      "x" : 0.6667,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 131,
+      "aim" : [
+        0,
+        -55
+      ],
+      "fixture" : "showtec/sunstrip-active",
+      "id" : "sunstrip1",
+      "mode" : "10chMode",
+      "mount" : "hang",
+      "rot_deg" : 90,
+      "truss" : "front",
+      "truss_pos_m" : -5.2,
+      "universe" : 2,
+      "x" : 0.0667,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 141,
+      "aim" : [
+        0,
+        -55
+      ],
+      "fixture" : "showtec/sunstrip-active",
+      "id" : "sunstrip2",
+      "mode" : "10chMode",
+      "mount" : "hang",
+      "rot_deg" : 90,
+      "truss" : "front",
+      "truss_pos_m" : 5.2,
+      "universe" : 2,
+      "x" : 0.9333,
+      "y_m" : -1.2,
+      "z_m" : 4.78
+    },
+    {
+      "address" : 131,
+      "fixture" : "robe/pointe",
+      "id" : "pointe1",
+      "mode" : "30ch",
+      "mount" : "hang",
+      "truss" : "back",
+      "truss_pos_m" : -4.5,
+      "universe" : 1,
+      "x" : 0.125,
+      "y_m" : -5,
+      "z_m" : 5.38
+    },
+    {
+      "address" : 161,
+      "fixture" : "robe/pointe",
+      "id" : "pointe2",
+      "mode" : "30ch",
+      "mount" : "hang",
+      "truss" : "back",
+      "truss_pos_m" : -2.5,
+      "universe" : 1,
+      "x" : 0.2917,
+      "y_m" : -5,
+      "z_m" : 5.38
+    },
+    {
+      "address" : 191,
+      "fixture" : "robe/pointe",
+      "id" : "pointe3",
+      "mode" : "30ch",
+      "mount" : "hang",
+      "truss" : "back",
+      "truss_pos_m" : 2.5,
+      "universe" : 1,
+      "x" : 0.7083,
+      "y_m" : -5,
+      "z_m" : 5.38
+    },
+    {
+      "address" : 221,
+      "fixture" : "robe/pointe",
+      "id" : "pointe4",
+      "mode" : "30ch",
+      "mount" : "hang",
+      "truss" : "back",
+      "truss_pos_m" : 4.5,
+      "universe" : 1,
+      "x" : 0.875,
+      "y_m" : -5,
+      "z_m" : 5.38
+    },
+    {
+      "address" : 251,
+      "fixture" : "dts/katana",
+      "id" : "katana1",
+      "mode" : "Extended",
+      "mount" : "hang",
+      "truss" : "back",
+      "truss_pos_m" : -0.975,
+      "universe" : 1,
+      "x" : 0.4188,
+      "y_m" : -5,
+      "z_m" : 5.38
+    },
+    {
+      "address" : 315,
+      "fixture" : "dts/katana",
+      "id" : "katana2",
+      "mode" : "Extended",
+      "mount" : "hang",
+      "truss" : "back",
+      "truss_pos_m" : 0.975,
+      "universe" : 1,
+      "x" : 0.5812,
+      "y_m" : -5,
+      "z_m" : 5.38
+    },
+    {
+      "address" : 379,
+      "fixture" : "chauvet/colorband-pix-m",
+      "id" : "pixm1",
+      "mode" : "42ch",
+      "mount" : "floor",
+      "universe" : 1,
+      "x" : 0.1833,
+      "y_m" : -3.8,
+      "z_m" : 0.25
+    },
+    {
+      "address" : 421,
+      "fixture" : "chauvet/colorband-pix-m",
+      "id" : "pixm2",
+      "mode" : "42ch",
+      "mount" : "floor",
+      "universe" : 1,
+      "x" : 0.3833,
+      "y_m" : -3.8,
+      "z_m" : 0.25
+    },
+    {
+      "address" : 463,
+      "fixture" : "chauvet/colorband-pix-m",
+      "id" : "pixm3",
+      "mode" : "42ch",
+      "mount" : "floor",
+      "universe" : 1,
+      "x" : 0.6167,
+      "y_m" : -3.8,
+      "z_m" : 0.25
+    },
+    {
+      "address" : 1,
+      "fixture" : "chauvet/colorband-pix-m",
+      "id" : "pixm4",
+      "mode" : "42ch",
+      "mount" : "floor",
+      "universe" : 2,
+      "x" : 0.8125,
+      "y_m" : -3.75,
+      "z_m" : 0.25
+    },
+    {
+      "address" : 151,
+      "aim" : [
+        0,
+        65
+      ],
+      "fixture" : "cameo/pixbar-600-pro",
+      "id" : "pixbar1",
+      "mode" : "78-CH",
+      "mount" : "floor",
+      "universe" : 2,
+      "x" : 0.125,
+      "y_m" : -0.25,
+      "z_m" : 0.2
+    },
+    {
+      "address" : 229,
+      "aim" : [
+        0,
+        65
+      ],
+      "fixture" : "cameo/pixbar-600-pro",
+      "id" : "pixbar2",
+      "mode" : "78-CH",
+      "mount" : "floor",
+      "universe" : 2,
+      "x" : 0.375,
+      "y_m" : -0.25,
+      "z_m" : 0.2
+    },
+    {
+      "address" : 307,
+      "aim" : [
+        0,
+        65
+      ],
+      "fixture" : "cameo/pixbar-600-pro",
+      "id" : "pixbar3",
+      "mode" : "78-CH",
+      "mount" : "floor",
+      "universe" : 2,
+      "x" : 0.625,
+      "y_m" : -0.25,
+      "z_m" : 0.2
+    },
+    {
+      "address" : 385,
+      "aim" : [
+        0,
+        65
+      ],
+      "fixture" : "cameo/pixbar-600-pro",
+      "id" : "pixbar4",
+      "mode" : "78-CH",
+      "mount" : "floor",
+      "universe" : 2,
+      "x" : 0.875,
+      "y_m" : -0.25,
+      "z_m" : 0.2
+    },
+    {
+      "address" : 505,
+      "aim" : [
+        180,
+        60
+      ],
+      "fixture" : "cameo/flat-pro-18",
+      "id" : "flat1",
+      "mode" : "8ch",
+      "mount" : "floor",
+      "universe" : 1,
+      "x" : 0.25,
+      "y_m" : -2.4,
+      "z_m" : 0.2
+    },
+    {
+      "address" : 463,
+      "aim" : [
+        180,
+        60
+      ],
+      "fixture" : "cameo/flat-pro-18",
+      "id" : "flat2",
+      "mode" : "8ch",
+      "mount" : "floor",
+      "universe" : 2,
+      "x" : 0.75,
+      "y_m" : -2.4,
+      "z_m" : 0.2
+    },
+    {
+      "address" : 43,
+      "fixture" : "chauvet/intimidator-spot-375z-irc",
+      "id" : "spotL1",
+      "mode" : "15ch",
+      "mount" : "stand",
+      "truss" : "towerL",
+      "truss_pos_m" : 1.2,
+      "universe" : 2,
+      "x" : -0.05,
+      "y_m" : -1.25,
+      "z_m" : 1.2
+    },
+    {
+      "address" : 58,
+      "fixture" : "chauvet/intimidator-spot-375z-irc",
+      "id" : "spotL2",
+      "mode" : "15ch",
+      "mount" : "stand",
+      "truss" : "towerL",
+      "truss_pos_m" : 2.6,
+      "universe" : 2,
+      "x" : -0.05,
+      "y_m" : -1.25,
+      "z_m" : 2.6
+    },
+    {
+      "address" : 73,
+      "fixture" : "chauvet/intimidator-spot-375z-irc",
+      "id" : "spotR1",
+      "mode" : "15ch",
+      "mount" : "stand",
+      "truss" : "towerR",
+      "truss_pos_m" : 1.2,
+      "universe" : 2,
+      "x" : 1.05,
+      "y_m" : -1.25,
+      "z_m" : 1.2
+    },
+    {
+      "address" : 88,
+      "fixture" : "chauvet/intimidator-spot-375z-irc",
+      "id" : "spotR2",
+      "mode" : "15ch",
+      "mount" : "stand",
+      "truss" : "towerR",
+      "truss_pos_m" : 2.6,
+      "universe" : 2,
+      "x" : 1.05,
+      "y_m" : -1.25,
+      "z_m" : 2.6
+    }
+  ],
+  "safety" : {
+    "allow_fast_strobe" : false,
+    "master" : 1,
+    "max_flash_hz" : 3
+  },
+  "screen" : {
+    "width_m" : 6.6
+  },
+  "stage" : {
+    "ceiling_m" : 8,
+    "eye_safety" : false,
+    "room_depth_m" : 20,
+    "width_m" : 12
+  },
+  "trusses" : [
+    {
+      "id" : "front",
+      "length_m" : 11,
+      "rot_deg" : 0,
+      "type" : "quatro",
+      "vertical" : false,
+      "x_m" : 6,
+      "y_m" : -1.2,
+      "z_m" : 5.2
+    },
+    {
+      "id" : "back",
+      "length_m" : 11,
+      "rot_deg" : 0,
+      "type" : "quatro",
+      "vertical" : false,
+      "x_m" : 6,
+      "y_m" : -5,
+      "z_m" : 5.8
+    },
+    {
+      "id" : "towerL",
+      "length_m" : 3,
+      "rot_deg" : 0,
+      "type" : "quatro",
+      "vertical" : true,
+      "x_m" : -0.6,
+      "y_m" : -1.6,
+      "z_m" : 1.5
+    },
+    {
+      "id" : "towerR",
+      "length_m" : 3,
+      "rot_deg" : 0,
+      "type" : "quatro",
+      "vertical" : true,
+      "x_m" : 12.6,
+      "y_m" : -1.6,
+      "z_m" : 1.5
+    }
+  ],
+  "zones" : [
+    {
+      "applies" : "auto",
+      "center" : [
+        11.25,
+        3.25,
+        3
+      ],
+      "enabled" : true,
+      "id" : "zone1",
+      "kind" : "avoid",
+      "margin_deg" : 2,
+      "name" : "Back wall",
+      "rot_deg" : -60,
+      "shape" : "rect",
+      "size" : [
+        8,
+        4
+      ],
+      "tilt_deg" : 0
+    },
+    {
+      "applies" : "auto",
+      "center" : [
+        1.25,
+        3.75,
+        3
+      ],
+      "enabled" : true,
+      "id" : "zone2",
+      "kind" : "avoid",
+      "margin_deg" : 2,
+      "name" : "Back wall",
+      "rot_deg" : 75,
+      "shape" : "rect",
+      "size" : [
+        8,
+        4
+      ],
+      "tilt_deg" : 0
+    },
+    {
+      "applies" : "auto",
+      "center" : [
+        6,
+        -6.25,
+        3
+      ],
+      "enabled" : true,
+      "id" : "zone3",
+      "kind" : "avoid",
+      "margin_deg" : 2,
+      "name" : "Back wall",
+      "rot_deg" : 0,
+      "shape" : "rect",
+      "size" : [
+        12.25,
+        4
+      ],
+      "tilt_deg" : 0
+    },
+    {
+      "applies" : "auto",
+      "center" : [
+        6,
+        -0.75,
+        6.800000000000001
+      ],
+      "enabled" : true,
+      "id" : "zone4",
+      "kind" : "avoid",
+      "margin_deg" : 2,
+      "name" : "Back wall",
+      "rot_deg" : -180,
+      "shape" : "rect",
+      "size" : [
+        10.75,
+        6.5
+      ],
+      "tilt_deg" : 85
+    }
+  ]
+}

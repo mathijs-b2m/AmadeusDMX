@@ -1,0 +1,282 @@
+{
+  "manufacturer": "beamZ",
+  "model": "Fuze75S Spot",
+  "kind": "moving_head",
+  "source": "beamZ Fuze75S manual (150.382), DMX channel table",
+  "physical": {
+    "pan_deg": 540,
+    "tilt_deg": 270,
+    "beam_deg": 11,
+    "light": "75 W white LED + colour wheel"
+  },
+  "motion": {
+    "_note": "Estimated (manual gives no speeds). Used to predict where the head is, not to limit it: DMX gets the target slightly ahead of time and the fixture moves at its own speed.",
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 1200
+  },
+  "color_wheel": {
+    "_note": "Slot ranges are from the manual. The manual does not name the colours: rgb values are guesses, check your wheel and correct them.",
+    "verified": false,
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 14,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "colour 1",
+        "from": 15,
+        "to": 29,
+        "rgb": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "colour 2",
+        "from": 30,
+        "to": 44,
+        "rgb": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "name": "colour 3",
+        "from": 45,
+        "to": 59,
+        "rgb": [
+          0.0,
+          0.2,
+          1.0
+        ]
+      },
+      {
+        "name": "colour 4",
+        "from": 60,
+        "to": 74,
+        "rgb": [
+          1.0,
+          0.9,
+          0.0
+        ]
+      },
+      {
+        "name": "colour 5",
+        "from": 75,
+        "to": 89,
+        "rgb": [
+          1.0,
+          0.0,
+          0.8
+        ]
+      },
+      {
+        "name": "colour 6",
+        "from": 90,
+        "to": 104,
+        "rgb": [
+          0.0,
+          0.9,
+          1.0
+        ]
+      },
+      {
+        "name": "colour 7",
+        "from": 105,
+        "to": 119,
+        "rgb": [
+          1.0,
+          0.45,
+          0.0
+        ]
+      },
+      {
+        "name": "colour 8",
+        "from": 120,
+        "to": 127,
+        "rgb": [
+          0.5,
+          0.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "modes": {
+    "13ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0,
+        "_note": "000-009 open"
+      },
+      {
+        "attr": "shutter",
+        "default": 40,
+        "_note": "032-063 open; strobe is never driven"
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "focus",
+        "default": 128
+      },
+      {
+        "attr": "prism",
+        "default": 128,
+        "_note": "006-255 prism off"
+      },
+      {
+        "attr": "gobo_prism_rotation",
+        "default": 0,
+        "_note": "000-003 no function"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0,
+        "_note": "0 = fastest"
+      },
+      {
+        "attr": "special",
+        "default": 0,
+        "_note": "000-079 no function; 080+ resets/programs"
+      }
+    ],
+    "11ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 40
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "focus",
+        "default": 128
+      },
+      {
+        "attr": "prism",
+        "default": 128
+      },
+      {
+        "attr": "gobo_prism_rotation",
+        "default": 0
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "special",
+        "default": 0
+      }
+    ]
+  },
+  "beam_fx": {
+    "_note": "DMX values per beam effect (from the manual's channel table). Lists are per gobo; the engine picks one.",
+    "open": {},
+    "gobo": {
+      "gobo": [
+        15,
+        25,
+        35,
+        45,
+        55,
+        65
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        80,
+        100,
+        120,
+        140,
+        160,
+        180
+      ]
+    },
+    "gobo_spin": {
+      "gobo": {
+        "range": [
+          190,
+          255
+        ]
+      }
+    },
+    "prism": {
+      "prism": 2
+    },
+    "prism_spin": {
+      "prism": 2,
+      "gobo_prism_rotation": {
+        "range": [
+          132,
+          255
+        ],
+        "reverse": [
+          127,
+          4
+        ]
+      }
+    },
+    "frost": {},
+    "gobo_rotate": {
+      "gobo": [
+        15,
+        25,
+        35,
+        45,
+        55,
+        65
+      ],
+      "gobo_prism_rotation": {
+        "range": [
+          132,
+          255
+        ],
+        "reverse": [
+          127,
+          4
+        ]
+      }
+    }
+  }
+}

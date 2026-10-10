@@ -1,0 +1,7 @@
+numpy==2.5.3
+openai==3.26.0
+scipy==1.18.1
+sounddevice==0.5.6
+soundfile==0.14.0
+websockets==17.2
+pyserial==3.5

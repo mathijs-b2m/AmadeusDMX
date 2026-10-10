@@ -1,0 +1,173 @@
+{
+  "manufacturer": "Martin",
+  "model": "MAC Aura",
+  "kind": "moving_head",
+  "source": "QLC+ fixture library (Martin/Martin-MAC-Aura.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Martin/Martin-MAC-Aura.qxf",
+    "type": "Moving Head",
+    "converter": 4
+  },
+  "physical": {
+    "pan_deg": 539,
+    "tilt_deg": 231,
+    "beam_deg": 11.0,
+    "size_mm": [
+      302,
+      302,
+      361
+    ],
+    "beam_deg_max": 58.0,
+    "watts": 245,
+    "lumens": 3850
+  },
+  "modes": {
+    "Extended": [
+      {
+        "attr": "shutter",
+        "default": 22
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "zoom",
+        "tight": 255,
+        "wide": 0
+      },
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "fixture_control_settings",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "beam_ctc",
+        "default": 0
+      },
+      {
+        "attr": "fx1_select",
+        "default": 0
+      },
+      {
+        "attr": "fx1_adjust_sync_speed_adjust",
+        "default": 0
+      },
+      {
+        "attr": "fx2_select",
+        "default": 0
+      },
+      {
+        "attr": "fx2_adjust_sync_speed_adjust",
+        "default": 0
+      },
+      {
+        "attr": "sync_fx_synchronization",
+        "default": 0
+      },
+      {
+        "attr": "shutter",
+        "default": 22
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      }
+    ],
+    "Standard": [
+      {
+        "attr": "shutter",
+        "default": 22
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "zoom",
+        "tight": 255,
+        "wide": 0
+      },
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "fixture_control_settings",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "beam_ctc",
+        "default": 0
+      }
+    ]
+  },
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

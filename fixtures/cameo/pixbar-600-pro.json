@@ -1,0 +1,1085 @@
+{
+  "manufacturer": "Cameo",
+  "model": "Pixbar 600 PRO",
+  "kind": "par_bar",
+  "source": "QLC+ fixture library (Cameo/Cameo-Pixbar-600-PRO.qxf), converted automatically: check it once with `decisive test`",
+  "qlc": {
+    "key": "Cameo/Cameo-Pixbar-600-PRO.qxf",
+    "type": "LED Bar (Beams)",
+    "converter": 4
+  },
+  "physical": {
+    "beam_deg": 23.0,
+    "size_mm": [
+      900,
+      120,
+      75
+    ],
+    "watts": 160,
+    "lumens": 3200,
+    "_lumens_note": "estimated from the power (20 lm/W)"
+  },
+  "modes": {
+    "2-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      }
+    ],
+    "6-CHMode1": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter",
+        "default": 2
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      }
+    ],
+    "6-CHMode2": [
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      }
+    ],
+    "8-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe_advanced",
+        "default": 0
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      }
+    ],
+    "12-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe_advanced",
+        "default": 0
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "colour_temperature_correction_add_to_rgb_and_colour_macro",
+        "default": 0
+      },
+      {
+        "attr": "auto_mode_override_rgbaw_colour_macro_ct",
+        "default": 0
+      },
+      {
+        "attr": "sound",
+        "default": 0
+      }
+    ],
+    "38-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe_advanced",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      }
+    ],
+    "42-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe_advanced",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "colour_temperature_correction_add_to_rgb_and_colour_macro",
+        "default": 0
+      },
+      {
+        "attr": "auto_mode_override_rgbaw_colour_macro_ct",
+        "default": 0
+      },
+      {
+        "attr": "sound",
+        "default": 0
+      }
+    ],
+    "74-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe_advanced",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "white",
+        "head": 12
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      }
+    ],
+    "78-CH": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe_advanced",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "white",
+        "head": 12
+      },
+      {
+        "attr": "amber",
+        "default": 0
+      },
+      {
+        "attr": "u_v",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "colour_temperature_correction_add_to_rgb_and_colour_macro",
+        "default": 0
+      },
+      {
+        "attr": "auto_mode_override_rgbaw_colour_macro_ct",
+        "default": 0
+      },
+      {
+        "attr": "sound",
+        "default": 0
+      }
+    ]
+  }
+}

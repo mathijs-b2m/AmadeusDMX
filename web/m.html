@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Rig Setup</title>
+<link rel="stylesheet" href="/css/mobile-setup.css">
+</head>
+<body>
+<header>
+  <h1><span>⚡</span> Rig Setup</h1>
+  <span class="note" id="status"></span>
+</header>
+<main>
+  <section>
+    <h2>Your rig</h2>
+    <div class="card" id="rig"><span class="note">Loading…</span></div>
+  </section>
+
+  <section>
+    <h2>Placement from a photo</h2>
+    <div class="card" id="place">
+      <div class="note">Each fixture lights up in its own colour; take a photo from the audience. The positions,
+        mounting and height go into the rig (you review them first).</div>
+      <div class="steps" style="margin-top:10px">
+        <button id="lightBtn">1. Light up the rig</button>
+        <div class="legend" id="legend"></div>
+        <button id="shotBtn" disabled>2. Take the photo</button>
+        <input type="file" id="setupPhoto" accept="image/*" capture="environment" hidden>
+      </div>
+      <div id="placeResult"></div>
+      <h2 style="margin-top:16px">Or exact: a 3D scan</h2>
+      <div class="note">Light the rig for 10 minutes, scan the setup with Scaniverse (walk around it, include the
+        floor and the wall behind), export a <b>point cloud (PLY)</b> and upload it here.</div>
+      <div class="row2">
+        <button id="scanLight">Light up for a scan</button>
+        <button id="scanOff">Lights off</button>
+      </div>
+      <button id="scanUpload" style="width:100%;margin-top:8px">Upload the scan (.ply)</button>
+      <input type="file" id="scanFile" hidden>
+      <div id="scanResult"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Add a fixture</h2>
+    <div class="searchrow">
+      <input type="search" id="q" placeholder="Brand or model" autocomplete="off" autocapitalize="off" enterkeyhint="search">
+      <button class="scanbtn" id="scanBtn" aria-label="Recognise the fixture from a photo">📷 Photo</button>
+      <input type="file" id="photo" accept="image/*" capture="environment" hidden>
+    </div>
+    <div class="note" style="margin-top:6px">Type a name, or take a photo: the label (type plate) is the surest, the fixture itself also works. Searches your fixtures, the QLC+ library (1,800 fixtures) and the Open Fixture Library.</div>
+    <div id="scan"></div>
+    <div class="results" id="results"></div>
+  </section>
+
+  <p class="note">Full setup (node, stage, safety, decision model): <a href="/setup.html">setup.html</a></p>
+</main>
+
+<div id="sheetWrap">
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/js/mobile-setup.js"></script>
+</body>
+</html>

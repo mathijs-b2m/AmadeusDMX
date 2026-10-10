@@ -1,0 +1,30 @@
+{
+  "manufacturer": "Ayra",
+  "model": "ComPar Kit 2",
+  "kind": "par_bar",
+  "source": "Ayra ComPar KIT 1 & 2 user manual v2.0, DMX tables",
+  "physical": {"heads": 4, "light": "4 RGB LED pars on one bar", "size_mm": [1200, 300, 140], "_size_note": "bar, approximate (QLC+ ComPar Kit 1)"},
+  "modes": {
+    "16ch": [
+      {"attr": "red", "head": 1}, {"attr": "green", "head": 1}, {"attr": "blue", "head": 1},
+      {"attr": "red", "head": 2}, {"attr": "green", "head": 2}, {"attr": "blue", "head": 2},
+      {"attr": "red", "head": 3}, {"attr": "green", "head": 3}, {"attr": "blue", "head": 3},
+      {"attr": "red", "head": 4}, {"attr": "green", "head": 4}, {"attr": "blue", "head": 4},
+      {"attr": "dimmer"},
+      {"attr": "strobe", "default": 0, "_note": "000-007 no function"},
+      {"attr": "program", "default": 0, "_note": "000-007 manual (colour chase off)"},
+      {"attr": "speed", "default": 0}
+    ],
+    "12ch": [
+      {"attr": "red", "head": 1}, {"attr": "green", "head": 1}, {"attr": "blue", "head": 1},
+      {"attr": "red", "head": 2}, {"attr": "green", "head": 2}, {"attr": "blue", "head": 2},
+      {"attr": "red", "head": 3}, {"attr": "green", "head": 3}, {"attr": "blue", "head": 3},
+      {"attr": "red", "head": 4}, {"attr": "green", "head": 4}, {"attr": "blue", "head": 4}
+    ],
+    "7ch": [
+      {"attr": "red"}, {"attr": "green"}, {"attr": "blue"}, {"attr": "dimmer"},
+      {"attr": "strobe", "default": 0}, {"attr": "program", "default": 0}, {"attr": "speed", "default": 0}
+    ],
+    "3ch": [{"attr": "red"}, {"attr": "green"}, {"attr": "blue"}]
+  }
+}

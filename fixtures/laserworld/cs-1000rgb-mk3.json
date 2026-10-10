@@ -1,0 +1,49 @@
+{
+  "manufacturer": "Laserworld",
+  "model": "CS-1000RGB Mk3",
+  "kind": "laser",
+  "source": "QLC+ fixture library (Laserworld/Laserworld-CS-1000RGB-Mk3.qxf), laser channels mapped by hand. The pattern numbers per shape are estimates: check them once on the real laser.",
+  "physical": {"size_mm": [200, 150, 116], "light": "1 W RGB diode laser, ILDA + DMX", "scan_deg": 40},
+  "modes": {
+    "13ch": [
+      {"attr": "laser_mode", "_note": "000-049 off, 150-255 DMX patterns"},
+      {"attr": "laser_pattern"},
+      {"attr": "laser_rot_z", "_note": "000-127 angle, 128-191 CCW slow to fast, 192-255 CW slow to fast"},
+      {"attr": "laser_rot_x", "default": 0},
+      {"attr": "laser_rot_y", "default": 0},
+      {"attr": "laser_x", "_note": "000-127 offset step (64 = centre)"},
+      {"attr": "laser_y", "_note": "000-127 offset step (64 = centre)"},
+      {"attr": "laser_size_x", "_note": "big to small"},
+      {"attr": "laser_size_y", "_note": "big to small"},
+      {"attr": "laser_drawing", "default": 0},
+      {"attr": "laser_scan_speed", "default": 0},
+      {"attr": "color_wheel"},
+      {"attr": "laser_color_speed", "default": 0}
+    ]
+  },
+  "laser": {
+    "on": 200,
+    "off": 0,
+    "verified": false,
+    "_note": "DMX value of 'Pattern Select' for each shape the show uses (the laser's pattern list decides: calibrate)",
+    "patterns": {"beams": 8, "fan": 40, "sheet": 40, "tunnel": 72, "cone": 104, "wave": 136},
+    "sheet_rot_z": 32,
+    "_note_sheet": "a sheet is the fan pattern turned flat: Z rotation index (0-127) that lays the fan horizontal",
+    "color_modes": {"multi": 225, "rainbow": 12},
+    "_note_colors": "multi = 'multi color step through' (225-255), rainbow = 'pattern color (original)' (0-24)",
+    "offset_deg": 20
+  },
+  "color_wheel": {
+    "verified": true,
+    "_note": "Laser colour macros (Color Change channel), from the QLC+ library.",
+    "slots": [
+      {"name": "white", "from": 175, "to": 199, "rgb": [1.0, 1.0, 1.0]},
+      {"name": "purple", "from": 25, "to": 49, "rgb": [0.627, 0.125, 0.941]},
+      {"name": "red", "from": 50, "to": 74, "rgb": [1.0, 0.0, 0.0]},
+      {"name": "yellow", "from": 75, "to": 99, "rgb": [1.0, 1.0, 0.0]},
+      {"name": "green", "from": 100, "to": 124, "rgb": [0.0, 1.0, 0.0]},
+      {"name": "cyan", "from": 125, "to": 149, "rgb": [0.0, 1.0, 1.0]},
+      {"name": "blue", "from": 150, "to": 174, "rgb": [0.0, 0.0, 1.0]}
+    ]
+  }
+}
