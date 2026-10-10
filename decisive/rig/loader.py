@@ -1,4 +1,5 @@
-"""Loading a rig (a set file): defaults filled in, its fixtures expanded into elements (pars, heads, cells…)."""
+"""Loading a show's rig: a set placed on a rig (or an old combined file), defaults filled in, and its fixtures
+expanded into elements (pars, heads, cells…)."""
 
 from __future__ import annotations
 
@@ -9,8 +10,11 @@ from decisive.library import fixtures as fxlib
 from decisive.rig import geometry
 
 
-def load_rig(path: str | Path) -> dict:
-    return load_rig_dict(json.loads(Path(path).read_text()))
+def load_rig(source) -> dict:
+    """`source`: a store.Selection (a set on a rig), or the path of a combined file."""
+    if hasattr(source, "load"):
+        return load_rig_dict(source.load())
+    return load_rig_dict(json.loads(Path(source).read_text()))
 
 
 def load_rig_dict(rig: dict) -> dict:

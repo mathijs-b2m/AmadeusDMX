@@ -20,8 +20,18 @@ final class AppModel {
         get { section }
         set { if let v = newValue { section = v } }
     }
+    /// Your gear (fixtures and patch) and the venues (trusses, stage) it can hang on. A show runs with one of each.
     var sets: [SetSummary] = []
-    var selectedSet: String = ""
+    var rigs: [RigSummary] = []
+    var selectedSet: String = "" { didSet { if selectedSet != oldValue { selectionChanged() } } }
+    var selectedRig: String = "" { didSet { if selectedRig != oldValue { selectionChanged() } } }
+    /// The set on the rig, in words: "showcase on club".
+    var showLabel: String { selectedSet.isEmpty ? "No Set" : "\(selectedSet) on \(selectedRig)" }
+    /// Sheets: a new rig (from a template), and "mount the set on this rig?" when it isn't yet.
+    var showNewRig = false
+    /// Goes up whenever sets or rigs were (re)read: views showing a file reload it.
+    var configVersion = 0
+    var mountPrompt: (rig: String, set: String)?
     /// Visualise / Perform / both (-showMode perform). Perform ↔ both switches live; DMX on/off restarts the show.
     var mode: ShowMode = .both {
         didSet {
@@ -35,15 +45,9 @@ final class AppModel {
     @ObservationIgnored private var runningWithDMX = false
     @ObservationIgnored private var remoteCode: String?
     var showInspector = true
-    /// The Rig page: "patch" (the table) or "layout" (the rig editor).
-    var rigMode: String = UserDefaults.standard.string(forKey: "rigMode") ?? "patch" {
-        didSet { UserDefaults.standard.set(rigMode, forKey: "rigMode") }
-    }
 
-    /// Open the rig editor for a set.
-    func editLayout(_ set: String? = nil) {
-        if let set, !engineRunning { selectedSet = set }
-        rigMode = "layout"
+    /// Open the rig editor.
+    func editLayout() {
         section = .rig
     }
     var showZones = UserDefaults.standard.bool(forKey: "showZones")   // -showZones YES
@@ -61,6 +65,7 @@ final class AppModel {
             ?? (UserDefaults.standard.object(forKey: "sendArtNet") as? Bool == false ? .visualise : .both)
         reloadSets()
         if let s = UserDefaults.standard.string(forKey: "section").flatMap(Section.init(rawValue:)) { section = s }  // -section rig
+        if UserDefaults.standard.string(forKey: "section") == "sets" { section = .set }
         DispatchQueue.main.async { EditorSelfTest.runIfRequested(self) }  // -editorSelfTest SET (development)
         if UserDefaults.standard.bool(forKey: "startLive") {  // -startLive YES: start the live show at launch
             DispatchQueue.main.async { self.startLive() }
@@ -86,17 +91,53 @@ final class AppModel {
         return true
     }
 
+    /// Reads the sets and rigs again (after any change to them), and keeps a valid selection.
     func reloadSets() {
-        guard let ws = workspace else { sets = []; return }
+        guard let ws = workspace else { sets = []; rigs = []; return }
+        ws.prepare()
         sets = ws.sets()
+        rigs = ws.rigs()
         if selectedSet.isEmpty || !sets.contains(where: { $0.name == selectedSet }) {
             selectedSet = UserDefaults.standard.string(forKey: "lastSet").flatMap { n in sets.contains { $0.name == n } ? n : nil }
                 ?? ws.activeSet ?? sets.first?.name ?? ""
         }
+        if selectedRig.isEmpty || !rigs.contains(where: { $0.name == selectedRig }) {
+            selectedRig = UserDefaults.standard.string(forKey: "lastRig").flatMap { n in rigs.contains { $0.name == n } ? n : nil }
+                ?? ws.activeRig ?? rigs.first?.name ?? ""
+        }
         previewCache = nil
+        configVersion += 1
+    }
+
+    private func selectionChanged() {
+        previewCache = nil
+        if !selectedSet.isEmpty { UserDefaults.standard.set(selectedSet, forKey: "lastSet") }
+        if !selectedRig.isEmpty { UserDefaults.standard.set(selectedRig, forKey: "lastRig") }
     }
 
     var currentSet: SetSummary? { sets.first { $0.name == selectedSet } }
+    var currentRig: RigSummary? { rigs.first { $0.name == selectedRig } }
+
+    /// How much of the set hangs on the rig: (mounted, all).
+    var mounted: (placed: Int, total: Int) {
+        workspace?.mounted(rig: selectedRig, set: selectedSet) ?? (0, 0)
+    }
+
+    /// Picks the rig (and the set) for the show; offers to mount the set if it doesn't hang there yet.
+    func choose(rig: String? = nil, set: String? = nil) {
+        guard !engineRunning else { return }
+        if let rig { selectedRig = rig }
+        if let set { selectedSet = set }
+        let m = mounted
+        if m.total > 0 && m.placed == 0 { mountPrompt = (selectedRig, selectedSet) }
+    }
+
+    /// Auto-mount the set's fixtures that aren't mounted on the rig yet (or all of them).
+    func autoMount(rig: String, set: String, all: Bool = false) async throws {
+        guard await ensureSetupService() else { throw SetupAPIError.notRunning }
+        try await api.automount(rig: rig, set: set, all: all)
+        reloadSets()
+    }
 
     // MARK: show state
 
@@ -121,12 +162,11 @@ final class AppModel {
     /// Start live mode: the lights follow VirtualDJ (DecisiveLink plugin), on this Mac or on a DJ laptop.
     func startLive(dj: String? = nil, code: String? = nil) {
         guard let ws = workspace, !selectedSet.isEmpty else { return }
-        UserDefaults.standard.set(selectedSet, forKey: "lastSet")
         playingFile = nil
         remoteDJ = dj
         remoteCode = code
         runningWithDMX = sendArtNet
-        var args = ["live", "--set", selectedSet, "--health", "30"]
+        var args = ["live", "--set", selectedSet, "--rig", selectedRig, "--health", "30"]
         if let dj, let code { args += ["--remote", "dj:" + dj, "--code", code] }
         if sendArtNet { args.insert("--artnet", at: 1) }
         engine.start(ws, args, environment: engineEnvironment, readyWhen: "Live mode", keepAwake: true)
@@ -135,10 +175,9 @@ final class AppModel {
     /// Play a track with the engine itself (no VirtualDJ): to try a set or a look.
     func play(_ file: URL, from start: Double = 0) {
         guard let ws = workspace, !selectedSet.isEmpty else { return }
-        UserDefaults.standard.set(selectedSet, forKey: "lastSet")
         playingFile = file
         runningWithDMX = sendArtNet
-        var args = ["play", file.path, "--set", selectedSet]
+        var args = ["play", file.path, "--set", selectedSet, "--rig", selectedRig]
         if sendArtNet { args.append("--artnet") }
         if start > 0 { args += ["--start", String(Int(start))] }
         if UserDefaults.standard.bool(forKey: "muted") { args.append("--mute") }   // -muted YES (testing)
@@ -171,6 +210,7 @@ final class AppModel {
 
     var engineEnvironment: [String: String] {
         var env: [String: String] = [:]
+        if let root = workspace?.root.path { env["DECISIVE_ROOT"] = root }  // the engine works in this folder
         if let key = Keychain.openAIKey, !key.isEmpty { env["OPENAI_API_KEY"] = key }
         return env
     }
@@ -204,15 +244,17 @@ final class AppModel {
                               stage: h.stage, screen: h.screen, hello: h, trusses: h.trusses,
                               zones: showZones ? h.zones : [])
         }
-        return preview(selectedSet)
+        return preview(rig: selectedRig, set: selectedSet)
     }
 
-    func preview(_ name: String) -> StageInput? {
-        if let c = previewCache, c.key == name { return c.input }
-        guard let ws = workspace, let p = ws.preview(name) else { return nil }
-        let inp = StageInput(key: "preview:\(name):\(p.fixtures.count)", fixtures: p.fixtures, stage: p.stage,
+    /// The set on the rig, before a show runs. Cached until the selection changes or a save (`reloadSets`).
+    func preview(rig: String, set: String) -> StageInput? {
+        let key = "\(rig)/\(set)"
+        if let c = previewCache, c.key == key { return c.input }
+        guard let ws = workspace, let p = ws.preview(rig: rig, set: set) else { return nil }
+        let inp = StageInput(key: "preview:\(key):\(p.fixtures.count):\(p.trusses.count)", fixtures: p.fixtures, stage: p.stage,
                              screen: p.screen, hello: nil, trusses: p.trusses)
-        previewCache = (name, inp)
+        previewCache = (key, inp)
         return inp
     }
 }

@@ -1,22 +1,28 @@
-// The editor's inspector: the selected truss or fixture.
+// The editor's inspector: with nothing selected, the set on this rig (what hangs where, and what still waits,
+// in groups to drag onto the stage) and the venue; else the selected truss, fixture(s) or zone.
 import DecisiveKit
 import SwiftUI
 
 struct EditorInspector: View {
+    @Environment(AppModel.self) private var model
     @Bindable var editor: RigEditorModel
     @Binding var showAdd: Bool
 
     var body: some View {
         Form {
-            switch editor.selection {
-            case .truss(let id):
-                if let t = editor.doc.trusses.first(where: { $0.id == id }) { TrussInspector(editor: editor, truss: t) }
-            case .fixture(let id):
-                if let f = editor.doc.fixtures.first(where: { $0.id == id }) { FixtureInspector(editor: editor, fixture: f) }
-            case .zone(let id):
-                if let z = editor.doc.zones.first(where: { $0.id == id }) { ZoneInspector(editor: editor, zone: z) }
-            case nil:
-                overview
+            if editor.selectedFixtures.count > 1 {
+                MultiFixtureInspector(editor: editor, ids: editor.selectedFixtures)
+            } else {
+                switch editor.selection {
+                case .truss(let id):
+                    if let t = editor.doc.trusses.first(where: { $0.id == id }) { TrussInspector(editor: editor, truss: t) }
+                case .fixture(let id):
+                    if let f = editor.doc.fixtures.first(where: { $0.id == id }) { FixtureInspector(editor: editor, fixture: f) }
+                case .zone(let id):
+                    if let z = editor.doc.zones.first(where: { $0.id == id }) { ZoneInspector(editor: editor, zone: z) }
+                case nil:
+                    overview
+                }
             }
         }
         .formStyle(.grouped)
@@ -24,15 +30,57 @@ struct EditorInspector: View {
 
     @ViewBuilder
     private var overview: some View {
+        let fixtures = editor.doc.fixtures
+        let waiting = editor.doc.waitingCount
         SwiftUI.Section {
-            LabeledContent("Set", value: editor.setName)
-            LabeledContent("Trusses", value: "\(editor.doc.trusses.count)")
-            LabeledContent("Fixtures", value: "\(editor.doc.fixtures.count)")
-            if editor.isDirty { Label("Unsaved changes", systemImage: "circle.fill").foregroundStyle(.orange).font(.callout) }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "light.overhead.right").foregroundStyle(.tint)
+                    Text("Set “\(editor.setName)”").font(.headline)
+                    Spacer()
+                    Button("Fixtures…") { model.section = .set }.buttonStyle(.link).font(.caption)
+                }
+                if !fixtures.isEmpty {
+                    ProgressView(value: Double(fixtures.count - waiting), total: Double(fixtures.count))
+                        .tint(waiting == 0 ? .green : .orange)
+                    Text(waiting == 0 ? "All \(fixtures.count) fixtures hang on this rig."
+                         : "\(fixtures.count - waiting) of \(fixtures.count) mounted. \(waiting) wait in front of the stage.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+                if waiting > 0 {
+                    Button {
+                        Task { await editor.autoMount(model) }
+                    } label: {
+                        Label("Auto-Mount the \(waiting) Waiting", systemImage: "wand.and.stars").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(editor.busy)
+                }
+                if editor.isDirty { Label("Unsaved changes", systemImage: "circle.fill").foregroundStyle(.orange).font(.callout) }
+            }
+        } footer: {
+            if !fixtures.isEmpty {
+                Text("Drag a group or a fixture onto a truss in the stage: a group hangs in a row. Click a group to select it all.")
+            }
+        }
+        SwiftUI.Section("Fixtures by Model") {
+            if fixtures.isEmpty {
+                Text("The set has no fixtures yet.").foregroundStyle(.secondary)
+                Button("Add Fixtures to the Set…") { model.section = .set }
+            }
+            ForEach(modelGroups(fixtures), id: \.key) { g in
+                ModelGroupRow(editor: editor, key: g.key, fixtures: g.fixtures)
+            }
+        }
+        SwiftUI.Section("Venue") {
+            ValueSlider(title: "Stage width", value: stageBinding(\.widthM), range: 2...30, step: 0.5)
+            ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
+            ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
+            Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
         }
         SwiftUI.Section("Trusses") {
             if editor.doc.trusses.isEmpty {
-                Text("No trusses yet. Add one with the Truss button; fixtures snap onto it.").foregroundStyle(.secondary)
+                Text("No trusses: fixtures stand on the floor. Add one with Truss; fixtures snap onto it.").foregroundStyle(.secondary)
             }
             ForEach(editor.doc.trusses) { t in
                 Button { editor.selection = .truss(t.id) } label: {
@@ -40,7 +88,7 @@ struct EditorInspector: View {
                         Image(systemName: t.vertical ? "building.columns" : "square.split.bottomrightquarter")
                         Text(t.id)
                         Spacer()
-                        Text("\(t.lengthM.formatted()) m · \(editor.doc.fixtures.filter { $0.truss == t.id }.count) fixtures")
+                        Text("\(t.lengthM.formatted()) m · \(fixtures.filter { $0.truss == t.id }.count) fixtures")
                             .foregroundStyle(.secondary).font(.caption)
                     }
                 }
@@ -65,17 +113,104 @@ struct EditorInspector: View {
                 .buttonStyle(.plain)
             }
         }
-        SwiftUI.Section("Fixtures") {
-            ForEach(editor.doc.fixtures) { f in
-                Button { editor.selection = .fixture(f.id) } label: {
-                    HStack {
-                        Text(f.id)
-                        Spacer()
-                        Text(f.truss.map { "on \($0)" } ?? f.mount).foregroundStyle(.secondary).font(.caption)
-                    }
+    }
+
+    private func modelGroups(_ fixtures: [PlacedFixture]) -> [(key: String, fixtures: [PlacedFixture])] {
+        var order: [String] = [], by: [String: [PlacedFixture]] = [:]
+        for f in fixtures {
+            if by[f.key] == nil { order.append(f.key) }
+            by[f.key, default: []].append(f)
+        }
+        return order.map { ($0, by[$0]!) }
+    }
+
+    private func stageBinding(_ kp: WritableKeyPath<Stage, Double>) -> Binding<Double> {
+        Binding(get: { editor.doc.stage[keyPath: kp] }, set: { v in editor.updateStage { $0[keyPath: kp] = v } })
+    }
+}
+
+/// One model of the set: how many, mounted or waiting; drag it (the waiting ones, else all) onto the stage.
+private struct ModelGroupRow: View {
+    let editor: RigEditorModel
+    let key: String
+    let fixtures: [PlacedFixture]
+    @State private var open = false
+
+    var body: some View {
+        let def = editor.definition(key)
+        let waiting = fixtures.filter(\.waiting)
+        let dragIDs = (waiting.isEmpty ? fixtures : waiting).map(\.id)
+        DisclosureGroup(isExpanded: $open) {
+            ForEach(fixtures) { f in
+                HStack {
+                    Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary).font(.caption)
+                    Text(f.id).font(.callout.monospaced())
+                    Spacer()
+                    Text(f.waiting ? "waiting" : f.truss.map { "\($0) · \(f.side ?? "")" } ?? f.mount)
+                        .font(.caption).foregroundStyle(f.waiting ? Color.orange : Color.secondary)
                 }
-                .buttonStyle(.plain)
+                .contentShape(.rect)
+                .onTapGesture { editor.select(fixtures: [f.id]) }
+                .draggable(RigEditorModel.payload([f.id]))
             }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: FixtureIcon.symbol(def?.kind)).foregroundStyle(.tint).frame(width: 20)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(fixtures.count)× \(def?.name ?? key)").lineLimit(1)
+                    Text(waiting.isEmpty ? "all mounted" : "\(waiting.count) waiting")
+                        .font(.caption).foregroundStyle(waiting.isEmpty ? Color.secondary : Color.orange)
+                }
+                Spacer()
+                Image(systemName: "hand.draw").foregroundStyle(.tertiary)
+                    .help("Drag onto a truss: they hang in a row")
+            }
+            .contentShape(.rect)
+            .onTapGesture { editor.select(fixtures: fixtures.map(\.id)) }
+            .draggable(RigEditorModel.payload(dragIDs)) {
+                Label("\(dragIDs.count)× \(def?.model ?? key)", systemImage: FixtureIcon.symbol(def?.kind))
+                    .padding(8).background(.regularMaterial, in: .capsule)
+            }
+        }
+    }
+}
+
+/// Several fixtures selected: what they have in common, and what can be done to all of them.
+private struct MultiFixtureInspector: View {
+    @Environment(AppModel.self) private var model
+    let editor: RigEditorModel
+    let ids: Set<String>
+
+    var body: some View {
+        let fixtures = editor.doc.fixtures.filter { ids.contains($0.id) }
+        let models = Set(fixtures.map(\.key))
+        let onBoxTruss = fixtures.allSatisfy { f in f.truss.flatMap { t in editor.doc.trusses.first { $0.id == t } }.map { !$0.vertical } ?? false }
+        SwiftUI.Section {
+            HStack {
+                Image(systemName: "square.stack.3d.up").font(.title2).foregroundStyle(.tint)
+                VStack(alignment: .leading) {
+                    Text("\(fixtures.count) Fixtures").font(.headline)
+                    Text(models.count == 1 ? (editor.definition(models.first!)?.name ?? models.first!) : "\(models.count) models")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Text(fixtures.map(\.id).sorted().joined(separator: ", ")).font(.caption.monospaced()).foregroundStyle(.secondary)
+        } footer: {
+            Text("Drag one of them in the stage and the others come along: onto a truss they hang in a row.")
+        }
+        if onBoxTruss {
+            SwiftUI.Section("Position on the Truss") {
+                Picker("Side", selection: Binding(get: { Set(fixtures.compactMap(\.side)).count == 1 ? fixtures.first?.side ?? "under" : "" },
+                                                  set: { editor.setSide(ids, $0) })) {
+                    Text("Under").tag("under"); Text("Front").tag("front"); Text("Top").tag("top"); Text("Back").tag("back")
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+        SwiftUI.Section {
+            Button("Auto-Mount These", systemImage: "wand.and.stars") { Task { await editor.autoMount(model, ids: Array(ids)) } }
+            Button("Rotate 90°", systemImage: "rotate.right") { editor.rotateSelection(by: 90) }
+            Button("Unmount (Back to Waiting)", systemImage: "arrow.down.to.line") { editor.unmount(ids) }
         }
     }
 }
@@ -195,7 +330,14 @@ struct FixtureInspector: View {
             }
         }
         SwiftUI.Section {
-            Button("Delete Fixture", systemImage: "trash", role: .destructive) { editor.deleteSelection() }
+            if fixture.waiting {
+                Label("Waiting in front of the stage: drag it onto a truss, or Auto-Mount.", systemImage: "hourglass")
+                    .font(.callout).foregroundStyle(.orange)
+            } else {
+                Button("Unmount (Back to Waiting)", systemImage: "arrow.down.to.line") { editor.unmount([fixture.id]) }
+            }
+        } footer: {
+            Text("The fixture stays in the set; to remove it from your gear, use the Set page.")
         }
     }
 
@@ -216,16 +358,7 @@ struct FixtureInspector: View {
         Binding(get: { fixture[keyPath: kp] ?? d }, set: { v in editor.updateFixture(fixture.id, "Move Fixture") { $0[keyPath: kp] = v } })
     }
 
-    private func icon(_ kind: String?) -> String {
-        switch kind {
-        case "moving_head": "light.overhead.right"
-        case "moving_bar", "par_bar": "light.strip.2"
-        case "laser": "rays"
-        case "strobe": "bolt"
-        case "blinder": "light.panel"
-        default: "light.recessed"
-        }
-    }
+    private func icon(_ kind: String?) -> String { FixtureIcon.symbol(kind) }
 }
 
 /// A labelled slider with its value; snaps to `step`.

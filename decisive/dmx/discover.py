@@ -7,12 +7,10 @@ with `python -m decisive patch MODEL:COUNT ...` instead. Both paths end in
 
 from __future__ import annotations
 
-import json
 import re
 import socket
 import struct
 import time
-from pathlib import Path
 
 from decisive.dmx import rdm
 from decisive.library import fixtures as fxlib
@@ -63,15 +61,19 @@ def new_ids(items: list[dict]) -> None:
         it.setdefault("id", f"{base}{counts[base]}")
 
 
-def write_rig(items: list[dict], path: Path, artnet: dict | None = None) -> dict:
-    old = json.loads(path.read_text()) if path.exists() else {}
-    rig = {
-        "artnet": artnet or old.get("artnet", {"ip": "192.168.1.50", "port": 6454, "fps": 40}),
-        "safety": old.get("safety", {"max_flash_hz": 3.0, "master": 1.0}),
-        "fixtures": items,
-    }
+def write_rig(items: list[dict], show, artnet: dict | None = None) -> dict:
+    """The fixtures (and the node) into the show's set; the rig keeps its trusses and stage."""
+    rig = show.load()
+    rig["artnet"] = artnet or rig.get("artnet", {"ip": "192.168.1.50", "port": 6454, "fps": 40})
+    rig.setdefault("safety", {"max_flash_hz": 3.0, "master": 1.0})
+    from decisive.rig.store import PLACEMENT_KEYS
+
+    for it in items:  # the gear only: where they hang is up to the rig (auto-mount or the rig editor)
+        for k in PLACEMENT_KEYS:
+            it.pop(k, None)
+    rig["fixtures"] = items
     rig["artnet"].setdefault("fps", 40)
-    path.write_text(json.dumps(rig, indent=2))
+    show.save(rig)
     return rig
 
 
@@ -86,7 +88,7 @@ def print_patch(items: list[dict]) -> None:
         )
 
 
-def manual_patch(specs: list[str], universe: int, modes: dict[str, str], rig_path: Path) -> dict:
+def manual_patch(specs: list[str], universe: int, modes: dict[str, str], show) -> dict:
     """`patch beamz/fuze75s-spot:2 ayra/compar-kit-2` → rig.json."""
     items = []
     for spec in specs:
@@ -98,9 +100,12 @@ def manual_patch(specs: list[str], universe: int, modes: dict[str, str], rig_pat
     new_ids(items)
     assign_addresses(items)
     layout(items)
-    rig = write_rig(items, rig_path)
+    rig = write_rig(items, show)
     print_patch(items)
-    print(f"\nWrote {rig_path}. Set each fixture to the DMX mode and start address above on its display.")
+    print(
+        f"\nWrote the set '{show.set or show.label}'. Set each fixture to the DMX mode and start address above "
+        "on its display."
+    )
     return rig
 
 
@@ -193,7 +198,7 @@ class Client:
         return None
 
 
-def discover(target: tuple[str, int] | None, rig_path: Path, readdress: bool, write: bool) -> None:
+def discover(target: tuple[str, int] | None, show, readdress: bool, write: bool) -> None:
     c = Client(target)
     print("Polling for Art-Net nodes …")
     nodes = c.poll()
@@ -245,12 +250,12 @@ def discover(target: tuple[str, int] | None, rig_path: Path, readdress: bool, wr
     if not items:
         print("\nNo known RDM fixtures found. Non-RDM fixtures (like most budget fixtures) can't be discovered:")
         print("  python -m decisive patch beamz/fuze75s-spot:2 ayra/compar-kit-2")
-        if write and rig_path.exists():  # still worth saving where the node is
-            rig = json.loads(rig_path.read_text())
+        if write:  # still worth saving where the node is
+            rig = show.load()
             rig["artnet"] = {**rig.get("artnet", {}), "ip": node.ip, "port": addr[1]}
             rig["artnet"].setdefault("fps", 40)
-            rig_path.write_text(json.dumps(rig, indent=2))
-            print(f"\nSaved node {node.ip}:{addr[1]} in {rig_path} (fixtures unchanged).")
+            show.save(rig)
+            print(f"\nSaved node {node.ip}:{addr[1]} in {show.label} (fixtures unchanged).")
         return
 
     new_ids(items)
@@ -282,7 +287,7 @@ def discover(target: tuple[str, int] | None, rig_path: Path, readdress: bool, wr
     if unknown:
         print(f"\nNot in the library (add a JSON file in fixtures/): {', '.join(unknown)}")
     if write and not problems:
-        write_rig(items, rig_path, artnet={"ip": node.ip, "port": addr[1], "fps": 40})
-        print(f"\nWrote {rig_path} (node {node.ip}:{addr[1]}).")
+        write_rig(items, show, artnet={"ip": node.ip, "port": addr[1], "fps": 40})
+        print(f"\nWrote {show.label} (node {node.ip}:{addr[1]}).")
     elif write:
         print("\nNot writing the rig while addresses conflict.")

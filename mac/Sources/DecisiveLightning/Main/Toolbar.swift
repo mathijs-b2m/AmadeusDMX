@@ -2,27 +2,40 @@
 import DecisiveKit
 import SwiftUI
 
+/// The rig and the set the show runs with: "showcase on club". Most people have one set, and a rig per venue.
 struct SetMenu: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Menu {
-            Picker("Set", selection: Binding(get: { model.selectedSet }, set: { model.selectedSet = $0 })) {
-                ForEach(model.sets) { s in
-                    Text("\(s.name) — \(s.fixtureCount) fixtures").tag(s.name)
+            SwiftUI.Section("Rig: the venue") {
+                Picker("Rig", selection: Binding(get: { model.selectedRig }, set: { model.choose(rig: $0) })) {
+                    ForEach(model.rigs) { r in
+                        Text("\(r.name) — \(r.summary)").tag(r.name)
+                    }
                 }
+                .pickerStyle(.inline)
+                Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
+                Button("Edit the Rig", systemImage: "square.split.bottomrightquarter") { model.section = .rig }
             }
-            .pickerStyle(.inline)
-            Divider()
-            Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
-            Button("Manage Sets", systemImage: "square.stack.3d.up") { model.section = .sets }
+            SwiftUI.Section("Set: your fixtures") {
+                if model.sets.count > 1 {
+                    Picker("Set", selection: Binding(get: { model.selectedSet }, set: { model.choose(set: $0) })) {
+                        ForEach(model.sets) { s in Text("\(s.name) — \(s.fixtureCount) fixtures").tag(s.name) }
+                    }
+                    .pickerStyle(.inline)
+                }
+                Button("Fixtures and Patch", systemImage: "light.overhead.right") { model.section = .set }
+                Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
+            }
         } label: {
-            Label(model.selectedSet.isEmpty ? "No Set" : model.selectedSet, systemImage: "square.stack.3d.up.fill")
+            Label(model.showLabel, systemImage: "square.split.bottomrightquarter")
                 .labelStyle(.titleAndIcon)
         }
         .disabled(model.engineRunning)
-        .help(model.engineRunning ? "A show runs with this set; stop it to switch sets" : "The rig the show runs with")
+        .help(model.engineRunning ? "A show runs on this rig with this set; stop it to switch"
+              : "The venue (rig) and your fixtures (set) the show runs with")
     }
 }
 

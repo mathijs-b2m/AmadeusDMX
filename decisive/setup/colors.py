@@ -51,8 +51,8 @@ NAMED = {  # common gel/wheel colour names → RGB as the engine and visualiser 
 }
 
 
-def run(rig_path, fixture_id: str, level: float = 0.8):
-    rig = load_rig(rig_path)
+def run(show, fixture_id: str, level: float = 0.8):
+    rig = load_rig(show)
     fixtures = {f["id"]: f for f in rig["fixtures"]}
     if fixture_id not in fixtures:
         raise SystemExit(f"No fixture '{fixture_id}' in the rig. Fixtures: {', '.join(fixtures)}")

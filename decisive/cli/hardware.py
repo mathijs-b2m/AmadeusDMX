@@ -57,14 +57,14 @@ def discover(args):
     if args.sim:
         host, _, port = args.sim.partition(":")
         target = (host, int(port or 6455))
-    run(target, args.rig, args.readdress, args.write)
+    run(target, args.show, args.readdress, args.write)
 
 
 def simnode(args):
     from decisive.dmx.simnode import run
 
     try:
-        run(args.fixtures, port=args.port, rdm_capable=not args.no_rdm, rig_path=None if args.factory else args.rig)
+        run(args.fixtures, port=args.port, rdm_capable=not args.no_rdm, show=None if args.factory else args.show)
     except KeyboardInterrupt:
         print("\nSimulator stopped")
 
@@ -72,22 +72,22 @@ def simnode(args):
 def test(args):
     from decisive.setup.bringup import run
 
-    run(args.rig, args.level, args.ip)
+    run(args.show, args.level, args.ip)
 
 
 def gobos(args):
     from decisive.setup.gobos import run
 
-    run(args.rig, args.fixture)
+    run(args.show, args.fixture)
 
 
 def colors(args):
     from decisive.setup.colors import run
 
-    run(args.rig, args.fixture)
+    run(args.show, args.fixture)
 
 
 def motion(args):
     from decisive.setup.motion import run
 
-    run(args.rig, args.fixture, args.axis)
+    run(args.show, args.fixture, args.axis)

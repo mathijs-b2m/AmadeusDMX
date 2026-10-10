@@ -1,5 +1,7 @@
-// An editable set: trusses and where every fixture sits, read from and written back to the set file
-// (config/sets/NAME.json). Unknown keys are kept as they are, so the engine and the web UI keep working.
+// A set on a rig, editable: the rig's trusses, stage and zones, and where every fixture of the set sits on it.
+// It is the combined view the engine reads (decisive/rig/store.py compose); saving goes through the engine's
+// setup API, which splits it back into the set file (the gear) and the rig file (the venue and placements).
+// Unknown keys are kept as they are, so the engine and the web UI keep working.
 //
 // Placement model (shared with decisive/geometry.py):
 //   fixture.x       position across the stage as a fraction of stage.width_m
@@ -131,6 +133,8 @@ public struct PlacedFixture: Identifiable, Equatable, Sendable {
     public var trussPos: Double?
     public var side: String?        // under | top | front | back (on a truss)
     public var mountRoll: Double?   // 90: on the front face, 270: on the back face (rolled about the truss)
+    /// Not mounted on this rig yet: it waits on the floor at the front (the engine's waiting spot).
+    public var waiting = false
 
     /// Base → head, as the engine sees it (geometry.mount_up).
     public var up: SIMD3<Double> {
@@ -152,17 +156,50 @@ public struct PlacedFixture: Identifiable, Equatable, Sendable {
     }
 }
 
-/// A set file, editable. `raw` keeps everything the editor doesn't touch.
+/// A set on a rig, editable. `raw` keeps everything the editor doesn't touch.
 public struct RigDocument: Equatable {
-    public var name: String
+    public var rig: String
+    public var set: String
     public var raw: [String: JSONValue]
     public var trusses: [Truss]
     public var fixtures: [PlacedFixture]
     public var zones: [Zone]
     public var stage: Stage
 
-    public init(name: String, data: Data) throws {
-        self.name = name
+    /// What belongs to the rig rather than the set, and a fixture's fields that say where it is
+    /// (decisive/rig/store.py: RIG_KEYS, PLACEMENT_KEYS).
+    public static let rigKeys = ["stage", "trusses", "zones", "screen"]
+    public static let placementKeys = ["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_side",
+                                       "mount_roll_deg", "reverse", "width", "group"]
+    public static let unplacedKey = "_unplaced"
+
+    /// The set placed on the rig (decisive/rig/store.py compose).
+    public static func compose(set: [String: JSONValue], rig: [String: JSONValue], setName: String) -> [String: JSONValue] {
+        var out = set.filter { !rigKeys.contains($0.key) }
+        for k in rigKeys { if let v = rig[k] { out[k] = v } }
+        let places = rig["placements"]?.object?[setName]?.object ?? [:]
+        var fixtures = (out["fixtures"]?.array ?? []).compactMap(\.object)
+        let waiting = fixtures.filter { places[$0["id"]?.string ?? ""] == nil }.count
+        var k = 0
+        for i in fixtures.indices {
+            for key in placementKeys { fixtures[i][key] = nil }
+            if let p = places[fixtures[i]["id"]?.string ?? ""]?.object {
+                fixtures[i].merge(p) { _, new in new }
+            } else {
+                let spot: [String: JSONValue] = ["x": .number(((Double(k) + 1) / Double(waiting + 1) * 10000).rounded() / 10000),
+                                                 "y_m": .number(-0.3), "z_m": .number(0.25), "mount": .string("floor")]
+                fixtures[i].merge(spot) { _, new in new }
+                fixtures[i][unplacedKey] = .object(spot)
+                k += 1
+            }
+        }
+        out["fixtures"] = .array(fixtures.map(JSONValue.object))
+        return out
+    }
+
+    public init(rig: String, set: String, data: Data) throws {
+        self.rig = rig
+        self.set = set
         raw = try JSONDecoder().decode([String: JSONValue].self, from: data)
         stage = (raw["stage"]).flatMap { try? JSONDecoder().decode(Stage.self, from: JSONEncoder().encode($0)) } ?? Stage()
         trusses = (raw["trusses"]).flatMap { try? JSONDecoder().decode([Truss].self, from: JSONEncoder().encode($0)) } ?? []
@@ -173,15 +210,26 @@ public struct RigDocument: Equatable {
             let mount = o["mount"]?.string ?? "stand"
             let d = mounts[mount] ?? (-0.6, 1.8)
             let aim = o["aim"]?.array.flatMap { a in a.count == 2 ? SIMD2(a[0].number ?? 0, a[1].number ?? 0) : nil }
-            return PlacedFixture(id: id, key: key, mode: o["mode"]?.string ?? "", universe: Int(o["universe"]?.number ?? 1),
-                                 address: Int(o["address"]?.number ?? 1), mount: mount, x: o["x"]?.number ?? 0.5,
-                                 yM: o["y_m"]?.number ?? d.0, zM: o["z_m"]?.number ?? d.1, rotDeg: o["rot_deg"]?.number ?? 0,
-                                 aim: aim, truss: o["truss"]?.string, trussPos: o["truss_pos_m"]?.number,
-                                 side: o["truss_side"]?.string, mountRoll: o["mount_roll_deg"]?.number)
+            var f = PlacedFixture(id: id, key: key, mode: o["mode"]?.string ?? "", universe: Int(o["universe"]?.number ?? 1),
+                                  address: Int(o["address"]?.number ?? 1), mount: mount, x: o["x"]?.number ?? 0.5,
+                                  yM: o["y_m"]?.number ?? d.0, zM: o["z_m"]?.number ?? d.1, rotDeg: o["rot_deg"]?.number ?? 0,
+                                  aim: aim, truss: o["truss"]?.string, trussPos: o["truss_pos_m"]?.number,
+                                  side: o["truss_side"]?.string, mountRoll: o["mount_roll_deg"]?.number)
+            f.waiting = o[Self.unplacedKey] != nil
+            return f
         }
     }
 
     public var width: Double { stage.widthM }
+    public var label: String { "\(set) on \(rig)" }
+    public var waitingCount: Int { fixtures.filter(\.waiting).count }
+
+    public var hasScreen: Bool {
+        switch raw["screen"] {
+        case nil, .some(.null), .some(.bool(false)): false
+        default: true
+        }
+    }
 
     /// The set as JSON, with the editor's changes merged into what was there.
     public func json() throws -> Data {
@@ -195,6 +243,17 @@ public struct RigDocument: Equatable {
         out["fixtures"] = .array(fixtures.map { f in
             var o = old[f.id] ?? [:]
             let r = { (v: Double, k: Double) in (v * k).rounded() / k }
+            if f.waiting {  // not mounted: its waiting spot, marked as such (the engine doesn't save it as a place)
+                for k in Self.placementKeys { o[k] = nil }
+                let spot: [String: JSONValue] = ["x": .number(r(f.x, 10000)), "y_m": .number(r(f.yM, 1000)),
+                                                 "z_m": .number(r(f.zM, 1000)), "mount": .string(f.mount)]
+                o.merge(spot) { _, new in new }
+                o[Self.unplacedKey] = .object(spot)
+                o["id"] = .string(f.id); o["fixture"] = .string(f.key); o["mode"] = .string(f.mode)
+                o["universe"] = .number(Double(f.universe)); o["address"] = .number(Double(f.address))
+                return .object(o)
+            }
+            o[Self.unplacedKey] = nil
             o["id"] = .string(f.id); o["fixture"] = .string(f.key); o["mode"] = .string(f.mode)
             o["universe"] = .number(Double(f.universe)); o["address"] = .number(Double(f.address))
             o["mount"] = .string(f.mount)

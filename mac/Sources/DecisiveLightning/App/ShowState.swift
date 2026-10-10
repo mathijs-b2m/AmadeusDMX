@@ -6,22 +6,31 @@ import Observation
 import Security
 
 enum Section: String, CaseIterable, Identifiable, Hashable {
-    case show, rig, sets, engine
+    case show, rig, set, engine
     var id: String { rawValue }
     var title: String {
         switch self {
         case .show: "Show"
         case .rig: "Rig"
-        case .sets: "Sets"
+        case .set: "Set"
         case .engine: "Engine"
         }
     }
     var symbol: String {
         switch self {
         case .show: "sparkles.tv"
-        case .rig: "light.overhead.right"
-        case .sets: "square.stack.3d.up"
+        case .rig: "square.split.bottomrightquarter"
+        case .set: "light.overhead.right"
         case .engine: "terminal"
+        }
+    }
+    /// What the page is for, in a few words (the sidebar's tooltip).
+    var help: String {
+        switch self {
+        case .show: "The show: the stage, the music and the director"
+        case .rig: "The venue: trusses, stage and zones, and where your fixtures hang"
+        case .set: "Your gear: the fixtures, their DMX patch and where the DMX goes"
+        case .engine: "The engine's log"
         }
     }
 }

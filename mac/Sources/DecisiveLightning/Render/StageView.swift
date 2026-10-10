@@ -8,12 +8,22 @@ import SwiftUI
 /// The rig editor: gets first go at clicks, drags and keys on the stage.
 @MainActor
 protocol StageEditing: AnyObject {
-    /// A click: true if it grabbed something (then drags move it instead of the camera).
-    func pick(origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool
+    /// A click: true if it grabbed something (then drags move it instead of the camera). `extend`: ⇧ held.
+    func pick(origin: SIMD3<Float>, dir: SIMD3<Float>, extend: Bool) -> Bool
     func drag(origin: SIMD3<Float>, dir: SIMD3<Float>, free: Bool)
     func endDrag()
     func clickedEmpty()
     func key(_ e: NSEvent) -> Bool
+    /// Something dragged in from elsewhere (text, e.g. fixture ids) is over / dropped on the stage.
+    func dropHover(origin: SIMD3<Float>, dir: SIMD3<Float>)
+    func drop(_ payload: String, origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool
+    func dropEnded()
+}
+
+extension StageEditing {
+    func dropHover(origin: SIMD3<Float>, dir: SIMD3<Float>) {}
+    func drop(_ payload: String, origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool { false }
+    func dropEnded() {}
 }
 
 final class StageMTKView: MTKView {
@@ -35,20 +45,40 @@ final class StageMTKView: MTKView {
             }
         }
         isPaused = false
+        registerForDraggedTypes([.string])
     }
 
-    private func ray(_ e: NSEvent) -> (SIMD3<Float>, SIMD3<Float>)? {
+    private func ray(_ e: NSEvent) -> (SIMD3<Float>, SIMD3<Float>)? { ray(windowPoint: e.locationInWindow) }
+
+    private func ray(windowPoint: NSPoint) -> (SIMD3<Float>, SIMD3<Float>)? {
         guard let r = renderer else { return nil }
-        let p = convert(e.locationInWindow, from: nil)
+        let p = convert(windowPoint, from: nil)
         let ray = r.ray(at: p, in: bounds.size)
         return (ray.origin, ray.dir)
+    }
+
+    // fixtures dragged in from the inspector
+    override func draggingEntered(_ info: NSDraggingInfo) -> NSDragOperation { draggingUpdated(info) }
+
+    override func draggingUpdated(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard let editor, let (o, d) = ray(windowPoint: info.draggingLocation) else { return [] }
+        editor.dropHover(origin: o, dir: d)
+        return .move
+    }
+
+    override func draggingExited(_ info: NSDraggingInfo?) { editor?.dropEnded() }
+
+    override func performDragOperation(_ info: NSDraggingInfo) -> Bool {
+        guard let editor, let text = info.draggingPasteboard.string(forType: .string),
+              let (o, d) = ray(windowPoint: info.draggingLocation) else { return false }
+        return editor.drop(text, origin: o, dir: d)
     }
 
     override func mouseDown(with e: NSEvent) {
         last = e.locationInWindow
         window?.makeFirstResponder(self)
         if let editor, let (o, d) = ray(e) {
-            if editor.pick(origin: o, dir: d) { dragging = true; return }
+            if editor.pick(origin: o, dir: d, extend: e.modifierFlags.contains(.shift)) { dragging = true; return }
             if e.clickCount == 1 { editor.clickedEmpty() }
         }
         if e.clickCount == 2, let r = renderer { r.setPreset(r.preset) }

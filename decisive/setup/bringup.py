@@ -7,10 +7,8 @@ orientation is calibrated) and changes are saved to the rig file at the end.
 
 from __future__ import annotations
 
-import json
 import threading
 import time
-from pathlib import Path
 
 import numpy as np
 
@@ -58,9 +56,9 @@ def _ask(prompt: str, keys: str = "") -> str:
         print(f"   Press Enter, or one of: {', '.join(keys)}")
 
 
-def run(rig_path: Path, level: float, ip: str | None):
-    rig = load_rig(rig_path)
-    original = json.loads(rig_path.read_text())
+def run(show, level: float, ip: str | None):
+    rig = load_rig(show)
+    original = show.load()
     st = geometry.stage(rig)
     port = rig.get("artnet", {}).get("port", 6454)
     fixtures = {f["id"]: f for f in rig["fixtures"]}
@@ -211,6 +209,6 @@ def run(rig_path: Path, level: float, ip: str | None):
                 f[k] = cur[k]
                 changed = True
     if changed:
-        rig_path.write_text(json.dumps(original, indent=2))
-        print(f"Calibration saved to {rig_path}.")
+        show.save(original)
+        print(f"Calibration saved to {show.label}.")
     print("Blacked out. Done.")

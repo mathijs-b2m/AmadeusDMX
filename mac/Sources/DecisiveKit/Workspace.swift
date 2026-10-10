@@ -1,5 +1,6 @@
 // Where the engine lives (the Decisive Lightning project folder with its Python environment) and the files
-// the app shares with it: config/sets/*.json, config/active-set, fixtures/, .env.
+// the app shares with it: config/sets (your gear), config/rigs (venues), config/active-set and active-rig,
+// fixtures/, .env. The file format is the engine's (decisive/rig/store.py, docs/rig-format.md).
 import Foundation
 
 public struct Workspace: Sendable, Equatable {
@@ -9,7 +10,9 @@ public struct Workspace: Sendable, Equatable {
 
     public var python: URL { root.appending(path: ".venv/bin/python") }
     public var setsDir: URL { root.appending(path: "config/sets") }
+    public var rigsDir: URL { root.appending(path: "config/rigs") }
     public var activeSetFile: URL { root.appending(path: "config/active-set") }
+    public var activeRigFile: URL { root.appending(path: "config/active-rig") }
     public var envFile: URL { root.appending(path: ".env") }
     public var pluginBundle: URL { root.appending(path: "vdj/build/DecisiveLink.bundle") }
 
@@ -27,30 +30,38 @@ public struct Workspace: Sendable, Equatable {
         (try? String(contentsOf: envFile, encoding: .utf8))?.contains("OPENAI_API_KEY") ?? false
     }
 
-    // MARK: sets
+    // MARK: first run and old files
 
-    public var exampleSetsDir: URL { root.appending(path: "examples/sets") }
+    /// A fresh checkout (no sets yet) or old combined set files: let the engine set things up, so the
+    /// migration lives in one place (decisive/rig/store.py). Fast; runs only when needed.
+    public func prepare() {
+        let fm = FileManager.default
+        let sets = names(in: setsDir)
+        let combined = sets.contains { name in
+            guard let o = (try? Data(contentsOf: setURL(name))).flatMap({ try? JSONDecoder().decode([String: JSONValue].self, from: $0) })
+            else { return false }
+            return RigDocument.rigKeys.contains { o[$0] != nil }
+        }
+        guard sets.isEmpty || combined || !fm.fileExists(atPath: rigsDir.path), isValid else { return }
+        let p = Process()
+        p.executableURL = python
+        p.arguments = ["-c", "from decisive.rig import store; store.sets.names(); store.rigs.names()"]
+        p.currentDirectoryURL = root
+        p.environment = ProcessInfo.processInfo.environment.merging(["DECISIVE_ROOT": root.path]) { _, new in new }
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
+        p.waitUntilExit()
+    }
 
-    public func setNames() -> [String] {
-        seedSetsIfEmpty()
-        let files = (try? FileManager.default.contentsOfDirectory(at: setsDir, includingPropertiesForKeys: nil)) ?? []
+    private func names(in dir: URL) -> [String] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         return files.filter { $0.pathExtension == "json" }.map { $0.deletingPathExtension().lastPathComponent }.sorted()
     }
 
-    /// A fresh checkout has no sets of its own yet: start with copies of the example sets (as the engine does).
-    private func seedSetsIfEmpty() {
-        let fm = FileManager.default
-        let own = (try? fm.contentsOfDirectory(at: setsDir, includingPropertiesForKeys: nil)) ?? []
-        guard !own.contains(where: { $0.pathExtension == "json" }),
-              let examples = try? fm.contentsOfDirectory(at: exampleSetsDir, includingPropertiesForKeys: nil) else { return }
-        try? fm.createDirectory(at: setsDir, withIntermediateDirectories: true)
-        for file in examples where file.pathExtension == "json" {
-            try? fm.copyItem(at: file, to: setsDir.appending(path: file.lastPathComponent))
-        }
-        if !fm.fileExists(atPath: activeSetFile.path) {
-            try? "showcase\n".write(to: activeSetFile, atomically: true, encoding: .utf8)
-        }
-    }
+    // MARK: sets (your gear)
+
+    public func setNames() -> [String] { names(in: setsDir) }
 
     public var activeSet: String? {
         (try? String(contentsOf: activeSetFile, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,6 +80,44 @@ public struct Workspace: Sendable, Equatable {
             guard let rig = loadSet(name) else { return nil }
             return SetSummary(name: name, rig: rig, isDefault: name == active)
         }
+    }
+
+    // MARK: rigs (venues)
+
+    public func rigNames() -> [String] { names(in: rigsDir) }
+
+    public var activeRig: String? {
+        (try? String(contentsOf: activeRigFile, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public func rigURL(_ name: String) -> URL { rigsDir.appending(path: "\(name).json") }
+
+    public func rigs() -> [RigSummary] {
+        let active = activeRig
+        return rigNames().compactMap { name in
+            guard let data = try? Data(contentsOf: rigURL(name)),
+                  let o = try? JSONDecoder().decode([String: JSONValue].self, from: data) else { return nil }
+            return RigSummary(name: name, json: o, isDefault: name == active)
+        }
+    }
+
+    // MARK: a set on a rig
+
+    /// The set placed on the rig, in the shape the engine reads (decisive/rig/store.py compose): fixtures with
+    /// their places on this rig; fixtures without one wait in a row on the floor at the front ("_unplaced").
+    public func composed(rig: String, set: String) -> Data? {
+        guard let setData = try? Data(contentsOf: setURL(set)),
+              let setDoc = try? JSONDecoder().decode([String: JSONValue].self, from: setData) else { return nil }
+        let rigDoc = (try? Data(contentsOf: rigURL(rig))).flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
+        return try? JSONEncoder().encode(RigDocument.compose(set: setDoc, rig: rigDoc, setName: set))
+    }
+
+    /// Which of the set's fixtures have a place on the rig: (mounted, all).
+    public func mounted(rig: String, set: String) -> (placed: Int, total: Int) {
+        let ids = loadSet(set)?.fixtures.map(\.id) ?? []
+        let rigDoc = (try? Data(contentsOf: rigURL(rig))).flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) }
+        let places = rigDoc?["placements"]?.object?[set]?.object ?? [:]
+        return (ids.filter { places[$0] != nil }.count, ids.count)
     }
 
     // MARK: finding the engine
@@ -183,6 +232,48 @@ public struct SetSummary: Sendable, Identifiable, Hashable {
 
 }
 
+/// A rig (config/rigs/NAME.json): a venue's structure, the parts the app lists.
+public struct RigSummary: Sendable, Identifiable, Hashable {
+    public var name: String
+    public var description: String
+    public var widthM: Double
+    public var trusses: Int
+    public var towers: Int
+    public var hasScreen: Bool
+    public var zones: Int
+    /// Sets with fixtures mounted on this rig, and how many.
+    public var mounted: [String: Int]
+    public var isDefault: Bool
+
+    public var id: String { name }
+
+    init(name: String, json o: [String: JSONValue], isDefault: Bool) {
+        self.name = name
+        description = o["description"]?.string ?? ""
+        widthM = o["stage"]?.object?["width_m"]?.number ?? 6
+        let ts = o["trusses"]?.array ?? []
+        towers = ts.filter { $0.object?["vertical"] == .bool(true) }.count
+        trusses = ts.count - towers
+        switch o["screen"] {
+        case nil, .some(.null), .some(.bool(false)): hasScreen = false
+        default: hasScreen = true
+        }
+        zones = o["zones"]?.array?.count ?? 0
+        mounted = (o["placements"]?.object ?? [:]).mapValues { $0.object?.count ?? 0 }
+        self.isDefault = isDefault
+    }
+
+    /// "12 m · 2 trusses · 2 towers · LED wall"
+    public var summary: String {
+        var parts = ["\(widthM.formatted()) m wide"]
+        if trusses > 0 { parts.append("\(trusses) truss\(trusses == 1 ? "" : "es")") }
+        if towers > 0 { parts.append("\(towers) tower\(towers == 1 ? "" : "s")") }
+        if trusses + towers == 0 { parts.append("floor and stands") }
+        if hasScreen { parts.append("LED wall") }
+        return parts.joined(separator: " · ")
+    }
+}
+
 // MARK: rig preview (before a show runs)
 
 extension Workspace {
@@ -192,19 +283,19 @@ extension Workspace {
         return try? JSONDecoder().decode(FixtureDefinition.self, from: data)
     }
 
-    public func document(_ name: String) -> RigDocument? {
-        guard let data = try? Data(contentsOf: setURL(name)) else { return nil }
-        return try? RigDocument(name: name, data: data)
+    public func document(rig: String, set: String) -> RigDocument? {
+        guard let data = composed(rig: rig, set: set) else { return nil }
+        return try? RigDocument(rig: rig, set: set, data: data)
     }
 
-    /// The set as the visualiser would place it (the same rules as decisive/fixtures.py + geometry.py).
-    public func preview(_ name: String) -> (fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss])? {
-        guard let doc = document(name) else { return nil }
+    /// The set on the rig as the visualiser would place it (the same rules as decisive/fixtures.py + geometry.py).
+    public func preview(rig: String, set: String) -> (fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss])? {
+        guard let doc = document(rig: rig, set: set) else { return nil }
         var defs: [String: FixtureDefinition] = [:]
         let els = RigElements.elements(doc) { key in
             if defs[key] == nil { defs[key] = definition(key) }
             return defs[key]
         }
-        return (els, doc.stage, loadSet(name)?.hasScreen ?? false, doc.trusses)
+        return (els, doc.stage, doc.hasScreen, doc.trusses)
     }
 }

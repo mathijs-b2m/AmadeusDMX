@@ -21,7 +21,7 @@ def lights(req):
     from decisive.setup import placement
 
     b = req.body()
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     if not b.get("on", True):
         placement.lights_off()
         event(f"{req.client} placement: lights off")
@@ -36,7 +36,7 @@ def analyze_photo(req):
     from decisive.setup import placement
 
     b = req.body()
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     batch = int(b.get("batch", 0))
     lit = [a for a in placement.assignments(rig) if a["batch"] == batch]
     saved = save_photo(b["image"])
@@ -54,11 +54,11 @@ def apply(req):
     from decisive.setup import placement
 
     b = req.body()
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     placement.apply(rig, b["changes"])
     problems = fxlib.validate(rig)
     if not problems:
-        req.rig_path.write_text(json.dumps(rig, indent=2))
+        req.show.save(rig)
     event(f"{req.client} placement: applied {len(b['changes'])} changes")
     return {"saved": not problems, "problems": problems}
 
@@ -94,7 +94,7 @@ def redo_scan(req):
 def _scan_result(req, path: Path, flip: bool, moves, batch: int) -> dict:
     from decisive.setup import placement, pointcloud
 
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     lit = [a for a in placement.assignments(rig) if a["batch"] == batch]
     t0 = time.monotonic()
     scan = pointcloud.analyse(path, rig, lit, flip=flip, moves=moves)

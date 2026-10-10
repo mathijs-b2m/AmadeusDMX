@@ -35,9 +35,9 @@ struct WizardView: View {
         switch w.step {
         case .welcome: WelcomeStep()
         case .engine: EngineStep()
-        case .venue: VenueStep(w: w)
         case .fixtures: FixturesStep(w: w)
         case .network: NetworkStep(w: w)
+        case .rig: RigStep(w: w)
         case .director: DirectorStep(w: w)
         case .review: ReviewStep(w: w)
         case .done: DoneStep(w: w)
@@ -59,13 +59,13 @@ struct WizardView: View {
             }
             switch w.step {
             case .review:
-                Button("Create Set") { Task { await w.create(model) } }
+                Button(w.autoMount ? "Create and Mount" : "Create") { Task { await w.create(model) } }
                     .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!w.canContinue || w.creating)
             case .done:
-                Button("Open the Show") {
-                    model.section = .show
+                Button(w.autoMount ? "Open the Show" : "Place the Fixtures") {
+                    model.section = w.autoMount ? .show : .rig
                     dismiss()
                 }
                 .buttonStyle(.glassProminent)
@@ -81,7 +81,7 @@ struct WizardView: View {
 
     private func next() {
         var s = WizardStep(rawValue: w.step.rawValue + 1) ?? .done
-        if s == .engine, model.workspace?.isValid == true, w.step == .welcome, !model.sets.isEmpty { s = .venue }
+        if s == .engine, model.workspace?.isValid == true, w.step == .welcome, !model.sets.isEmpty { s = .fixtures }
         w.step = s
     }
 
@@ -106,7 +106,7 @@ struct StepRail: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Image(systemName: "bolt.fill").foregroundStyle(.yellow)
-                Text("New Set").font(.headline)
+                Text("Set Up").font(.headline)
             }
             .padding(.bottom, 18)
             ForEach(WizardStep.allCases.filter { $0 != .welcome }, id: \.self) { s in

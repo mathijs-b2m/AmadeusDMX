@@ -1,6 +1,8 @@
-// The rig editor's state: one set being laid out. Trusses can be placed, moved, raised, turned and resized;
-// fixtures snap onto trusses (and move along with them), slide along them, turn, and aim.
-// Everything is written back into the set file; the engine reads plain positions (x, y_m, z_m, rot_deg, aim).
+// The rig editor's state: a set placed on a rig. The rig's trusses can be placed, moved, raised, turned and
+// resized; the set's fixtures snap onto trusses (and move along with them), slide along them, turn, and aim.
+// Fixtures not mounted yet wait on the floor in front of the stage. Several fixtures can be selected and
+// dragged together, or dropped onto a truss from the inspector; auto-mount places the rest.
+// Saving goes through the engine, which writes the rig (trusses, stage, zones, placements) and the set.
 import AppKit
 import DecisiveKit
 import Foundation
@@ -26,10 +28,15 @@ enum EditorSelection: Hashable {
 final class RigEditorModel: StageEditing {
     private(set) var doc: RigDocument
     private var saved: RigDocument
-    var selection: EditorSelection?
+    /// The primary selection (what the inspector shows); `group` holds more fixtures selected along with it.
+    var selection: EditorSelection? { didSet { if case .fixture = selection {} else if selection != nil { group = [] } } }
+    var group: Set<String> = []
+    /// While something is dragged over the stage from the inspector: the truss it would land on.
+    private(set) var dropTarget: String?
     var snap = true
     var showZones = true { didSet { version += 1 } }
     var message: String?
+    var busy = false
     @ObservationIgnored var undoManager: UndoManager?
     @ObservationIgnored private var defs: [String: FixtureDefinition] = [:]
     @ObservationIgnored private let workspace: Workspace
@@ -40,16 +47,19 @@ final class RigEditorModel: StageEditing {
     static let sideOut = 0.4      // a fixture on the front/back face: its centre out from the truss centre
     static let sides = ["under", "top", "front", "back"]
     static let grid = 0.25        // snapping step (m)
+    static let spacing = 0.6      // fixtures dropped or dragged as a group: this far apart on a truss
+    static let payloadPrefix = "fixtures:"
 
-    init?(workspace: Workspace, set: String) {
-        guard let d = workspace.document(set) else { return nil }
+    init?(workspace: Workspace, rig: String, set: String) {
+        guard let d = workspace.document(rig: rig, set: set) else { return nil }
         self.workspace = workspace
         doc = d
         saved = d
     }
 
     var isDirty: Bool { doc != saved }
-    var setName: String { doc.name }
+    var rigName: String { doc.rig }
+    var setName: String { doc.set }
 
     func definition(_ key: String) -> FixtureDefinition? {
         if let d = defs[key] { return d }
@@ -58,12 +68,29 @@ final class RigEditorModel: StageEditing {
         return d
     }
 
+    /// Every selected fixture: the primary one and the group.
+    var selectedFixtures: Set<String> {
+        var s = group
+        if case .fixture(let id) = selection { s.insert(id) }
+        return s
+    }
+
+    func select(fixtures ids: [String]) {
+        guard let first = ids.first else { selection = nil; group = []; return }
+        selection = .fixture(first)
+        group = Set(ids.dropFirst())
+        refresh()
+    }
+
     // MARK: - what the stage shows
 
     func stageInput() -> StageInput {
         let els = RigElements.elements(doc) { [unowned self] in definition($0) }
-        return StageInput(key: "edit:\(doc.name):\(version)", fixtures: els, stage: doc.stage, screen: false, hello: nil,
-                          trusses: doc.trusses, selected: selection.map { [$0.key] } ?? [], keepCamera: true,
+        var selected = selection.map { [$0.key] } ?? []
+        selected += group.map { "fixture:\($0)" }
+        if let t = dropTarget { selected.append("truss:\(t)") }
+        return StageInput(key: "edit:\(doc.label):\(version)", fixtures: els, stage: doc.stage, screen: doc.hasScreen, hello: nil,
+                          trusses: doc.trusses, selected: Set(selected), keepCamera: true,
                           zones: doc.zones.filter { z in showZones || selection == .zone(z.id) })
     }
 
@@ -88,6 +115,21 @@ final class RigEditorModel: StageEditing {
     }
 
     private func refresh() { version += 1 }
+
+    // MARK: - the venue
+
+    func updateStage(_ name: String = "Change Stage", _ body: (inout Stage) -> Void) {
+        change(name) { d in
+            body(&d.stage)
+            d.raw["stage"] = try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage))
+        }
+    }
+
+    func setScreen(_ on: Bool) {
+        change(on ? "Add LED Wall" : "Remove LED Wall") { d in
+            d.raw["screen"] = on ? .object(["width_m": .number(min(10, d.width * 0.55).rounded())]) : nil
+        }
+    }
 
     // MARK: - trusses
 
@@ -123,17 +165,21 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    /// Clamp a fixture to a truss (decisive/rig/trusses.py place: the same rules).
     static func place(_ f: inout PlacedFixture, on t: Truss, at u: Double, width: Double) {
         let u = t.vertical ? max(0.2, min(t.lengthM, u)) : max(-t.lengthM / 2, min(t.lengthM / 2, u))
         if f.truss != t.id && !t.vertical { f.rotDeg = t.rotDeg }  // clamped on: square to the truss
         f.truss = t.id
         f.trussPos = u
+        f.waiting = false
         if t.vertical {  // clamped to the tower's front, facing the audience
             let base = t.zM - t.lengthM / 2
             f.x = t.xM / width
             f.yM = t.yM + 0.32
             f.zM = base + u
-            if f.mount == "floor" { f.mount = "stand" }
+            f.side = nil
+            f.mountRoll = nil
+            f.mount = "stand"
         } else {
             // the box truss's four sides: under it, on top, on the front (audience) or the back face
             let side = f.side.flatMap { sides.contains($0) ? $0 : nil } ?? (f.mount == "stand" ? "top" : "under")
@@ -159,12 +205,24 @@ final class RigEditorModel: StageEditing {
         updateFixture(id, "Move to \(side.capitalized)") { $0.side = side }
     }
 
+    /// Every selected fixture on a box truss: onto this side of it.
+    func setSide(_ ids: Set<String>, _ side: String) {
+        change("Move to \(side.capitalized)") { d in
+            for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
+                guard let tid = d.fixtures[i].truss, let t = d.trusses.first(where: { $0.id == tid }), !t.vertical else { continue }
+                d.fixtures[i].side = side
+                Self.place(&d.fixtures[i], on: t, at: d.fixtures[i].trussPos ?? 0, width: d.width)
+            }
+        }
+    }
+
     // MARK: - fixtures
 
     func updateFixture(_ id: String, _ name: String = "Change Fixture", _ body: (inout PlacedFixture) -> Void) {
         change(name) { d in
             guard let i = d.fixtures.firstIndex(where: { $0.id == id }) else { return }
             body(&d.fixtures[i])
+            d.fixtures[i].waiting = false
             if let tid = d.fixtures[i].truss, let t = d.trusses.first(where: { $0.id == tid }) {
                 Self.place(&d.fixtures[i], on: t, at: d.fixtures[i].trussPos ?? 0, width: d.width)
             }
@@ -178,14 +236,88 @@ final class RigEditorModel: StageEditing {
                 f.trussPos = 0
                 if f.mount == "floor" { f.mount = "hang" }
             } else {
-                f.truss = nil; f.trussPos = nil
+                f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil
                 f.mount = "floor"; f.zM = 0.25
             }
         }
     }
 
-    /// Adds fixtures: spread along the selected truss, or in a row on the stage floor. Addresses are filled in
-    /// after the last used channel, universe by universe.
+    /// Back to waiting in front of the stage: not mounted on this rig any more (the set keeps them).
+    func unmount(_ ids: Set<String>) {
+        change(ids.count == 1 ? "Unmount Fixture" : "Unmount \(ids.count) Fixtures") { d in
+            for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
+                d.fixtures[i].waiting = true
+                d.fixtures[i].truss = nil; d.fixtures[i].trussPos = nil; d.fixtures[i].side = nil; d.fixtures[i].mountRoll = nil
+                d.fixtures[i].rotDeg = 0; d.fixtures[i].aim = nil
+            }
+            Self.lineUpWaiting(&d)
+        }
+        selection = nil
+        group = []
+    }
+
+    /// Waiting fixtures stand in a row on the floor at the front of the stage (as the engine puts them).
+    private static func lineUpWaiting(_ d: inout RigDocument) {
+        let waiting = d.fixtures.indices.filter { d.fixtures[$0].waiting }
+        for (k, i) in waiting.enumerated() {
+            d.fixtures[i].x = (Double(k) + 1) / Double(waiting.count + 1)
+            d.fixtures[i].yM = -0.3
+            d.fixtures[i].zM = 0.25
+            d.fixtures[i].mount = "floor"
+        }
+    }
+
+    /// Fixtures in a row along a truss, centred as near `u` as there is room (or one above the other on a tower),
+    /// `spacing` apart, clear of the fixtures already on that side of the truss.
+    private static func arrange(_ d: inout RigDocument, _ ids: [String], on t: Truss, at u: Double, side: String?,
+                                width: (PlacedFixture) -> Double) {
+        let n = Double(ids.count)
+        let own = ids.compactMap { id in d.fixtures.first { $0.id == id } }.map(width).max() ?? 0.4
+        let step = t.vertical ? 0.6 : max(spacing, own + 0.15)
+        let span = step * (n - 1)
+        // keep the whole row on the truss
+        let lo = t.vertical ? 0.3 : -t.lengthM / 2, hi = t.vertical ? t.lengthM - 0.3 : t.lengthM / 2
+        let mine = Set(ids)
+        let busy = d.fixtures.filter { f in
+            !mine.contains(f.id) && f.truss == t.id && (t.vertical || (f.side ?? "under") == (side ?? "under"))
+        }.compactMap { f in f.trussPos.map { ($0, t.vertical ? 0.45 : width(f)) } }
+        func fits(_ start: Double) -> Bool {   // housings at least 15 cm apart
+            start >= lo - 1e-6 && start + span <= hi + 1e-6
+                && (0..<ids.count).allSatisfy { k in
+                    busy.allSatisfy { abs(start + step * Double(k) - $0.0) >= (own + $0.1) / 2 + 0.15 }
+                }
+        }
+        let wanted = max(lo, min(hi - span, u - span / 2))
+        // the nearest free stretch: try further and further to either side
+        let start = stride(from: 0.0, through: t.lengthM, by: 0.05).lazy
+            .flatMap { off in [wanted - off, wanted + off] }
+            .first(where: fits) ?? wanted
+        for (k, id) in ids.enumerated() {
+            guard let i = d.fixtures.firstIndex(where: { $0.id == id }) else { continue }
+            if d.fixtures[i].truss != t.id {
+                d.fixtures[i].side = side
+                if d.fixtures[i].mount == "floor" || d.fixtures[i].waiting { d.fixtures[i].mount = t.vertical ? "stand" : "hang" }
+            }
+            place(&d.fixtures[i], on: t, at: start + step * Double(k), width: d.width)
+        }
+    }
+
+    /// Fixtures in a row on the floor around a point, left to right.
+    private static func lineUp(_ d: inout RigDocument, _ ids: [String], at p: SIMD2<Double>) {
+        let span = spacing * Double(ids.count - 1)
+        for (k, id) in ids.enumerated() {
+            guard let i = d.fixtures.firstIndex(where: { $0.id == id }) else { continue }
+            d.fixtures[i].truss = nil; d.fixtures[i].trussPos = nil; d.fixtures[i].side = nil; d.fixtures[i].mountRoll = nil
+            d.fixtures[i].waiting = false
+            d.fixtures[i].mount = "floor"
+            d.fixtures[i].zM = 0.25
+            d.fixtures[i].x = (p.x - span / 2 + spacing * Double(k)) / d.width
+            d.fixtures[i].yM = p.y
+        }
+    }
+
+    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. Addresses are
+    /// filled in after the last used channel, universe by universe.
     func addFixtures(key: String, mode: String, count: Int) {
         guard let def = definition(key), count > 0 else { return }
         let footprint = max(1, def.channels(mode))
@@ -221,6 +353,47 @@ final class RigEditorModel: StageEditing {
                 }
                 d.fixtures.append(f)
             }
+        }
+    }
+
+    // MARK: - auto-mount
+
+    /// Mount fixtures the engine's way (decisive/rig/automount.py): `ids`, or the ones waiting, or `all`.
+    /// One undoable change; nothing is saved until Save.
+    func autoMount(_ model: AppModel, ids: [String]? = nil, all: Bool = false) async {
+        busy = true
+        defer { busy = false }
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            guard let layout = try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any] else { return }
+            let places = try await model.api.automountPlacements(layout: layout, ids: ids, all: all)
+            apply(places, name: places.count == 1 ? "Auto-Mount Fixture" : "Auto-Mount \(places.count) Fixtures")
+            message = places.isEmpty ? "Everything is mounted already" : "Mounted \(places.count) fixture\(places.count == 1 ? "" : "s")"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    /// Placements (fixture id → position fields, as in a rig file) onto the fixtures.
+    func apply(_ places: [String: [String: JSONValue]], name: String) {
+        change(name) { d in
+            for i in d.fixtures.indices {
+                guard let p = places[d.fixtures[i].id] else { continue }
+                var f = d.fixtures[i]
+                f.waiting = false
+                f.mount = p["mount"]?.string ?? "stand"
+                f.x = p["x"]?.number ?? f.x
+                f.yM = p["y_m"]?.number ?? f.yM
+                f.zM = p["z_m"]?.number ?? f.zM
+                f.rotDeg = p["rot_deg"]?.number ?? 0
+                f.aim = p["aim"]?.array.flatMap { a in a.count == 2 ? SIMD2(a[0].number ?? 0, a[1].number ?? 0) : nil }
+                f.truss = p["truss"]?.string
+                f.trussPos = p["truss_pos_m"]?.number
+                f.side = p["truss_side"]?.string
+                f.mountRoll = p["mount_roll_deg"]?.number
+                d.fixtures[i] = f
+            }
+            Self.lineUpWaiting(&d)
         }
     }
 
@@ -276,6 +449,7 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    /// ⌫: a zone or truss is deleted; fixtures are unmounted (they stay in the set, waiting in front).
     func deleteSelection() {
         guard let sel = selection else { return }
         switch sel {
@@ -289,8 +463,9 @@ final class RigEditorModel: StageEditing {
                     d.fixtures[i].mount = "floor"; d.fixtures[i].zM = 0.25
                 }
             }
-        case .fixture(let id):
-            change("Delete Fixture") { $0.fixtures.removeAll { $0.id == id } }
+        case .fixture:
+            unmount(selectedFixtures)
+            return
         }
         selection = nil
     }
@@ -317,7 +492,14 @@ final class RigEditorModel: StageEditing {
     func rotateSelection(by deg: Double) {
         switch selection {
         case .truss(let id): updateTruss(id, "Rotate Truss") { $0.rotDeg = Self.wrap($0.rotDeg + deg) }
-        case .fixture(let id): updateFixture(id, "Rotate Fixture") { $0.rotDeg = Self.wrap($0.rotDeg + deg) }
+        case .fixture:
+            let ids = selectedFixtures
+            change("Rotate") { d in
+                for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
+                    d.fixtures[i].rotDeg = Self.wrap(d.fixtures[i].rotDeg + deg)
+                    d.fixtures[i].waiting = false
+                }
+            }
         case .zone(let id): updateZone(id, "Rotate Zone") { $0.rotDeg = Self.wrap($0.rotDeg + deg) }
         case nil: break
         }
@@ -326,9 +508,19 @@ final class RigEditorModel: StageEditing {
     func nudge(_ dx: Double, _ dy: Double) {
         switch selection {
         case .truss(let id): updateTruss(id, "Move Truss") { $0.xM += dx; $0.yM += dy }
-        case .fixture(let id):
-            updateFixture(id, "Move Fixture") { f in
-                if f.truss != nil { f.trussPos = (f.trussPos ?? 0) + dx } else { f.x += dx / doc.width; f.yM += dy }
+        case .fixture:
+            let ids = selectedFixtures
+            change("Move") { d in
+                for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
+                    var f = d.fixtures[i]
+                    f.waiting = false
+                    if let tid = f.truss, let t = d.trusses.first(where: { $0.id == tid }) {
+                        Self.place(&f, on: t, at: (f.trussPos ?? 0) + dx, width: d.width)
+                    } else {
+                        f.x += dx / d.width; f.yM += dy
+                    }
+                    d.fixtures[i] = f
+                }
             }
         case .zone(let id): updateZone(id, "Move Zone") { $0.centerV += [dx, dy, 0] }
         case nil: break
@@ -344,11 +536,25 @@ final class RigEditorModel: StageEditing {
 
     // MARK: - save / revert
 
-    func save() throws {
-        let data = try doc.json()
-        try data.write(to: workspace.setURL(doc.name), options: .atomic)
+    /// Saved through the engine's setup API: it splits the layout into the rig file and the set file.
+    func save(_ model: AppModel) async throws {
+        guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+        guard let layout = try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any] else { return }
+        try await model.api.saveRig(layout, rigName: doc.rig, setName: doc.set)
         saved = doc
-        message = "Saved \(doc.name)"
+        message = "Saved \(doc.rig)"
+        model.reloadSets()
+    }
+
+    /// The files changed (an auto-mount from elsewhere, a fixture added to the set): read them again, unless
+    /// there are unsaved changes here.
+    func reloadIfClean() {
+        guard !isDirty, let d = workspace.document(rig: doc.rig, set: doc.set), d != doc else { return }
+        doc = d
+        saved = d
+        selection = nil
+        group = []
+        refresh()
     }
 
     func revert() {
@@ -375,13 +581,29 @@ final class RigEditorModel: StageEditing {
         return (simd_length((o + d * sc) - (a + u * tc)), sc)
     }
 
-    func pick(origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool {
+    /// The truss a ray passes closest to (within `radius`), and where along it.
+    private func truss(near o: SIMD3<Double>, _ d: SIMD3<Double>, radius: Double) -> (Truss, Double)? {
+        var best: (Truss, Double, Double)?
+        for t in doc.trusses {
+            let a = t.vertical ? SIMD3(t.xM, t.yM, 0) : t.point(-t.lengthM / 2)
+            let b = t.vertical ? SIMD3(t.xM, t.yM, t.zM + t.lengthM / 2) : t.point(t.lengthM / 2)
+            let (dist, along) = Self.rayToSegment(o, d, a, b)
+            guard dist < radius, best == nil || dist < best!.2 else { continue }
+            let hit = o + d * along
+            let u = t.vertical ? hit.z - (t.zM - t.lengthM / 2) : t.project(SIMD2(hit.x, hit.y)).u
+            best = (t, u, dist)
+        }
+        return best.map { ($0.0, $0.1) }
+    }
+
+    func pick(origin: SIMD3<Float>, dir: SIMD3<Float>, extend: Bool) -> Bool {
         let o = s(origin), d = s(dir)
         var best: (sel: EditorSelection, score: Double, at: SIMD3<Double>)?
         func consider(_ sel: EditorSelection, _ a: SIMD3<Double>, _ b: SIMD3<Double>, radius: Double) {
             let (dist, t) = Self.rayToSegment(o, d, a, b)
-            // fixtures win from the truss they hang on (it's right in front of them, seen from above)
-            let score = t - (sel.isFixture ? 0.8 : 0)
+            // fixtures win from the truss they hang on (it's right in front of them, seen from above); between
+            // fixtures, the one closest to the pointer
+            let score = t - (sel.isFixture ? 0.8 - dist * 3 : 0)
             if dist < radius, best == nil || score < best!.score {
                 best = (sel, score, o + d * t)
             }
@@ -412,7 +634,26 @@ final class RigEditorModel: StageEditing {
             if let p = pickZone { best = (.zone(p.z.id), p.t, o + d * p.t) }
         }
         guard let b = best else { return false }
-        selection = b.sel
+        if case .fixture(let id) = b.sel {
+            if extend {  // ⇧-click: add to (or take out of) the selection
+                var all = selectedFixtures
+                if all.contains(id) { all.remove(id) } else { all.insert(id) }
+                let ordered = [id] + all.filter { $0 != id }.sorted()
+                select(fixtures: all.contains(id) ? ordered : Array(all.sorted()))
+                if !all.contains(id) { return true }
+            } else if !selectedFixtures.contains(id) {
+                group = []
+                selection = b.sel
+            } else {  // a click on one of the selected fixtures: it leads, the others come along
+                var rest = selectedFixtures
+                rest.remove(id)
+                selection = b.sel
+                group = rest
+            }
+        } else {
+            group = []
+            selection = b.sel
+        }
         refresh()
         let start: SIMD3<Double>
         switch b.sel {
@@ -451,6 +692,7 @@ final class RigEditorModel: StageEditing {
         case .fixture(let id):
             guard let i = doc.fixtures.firstIndex(where: { $0.id == id }) else { return }
             var f = doc.fixtures[i]
+            f.waiting = false
             let p2 = SIMD2(target.x, target.y)
             // snap onto the nearest truss within reach (towers by their footprint)
             let near = doc.trusses.map { ($0, $0.project(p2)) }.filter { $0.1.distance < 0.9 }.min { $0.1.distance < $1.1.distance }
@@ -466,27 +708,103 @@ final class RigEditorModel: StageEditing {
                     else if f.side == "front" || f.side == "back" || f.truss != tr.id { f.side = f.mount == "stand" ? "top" : "under" }
                 }
                 Self.place(&f, on: tr, at: u, width: doc.width)
+                doc.fixtures[i] = f
+                if !group.isEmpty {  // the others come along, in a row on the same truss
+                    let ids = rowOrder([id] + group, from: g.before)
+                    Self.arrange(&doc, ids, on: tr, at: groupCentre(ids, lead: id, leadU: u), side: f.side, width: housingWidth)
+                }
             } else {
                 if snapOn { target.x = (target.x / grid).rounded() * grid; target.y = (target.y / grid).rounded() * grid }
+                let delta = SIMD2(target.x - g.start.x, target.y - g.start.y)
                 if f.truss != nil { f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil; f.mount = "floor"; f.zM = 0.25 }
                 f.x = target.x / doc.width
                 f.yM = target.y
+                doc.fixtures[i] = f
+                for other in group {  // the others move by as much, onto the floor
+                    guard let j = doc.fixtures.firstIndex(where: { $0.id == other }),
+                          let was = g.before.fixtures.first(where: { $0.id == other }) else { continue }
+                    var o2 = doc.fixtures[j]
+                    let p = was.position(width: doc.width)
+                    o2.waiting = false
+                    o2.truss = nil; o2.trussPos = nil; o2.side = nil; o2.mountRoll = nil; o2.mount = "floor"; o2.zM = 0.25
+                    o2.x = (p.x + delta.x) / doc.width
+                    o2.yM = (was.waiting ? f.yM : p.y + delta.y)
+                    doc.fixtures[j] = o2
+                }
             }
-            doc.fixtures[i] = f
         }
         refresh()
+    }
+
+    /// How much of a truss a fixture takes up: its housing's width (a bar's length).
+    private func housingWidth(_ f: PlacedFixture) -> Double { definition(f.key)?.size.x ?? 0.4 }
+
+    /// The order of a group in a row: as they were, left to right.
+    private func rowOrder(_ ids: [String], from before: RigDocument) -> [String] {
+        ids.sorted { a, b in
+            let pa = before.fixtures.first { $0.id == a }?.x ?? 0, pb = before.fixtures.first { $0.id == b }?.x ?? 0
+            return pa < pb
+        }
+    }
+
+    /// Where a group's row is centred so that the leading fixture stays under the pointer.
+    private func groupCentre(_ ids: [String], lead: String, leadU: Double) -> Double {
+        let k = Double(ids.firstIndex(of: lead) ?? 0), n = Double(ids.count)
+        return leadU - (k - (n - 1) / 2) * Self.spacing
     }
 
     func endDrag() {
         guard let g = drag else { return }
         drag = nil
         if doc != g.before {
-            registerUndo(g.sel.isFixture ? "Move Fixture" : g.sel.isZone ? "Move Zone" : "Move Truss", g.before)
+            registerUndo(g.sel.isFixture ? (group.isEmpty ? "Move Fixture" : "Move Fixtures") : g.sel.isZone ? "Move Zone" : "Move Truss",
+                         g.before)
         }
     }
 
     func clickedEmpty() {
-        if selection != nil { selection = nil; refresh() }
+        if selection != nil || !group.isEmpty { selection = nil; group = []; refresh() }
+    }
+
+    // MARK: - dropping fixtures from the inspector
+
+    static func payload(_ ids: [String]) -> String { payloadPrefix + ids.joined(separator: ",") }
+
+    private static func ids(from payload: String) -> [String]? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        let ids = payload.dropFirst(payloadPrefix.count).split(separator: ",").map(String.init)
+        return ids.isEmpty ? nil : ids
+    }
+
+    func dropHover(origin: SIMD3<Float>, dir: SIMD3<Float>) {
+        let t = truss(near: s(origin), s(dir), radius: 0.8)?.0.id
+        if t != dropTarget { dropTarget = t; refresh() }
+    }
+
+    func dropEnded() {
+        if dropTarget != nil { dropTarget = nil; refresh() }
+    }
+
+    /// Fixtures dropped on the stage: in a row on the truss under the pointer, else on the floor there.
+    func drop(_ payload: String, origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool {
+        defer { dropEnded() }
+        guard let ids = Self.ids(from: payload)?.filter({ id in doc.fixtures.contains { $0.id == id } }), !ids.isEmpty else { return false }
+        let o = s(origin), d = s(dir)
+        if let (t, u) = truss(near: o, d, radius: 0.8) {
+            change(ids.count == 1 ? "Mount Fixture" : "Mount \(ids.count) Fixtures") { doc in
+                Self.arrange(&doc, ids, on: t, at: u, side: nil, width: housingWidth)
+                Self.lineUpWaiting(&doc)
+            }
+        } else {
+            guard d.z < -1e-4 else { return false }
+            let hit = o + d * (-o.z / d.z)
+            change(ids.count == 1 ? "Place Fixture" : "Place \(ids.count) Fixtures") { doc in
+                Self.lineUp(&doc, ids, at: SIMD2(hit.x, hit.y))
+                Self.lineUpWaiting(&doc)
+            }
+        }
+        select(fixtures: ids)
+        return true
     }
 
     func key(_ e: NSEvent) -> Bool {
@@ -499,6 +817,10 @@ final class RigEditorModel: StageEditing {
         case 125: nudge(0, step); return true                        // ↓ (towards the audience)
         case 126: nudge(0, -step); return true                       // ↑ (towards the back)
         default: break
+        }
+        if e.modifierFlags.contains(.command), e.charactersIgnoringModifiers == "a" {  // ⌘A: every fixture
+            select(fixtures: doc.fixtures.map(\.id))
+            return true
         }
         switch e.charactersIgnoringModifiers?.lowercased() {
         case "r": rotateSelection(by: shift ? 90 : 15); return true

@@ -98,8 +98,10 @@ public struct SetupAPI: Sendable {
         return try decode(try await URLSession.shared.data(for: req).0)
     }
 
-    func post<T: Decodable>(_ path: String, _ body: Any, timeout: TimeInterval = 60) async throws -> T {
-        var req = URLRequest(url: base.appending(path: path))
+    func post<T: Decodable>(_ path: String, _ body: Any, query: [String: String] = [:], timeout: TimeInterval = 60) async throws -> T {
+        var comps = URLComponents(url: base.appending(path: path), resolvingAgainstBaseURL: false)!
+        if !query.isEmpty { comps.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) } }
+        var req = URLRequest(url: comps.url!)
         req.httpMethod = "POST"
         req.timeoutInterval = timeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -150,8 +152,10 @@ public struct SetupAPI: Sendable {
         return r.nodes
     }
 
-    /// Creates a set and makes it the one being edited (and the default). `grid`: a generated rig
-    /// (`layout: "concert"` with model/count/width/height/depth/lasers), or nil for an empty set.
+    // MARK: sets (gear) and rigs (venues)
+
+    /// Creates a set and makes it the active one. `grid`: a generated test rig (`layout: "concert"` with
+    /// model/count/width/height/depth/lasers; its positions become a rig of the same name), or an empty set.
     public func createSet(name: String, grid: [String: Any]? = nil, copyOf: String? = nil) async throws {
         var body: [String: Any] = ["name": name]
         if let grid { body["grid"] = grid }
@@ -167,17 +171,69 @@ public struct SetupAPI: Sendable {
         let _: [String: JSONValue] = try await post("api/sets", ["delete": name])
     }
 
-    /// The set being edited (the default set), as raw JSON for editing.
-    public func rig() async throws -> [String: Any] {
-        let (data, _) = try await URLSession.shared.data(from: base.appending(path: "api/rig"))
+    public func renameSet(_ name: String, to new: String) async throws {
+        let _: [String: JSONValue] = try await post("api/sets", ["rename": name, "to": new])
+    }
+
+    /// A new rig from a template (floor, stands, booth, club, stage), or a copy of a rig; it becomes active.
+    public func createRig(name: String, template: String = "booth", width: Double = 8, height: Double = 4.5,
+                          depth: Double = 15, screen: Bool = false, copyOf: String? = nil) async throws {
+        var body: [String: Any] = ["name": name, "template": template, "width": width, "height": height,
+                                   "depth": depth, "screen": screen]
+        if let copyOf { body["copy"] = copyOf }
+        let _: [String: JSONValue] = try await post("api/rigs", body)
+    }
+
+    public func makeDefaultRig(_ name: String) async throws {
+        let _: [String: JSONValue] = try await post("api/rigs", ["active": name])
+    }
+
+    public func deleteRig(_ name: String) async throws {
+        let _: [String: JSONValue] = try await post("api/rigs", ["delete": name])
+    }
+
+    public func renameRig(_ name: String, to new: String) async throws {
+        let _: [String: JSONValue] = try await post("api/rigs", ["rename": name, "to": new])
+    }
+
+    private func pair(_ rig: String?, _ set: String?) -> [String: String] {
+        var q: [String: String] = [:]
+        if let rig { q["rig"] = rig }
+        if let set { q["set"] = set }
+        return q
+    }
+
+    /// A set on a rig (the active ones by default), as raw JSON for editing.
+    public func rig(rig: String? = nil, set: String? = nil) async throws -> [String: Any] {
+        var comps = URLComponents(url: base.appending(path: "api/rig"), resolvingAgainstBaseURL: false)!
+        let q = pair(rig, set)
+        if !q.isEmpty { comps.queryItems = q.map { URLQueryItem(name: $0.key, value: $0.value) } }
+        let (data, _) = try await URLSession.shared.data(from: comps.url!)
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
+    /// Saves a set on a rig: the engine splits it into the set file and the rig file.
     @discardableResult
-    public func saveRig(_ rig: [String: Any]) async throws -> SaveResult {
-        let r: SaveResult = try await post("api/rig", rig)
+    public func saveRig(_ rig: [String: Any], rigName: String? = nil, setName: String? = nil) async throws -> SaveResult {
+        let r: SaveResult = try await post("api/rig", rig, query: pair(rigName, setName))
         if r.saved == false { throw SetupAPIError.server((r.problems ?? []).joined(separator: "\n")) }
         return r
+    }
+
+    /// Auto-mount on the saved rig: `ids`, else the fixtures not mounted yet (`all`: every one). Saves.
+    public func automount(rig: String, set: String, ids: [String]? = nil, all: Bool = false) async throws {
+        var body: [String: Any] = ["all": all]
+        if let ids { body["ids"] = ids }
+        let _: [String: JSONValue] = try await post("api/automount", body, query: pair(rig, set))
+    }
+
+    /// Auto-mount on an unsaved layout (a combined set-on-rig dict): only the placements come back.
+    public func automountPlacements(layout: [String: Any], ids: [String]?, all: Bool) async throws -> [String: [String: JSONValue]] {
+        struct R: Decodable { var placements: [String: [String: JSONValue]] }
+        var body: [String: Any] = ["rig": layout, "all": all]
+        if let ids { body["ids"] = ids }
+        let r: R = try await post("api/automount", body)
+        return r.placements
     }
 
     /// Free start addresses for `count` fixtures of a mode: tightly packed, or on easy-to-dial numbers.
@@ -194,8 +250,8 @@ public struct SetupAPI: Sendable {
     }
 
     /// Lights one fixture white for 2 s (on the real rig).
-    public func identify(fixture: String) async throws {
-        let rig = try await rig()
+    public func identify(fixture: String, rig rigName: String? = nil, set: String? = nil) async throws {
+        let rig = try await rig(rig: rigName, set: set)
         let _: [String: JSONValue] = try await post("api/identify", ["fixture": fixture, "rig": rig])
     }
 }

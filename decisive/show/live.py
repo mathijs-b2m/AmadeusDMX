@@ -63,9 +63,9 @@ def open_listener(remote: str | None, code: str | None, cache: Path):
 class DirectorFollower:
     """Without --director, the show uses the set's decision model and follows changes the setup page saves."""
 
-    def __init__(self, rig_path: Path, shows: TrackShows):
-        self.path, self.shows = rig_path, shows
-        self.mtime = rig_path.stat().st_mtime if rig_path.exists() else 0.0
+    def __init__(self, show, shows: TrackShows):
+        self.show, self.shows = show, shows
+        self.mtime = show.mtime()
         self.checked = 0.0
 
     def poll(self, now: float):
@@ -73,10 +73,10 @@ class DirectorFollower:
             return
         self.checked = now
         try:
-            m = self.path.stat().st_mtime
+            m = self.show.mtime()
             if m != self.mtime:
                 self.mtime = m
-                self.shows.set_director(json.loads(self.path.read_text()).get("director", "rules"))
+                self.shows.set_director(self.show.load().get("director", "rules"))
         except (OSError, json.JSONDecodeError):
             pass
 
@@ -132,7 +132,7 @@ async def run(
     http_port: int = 8080,
     ws_port: int = 8765,
     cache: Path = paths.CACHE,
-    rig_path: Path | None = None,
+    show=None,
     health: float = 0.0,
     remote: str | None = None,
     code: str | None = None,
@@ -142,15 +142,15 @@ async def run(
     light loop keeps time, threads and memory (to tell a VirtualDJ stall from one of ours)."""
     from websockets.asyncio.server import serve
 
-    from decisive.rig import sets
+    from decisive.rig import store
 
-    rig_path = rig_path or sets.path()
+    show = show or store.current()
     listener = open_listener(remote, code, cache)
     follow_set = director is None  # no --director: the set's decision model, following changes to it
     director = director or rig.get("director", "rules")
     sender = open_output(rig, None if artnet_ip == "rig" else artnet_ip) if artnet_ip else None
     shows = TrackShows(rig, director, cache, real_output=drives_real_lights(sender, rig))
-    follower = DirectorFollower(rig_path, shows) if follow_set else None
+    follower = DirectorFollower(show, shows) if follow_set else None
     universes = sorted({f["universe"] for f in rig["fixtures"]})
     ids = [e["id"] for e in rig["elements"]]
     period = 1.0 / rig["artnet"].get("fps", 40)
@@ -159,7 +159,7 @@ async def run(
     mixer, bands = Mixer(rig), Bands()
     showing = None  # (deck, file, director, plan) the visualiser's hello describes
 
-    httpd = serve_http(http_port, rig_path)
+    httpd = serve_http(http_port, show)
     if remote:
         print(f"Live mode: VirtualDJ on {listener.name}, via Decisive Link.")
     else:

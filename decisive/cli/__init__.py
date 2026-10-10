@@ -6,9 +6,13 @@ decisive play    TRACK [--dmx [IP]]       play it with the lights (and the visua
 decisive live    [--dmx] [--remote …]     follow VirtualDJ (the DecisiveLink plugin), here or on a DJ laptop
 decisive setup   [--lan]                  web UI for fixtures, node and stage
 
-decisive set [NAME] [--copy-of SET | --grid MODEL:COUNT]   list, switch or create sets (rigs)
+decisive set [NAME] [--copy-of SET | --grid MODEL:COUNT]   your gear: list, switch or create sets
+decisive rig [NAME] [--template T] [--automount]          the venue: list, switch, create rigs; mount the set
 decisive library [WORDS] [--add KEY]                       fixture library: ours, QLC+, Open Fixture Library
 decisive patch MODEL[:COUNT] …                             patch fixtures into the active set
+
+A show runs with a set (your fixtures) placed on a rig (the trusses and stage): --set NAME --rig NAME, or
+the active ones (`decisive set NAME`, `decisive rig NAME`).
 
 decisive discover / simnode / test / gobos / colors / motion   hardware: find, simulate, calibrate
 decisive monitor                                               watch VirtualDJ and the engine run
@@ -34,18 +38,22 @@ def main(argv: list[str] | None = None):
         handlers.update(group.add_commands(sub))
     args = ap.parse_args(argv)
     paths.CACHE.mkdir(exist_ok=True)
-    if hasattr(args, "set_name") and args.rig is None:  # commands that work on a set
-        _resolve_set(args)
+    if hasattr(args, "set_name"):  # commands that work on a show's rig and set
+        _resolve_show(args)
     handlers[args.cmd](args)
 
 
-def _resolve_set(args):
-    """--set NAME, else the active set; the setup page without either edits whichever set you pick there."""
-    from decisive.rig import sets
+def _resolve_show(args):
+    """--rig / --set, else the active ones; the setup page without either edits whichever you pick there."""
+    from decisive.rig import store
 
-    args.edit_any_set = args.cmd == "setup" and not args.set_name
-    if args.set_name and sets.safe_name(args.set_name) not in sets.names():
-        raise SystemExit(f"No set '{args.set_name}'. Sets: {', '.join(sets.names())}")
-    args.rig = sets.path(sets.safe_name(args.set_name) if args.set_name else None)
+    args.edit_any_set = args.cmd == "setup" and not args.set_name and not args.rig
+    args.show = store.current(args.rig, args.set_name)
     if args.cmd in ANNOUNCE_SET:
-        print(f"Set: {args.rig.stem}")
+        placed, total = args.show.placed()
+        note = f" ({total - placed} of {total} fixtures not mounted yet)" if placed < total else ""
+        print(
+            f"Set '{args.show.set}' on the rig '{args.show.rig}'{note}"
+            if not args.show.file
+            else f"Rig file: {args.show.file}"
+        )

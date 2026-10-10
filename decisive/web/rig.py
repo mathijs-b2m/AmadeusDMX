@@ -17,7 +17,7 @@ OLLAMA_TAGS = "http://localhost:11434/api/tags"
 
 
 def get_rig(req):
-    return json.loads(req.rig_path.read_text())
+    return req.show.load()
 
 
 def save_rig(req):
@@ -26,7 +26,7 @@ def save_rig(req):
     rig = req.body()
     problems = fxlib.validate(rig) + outputs.validate(rig)
     if not problems:
-        req.rig_path.write_text(json.dumps(rig, indent=2))
+        req.show.save(rig)
     return {"saved": not problems, "problems": problems}
 
 
@@ -68,16 +68,16 @@ def set_director(req):
     director = req.body()["director"]
     if director not in {d["value"] for d in directors() if d["available"]}:
         return {"error": f"'{director}' is not available right now"}, 400
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     rig["director"] = director
-    req.rig_path.write_text(json.dumps(rig, indent=2))
+    req.show.save(rig)
     return {"saved": True, "director": director}
 
 
 def outputs_info(req):
     from decisive.dmx import outputs
 
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     return {
         "current": outputs.describe(rig),
         "output": rig.get("output"),
@@ -87,67 +87,112 @@ def outputs_info(req):
 
 
 def list_sets(req):
-    from decisive.rig import sets
+    """The sets (your gear) and the rigs (venues), which ones are active, and which ones this server is fixed to."""
+    from decisive.rig import store, templates
 
-    return {"sets": sets.info(), "fixed": str(req.fixed_rig) if req.fixed_rig else None}
+    fixed = req.fixed
+    return {
+        "sets": store.set_info(),
+        "rigs": store.rig_info(),
+        "active": {"set": store.sets.active(), "rig": store.rigs.active()},
+        "templates": templates.TEMPLATES,
+        "fixed": fixed.label if fixed else None,
+    }
 
 
 def change_sets(req):
-    """{"active": name} switches; {"name", "copy"|"grid"} creates (and switches); {"delete": name} deletes."""
-    from decisive.rig import sets
+    """{"active": name} switches; {"name", "copy"|"grid"} creates (and switches); {"delete": name} deletes;
+    {"rename": old, "to": new} renames."""
+    from decisive.rig import manage, store
 
     b = req.body()
-    if req.fixed_rig:
-        return {"error": f"this server was started with --rig {req.fixed_rig}"}, 409
+    if req.fixed:
+        return {"error": f"this server was started for {req.fixed.label}"}, 409
     if b.get("delete"):
-        name = sets.safe_name(b["delete"])
-        if len(sets.names()) <= 1:
-            return {"error": "can't delete the only set"}, 409
-        sets.path(name).unlink(missing_ok=True)
-        event(f"{req.client} set: deleted {name}")
-        b["active"] = sets.active_name() if sets.active_name() != name else next(n for n in sets.names() if n != name)
+        store.sets.delete(store.safe_name(b["delete"]))
+        event(f"{req.client} set: deleted {b['delete']}")
+    elif b.get("rename"):
+        name = store.sets.rename(store.safe_name(b["rename"]), b["to"])
+        _rename_placements(b["rename"], name)
+        event(f"{req.client} set: renamed {b['rename']} → {name}")
     elif b.get("name"):
-        name = sets.safe_name(b["name"])
-        if name in sets.names():
-            return {"error": f"a set '{name}' already exists"}, 409
-        rig = _new_set(b)
-        sets.save(name, rig)
-        event(f"{req.client} set: created {name} ({len(rig['fixtures'])} fixtures)")
-        b["active"] = name
-    sets.switch(sets.safe_name(b["active"]))
-    event(f"{req.client} set: active = {b['active']}")
-    return {"sets": sets.info()}
+        generated = _generated(b["grid"]) if b.get("grid") else None
+        name = manage.new_set(b["name"], copy_of=b.get("copy"), generated=generated)
+        event(f"{req.client} set: created {name}")
+        store.sets.switch(name)
+        if generated:
+            store.rigs.switch(name)
+    if b.get("active"):
+        store.sets.switch(store.safe_name(b["active"]))
+        event(f"{req.client} set: active = {b['active']}")
+    return list_sets(req)
 
 
-def _new_set(b: dict) -> dict:
-    from decisive.rig import sets
+def change_rigs(req):
+    """{"active": name} switches; {"name", "template"|"copy", "width", "height", "depth", "screen"} creates (and
+    switches); {"delete": name} deletes; {"rename": old, "to": new} renames."""
+    from decisive.rig import manage, store
 
-    if b.get("copy"):
-        rig = json.loads(sets.path(sets.safe_name(b["copy"])).read_text())
-        rig["description"] = f"copy of {b['copy']}"
-        return rig
-    if b.get("grid"):
-        from decisive.rig.grid import concert_rig, grid_rig
+    b = req.body()
+    if req.fixed:
+        return {"error": f"this server was started for {req.fixed.label}"}, 409
+    if b.get("delete"):
+        store.rigs.delete(store.safe_name(b["delete"]))
+        event(f"{req.client} rig: deleted {b['delete']}")
+    elif b.get("rename"):
+        name = store.rigs.rename(store.safe_name(b["rename"]), b["to"])
+        event(f"{req.client} rig: renamed {b['rename']} → {name}")
+    elif b.get("name"):
+        name = manage.new_rig(b["name"], b.get("template", "booth"), float(b.get("width", 8)),
+                              float(b.get("height", 4.5)), float(b.get("depth", 15)), bool(b.get("screen")),
+                              copy_of=b.get("copy"))  # fmt: skip
+        event(f"{req.client} rig: created {name}")
+        store.rigs.switch(name)
+    if b.get("active"):
+        store.rigs.switch(store.safe_name(b["active"]))
+        event(f"{req.client} rig: active = {b['active']}")
+    return list_sets(req)
 
-        g = b["grid"]
-        size = {
-            "width": float(g.get("width", 16)),
-            "height": float(g.get("height", 7)),
-            "depth": float(g.get("depth", 6)),
-        }
-        if g.get("layout") == "concert":
-            return concert_rig(g["model"], int(g["count"]), lasers=int(g.get("lasers", 0)), **size)
-        return grid_rig(g["model"], int(g["count"]), rows=int(g.get("rows", 3)), **size)
-    # empty: keep the node and safety settings of the current set
-    current = json.loads(sets.path().read_text()) if sets.path().exists() else {}
-    return {
-        "description": "",
-        "artnet": current.get("artnet", {"ip": "127.0.0.1", "port": 6454, "fps": 40}),
-        "safety": current.get("safety", {"max_flash_hz": 3, "master": 1.0}),
-        "fixtures": [],
-        "stage": current.get("stage", {}),
-        "director": current.get("director", "rules"),
-    }
+
+def _rename_placements(old: str, new: str):
+    from decisive.rig import store
+
+    for r in store.rigs.names():
+        doc = store.rigs.load(r)
+        places = doc.get("placements", {})
+        if old in places:
+            places[new] = places.pop(old)
+            store.rigs.save(r, doc)
+
+
+def _generated(g: dict) -> dict:
+    from decisive.rig.grid import concert_rig, grid_rig
+
+    size = {"width": float(g.get("width", 16)), "height": float(g.get("height", 7)), "depth": float(g.get("depth", 6))}
+    if g.get("layout") == "concert":
+        return concert_rig(g["model"], int(g["count"]), lasers=int(g.get("lasers", 0)), **size)
+    return grid_rig(g["model"], int(g["count"]), rows=int(g.get("rows", 3)), **size)
+
+
+def automount(req):
+    """{"ids": [...]} (else the fixtures not mounted yet; "all": true for every one): mount the set's fixtures
+    on the rig. Returns the new placements and the rig as it is now. With "rig": a combined dict (an editor's
+    unsaved layout), only the placements come back and nothing is saved."""
+    from decisive.rig import automount as am
+    from decisive.rig import manage, store
+
+    b = req.body()
+    if isinstance(b.get("rig"), dict):
+        merged = b["rig"]
+        ids = b.get("ids") or [f["id"] for f in merged.get("fixtures", []) if b.get("all") or f.get(store.UNPLACED)]
+        for f in merged.get("fixtures", []):
+            if f["id"] in ids:
+                f[store.UNPLACED] = True
+        return {"placements": am.automount(merged, ids)}
+    show = req.show
+    places = manage.mount(show, b.get("ids"), everything=bool(b.get("all")))
+    event(f"{req.client} automount: {len(places)} fixtures of {show.label}")
+    return {"placements": places, "rig": show.load()}
 
 
 def autopatch(req):
@@ -218,11 +263,19 @@ def page_log(req):
     return {"ok": True}
 
 
-GET = {"/api/rig": get_rig, "/api/directors": directors, "/api/outputs": outputs_info, "/api/sets": list_sets}
+GET = {
+    "/api/rig": get_rig,
+    "/api/directors": directors,
+    "/api/outputs": outputs_info,
+    "/api/sets": list_sets,
+    "/api/rigs": list_sets,
+}
 POST = {
     "/api/rig": save_rig,
     "/api/director": set_director,
     "/api/sets": change_sets,
+    "/api/rigs": change_rigs,
+    "/api/automount": automount,
     "/api/autopatch": autopatch,
     "/api/discover": discover,
     "/api/identify": identify,

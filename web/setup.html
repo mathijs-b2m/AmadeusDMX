@@ -14,12 +14,17 @@
 </header>
 <main>
   <section>
-    <h2>Set (which rig you are editing)</h2>
+    <h2>Set and rig (your fixtures, and the venue they hang on)</h2>
     <div class="row">
       <label>Set <select id="setSel"></select></label>
       <button id="setCopy">Copy as new set…</button>
       <button id="setNew">New empty set…</button>
       <button id="setDel">Delete this set</button>
+    </div>
+    <div class="row">
+      <label>Rig <select id="rigSel"></select></label>
+      <button id="rigNew">New rig…</button>
+      <button id="rigMount">Auto-mount the set on it</button>
     </div>
     <p class="note" id="setNote"></p>
     <details style="margin-top:8px"><summary class="note">Generate a set: many fixtures on a concert stage or a truss grid (for the visualiser)</summary>

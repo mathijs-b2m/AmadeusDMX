@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 
 from decisive import paths
@@ -81,10 +80,10 @@ def direct_or_play(args):
     from decisive.pipeline import get_plan, pick_director, separate_now
     from decisive.rig.loader import load_rig
 
-    if args.director == "auto" and args.cmd == "play" and args.rig.exists():  # the model chosen on the setup page
-        args.director = json.loads(args.rig.read_text()).get("director", "auto")
+    if args.director == "auto" and args.cmd == "play":  # the model chosen on the setup page
+        args.director = args.show.load().get("director", "auto")
     director = pick_director(args.director, args.wav, args.redo, args.tempo)
-    rig = load_rig(args.rig) if args.cmd == "play" else None
+    rig = load_rig(args.show) if args.cmd == "play" else None
     separate_now(args.wav)
     a, plan = get_plan(args.wav, director, args.redo, args.tempo, rig=rig)
     if args.cmd != "play":
@@ -116,12 +115,12 @@ def live(args):
     try:
         asyncio.run(
             run(
-                load_rig(args.rig),
+                load_rig(args.show),
                 args.director,
                 args.artnet,
                 http_port=args.port,
                 cache=paths.CACHE,
-                rig_path=args.rig,
+                show=args.show,
                 health=args.health,
                 remote=args.remote,
                 code=args.code,

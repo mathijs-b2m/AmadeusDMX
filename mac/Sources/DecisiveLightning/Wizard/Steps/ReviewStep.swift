@@ -1,4 +1,4 @@
-// Wizard: the set before it is saved.
+// Wizard: the set, the rig and how the set goes on it, before anything is made.
 import DecisiveKit
 import SwiftUI
 
@@ -8,23 +8,28 @@ struct ReviewStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             StepHeader(symbol: "checklist", title: "Ready to Create",
-                       text: "A set is one rig. A show starts with one set; make as many as you like.")
+                       text: "Your set (the fixtures) goes on the rig (the venue). Later you can mount the same set on other rigs.")
             Form {
-                TextField("Set name", text: $w.name)
-                LabeledContent("Venue", value: "\(w.venue.title), \(Int(w.width)) × \(Int(w.depth)) m, trusses at \(w.height.formatted()) m")
-                LabeledContent("Fixtures") {
-                    VStack(alignment: .trailing) {
-                        if w.quickRig, let e = w.quickEntry {
-                            Text("\(w.quickCount)× \(e.model) in a concert layout")
-                            if w.quickLasers > 0 { Text("\(w.quickLasers)× laser") }
-                        } else {
-                            ForEach(w.planned) { p in Text("\(p.count)× \(p.entry.model)") }
-                        }
+                SwiftUI.Section("1 · The set") {
+                    TextField("Set name", text: $w.name)
+                    LabeledContent("Fixtures") {
+                        VStack(alignment: .trailing) { ForEach(w.planned) { p in Text("\(p.count)× \(p.entry.model)") } }
+                    }
+                    LabeledContent("Lights", value: w.outputText)
+                    LabeledContent("Director", value: w.directors.first { $0.value == w.director }?.label ?? w.director)
+                }
+                SwiftUI.Section("2 · The rig") {
+                    if w.useExistingRig {
+                        LabeledContent("Rig", value: w.existingRig)
+                    } else {
+                        LabeledContent("Rig", value: "\(w.rigName): \(w.template.title.lowercased())")
+                        LabeledContent("Size", value: "\(w.width.formatted()) m wide\(w.template == .floor ? "" : ", trusses at \(w.height.formatted()) m")")
+                        LabeledContent("LED wall", value: w.ledWall ? "Yes" : "No")
                     }
                 }
-                LabeledContent("LED wall", value: w.ledWall ? "Yes" : "No")
-                LabeledContent("Lights", value: w.outputText)
-                LabeledContent("Director", value: w.directors.first { $0.value == w.director }?.label ?? w.director)
+                SwiftUI.Section("3 · On the rig") {
+                    LabeledContent("Fixtures", value: w.autoMount ? "Auto-mounted" : "Placed by hand in the rig editor")
+                }
             }
             .formStyle(.grouped)
         }

@@ -177,11 +177,13 @@ async function loadSets() {
   const r = await fetch("/api/sets").then(r => r.json());
   const active = r.sets.find(s => s.active);
   $("setSel").innerHTML = r.sets.map(s => `<option value="${s.name}" ${s.active ? "selected" : ""}>${s.name} (${s.fixtures} fixtures)</option>`).join("");
+  $("rigSel").innerHTML = r.rigs.map(g => `<option value="${g.name}" ${g.active ? "selected" : ""}>${g.name} (${g.width_m} m, ${g.trusses} trusses)</option>`).join("");
+  rigTemplates = r.templates || {};
   const fixed = r.fixed;
-  for (const id of ["setSel", "setCopy", "setNew", "setDel", "gMake"]) $(id).disabled = !!fixed;
+  for (const id of ["setSel", "setCopy", "setNew", "setDel", "gMake", "rigSel", "rigNew"]) $(id).disabled = !!fixed;
   $("setNote").textContent = fixed
     ? `This server edits ${fixed} (started with --set/--rig, or a show is running with it). Start "decisive setup" without --set to manage sets here.`
-    : `${active?.description || active?.summary || ""} · ${active?.output || "Art-Net " + (active?.artnet || "?")} · play/live/setup start with this set unless given --set NAME.`;
+    : `${active?.description || active?.summary || ""} · ${active?.output || "Art-Net " + (active?.artnet || "?")} · play/live/setup start with this set on this rig unless given --set / --rig.`;
   $("gModel").innerHTML = library.filter(l => l.kind === "moving_head").concat(library.filter(l => l.kind !== "moving_head"))
     .map(l => `<option value="${l.key}" ${/encore/i.test(l.model) ? "selected" : ""}>${l.manufacturer} ${l.model}</option>`).join("");
 }
@@ -191,9 +193,23 @@ async function setsPost(body) {
   await load(); await loadSets();
 }
 $("setSel").onchange = () => setsPost({ active: $("setSel").value });
+let rigTemplates = {};
+async function rigsPost(body, path = "/api/rigs") {
+  const r = await fetch(path, { method: "POST", body: JSON.stringify(body) }).then(r => r.json());
+  if (r.error) { msg(r.error, "bad"); return; }
+  await load(); await loadSets();
+}
+$("rigSel").onchange = () => rigsPost({ active: $("rigSel").value });
+$("rigNew").onclick = () => {
+  const t = prompt("Template: " + Object.entries(rigTemplates).map(([k, v]) => `${k} (${v})`).join("; "), "club"); if (!t) return;
+  const n = prompt("Name of the new rig:", t); if (!n) return;
+  const w = +prompt("Stage width in metres:", "10") || 10;
+  rigsPost({ name: n, template: t, width: w, screen: t === "club" || t === "stage" });
+};
+$("rigMount").onclick = () => rigsPost({}, "/api/automount");
 $("setCopy").onclick = () => { const n = prompt("Name of the new set (a copy of this one):"); if (n) setsPost({ name: n, copy: $("setSel").value }); };
 $("setNew").onclick = () => { const n = prompt("Name of the new, empty set:"); if (n) setsPost({ name: n }); };
-$("setDel").onclick = () => { const n = $("setSel").value; if (confirm(`Delete the set "${n}"? Its rig file is removed.`)) setsPost({ delete: n }); };
+$("setDel").onclick = () => { const n = $("setSel").value; if (confirm(`Delete the set "${n}"? Its fixtures and patch are removed (the rigs stay).`)) setsPost({ delete: n }); };
 $("gMake").onclick = () => {
   const n = prompt("Name of the new set:", `grid${$("gCount").value}`); if (!n) return;
   setsPost({ name: n, grid: { layout: $("gLayout").value, model: $("gModel").value, count: +$("gCount").value, rows: +$("gRows").value,

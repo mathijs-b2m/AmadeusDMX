@@ -4,6 +4,8 @@ AI-directed sound-to-light for DJs. Tracks are analysed (beats, bars, phrases, d
 
 There is a 3D visualiser in the browser and a native **Mac app** (`mac/`) with a Metal stage, a rig editor and a set-up assistant.
 
+Your lighting is described in two parts: a **set** (your fixtures: what you own and how it's patched) and a **rig** (a venue: the stage and the trusses). You make a set once, make a rig per venue, and mount the set on it: automatically or by dragging fixtures onto the trusses. See [Sets and rigs](#sets-and-rigs).
+
 ```
                       ┌─────────────── per track, ahead of time ───────────────┐
  audio (WAV/MP3/M4A) ─► analysis ─────────► director ─────────────► plan per phrase
@@ -30,8 +32,8 @@ echo 'OPENAI_API_KEY=sk-...' > .env          # optional: only for the OpenAI dec
 .venv/bin/decisive play "track.mp3" --dmx    # … and the real lights
 ```
 
-The first run starts with the example sets (`examples/sets`): a showcase of popular fixtures, concert rigs
-with 60 moving heads and lasers. Your own sets live in `config/` (not in git).
+The first run starts with the examples (`examples/`): a showcase set of popular fixtures on a club rig, and
+60 moving heads with lasers on a concert stage. Your own sets and rigs live in `config/` (not in git).
 
 **Mac app:** `cd mac && ./build-app.sh --install` (see `mac/README.md`).
 
@@ -49,14 +51,15 @@ For VirtualDJ: see [Live in VirtualDJ](#live-in-virtualdj).
 | `decisive analyze TRACK [--tempo half\|double]` | Audio analysis only (cached in `.cache/`) |
 | `decisive direct TRACK [--director …] [--redo]` | Build and print the show plan |
 | `decisive library` | List fixture definitions; `decisive library beamz fuze` searches QLC+ and the Open Fixture Library too, `--add <key>` adds a result |
-| `decisive patch MODEL[:COUNT] …` | Patch fixtures, assign addresses, write the rig |
+| `decisive patch MODEL[:COUNT] …` | Patch fixtures into the active set, assign addresses |
 | `decisive discover [--write] [--readdress] [--sim]` | Find the Art-Net node (and RDM fixtures) on the network |
 | `decisive test` | Hardware bring-up: each fixture on its own, then head orientation calibration |
 | `decisive gobos FIXTURE` | Project the gobos one by one and name them |
 | `decisive colors FIXTURE` | Show the colour wheel slot by slot and name the colours |
 | `decisive motion FIXTURE [--axis pan\|tilt]` | Measure how fast a moving head really swings on the beat |
 | `decisive simnode MODEL[:COUNT],…` | Simulated Net-2/5 with virtual (RDM) fixtures, decodes incoming DMX |
-| `decisive set [NAME]` | List, switch or create sets (rigs) |
+| `decisive set [NAME] [--new \| --copy-of SET]` | Your fixtures: list, switch or create sets |
+| `decisive rig [NAME] [--template T] [--automount [--all]]` | The venue: list, switch or create rigs (templates: floor, stands, booth, club, stage); mount the set on it |
 | `decisive monitor` | Watch VirtualDJ and the engine: CPU, memory, threads, GPU, crashes |
 
 (`decisive` = `.venv/bin/decisive`, or `python -m decisive`.) `--dmx` without an IP uses the node from the rig. Audio formats: WAV, MP3, FLAC, OGG, AIFF directly; M4A/AAC is decoded once with ffmpeg.
@@ -154,18 +157,25 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 
 ## Hardware
 
-### Sets (several rigs side by side)
+### Sets and rigs
 
-Each rig is a **set**: `config/sets/<name>.json`. A fresh checkout starts with copies of `examples/sets`. Commands use the active set (`config/active-set`) unless given `--set NAME`; a running show keeps the set it was started with.
+- A **set** is your gear: the fixtures you own, their DMX mode and address, calibration, where the DMX goes (`config/sets/<name>.json`). Most people have one.
+- A **rig** is a venue: the stage's size, trusses and towers, the LED wall, zones, and where each set's fixtures hang on it (`config/rigs/<name>.json`).
+- A show runs with a set placed on a rig: the active ones (`config/active-set`, `config/active-rig`), or `--set NAME --rig NAME`. A running show keeps the ones it started with.
 
 ```bash
-.venv/bin/decisive set                    # list
-.venv/bin/decisive set encore60           # make it the default for the next start
-.venv/bin/decisive play TRACK.mp3 --set encore60 --mute
-.venv/bin/decisive set encore60 --grid qlc:Martin/Martin-MAC-Encore-Performance.qxf:60 --rows 3 --width 16 --height 7
+.venv/bin/decisive set                                  # your sets
+.venv/bin/decisive rig                                  # your rigs, and which sets are mounted on them
+.venv/bin/decisive rig rotterdam --template club --width 10 --screen   # a new rig from a template
+.venv/bin/decisive rig --automount                      # mount the active set's fixtures on the active rig
+.venv/bin/decisive play TRACK.mp3 --set mine --rig rotterdam --mute
 ```
 
-On the setup page (`decisive setup` without `--set`) you pick the set you are editing, copy it, start an empty one, delete one, or **generate a truss-grid set** from any library fixture (Art-Net to 127.0.0.1 only, so a test rig never drives your real lights). The visualiser frames the room to the rig: a DJ booth or a 16 m grid at 7 m. Head motion for big rigs is simulated for all heads at once (60 heads: ~1.5 s on first load) and cached in `.cache/trajectories/`.
+**Mounting a set on a rig:** fixtures the rig has no place for yet wait on the floor in front of the stage. **Auto-mount** hangs them the way a lighting tech would start: lasers high at the back, moving heads under the trusses (some on the towers), strobes and blinders on the front, bars and pars on the floor, every model mirrored around the middle. In the Mac app's rig editor you can then drag any fixture, a ⇧-selection, or a whole group from the list onto a truss; a group hangs in a row. The same set can be mounted on as many rigs as you like; each rig remembers where it hangs. The file format and the rules are in [docs/rig-format.md](docs/rig-format.md).
+
+Sets from before rigs existed (fixtures with positions and the stage in one file) are split into a set and a rig of the same name the first time you run the engine or the Mac app; nothing changes for the show.
+
+**Test rigs:** `decisive set NAME --grid qlc:Martin/Martin-MAC-Encore-Performance.qxf:60 --rows 3 --width 16 --height 7` (or `--layout concert --lasers 10`) makes a set of many fixtures and a rig they hang on (Art-Net to 127.0.0.1 only, so a test rig never drives your real lights). Head motion for big rigs is simulated for all heads at once (60 heads: ~1.5 s on first load) and cached in `.cache/trajectories/`.
 
 ### Groups of heads (big rigs)
 
@@ -181,17 +191,14 @@ Towers fan out in height, waves span at most 4 beats, and safety nets keep drops
 
 ### Lasers
 
-Multicolour DMX lasers (kind `laser`, e.g. `fixtures/laserworld/cs-1000rgb-mk3.json`) get their own decisions per phrase when the rig has them: **look** (off, beams, fan, tunnel, cone, wave), **movement** (still, scan, rotate, wave, chase) and **colour** (from the palette); their on/off rhythm follows the heads' light. **Safety: laser beams always stay above the audience**: every laser gets a minimum elevation so that each beam is at least 3 m high at the stage edge and keeps rising (from the back of the stage that is ~18° up); cones and tunnels are lifted so their lowest beam obeys it too. Audience scanning with lasers is not supported. The pattern numbers per shape depend on the laser model: check them once on the real laser (`"laser": {"patterns": …}` in the fixture file). `decisive set NAME --layout concert --grid MODEL:60 --lasers 10` (or the setup page) adds lasers: on the front truss, at the back of the stage and on the towers.
+Multicolour DMX lasers (kind `laser`, e.g. `fixtures/laserworld/cs-1000rgb-mk3.json`) get their own decisions per phrase when the rig has them: **look** (off, beams, fan, tunnel, cone, wave), **movement** (still, scan, rotate, wave, chase) and **colour** (from the palette); their on/off rhythm follows the heads' light. **Safety: laser beams always stay above the audience**: every laser gets a minimum elevation so that each beam is at least 3 m high at the stage edge and keeps rising (from the back of the stage that is ~18° up); cones and tunnels are lifted so their lowest beam obeys it too. Audience scanning with lasers is not supported. The pattern numbers per shape depend on the laser model: check them once on the real laser (`"laser": {"patterns": …}` in the fixture file). Auto-mount puts lasers high at the back of the rig; `decisive set NAME --layout concert --grid MODEL:60 --lasers 10` (or the setup page) makes a concert test rig with lasers: on the front truss, at the back of the stage and on the towers.
 
-### Rig (a set file, or the setup page)
+### What's in a set and a rig
 
-- **`artnet`:** node IP, port, frame rate.
-- **`stage`:** width, ceiling, room depth (for the visualiser), `eye_safety`.
-- **`safety`:** `master`, `max_flash_hz`, `allow_fast_strobe`.
-- **`director`:** the decision model.
-- **`fixtures`:** id, library model, mode, universe, address, stage position `x`, and for heads `mount` plus calibration.
+- **Set:** `artnet` (node IP, port, frame rate) or `output` (sACN, USB), `safety` (`master`, `max_flash_hz`, `allow_fast_strobe`), `director` (the decision model), and `fixtures`: id, library model, mode, universe, address and calibration.
+- **Rig:** `stage` (width, ceiling, room depth, `eye_safety`), `trusses`, `screen` (an LED wall), `zones`, and `placements`: per set, per fixture, where it hangs (`x`, `y_m`, `z_m`, `mount`, `truss`, …).
 
-The **setup page** (`/setup.html`) edits all of this: add fixtures from the library, modes, addresses, auto-address and layout, Identify (lights one fixture white for 2 s), find the node on the network, stage and safety, decision model. Saves with overlapping addresses are refused.
+The **setup page** (`/setup.html`) edits the active set on the active rig: pick the set and the rig (or make a new rig from a template and auto-mount the set on it), add fixtures from the library, modes, addresses, auto-address and layout, Identify (lights one fixture white for 2 s), find the node on the network, stage and safety, decision model. Saves with overlapping addresses are refused.
 
 **Mobile setup** (`decisive setup --lan`, then open the printed `http://<mac-ip>:8080/m.html` on your phone): search a fixture across your library, the QLC+ library (~1,800 fixtures, Apache-2.0) and the Open Fixture Library (MIT); pick the DMX mode; get free start addresses (*easy to dial*: every address ends in 1, or *packed*) with what to set on the fixture's menu; add it to the rig. Existing fixtures keep their addresses. Or tap **📷 Photo**: photograph the fixture's label (type plate), or just the fixture. With `OPENAI_API_KEY`, `gpt-6-luna` looks at the photo and says what it is (brand, model, type, beam/spot/wash: read from the label, or recognised from the housing, lens and logo), then the Decisions API picks the matching entry among the closest library fixtures, with the photo; at ≥ 90 % from a label it opens the fixture straight away, from the looks alone it always asks you to confirm. Without a key, a local Ollama vision model (e.g. `gemma4`) reads the label and the text is searched (~10–30 s). Every step is logged in the setup terminal and `.cache/setup-events.log`; the last 20 photos are kept in `.cache/labels/`. The QLC+ library is fetched once as a sparse git checkout into `.cache/qlcplus` (~18 MB). `--lan` lets anyone on that network change the rig, so use it on a network you trust.
 
@@ -239,9 +246,9 @@ Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress
 | `mac/` | The Mac app and the Decisive Link app ([mac/README.md](mac/README.md)) |
 | `vdj/` | The DecisiveLink VirtualDJ plugin (SDK headers downloaded at build time) |
 | `fixtures/` | The fixture library |
-| `examples/sets/` | Example rigs; your own sets go to `config/sets/` |
+| `examples/` | Example sets and rigs; your own go to `config/sets/` and `config/rigs/` |
 | `tests/` | Golden-master and unit tests |
-| `docs/` | [Architecture](docs/architecture.md), [protocols](docs/protocols.md) |
+| `docs/` | [Architecture](docs/architecture.md), [sets and rigs](docs/rig-format.md), [protocols](docs/protocols.md) |
 
 ## Known limits
 

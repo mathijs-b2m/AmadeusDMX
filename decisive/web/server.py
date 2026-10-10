@@ -36,7 +36,6 @@ import json
 import socket
 import threading
 import time
-from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from decisive import paths
@@ -50,15 +49,19 @@ QUIET = {"/api/log"}  # not logged as a request (they log themselves)
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     """Static files from web/, and the API routes. Route handlers get the handler as `req`: `req.query`,
-    `req.body()`, `req.rig_path`, `req.fixed_rig`, `req.client`, `req.headers`, `req.rfile`."""
+    `req.body()`, `req.show` (the rig and set to work on), `req.fixed`, `req.client`, `req.headers`, `req.rfile`."""
 
-    fixed_rig: Path | None = None  # --rig/--set given (or a show is running); otherwise the active set
+    fixed = None  # a store.Selection: --rig/--set given (or a show is running); otherwise the active ones
 
     @property
-    def rig_path(self) -> Path:
-        from decisive.rig import sets
+    def show(self):
+        """The rig and set: `?rig=…&set=…` on the request, else the fixed ones, else the active ones."""
+        from decisive.rig import store
 
-        return self.fixed_rig or sets.path()
+        q = getattr(self, "query", {}) or {}
+        if q.get("rig") or q.get("set"):
+            return store.current(q.get("rig"), q.get("set"))
+        return self.fixed or store.current()
 
     @property
     def client(self) -> str:
@@ -89,9 +92,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         url = urlsplit(self.path)
-        self.query = {}
         if url.path not in POST:
             return self._reply({"error": "unknown endpoint"}, 404, url.path)
+        self.query = {k: v[0] for k, v in parse_qs(url.query).items()}
         return self._route(POST[url.path], url.path)
 
     def _route(self, handler, path: str):
@@ -124,7 +127,7 @@ def _summary(obj) -> str:
     return ""
 
 
-def serve(port: int, rig_path: Path | None = None, host: str = "127.0.0.1"):
+def serve(port: int, show=None, host: str = "127.0.0.1"):
     """Start the web UI server in a background thread; returns the server (call .shutdown()).
 
     host="0.0.0.0" makes it reachable from a phone on the same network (anyone on that network can
@@ -136,7 +139,7 @@ def serve(port: int, rig_path: Path | None = None, host: str = "127.0.0.1"):
                 f"Port {port} is already used by another process (a running `decisive live`/`play`/"
                 f"`setup`?). Stop it first, or use --port."
             )
-    handler = functools.partial(type("H", (Handler,), {"fixed_rig": rig_path}), directory=str(paths.WEB))
+    handler = functools.partial(type("H", (Handler,), {"fixed": show}), directory=str(paths.WEB))
     try:
         httpd = http.server.ThreadingHTTPServer((host, port), handler)
     except OSError as e:

@@ -72,10 +72,10 @@ def grid_rig(
 def _current_director() -> str:
     import json
 
-    from decisive.rig import sets
+    from decisive.rig import store
 
     try:
-        return json.loads(sets.path().read_text()).get("director", "rules")
+        return store.sets.load().get("director", "rules")
     except (OSError, json.JSONDecodeError):
         return "rules"
 

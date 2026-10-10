@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 
 def add_set_args(p: argparse.ArgumentParser):
-    p.add_argument("--rig", type=Path, default=None, help="rig file (default: the active set)")
-    p.add_argument("--set", dest="set_name", metavar="NAME", help="use this set (default: the active one)")
+    p.add_argument("--set", dest="set_name", metavar="NAME", help="your fixtures: this set (default: the active one)")
+    p.add_argument(
+        "--rig", metavar="NAME", help="the venue: this rig (default: the active one), or a combined .json file"
+    )
 
 
 def add_dmx_arg(p: argparse.ArgumentParser):

@@ -1,4 +1,5 @@
-// The rig editor: the stage in 3D (or from above), trusses and fixtures to place, an inspector for the selection.
+// The rig editor: the stage in 3D (or from above), the rig's trusses and zones, the set's fixtures to mount on
+// it (one by one, as a group, or automatically), and an inspector for the selection.
 import DecisiveKit
 import SwiftUI
 
@@ -24,7 +25,7 @@ struct RigEditorView: View {
                 toolbar.padding(12)
                 VStack {
                     Spacer()
-                    HStack {
+                    HStack(alignment: .bottom) {
                         hint
                         Spacer()
                         cameraButtons
@@ -35,10 +36,11 @@ struct RigEditorView: View {
             .frame(minWidth: 520)
 
             EditorInspector(editor: editor, showAdd: $showAdd)
-                .frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
+                .frame(minWidth: 300, idealWidth: 340, maxWidth: 440)
         }
         .onChange(of: undoManager) { editor.undoManager = undoManager }
-        .background {  // ⌘S saves the layout
+        .onChange(of: model.configVersion) { editor.reloadIfClean() }
+        .background {  // ⌘S saves the rig
             Button("") { save() }.keyboardShortcut("s", modifiers: .command).hidden()
         }
         .alert("Couldn’t Save", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -46,12 +48,15 @@ struct RigEditorView: View {
     }
 
     private func save() {
-        do { try editor.save(); model.reloadSets() } catch { self.error = error.localizedDescription }
+        Task {
+            do { try await editor.save(model) } catch { self.error = error.localizedDescription }
+        }
     }
 
     private var toolbar: some View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
+                RigMenu(editor: editor)
                 Menu {
                     SwiftUI.Section("Box truss (quatro, 30 cm)") {
                         ForEach([1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0], id: \.self) { l in
@@ -67,7 +72,7 @@ struct RigEditorView: View {
                     Label("Truss", systemImage: "square.split.bottomrightquarter")
                 }
                 .buttonStyle(.glass)
-                .help("Add a truss")
+                .help("Add a truss or a tower")
                 Menu {
                     SwiftUI.Section("Artistic (moving heads)") {
                         ForEach([RigEditorModel.ZonePreset.wall, .floorArea, .keepIn]) { p in
@@ -84,21 +89,38 @@ struct RigEditorView: View {
                 }
                 .buttonStyle(.glass)
                 .help("Draw a zone: where beams may not go (or may only go)")
-                Button { showAdd = true } label: { Label("Fixtures", systemImage: "plus.circle") }
-                    .buttonStyle(.glass)
-                    .help("Add fixtures: on the selected truss, or on the floor")
-                    .popover(isPresented: $showAdd, arrowEdge: .bottom) {
-                        AddFixturesView(editor: editor, isPresented: $showAdd)
+                Menu {
+                    Button("Mount the \(editor.doc.waitingCount) Waiting", systemImage: "wand.and.stars") {
+                        Task { await editor.autoMount(model) }
                     }
+                    .disabled(editor.doc.waitingCount == 0)
+                    if editor.selectedFixtures.count > 0 {
+                        Button("Re-Mount the Selected \(editor.selectedFixtures.count)", systemImage: "arrow.triangle.2.circlepath") {
+                            Task { await editor.autoMount(model, ids: Array(editor.selectedFixtures)) }
+                        }
+                    }
+                    Divider()
+                    Button("Re-Mount Everything", systemImage: "arrow.counterclockwise") { Task { await editor.autoMount(model, all: true) } }
+                } label: {
+                    Label("Auto-Mount", systemImage: "wand.and.stars")
+                } primaryAction: {
+                    Task { await editor.autoMount(model, all: editor.doc.waitingCount == 0) }
+                }
+                .buttonStyle(.glass)
+                .disabled(editor.busy || editor.doc.fixtures.isEmpty)
+                .help("Hang the fixtures that wait in front of the stage: heads on the trusses, lasers high at the back, bars on the floor…")
                 Toggle(isOn: $editor.showZones) { Label("Zones", systemImage: editor.showZones ? "eye" : "eye.slash") }
                     .toggleStyle(.button)
                     .buttonStyle(.glass)
+                    .labelStyle(.iconOnly)
                     .help("Show or hide the zones (a selected zone always shows)")
                 Toggle(isOn: $editor.snap) { Label("Snap", systemImage: "squareshape.split.3x3") }
                     .toggleStyle(.button)
                     .buttonStyle(.glass)
+                    .labelStyle(.iconOnly)
                     .help("Snap to the 25 cm grid and onto trusses (hold ⌥ while dragging to place freely)")
                 Spacer()
+                if editor.busy { ProgressView().controlSize(.small) }
                 if let m = editor.message {
                     Text(m).font(.callout).foregroundStyle(.secondary)
                         .task(id: m) { try? await Task.sleep(for: .seconds(2.5)); editor.message = nil }
@@ -109,15 +131,23 @@ struct RigEditorView: View {
                 Button("Save") { save() }
                     .buttonStyle(.glassProminent)
                     .disabled(!editor.isDirty)
-                    .help("Write the layout into the set (⌘S)")
+                    .help("Save the rig, and where the set hangs on it (⌘S)")
             }
         }
     }
 
     private var hint: some View {
-        Text(editor.selection == nil
-             ? "Click a truss or fixture to select it · drag empty space to turn the view"
-             : "Drag to move · R rotates 15° (⇧R 90°) · arrows nudge · ⌫ deletes · ⌥-drag places freely")
+        let n = editor.selectedFixtures.count
+        let text = if editor.doc.waitingCount > 0 && editor.selection == nil {
+            "\(editor.doc.waitingCount) fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount"
+        } else if editor.selection == nil {
+            "Click to select · ⇧-click for more · ⌘A all fixtures · drag empty space to turn the view"
+        } else if n > 1 {
+            "\(n) selected: drag one and the rest come along · ⌫ unmounts them · R rotates"
+        } else {
+            "Drag to move · R rotates 15° (⇧R 90°) · arrows nudge · ⌫ unmounts or deletes · ⌥-drag places freely"
+        }
+        return Text(text)
             .font(.caption)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .glassEffect(.regular, in: .capsule)
@@ -132,6 +162,71 @@ struct RigEditorView: View {
                         .help(p.rawValue)
                 }
             }
+        }
+    }
+}
+
+/// The rig's name: switch to another rig, make a new one, duplicate, rename, delete.
+private struct RigMenu: View {
+    @Environment(AppModel.self) private var model
+    let editor: RigEditorModel
+    @State private var renaming: String?
+    @State private var confirmDelete = false
+    @State private var error: String?
+
+    var body: some View {
+        Menu {
+            Picker("Rig", selection: Binding(get: { model.selectedRig }, set: { model.choose(rig: $0) })) {
+                ForEach(model.rigs) { r in Text("\(r.name) — \(r.summary)").tag(r.name) }
+            }
+            .pickerStyle(.inline)
+            Divider()
+            Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
+            Button("Duplicate", systemImage: "plus.square.on.square") {
+                let r = model.selectedRig
+                run { try await model.api.createRig(name: unique(r + "-copy"), copyOf: r) }
+            }
+            Button("Rename…", systemImage: "pencil") { renaming = model.selectedRig }
+            Button("Show in Finder", systemImage: "folder") {
+                if let url = model.workspace?.rigURL(model.selectedRig) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            }
+            Divider()
+            Button("Delete…", systemImage: "trash", role: .destructive) { confirmDelete = true }
+                .disabled(model.rigs.count <= 1)
+        } label: {
+            Label(editor.isDirty ? "\(model.selectedRig) •" : model.selectedRig, systemImage: "building.2")
+        }
+        .buttonStyle(.glass)
+        .disabled(model.engineRunning)
+        .help("The rig: switch, make a new one, rename… (unsaved changes are kept until you switch)")
+        .alert("Rename the Rig", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: Binding(get: { renaming ?? "" }, set: { renaming = $0 }))
+            Button("Rename") {
+                let old = model.selectedRig, new = renaming ?? old
+                run { try await model.api.renameRig(old, to: new); await MainActor.run { model.selectedRig = new.lowercased() } }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Delete the rig “\(model.selectedRig)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { let r = model.selectedRig; run { try await model.api.deleteRig(r) } }
+        } message: {
+            Text("Its trusses, zones and where every set hung on it are removed. Your sets (the fixtures) stay.")
+        }
+        .alert("Couldn’t Change the Rigs", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+        } message: { Text(error ?? "") }
+    }
+
+    private func unique(_ base: String) -> String {
+        var n = base, i = 2
+        while model.rigs.contains(where: { $0.name == n }) { n = "\(base)\(i)"; i += 1 }
+        return n
+    }
+
+    private func run(_ op: @escaping () async throws -> Void) {
+        Task {
+            guard await model.ensureSetupService() else { error = "The engine's setup service did not start."; return }
+            do { try await op() } catch { self.error = error.localizedDescription }
+            model.reloadSets()
         }
     }
 }

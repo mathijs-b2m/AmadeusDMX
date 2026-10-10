@@ -8,13 +8,11 @@ default so it can run next to the discovery client on one machine.
 
 from __future__ import annotations
 
-import json
 import socket
 import struct
 import time
 import zlib
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from decisive.dmx import rdm
 from decisive.library import fixtures as fxlib
@@ -64,11 +62,11 @@ def build(spec: str, universe: int, rdm_capable: bool) -> list[VirtualFixture]:
     return out
 
 
-def preaddress(fixtures: list[VirtualFixture], rig_path: Path) -> bool:
-    """Give virtual fixtures the addresses/modes the rig expects, matched by model in patch order."""
-    if not rig_path.exists():
+def preaddress(fixtures: list[VirtualFixture], show) -> bool:
+    """Give virtual fixtures the addresses/modes the set expects, matched by model in patch order."""
+    patched = show.load().get("fixtures", [])
+    if not patched:
         return False
-    patched = json.loads(rig_path.read_text()).get("fixtures", [])
     queues: dict[str, list[dict]] = {}
     for fx in sorted(patched, key=lambda f: (f["universe"], f["address"])):
         queues.setdefault(fx["fixture"], []).append(fx)
@@ -86,11 +84,11 @@ def run(
     universe: int = 0,
     rdm_capable: bool = True,
     monitor: bool = True,
-    rig_path: Path | None = None,
+    show=None,
 ):
     fixtures = build(spec, universe, rdm_capable)
-    if rig_path is not None and preaddress(fixtures, rig_path):
-        print(f"Addresses taken from {rig_path} (use --factory to start everything at address 1)")
+    if show is not None and preaddress(fixtures, show):
+        print(f"Addresses taken from {show.label} (use --factory to start everything at address 1)")
     by_uid = {f.uid: f for f in fixtures}
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, port))

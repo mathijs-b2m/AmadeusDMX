@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from decisive.library import fixtures as fxlib
 from decisive.web.events import event, save_photo
 
@@ -50,7 +48,7 @@ def suggest(req):
 
     b = req.body()
     n = len(catalog.details(b["key"])["modes"][b["mode"]])
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     return {"footprint": n, **catalog.suggest_addresses(rig, n, int(b.get("count", 1)), int(b.get("universe", 1)))}
 
 
@@ -59,11 +57,11 @@ def add_to_rig(req):
     from decisive.library import catalog
 
     b = req.body()
-    rig = json.loads(req.rig_path.read_text())
+    rig = req.show.load()
     new = catalog.add_to_rig(rig, b["key"], b["mode"], [int(a) for a in b["addresses"]], int(b.get("universe", 1)))
     problems = fxlib.validate(rig)
     if not problems:
-        req.rig_path.write_text(json.dumps(rig, indent=2))
+        req.show.save(rig)
     return {"saved": not problems, "problems": problems, "added": new}
 
 

@@ -1,41 +1,9 @@
-// The setup wizard's state and the steps that create a set through the engine's setup API.
+// The setup wizard's state: 1. a set (your fixtures and where the DMX goes), 2. a rig (the venue: a new one from a
+// template, or one you have), 3. the set placed on the rig (auto-mounted, or by hand in the rig editor).
+// Everything is made through the engine's setup API.
 import DecisiveKit
 import Foundation
 import Observation
-
-enum Venue: String, CaseIterable, Identifiable {
-    case mobile, club, stage
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .mobile: "Mobile DJ"
-        case .club: "Club"
-        case .stage: "Concert Stage"
-        }
-    }
-    var detail: String {
-        switch self {
-        case .mobile: "A DJ booth with a few pars and moving heads on stands."
-        case .club: "Heads on a truss over the booth, maybe lasers and an LED wall."
-        case .stage: "Overhead trusses, towers, a row at the back: audience scanning."
-        }
-    }
-    var symbol: String {
-        switch self {
-        case .mobile: "car.side"
-        case .club: "music.note.house"
-        case .stage: "theatermasks"
-        }
-    }
-    /// width, trim height, room depth (m)
-    var size: (Double, Double, Double) {
-        switch self {
-        case .mobile: (4, 3, 8)
-        case .club: (8, 5, 15)
-        case .stage: (12, 7, 25)
-        }
-    }
-}
 
 struct PlannedFixture: Identifiable, Hashable {
     var id = UUID()
@@ -43,19 +11,18 @@ struct PlannedFixture: Identifiable, Hashable {
     var mode: String
     var modes: [String]
     var count: Int
-    var mount: String
 }
 
 enum WizardStep: Int, CaseIterable {
-    case welcome, engine, venue, fixtures, network, director, review, done
+    case welcome, engine, fixtures, network, rig, director, review, done
 
     var title: String {
         switch self {
         case .welcome: "Welcome"
         case .engine: "Engine"
-        case .venue: "Venue"
-        case .fixtures: "Fixtures"
+        case .fixtures: "Your Fixtures"
         case .network: "Lights"
+        case .rig: "Rig"
         case .director: "Director"
         case .review: "Review"
         case .done: "Done"
@@ -67,17 +34,8 @@ enum WizardStep: Int, CaseIterable {
 @Observable
 final class WizardModel {
     var step: WizardStep = .welcome
-    var venue: Venue = .club { didSet { applyVenue() } }
-    var width = 8.0
-    var height = 5.0
-    var depth = 15.0
-    var ledWall = true
 
-    // fixtures
-    var quickRig = false
-    var quickEntry: CatalogEntry?
-    var quickCount = 24
-    var quickLasers = 4
+    // the set: fixtures
     var planned: [PlannedFixture] = []
     var query = ""
     var results: [CatalogEntry] = []
@@ -98,18 +56,29 @@ final class WizardModel {
     var discovering = false
     var discoverError: String?
 
+    // the rig: a new one from a template, or one there is already; and how the set goes on it
+    var useExistingRig = false
+    var existingRig = ""
+    var template: RigTemplate = .club { didSet { applyTemplate() } }
+    var rigName = "club"
+    var width = 10.0
+    var height = 4.5
+    var depth = 15.0
+    var ledWall = true
+    var autoMount = true
+
     // director
     var directors: [DirectorOption] = []
     var director = "rules"
 
     // create
-    var name = ""
+    var name = "my-set"
     var creating = false
     var progress = ""
     var error: String?
 
     init() {
-        applyVenue()
+        applyTemplate()
         if let raw = UserDefaults.standard.string(forKey: "wizardStep"),  // -wizardStep network (testing)
            let st = WizardStep.allCases.first(where: { $0.title.lowercased() == raw || "\($0)" == raw }) {
             step = st
@@ -117,20 +86,18 @@ final class WizardModel {
         }
     }
 
-    private func applyVenue() {
-        (width, height, depth) = venue.size
-        ledWall = venue != .mobile
-        quickRig = venue == .stage
-        if name.isEmpty || ["mobile", "club", "stage"].contains(where: { name.hasPrefix($0) }) {
-            name = venue.rawValue
-        }
+    private func applyTemplate() {
+        (width, height, depth) = template.size
+        ledWall = template == .club || template == .stage
+        if RigTemplate.allCases.contains(where: { rigName.hasPrefix($0.rawValue) }) || rigName.isEmpty { rigName = template.rawValue }
     }
 
-    var fixtureCount: Int { quickRig ? quickCount + quickLasers : planned.reduce(0) { $0 + $1.count } }
+    var fixtureCount: Int { planned.reduce(0) { $0 + $1.count } }
 
     var canContinue: Bool {
         switch step {
-        case .fixtures: quickRig ? quickEntry != nil : !planned.isEmpty
+        case .fixtures: !planned.isEmpty
+        case .rig: useExistingRig ? !existingRig.isEmpty : !rigName.trimmingCharacters(in: .whitespaces).isEmpty
         case .network: (output != .node || node != nil) && (output != .usb || !usb.isEmpty || usbPort == "auto")
         case .review: !name.trimmingCharacters(in: .whitespaces).isEmpty
         default: true
@@ -150,9 +117,8 @@ final class WizardModel {
     func add(_ e: CatalogEntry, _ api: SetupAPI) async {
         var modes = e.modes.map { $0.sorted { $0.value > $1.value }.map(\.key) } ?? []
         if modes.isEmpty, let d = try? await api.details(e.key) { modes = d.modeList.map(\.name) }
-        let mount = e.type == "moving head" ? (venue == .mobile ? "stand" : "hang") : "stand"
         planned.append(PlannedFixture(entry: e, mode: modes.first ?? "", modes: modes,
-                                      count: e.type == "moving head" ? 4 : 2, mount: mount))
+                                      count: e.type == "moving head" ? 4 : 2))
     }
 
     // MARK: network
@@ -207,69 +173,64 @@ final class WizardModel {
         }
     }
 
-    // MARK: create the set
+    // MARK: create: the set, the rig, the set on the rig
+
+    static func safe(_ name: String) -> String {
+        name.lowercased().replacingOccurrences(of: #"[^a-z0-9_-]+"#, with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    }
 
     func create(_ model: AppModel) async {
         creating = true
         error = nil
         defer { creating = false }
         let api = model.api
-        let setName = name.lowercased().replacingOccurrences(of: #"[^a-z0-9_-]+"#, with: "-", options: .regularExpression)
+        let setName = Self.safe(name)
+        let rig = useExistingRig ? existingRig : Self.safe(rigName)
         do {
             progress = "Starting the engine’s setup service…"
             guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
             if model.sets.contains(where: { $0.name == setName }) {
                 throw SetupAPIError.server("A set called “\(setName)” already exists. Choose another name.")
             }
-            if quickRig, let e = quickEntry {
-                progress = "Building a concert rig of \(quickCount)× \(e.model)…"
-                try await api.createSet(name: setName, grid: [
-                    "layout": "concert", "model": e.key, "count": quickCount, "width": width, "height": height,
-                    "depth": min(8, max(3, width * 0.4)), "lasers": quickLasers,   // depth of the stage, not the room
-                ])
+            if !useExistingRig && model.rigs.contains(where: { $0.name == rig }) {
+                throw SetupAPIError.server("A rig called “\(rig)” already exists. Choose another name, or use it.")
+            }
+            progress = "1/3 · The set…"
+            try await api.createSet(name: setName)
+            progress = "2/3 · The rig…"
+            if useExistingRig {
+                try await api.makeDefaultRig(rig)
             } else {
-                progress = "Creating the set…"
-                try await api.createSet(name: setName)
+                try await api.createRig(name: rig, template: template.rawValue, width: width, height: height, depth: depth,
+                                        screen: ledWall)
             }
-            var rig = try await api.rig()
-            if !quickRig {
-                var items: [[String: Any]] = []
-                for p in planned {
-                    progress = "Adding \(p.count)× \(p.entry.model)…"
-                    let key = p.entry.isLocal ? p.entry.key : try await api.addToLibrary(p.entry.key)
-                    for _ in 0..<p.count {
-                        var f: [String: Any] = ["fixture": key, "mode": p.mode, "universe": 1, "mount": p.mount]
-                        if p.entry.type == "laser" || key.contains("laser") {  // lasers: always above the audience
-                            f["mount"] = "hang"; f["y_m"] = -1.0; f["z_m"] = max(2.6, height - 0.4)
-                        } else if p.mount == "hang" {
-                            f["z_m"] = max(2.4, height - 0.6)
-                        }
-                        items.append(f)
-                    }
-                }
-                progress = "Patching addresses…"
-                rig["fixtures"] = try await autopatch(api, items)
+            var layout = try await api.rig(rig: rig, set: setName)
+            var items: [[String: Any]] = []
+            for p in planned {
+                progress = "Adding \(p.count)× \(p.entry.model)…"
+                let key = p.entry.isLocal ? p.entry.key : try await api.addToLibrary(p.entry.key)
+                for _ in 0..<p.count { items.append(["fixture": key, "mode": p.mode, "universe": 1]) }
             }
-            progress = "Saving…"
-            var stage = rig["stage"] as? [String: Any] ?? [:]
-            stage["width_m"] = width
-            stage["ceiling_m"] = max(height + 1.5, stage["ceiling_m"] as? Double ?? 0)
-            stage["room_depth_m"] = depth
-            rig["stage"] = stage
-            var artnet = rig["artnet"] as? [String: Any] ?? ["port": 6454, "fps": 40]
+            progress = "Patching addresses…"
+            let placementKeys = Set(RigDocument.placementKeys)
+            layout["fixtures"] = try await autopatch(api, items).compactMap { ($0 as? [String: Any])?.filter { !placementKeys.contains($0.key) } }
+            var artnet = layout["artnet"] as? [String: Any] ?? ["port": 6454, "fps": 40]
             artnet["ip"] = artnetIP
-            rig["artnet"] = artnet
-            if let spec = outputSpec { rig["output"] = spec } else { rig.removeValue(forKey: "output") }
-            rig["director"] = director
-            if ledWall { rig["screen"] = ["_note": "LED wall behind the DJ (visualiser only for now)", "width_m": min(10, width * 0.55)] }
-            else { rig.removeValue(forKey: "screen") }
-            if (rig["description"] as? String ?? "").isEmpty || quickRig {
-                rig["description"] = "\(venue.title), \(fixtureCount) fixtures, made with the Mac app"
+            layout["artnet"] = artnet
+            if let spec = outputSpec { layout["output"] = spec } else { layout.removeValue(forKey: "output") }
+            layout["director"] = director
+            layout["description"] = "\(fixtureCount) fixtures, made with the Mac app"
+            try await api.saveRig(layout, rigName: rig, setName: setName)
+            if autoMount {
+                progress = "3/3 · Mounting the fixtures on \(rig)…"
+                try await api.automount(rig: rig, set: setName)
             }
-            try await api.saveRig(rig)
             model.reloadSets()
             model.selectedSet = setName
+            model.selectedRig = rig
             name = setName
+            rigName = rig
             step = .done
         } catch {
             self.error = error.localizedDescription

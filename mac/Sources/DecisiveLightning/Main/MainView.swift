@@ -1,4 +1,4 @@
-// The main window: a sidebar (Show, Rig, Sets, Engine), the engine controls in the toolbar.
+// The main window: a sidebar (Show, Rig, Set, Engine), the rig and set and the engine controls in the toolbar.
 import DecisiveKit
 import SwiftUI
 
@@ -20,7 +20,7 @@ struct MainView: View {
                     switch model.section {
                     case .show: ShowView(stage: stage)
                     case .rig: RigView()
-                    case .sets: SetsView()
+                    case .set: SetView()
                     case .engine: EngineView()
                     }
                 }
@@ -36,6 +36,10 @@ struct MainView: View {
             Text(m.sendsDMX ? "Sending to the lights needs the show to restart. It picks up where it was in a few seconds."
                  : "The show restarts without sending to the lights: the lights black out.")
         }
+        .sheet(isPresented: $model.showNewRig) { NewRigSheet().environment(model) }
+        .sheet(isPresented: Binding(get: { model.mountPrompt != nil }, set: { if !$0 { model.mountPrompt = nil } })) {
+            if let p = model.mountPrompt { MountPromptSheet(rig: p.rig, set: p.set).environment(model) }
+        }
         .navigationTitle(model.section == .show ? (model.showState.isActive ? model.feed.hello?.title ?? "Show" : "Show")
                          : model.section.title)
         .navigationSubtitle(subtitle)
@@ -50,7 +54,9 @@ struct MainView: View {
             if let h = model.feed.hello { return "\(Int(h.bpm.rounded())) BPM · \(model.showState.title)" }
             return model.showState.title
         default:
-            return model.currentSet.map { "\($0.fixtureCount) fixtures\($0.hasScreen ? " · LED wall" : "")" } ?? ""
+            let m = model.mounted
+            guard m.total > 0 else { return model.currentRig?.summary ?? "" }
+            return m.placed < m.total ? "\(m.total - m.placed) of \(m.total) fixtures not mounted" : "\(m.total) fixtures · \(model.currentRig?.summary ?? "")"
         }
     }
 

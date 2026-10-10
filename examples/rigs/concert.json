@@ -1,0 +1,678 @@
+{
+  "description": "A concert stage: two overhead trusses, a low truss at the back and a tower on each side.",
+  "stage": {
+    "width_m": 16,
+    "ceiling_m": 9.5,
+    "room_depth_m": 25,
+    "eye_safety": false
+  },
+  "trusses": [
+    {
+      "id": "front",
+      "type": "quatro",
+      "length_m": 15.0,
+      "x_m": 8.0,
+      "y_m": -1.5,
+      "z_m": 7.0
+    },
+    {
+      "id": "mid",
+      "type": "quatro",
+      "length_m": 15.0,
+      "x_m": 8.0,
+      "y_m": -4.7,
+      "z_m": 7.5
+    },
+    {
+      "id": "back",
+      "type": "quatro",
+      "length_m": 12.5,
+      "x_m": 8.0,
+      "y_m": -7.9,
+      "z_m": 1.0
+    },
+    {
+      "id": "towerL",
+      "type": "quatro",
+      "length_m": 6.5,
+      "x_m": 0.3,
+      "y_m": -1.0,
+      "z_m": 3.25,
+      "vertical": true
+    },
+    {
+      "id": "towerR",
+      "type": "quatro",
+      "length_m": 6.5,
+      "x_m": 15.7,
+      "y_m": -1.0,
+      "z_m": 3.25,
+      "vertical": true
+    }
+  ],
+  "screen": {
+    "width_m": 8.8
+  },
+  "placements": {
+    "concert60": {
+      "top1": {
+        "x": 0.1029,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -6.353,
+        "truss_side": "under"
+      },
+      "top2": {
+        "x": 0.8971,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 6.353,
+        "truss_side": "under"
+      },
+      "top3": {
+        "x": 0.1526,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -5.559,
+        "truss_side": "under"
+      },
+      "top4": {
+        "x": 0.8474,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 5.559,
+        "truss_side": "under"
+      },
+      "top5": {
+        "x": 0.2022,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -4.765,
+        "truss_side": "under"
+      },
+      "top6": {
+        "x": 0.7978,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 4.765,
+        "truss_side": "under"
+      },
+      "top7": {
+        "x": 0.2518,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -3.971,
+        "truss_side": "under"
+      },
+      "top8": {
+        "x": 0.7482,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 3.971,
+        "truss_side": "under"
+      },
+      "top9": {
+        "x": 0.3015,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -3.176,
+        "truss_side": "under"
+      },
+      "top10": {
+        "x": 0.6985,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 3.176,
+        "truss_side": "under"
+      },
+      "top11": {
+        "x": 0.3511,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -2.382,
+        "truss_side": "under"
+      },
+      "top12": {
+        "x": 0.6489,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 2.382,
+        "truss_side": "under"
+      },
+      "top13": {
+        "x": 0.4007,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -1.588,
+        "truss_side": "under"
+      },
+      "top14": {
+        "x": 0.5993,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 1.588,
+        "truss_side": "under"
+      },
+      "top15": {
+        "x": 0.4504,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": -0.794,
+        "truss_side": "under"
+      },
+      "top16": {
+        "x": 0.5496,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 0.794,
+        "truss_side": "under"
+      },
+      "top17": {
+        "x": 0.5,
+        "y_m": -1.5,
+        "z_m": 6.58,
+        "mount": "hang",
+        "truss": "front",
+        "truss_pos_m": 0.0,
+        "truss_side": "under"
+      },
+      "top18": {
+        "x": 0.1029,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -6.353,
+        "truss_side": "under"
+      },
+      "top19": {
+        "x": 0.8971,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 6.353,
+        "truss_side": "under"
+      },
+      "top20": {
+        "x": 0.1526,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -5.559,
+        "truss_side": "under"
+      },
+      "top21": {
+        "x": 0.8474,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 5.559,
+        "truss_side": "under"
+      },
+      "top22": {
+        "x": 0.2022,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -4.765,
+        "truss_side": "under"
+      },
+      "top23": {
+        "x": 0.7978,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 4.765,
+        "truss_side": "under"
+      },
+      "top24": {
+        "x": 0.2518,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -3.971,
+        "truss_side": "under"
+      },
+      "back1": {
+        "x": 0.7482,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 3.971,
+        "truss_side": "under"
+      },
+      "back2": {
+        "x": 0.3015,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -3.176,
+        "truss_side": "under"
+      },
+      "back3": {
+        "x": 0.6985,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 3.176,
+        "truss_side": "under"
+      },
+      "back4": {
+        "x": 0.3511,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -2.382,
+        "truss_side": "under"
+      },
+      "back5": {
+        "x": 0.6489,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 2.382,
+        "truss_side": "under"
+      },
+      "back6": {
+        "x": 0.4007,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -1.588,
+        "truss_side": "under"
+      },
+      "back7": {
+        "x": 0.5993,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 1.588,
+        "truss_side": "under"
+      },
+      "back8": {
+        "x": 0.4504,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": -0.794,
+        "truss_side": "under"
+      },
+      "back9": {
+        "x": 0.5496,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 0.794,
+        "truss_side": "under"
+      },
+      "back10": {
+        "x": 0.5,
+        "y_m": -4.7,
+        "z_m": 7.08,
+        "mount": "hang",
+        "truss": "mid",
+        "truss_pos_m": 0.0,
+        "truss_side": "under"
+      },
+      "back11": {
+        "x": 0.1735,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -5.223,
+        "truss_side": "top"
+      },
+      "back12": {
+        "x": 0.8265,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 5.223,
+        "truss_side": "top"
+      },
+      "front1": {
+        "x": 0.2238,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -4.42,
+        "truss_side": "top"
+      },
+      "front2": {
+        "x": 0.7762,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 4.42,
+        "truss_side": "top"
+      },
+      "front3": {
+        "x": 0.274,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -3.616,
+        "truss_side": "top"
+      },
+      "front4": {
+        "x": 0.726,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 3.616,
+        "truss_side": "top"
+      },
+      "front5": {
+        "x": 0.3242,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -2.812,
+        "truss_side": "top"
+      },
+      "front6": {
+        "x": 0.6758,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 2.812,
+        "truss_side": "top"
+      },
+      "front7": {
+        "x": 0.3744,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -2.009,
+        "truss_side": "top"
+      },
+      "front8": {
+        "x": 0.6256,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 2.009,
+        "truss_side": "top"
+      },
+      "front9": {
+        "x": 0.4247,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -1.205,
+        "truss_side": "top"
+      },
+      "front10": {
+        "x": 0.5753,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 1.205,
+        "truss_side": "top"
+      },
+      "towerL1": {
+        "x": 0.4749,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": -0.402,
+        "truss_side": "top"
+      },
+      "towerL2": {
+        "x": 0.5251,
+        "y_m": -7.9,
+        "z_m": 1.42,
+        "mount": "stand",
+        "truss": "back",
+        "truss_pos_m": 0.402,
+        "truss_side": "top"
+      },
+      "towerL3": {
+        "x": 0.0187,
+        "y_m": -0.68,
+        "z_m": 6.2,
+        "mount": "stand",
+        "truss": "towerL",
+        "truss_pos_m": 6.2
+      },
+      "towerL4": {
+        "x": 0.9812,
+        "y_m": -0.68,
+        "z_m": 6.2,
+        "mount": "stand",
+        "truss": "towerR",
+        "truss_pos_m": 6.2
+      },
+      "towerL5": {
+        "x": 0.0187,
+        "y_m": -0.68,
+        "z_m": 5.6,
+        "mount": "stand",
+        "truss": "towerL",
+        "truss_pos_m": 5.6
+      },
+      "towerL6": {
+        "x": 0.9812,
+        "y_m": -0.68,
+        "z_m": 5.6,
+        "mount": "stand",
+        "truss": "towerR",
+        "truss_pos_m": 5.6
+      },
+      "towerL7": {
+        "x": 0.0187,
+        "y_m": -0.68,
+        "z_m": 5.0,
+        "mount": "stand",
+        "truss": "towerL",
+        "truss_pos_m": 5.0
+      },
+      "towerR1": {
+        "x": 0.9812,
+        "y_m": -0.68,
+        "z_m": 5.0,
+        "mount": "stand",
+        "truss": "towerR",
+        "truss_pos_m": 5.0
+      },
+      "towerR2": {
+        "x": 0.0187,
+        "y_m": -0.68,
+        "z_m": 4.4,
+        "mount": "stand",
+        "truss": "towerL",
+        "truss_pos_m": 4.4
+      },
+      "towerR3": {
+        "x": 0.9812,
+        "y_m": -0.68,
+        "z_m": 4.4,
+        "mount": "stand",
+        "truss": "towerR",
+        "truss_pos_m": 4.4
+      },
+      "towerR4": {
+        "x": 0.0187,
+        "y_m": -0.68,
+        "z_m": 3.8,
+        "mount": "stand",
+        "truss": "towerL",
+        "truss_pos_m": 3.8
+      },
+      "towerR5": {
+        "x": 0.9812,
+        "y_m": -0.68,
+        "z_m": 3.8,
+        "mount": "stand",
+        "truss": "towerR",
+        "truss_pos_m": 3.8
+      },
+      "towerR6": {
+        "x": 0.0187,
+        "y_m": -0.68,
+        "z_m": 3.2,
+        "mount": "stand",
+        "truss": "towerL",
+        "truss_pos_m": 3.2
+      },
+      "towerR7": {
+        "x": 0.9812,
+        "y_m": -0.68,
+        "z_m": 3.2,
+        "mount": "stand",
+        "truss": "towerR",
+        "truss_pos_m": 3.2
+      },
+      "ltop1": {
+        "x": 0.2469,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": -4.05,
+        "truss_side": "top"
+      },
+      "ltop2": {
+        "x": 0.7531,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": 4.05,
+        "truss_side": "top"
+      },
+      "ltop3": {
+        "x": 0.3031,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": -3.15,
+        "truss_side": "top"
+      },
+      "ltop4": {
+        "x": 0.6969,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": 3.15,
+        "truss_side": "top"
+      },
+      "lback1": {
+        "x": 0.3594,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": -2.25,
+        "truss_side": "top"
+      },
+      "lback2": {
+        "x": 0.6406,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": 2.25,
+        "truss_side": "top"
+      },
+      "lback3": {
+        "x": 0.4156,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": -1.35,
+        "truss_side": "top"
+      },
+      "lback4": {
+        "x": 0.5844,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": 1.35,
+        "truss_side": "top"
+      },
+      "ltower1": {
+        "x": 0.4719,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": -0.45,
+        "truss_side": "top"
+      },
+      "ltower2": {
+        "x": 0.5281,
+        "y_m": -4.7,
+        "z_m": 7.92,
+        "mount": "stand",
+        "truss": "mid",
+        "truss_pos_m": 0.45,
+        "truss_side": "top"
+      }
+    }
+  }
+}

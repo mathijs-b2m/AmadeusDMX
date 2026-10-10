@@ -1,4 +1,4 @@
-// Wizard: the fixtures, from the library or found on the network.
+// Wizard step 1: the set, your fixtures: search the libraries, choose the mode and how many of each.
 import DecisiveKit
 import SwiftUI
 
@@ -9,15 +9,7 @@ struct FixturesStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             StepHeader(symbol: "light.overhead.right.fill", title: "Your Fixtures",
-                       text: "Search our library, QLC+ and the Open Fixture Library by brand or model.")
-            if w.venue == .stage {
-                Picker("", selection: $w.quickRig) {
-                    Text("Concert rig from one model").tag(true)
-                    Text("My own list").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
+                       text: "The gear you bring to every gig: your set. Search our library, QLC+ and the Open Fixture Library by brand or model. Where they hang comes next.")
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("e.g. beamz fuze, mac encore, laserworld", text: $w.query)
@@ -42,8 +34,8 @@ struct FixturesStep: View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button(w.quickRig ? "Use" : "Add") {
-                                if w.quickRig { w.quickEntry = e } else { Task { await w.add(e, model.api) } }
+                            Button("Add") {
+                                Task { await w.add(e, model.api) }
                                 w.query = ""; w.results = []
                             }
                         }
@@ -53,21 +45,7 @@ struct FixturesStep: View {
                 }
                 .background(.background.secondary, in: .rect(cornerRadius: 9))
             }
-            if w.quickRig {
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 10) {
-                        LabeledContent("Moving heads") {
-                            Text(w.quickEntry.map { "\($0.manufacturer) \($0.model)" } ?? "Search and choose a model above")
-                                .foregroundStyle(w.quickEntry == nil ? .secondary : .primary)
-                        }
-                        Stepper("Count: \(w.quickCount)", value: $w.quickCount, in: 4...120, step: 2)
-                        Stepper("Lasers (Laserworld CS-1000RGB): \(w.quickLasers)", value: $w.quickLasers, in: 0...16)
-                        Text("Spread over two overhead trusses, a row at the back, the front edge and two towers.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(6)
-                }
-            } else if !w.planned.isEmpty {
+            if !w.planned.isEmpty {
                 VStack(spacing: 8) {
                     ForEach($w.planned) { $p in
                         HStack(spacing: 10) {
@@ -78,11 +56,7 @@ struct FixturesStep: View {
                                 Picker("", selection: $p.mode) { ForEach(p.modes, id: \.self) { Text($0).tag($0) } }
                                     .labelsHidden().frame(width: 90)
                             }
-                            Picker("", selection: $p.mount) {
-                                Text("Hung").tag("hang"); Text("Stand").tag("stand"); Text("Floor").tag("floor")
-                            }
-                            .labelsHidden().frame(width: 80)
-                            Stepper("\(p.count)×", value: $p.count, in: 1...64).monospacedDigit()
+                            Stepper("\(p.count)×", value: $p.count, in: 1...120).monospacedDigit()
                             Button { w.planned.removeAll { $0.id == p.id } } label: { Image(systemName: "minus.circle.fill") }
                                 .buttonStyle(.borderless).foregroundStyle(.secondary)
                         }

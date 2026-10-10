@@ -1,4 +1,4 @@
-// The sidebar: the pages, the sets, and the engine's state at the bottom.
+// The sidebar: the pages, and the engine's state at the bottom.
 import DecisiveKit
 import SwiftUI
 
@@ -14,27 +14,7 @@ struct Sidebar: View {
                     Label(s.title, systemImage: s.symbol)
                 }
                 .badge(badge(s))
-            }
-            if !model.sets.isEmpty {
-                SwiftUI.Section("Sets") {
-                    ForEach(model.sets) { set in
-                        Button {
-                            if !model.engineRunning { model.selectedSet = set.name }
-                        } label: {
-                            HStack {
-                                Label(set.name, systemImage: set.name == model.selectedSet ? "checkmark.circle.fill" : "circle")
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(set.name == model.selectedSet ? .primary : .secondary)
-                                Spacer()
-                                Text("\(set.fixtureCount)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(model.engineRunning && set.name != model.selectedSet)
-                    }
-                }
+                .help(s.help)
             }
         }
         .listStyle(.sidebar)
@@ -43,6 +23,10 @@ struct Sidebar: View {
 
     private func badge(_ s: Section) -> Text? {
         if s == .engine, case .failed = model.showState { return Text("!") }
+        if s == .rig {  // fixtures of the set that don't hang on the rig yet
+            let m = model.mounted
+            if m.placed < m.total { return Text("\(m.total - m.placed)") }
+        }
         return nil
     }
 }
