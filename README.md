@@ -45,11 +45,12 @@ For VirtualDJ: see [Live in VirtualDJ](#live-in-virtualdj).
 
 | Command | What it does |
 |---|---|
-| `decisive play TRACK [--dmx [IP]] [--mute] [--start SEC] [--tempo half\|double] [--director …]` | Play a track with lights and visualiser (audio-clocked). Blackout on Ctrl+C |
+| `decisive play TRACK [--dmx [IP]] [--mute] [--start SEC] [--tempo half\|double] [--director …] [--style GENRE]` | Play a track with lights and visualiser (audio-clocked). Blackout on Ctrl+C |
 | `decisive live [--dmx [IP]] [--director …] [--remote dj:NAME --code NNNN]` | Follow a VirtualDJ mix via the DecisiveLink plugin, on this computer or on a DJ laptop (Decisive Link) |
 | `decisive setup` | Web setup page only (no show) |
+| `decisive genre TRACK [GENRE\|auto]` | A track's genre (one word) and where it came from; set your own, or back to automatic |
 | `decisive analyze TRACK [--tempo half\|double]` | Audio analysis only (cached in `.cache/`) |
-| `decisive direct TRACK [--director …] [--redo]` | Build and print the show plan |
+| `decisive direct TRACK [--director …] [--style GENRE] [--redo]` | Build and print the show plan (`--style`: in another genre's house style) |
 | `decisive library` | List fixture definitions; `decisive library beamz fuze` searches QLC+ and the Open Fixture Library too, `--add <key>` adds a result |
 | `decisive patch MODEL[:COUNT] …` | Patch fixtures into the active set, assign addresses |
 | `decisive discover [--write] [--readdress] [--sim]` | Find the Art-Net node (and RDM fixtures) on the network |
@@ -84,6 +85,44 @@ Restart VirtualDJ, then enable **DecisiveLink** as a **master** effect. Works wi
 - The plugin keeps its VirtualDJ queries low (~230/s: only real decks; file, length and original BPM twice per second).
 
 **Known VirtualDJ issue (not the plugin):** on macOS the VDJ interface can freeze after switching apps while audio keeps running. Workarounds from the VDJ forums: set the display to 60 Hz instead of ProMotion, avoid Stage Manager or toggle Full Screen/Windowed, try `experimentalUseMetal` or `skinFps` in VDJ's options.
+
+## Genres and programs
+
+Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, dnb, dubstep, hiphop, rnb, pop, rock, metal, latin, funk, jazz), shown with the track in the app and the visualiser:
+
+1. **your choice** (`decisive genre TRACK GENRE`, kept in `config/genres.json`);
+2. the **Decisions API**, given the artist and title (from the file's tags, or its name), when there's a key and it is confident. A title alone ("Symphony") has to be very sure, and a beat-less genre (cinematic, classical, ambient) only counts when the audio has no groove either;
+3. a **genre tag** in the file;
+4. the **audio**, as the fallback: how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
+
+### A house style per genre
+
+Every genre has a **style sheet** ([decisive/director/style.py](decisive/director/style.py)), so tracks that share a genre look like one show instead of each getting its own random mood. A sheet says:
+- which palettes the genre uses (techno: cool, ice and fire; hip-hop: gold and purple; rock: a white and amber `stage` look);
+- which looks don't fit it (no spinning prisms or colour cycling in techno, no strobing light in jazz or ambient, no soft fades in hardstyle);
+- what to use instead;
+- a few lines describing the style.
+
+The **rule director** keeps to the genre's palettes and swaps a misfit for what fits. The **decision models** get the style in their prompt, and only the options that fit are offered as answers. The song's arc and the drop rules still have the last word. A style describes looks, not fixtures, so it works on any rig. Tracks without a genre are directed as before.
+
+**The set's genre (live).** Detection is noisy: one house track called "pop" must not flip the style for one song. In a live set, a new genre takes over only after **two tracks in a row**. Until then, a track is lit in the set's style, and the app shows it as `POP → HOUSE`. Your own genre choice always counts for its track. A cinematic track plays its own program and leaves the set's genre alone. For a single track, `--style GENRE` lights it in another genre's style.
+
+A genre can also have a **program**: a show of its own.
+
+### The cinematic program
+
+Film scores and trailer music have no beat grid to light. The cinematic program plays them **hit by hit**, with the rig played like an orchestra:
+
+- every hit is found **where it really is** (spectral flux in nine bands, no grid; ~5 per second in a dense passage) and sorted into **voices** by its spectral fingerprint: booms, thuds, stabs, ticks…;
+- **sections**: fixtures of one kind form a section (the four beams, the floor pixel bars, the two washes…; a big uniform rig is split by where its fixtures hang). Each section suits some parts: beams the stabs, floor lights and blinders the booms, pixel bars the ticks and the melody, washes a held pad. Powerful sections without a part are the **brass**: they join the strongest hits when the music is big;
+- **the score**: every phrase, each voice gets a *lead* section and, when the music is big enough, an *answer*. The parts move to other sections from phrase to phrase. Quiet phrases are chamber music (a few soloists); the climax is tutti;
+- **gestures**: a section plays its voice in one gesture for the whole phrase: a chase, mirrored pairs outside-in, odds against evens, steps along its pixels, or keys (the pitch picks the place). A run of hits plays the gesture through, and the next run is the answer: the other section, or the chase back the other way. Strong hits are played by the whole section, or by both sections together;
+- **played notes**: a light is played the way a musician plays a note: hit at once (to one of three levels: soft, half, full), held for as long as the note sounds (until its instrument plays again, or it has died away), and let go gently. In between it never flickers along with the music. Slow things are smooth: long booms are let go slowly, and the low glow and the melody layer come and go in slow fades. No fixture is hit again within a third of a second;
+- **impacts** (the biggest hits) play the whole rig, the strobes (within `max_flash_hz`) and the lasers, and the moving heads change picture (a cathedral of beams, a fan over the crowd, a cross, all on the DJ…). They move there in the dark just before, so the new picture lands on the hit;
+- **the lows** glow on the floor in deep colours, on a few steps that change slowly;
+- **room for the accents**, the light show's version of sidechaining. A rig often mixes a few very powerful lights (a 180,000 lm strobe, halogen sunstrips) with small ones (pixel cells, narrow beams), and when the big ones are on, the small ones' accents disappear. So every fixture gets a *power* from its real output (lumens, and how wide it spreads). Powerful sections leave the ticks and weak hits to small ones. While small fixtures play accents, the powerful ones step down (never to black) and come back after. An impact's flash and the first instant of a big fixture's own hit are left alone. A rig of equal fixtures is unaffected;
+- **the melody**: when everything plays together legato, there are few hits to play, so a melody layer takes over. The notes of the separated melody instrument are played over the melody section (each held, then let go as the next one comes): low notes in the centre, high notes out to the sides. The pad section holds a steady glow, and the moving heads drift with the melody's contour. Percussive passages don't get it;
+- between hits it's dark. Quiet passages play soft, the climax hard. The colours follow the arc: ice when calm, warm in the swells, fire at the climax. An answering section plays in the next colour of the palette.
 
 ## Decision models
 
@@ -187,7 +226,7 @@ A rig with several groups of moving heads (overhead truss, back of the stage, fr
 
 **Layering** on top of that: per phrase the director picks which heads hold a soft **base** glow (low, medium or breathing, in the base colour) and which play the **accents** on the hits: every other head, the outer vs inner heads of each group, high vs low heads, or the featured groups vs the rest.
 
-Towers fan out in height, waves span at most 4 beats, and safety nets keep drops from going solo and make the grouping and the featured part change regularly. Plans are cached per group layout.
+Towers fan out in height, waves span at most 4 beats, and safety nets keep drops from going solo and make the grouping and the featured part change regularly. Plans are cached per group layout (and per house style).
 
 ### Lasers
 

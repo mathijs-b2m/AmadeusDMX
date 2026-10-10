@@ -13,10 +13,12 @@ struct NowPlayingCard: View {
                 let d = h.plan.indices.contains(i) ? h.plan[i] : nil
                 let next = h.plan.indices.contains(i + 1) ? h.plan[i + 1] : nil
                 VStack(alignment: .leading, spacing: 8) {
+                    ProgramBanner(program: h.program)
                     HStack(spacing: 8) {
                         Image(systemName: state == .playing ? "music.note" : "dot.radiowaves.left.and.right")
                             .foregroundStyle(.secondary)
                         Text(h.title).font(.headline).lineLimit(1)
+                        GenreChip(genre: h.genre, source: h.genreSource, style: h.style)
                     }
                     HStack(spacing: 14) {
                         Metric(value: "\(Int(h.bpm.rounded()))", label: "BPM")

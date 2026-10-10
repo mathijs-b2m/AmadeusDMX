@@ -85,6 +85,11 @@ def hello(a: Analysis, plan: list[Decision], rig: dict, real, *, title: str, dir
             "max_flash_hz": rig["safety"]["max_flash_hz"],
             "energy": energy_curve(a),
             "screen": bool(rig.get("screen")),
+            # what kind of music, where that came from, and the program it gets (if any: e.g. cinematic)
+            "genre": getattr(a, "genre", ""),
+            "genre_source": getattr(a, "genre_source", ""),
+            "style": getattr(a, "style", ""),  # the genre whose house style the plan follows
+            "program": "cinematic" if getattr(a, "genre", "") == "cinematic" and a.hits is not None else "",
         }
     )
 

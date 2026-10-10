@@ -270,6 +270,8 @@ class MotionMixin:
                     self.rig["fixtures"],
                     self.stage,
                     self.rig.get("zones", []),
+                    self.program,  # a program's head pictures depend on its hits
+                    [len(self.cine_hits), float(self.cine_hits.t.sum()), self.CINE_VERSION] if self.program else None,
                 ],
                 sort_keys=True,
                 default=str,
@@ -427,6 +429,8 @@ class MotionMixin:
 
     def _head_dirs_v(self, ts: np.ndarray, j: int) -> np.ndarray:
         """A head's target directions over time: per phrase, with the crossfade and the move-in-black before drops."""
+        if self.program == "cinematic":
+            return self._cinematic_head_dirs(ts, j)
         out = np.empty((len(ts), 3))
         idx = np.maximum(0, np.searchsorted(self.starts, ts, side="right") - 1)
         _, _, period = self._beat_info_v(ts)

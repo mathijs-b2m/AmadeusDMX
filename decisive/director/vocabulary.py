@@ -43,7 +43,17 @@ PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 
         "White, pale cyan and blue. Clean, minimal, cold.",
         [(0.85, 0.95, 1.0), (0.3, 0.8, 1.0), (0.1, 0.35, 1.0), (1.0, 1.0, 1.0)],
     ),
+    # only offered when a genre's style asks for them (decisive/director/style.py)
+    "gold": (
+        "Gold, amber and deep purple. Classy, warm, hip-hop, soul, disco.",
+        [(1.0, 0.65, 0.1), (0.55, 0.0, 0.9), (1.0, 0.85, 0.45), (0.9, 0.3, 0.6)],
+    ),
+    "stage": (
+        "Warm white, amber and deep blue. A concert stage: rock, live bands.",
+        [(1.0, 0.85, 0.65), (1.0, 0.55, 0.1), (0.1, 0.2, 0.9), (1.0, 1.0, 1.0)],
+    ),
 }
+DEFAULT_PALETTES = ["warm", "cool", "neon", "fire", "ice"]  # without a style
 
 PAR_BASE = [
     ("off", "Pars dark between hits: punchy, high contrast."),

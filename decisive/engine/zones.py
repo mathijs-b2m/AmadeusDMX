@@ -232,17 +232,18 @@ class Zones:
             den = d @ self._rn.T  # (M, Z)
             with np.errstate(divide="ignore", invalid="ignore"):
                 t = (rel * self._rn[None]).sum(-1) / den
-            q = d[:, None, :] * t[..., None] - rel  # hit point relative to each centre
-            g = np.linalg.norm(rel, axis=-1) * self._rm[None]  # the margin, as metres there
-            a = np.abs((q * self._ru[None]).sum(-1))
-            b = np.abs((q * self._rv[None]).sum(-1))
-            hit = (
-                (np.abs(den) > 1e-12)
-                & (t > 0)
-                & (t < L[:, None])
-                & (a <= self._rh[None, :, 0] + g)
-                & (b <= self._rh[None, :, 1] + g)
-            )
+            with np.errstate(invalid="ignore"):  # a beam parallel to a rectangle: inf × 0
+                q = d[:, None, :] * t[..., None] - rel  # hit point relative to each centre
+                g = np.linalg.norm(rel, axis=-1) * self._rm[None]  # the margin, as metres there
+                a = np.abs((q * self._ru[None]).sum(-1))
+                b = np.abs((q * self._rv[None]).sum(-1))
+                hit = (
+                    (np.abs(den) > 1e-12)
+                    & (t > 0)
+                    & (t < L[:, None])
+                    & (a <= self._rh[None, :, 0] + g)
+                    & (b <= self._rh[None, :, 1] + g)
+                )
             out |= hit.any(axis=1)
         for z in self._boxes:
             dist = np.linalg.norm(z.c - pos, axis=1)

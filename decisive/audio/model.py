@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -53,6 +53,13 @@ class Analysis:
     stutter_strength: np.ndarray | None = None  # 0..1 per frame: how clearly the synths are chopped right now
     # from the separated synth/melody instrument (Demucs "other"), if available: (times, strengths, pitch 0..1)
     synth_notes: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+    # what kind of music it is (decisive/audio/genre.py): one word, where that came from, and the facts
+    genre: str = ""
+    genre_source: str = ""
+    genre_facts: dict = field(default_factory=dict)
+    style: str = ""  # the genre whose house style the plan follows (a live set's genre can differ from `genre`)
+    # every hit at its exact time, in voices (decisive/audio/hits.py): only for programs that play them
+    hits: object | None = None
 
     def band_norm(self, name: str) -> np.ndarray:
         """Band energy scaled to 0..1 between the set's 10th and 97th percentile."""

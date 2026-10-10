@@ -13,6 +13,7 @@ from decisive.director.arc import apply_arc, laser_star, song_arc
 from decisive.director.decision import GROUP_NAMES, LASER_NAMES, LAYER_NAMES, SCREEN_NAMES, Decision
 from decisive.director.prompt import build_prompt, questions_for, synth_riff
 from decisive.director.rules import PER_BEAT, RuleDirector
+from decisive.director.style import Style
 
 MODEL = "gpt-6-luna"
 
@@ -35,6 +36,7 @@ class OpenAIDirector:
         groups: list[dict] | None = None,
         lasers: list[dict] | None = None,
         screen: bool = False,
+        style: Style | None = None,
     ):
         from openai import OpenAI  # imported lazily so the rules mode works without a key
 
@@ -42,9 +44,9 @@ class OpenAIDirector:
         self.model = model
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
-        self.groups, self.lasers, self.screen = groups, lasers, screen
-        self.questions = questions_for(groups, lasers, screen)
-        self.fallback = RuleDirector(groups, lasers, screen)
+        self.groups, self.lasers, self.screen, self.style = groups, lasers, screen, style
+        self.questions = questions_for(groups, lasers, screen, style)
+        self.fallback = RuleDirector(groups, lasers, screen, style)
         self.timings = []
 
     timings: list[float]
@@ -60,7 +62,7 @@ class OpenAIDirector:
         return self.cache[key]
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
-        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen)
+        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen, self.style)
         d = self.fallback.decide(a, i, history)  # supplies any refused or failed answer
         d.prompt = prompt
         try:
@@ -211,14 +213,15 @@ class OllamaDirector(OpenAIDirector):
         groups: list[dict] | None = None,
         lasers: list[dict] | None = None,
         screen: bool = False,
+        style: Style | None = None,
     ):
         self.model, self.host = model, host
         self.name = f"ollama-{model.replace(':', '-').replace('/', '-')}"
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
-        self.groups, self.lasers, self.screen = groups, lasers, screen
-        self.questions = questions_for(groups, lasers, screen)
-        self.fallback = RuleDirector(groups, lasers, screen)
+        self.groups, self.lasers, self.screen, self.style = groups, lasers, screen, style
+        self.questions = questions_for(groups, lasers, screen, style)
+        self.fallback = RuleDirector(groups, lasers, screen, style)
         self.timings = []
 
     def _questions(self) -> dict:

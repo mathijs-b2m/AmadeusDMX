@@ -5,9 +5,8 @@ from __future__ import annotations
 from decisive.audio.model import DROP_THRESHOLD, Analysis
 from decisive.director.arc import apply_arc, laser_star, song_arc
 from decisive.director.decision import Decision
-from decisive.director.vocabulary import (
-    PALETTES,
-)
+from decisive.director.style import Style
+from decisive.director.vocabulary import DEFAULT_PALETTES
 
 # Looks per section, used round-robin so consecutive phrases of a section differ:
 # (par_base, par_accent, trigger, head_light, movement, head_color, dynamics)
@@ -162,10 +161,17 @@ class RuleDirector:
 
     name = "rules"
 
-    def __init__(self, groups: list[dict] | None = None, lasers: list[dict] | None = None, screen: bool = False):
+    def __init__(
+        self,
+        groups: list[dict] | None = None,
+        lasers: list[dict] | None = None,
+        screen: bool = False,
+        style: Style | None = None,
+    ):
         self.groups = groups
         self.lasers = lasers
         self.screen = screen
+        self.style = style  # the genre's house style, if any
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
         p = a.phrases[i]
@@ -197,8 +203,8 @@ class RuleDirector:
         else:
             section = "groove"
 
-        palettes = list(PALETTES)
-        palette = last.palette if last else "cool"
+        palettes = list(self.style.palettes) if self.style else DEFAULT_PALETTES
+        palette = last.palette if last and last.palette in palettes else palettes[0 if self.style else 1]
         if section in ("drop", "breakdown") and last and last.section != section:
             palette = palettes[(palettes.index(palette) + 1) % len(palettes)]
 
@@ -221,6 +227,8 @@ class RuleDirector:
             source=self.name,
             head_trigger=head_trigger,
         )
+        if self.style:
+            self.style.adjust(d, n_before)
         apply_groups(d, self.groups, n_before)
         apply_lasers(d, self.lasers, n_before)
         apply_screen(d, self.screen, n_before)

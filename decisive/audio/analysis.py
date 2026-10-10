@@ -71,7 +71,7 @@ def analyze(
     path = readable_audio(path, cache_dir)
     npz_path, json_path = cache_paths(path, cache_dir, tempo)
     if npz_path.exists() and json_path.exists():
-        return _with_notes(_load(npz_path, json_path), path)
+        return _finish(_load(npz_path, json_path), path)
 
     log = print if verbose else (lambda *a, **k: None)
     log(f"Analysing {path.name} …")
@@ -132,7 +132,20 @@ def analyze(
         stutter_strength=stutter_strength,
     )
     _save(a, npz_path, json_path)
-    return _with_notes(a, path)
+    return _finish(a, path)
+
+
+def _finish(a: Analysis, path: Path) -> Analysis:
+    """What isn't cached with the analysis itself: the separated notes, the genre (your choice can change it),
+    and, for a track with a program of its own (cinematic), its hits."""
+    from decisive.audio import genre, hits
+
+    a = _with_notes(a, path)
+    call = genre.detect(a)
+    a.genre, a.genre_source, a.genre_facts = call.genre, call.source, call.facts
+    if call.program == "cinematic":
+        a.hits = hits.load_or_detect(path)
+    return a
 
 
 def _with_notes(a: Analysis, path: Path) -> Analysis:

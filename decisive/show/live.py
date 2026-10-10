@@ -198,6 +198,8 @@ async def run(
                             "play": deck.play,
                             "ready": show is not None,
                             "status": shows.progress(deck.file),
+                            "genre": show[0].genre if show else "",
+                            "style": show[0].style if show else "",
                         }
                     )
                     weight = deck.vol if deck.play else 0.0

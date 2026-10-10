@@ -10,8 +10,10 @@ import numpy as np
 from decisive.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from decisive.director.arc import SYNTH_LINE, arc_hint, song_arc, synth_line
 from decisive.director.decision import Decision, fmt_time
+from decisive.director.style import Style
 from decisive.director.vocabulary import (
     BASE_GLOWS,
+    DEFAULT_PALETTES,
     FORMATIONS,
     GROUPINGS,
     INTENSITY_LEVELS,
@@ -121,6 +123,7 @@ def build_prompt(
     groups: list[dict] | None = None,
     lasers: list[dict] | None = None,
     screen: bool = False,
+    style: Style | None = None,
 ) -> str:
     phrases = a.phrases
     p = phrases[i]
@@ -144,6 +147,11 @@ def build_prompt(
         f"Set position: {fmt_time(p.start)} of {fmt_time(a.duration)} ({p.start / a.duration:.0%}).",
         f"Track: {Path(str(a.path)).stem} (the title can be a hint for the mood or the show).",
     ]
+    if style:
+        parts.append(
+            f"STYLE: this part of the set is {style.genre}. Keep this house style for every {style.genre} track, "
+            f"so the set looks like one show (vary within it): {style.text}"
+        )
     if groups and len(groups) > 1:
         from decisive.rig.groups import describe as describe_groups
 
@@ -249,7 +257,7 @@ QUESTIONS = [
     _choice("section", SECTIONS, "Which part of a track structure is the CURRENT phrase?"),
     _choice(
         "palette",
-        [(v, d) for v, (d, _) in PALETTES.items()],
+        [(v, PALETTES[v][0]) for v in DEFAULT_PALETTES],
         "Which colour palette fits the mood? Keep it within a section; change it at drops and breakdowns.",
     ),
     *[_choice(name, options, q) for name, options, q in LAYERS],
@@ -262,9 +270,27 @@ QUESTIONS = [
 ]
 
 
-def questions_for(groups: list[dict] | None, lasers: list[dict] | None = None, screen: bool = False) -> list[dict]:
+def questions_for(
+    groups: list[dict] | None, lasers: list[dict] | None = None, screen: bool = False, style: Style | None = None
+) -> list[dict]:
     """The questions for this rig: group/layer questions only with several groups of heads, laser questions
-    only with lasers."""
+    only with lasers. With a genre's style only the options that fit it are offered."""
+    qs = _questions_for(groups, lasers, screen)
+    return [_styled(q, style) for q in qs] if style else qs
+
+
+def _styled(q: dict, style: Style) -> dict:
+    """A question with only the options that fit the style (its palettes, no misfits)."""
+    if q["type"] != "choice":
+        return q
+    if q["name"] == "palette":
+        choices = [{"value": v, "description": PALETTES[v][0]} for v in style.palettes]
+    else:
+        choices = [c for c in q["choices"] if style.allows(q["name"], c["value"])] or q["choices"]
+    return {**q, "choices": choices}
+
+
+def _questions_for(groups: list[dict] | None, lasers: list[dict] | None = None, screen: bool = False) -> list[dict]:
     out = _group_questions(groups) if groups and len(groups) > 1 else []
     if lasers:
         out += [

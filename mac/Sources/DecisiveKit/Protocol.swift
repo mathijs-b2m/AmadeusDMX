@@ -188,9 +188,16 @@ public struct Hello: Decodable, Sendable {
     public var screen: Bool
     public var trusses: [Truss]
     public var zones: [Zone]
+    /// What kind of music (one word), where that came from (you, ai, tag, audio), and the program it gets.
+    public var genre: String
+    public var genreSource: String
+    public var program: String
+    /// The genre whose house style the plan follows: in a live set the set's genre, which can differ.
+    public var style: String
 
     enum CodingKeys: String, CodingKey {
         case track, duration, bpm, director, fixtures, stage, plan, maxFlashHz = "max_flash_hz", energy, screen, trusses, zones
+        case genre, genreSource = "genre_source", program, style
     }
 
     public init(from decoder: Decoder) throws {
@@ -206,6 +213,10 @@ public struct Hello: Decodable, Sendable {
         energy = try c.decodeIfPresent([Double].self, forKey: .energy) ?? []
         screen = try c.decodeIfPresent(Bool.self, forKey: .screen) ?? false
         trusses = (try? c.decodeIfPresent([Truss].self, forKey: .trusses)) ?? []
+        genre = (try? c.decodeIfPresent(String.self, forKey: .genre)) ?? ""
+        genreSource = (try? c.decodeIfPresent(String.self, forKey: .genreSource)) ?? ""
+        program = (try? c.decodeIfPresent(String.self, forKey: .program)) ?? ""
+        style = (try? c.decodeIfPresent(String.self, forKey: .style)) ?? ""
         zones = (try? c.decodeIfPresent([Zone].self, forKey: .zones)) ?? []
     }
 
@@ -243,6 +254,8 @@ public struct DeckInfo: Decodable, Sendable, Identifiable, Equatable {
     public var play: Bool
     public var ready: Bool
     public var status: TrackStatus?
+    public var genre: String?
+    public var style: String?
     public var id: Int { deck }
 }
 

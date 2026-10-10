@@ -18,6 +18,9 @@ from decisive.director import (
     load_plan,
     save_plan,
 )
+from decisive.director.cinematic import NAME as CINEMATIC
+from decisive.director.cinematic import CinematicDirector
+from decisive.director.style import style_for
 from decisive.rig.groups import head_groups, laser_list, signature
 
 CACHE = paths.CACHE
@@ -61,17 +64,39 @@ def plan_path(wav: Path, director: str, tempo: str | None = None, layout: str | 
 
 
 def get_plan(
-    wav: Path, director: str, redo: bool, tempo: str | None = None, cancel=None, rig: dict | None = None, progress=None
+    wav: Path,
+    director: str,
+    redo: bool,
+    tempo: str | None = None,
+    cancel=None,
+    rig: dict | None = None,
+    progress=None,
+    style_genre=None,
 ):
     """Analysis + plan for a track. With a rig of several head groups, the director also decides how the
-    groups work together (and the plan is cached per group layout)."""
+    groups work together (and the plan is cached per group layout).
+
+    The plan follows the house style of the track's genre, or of `style_genre`: a genre, or a function of the
+    analysis giving one (a live set's genre, decisive/director/style.py). The plan is cached per style."""
     director = normalize_director(director)
     a = analyze(wav, CACHE, tempo=tempo)
+    if a.genre == CINEMATIC:  # a program of its own: the hits are the show, the music decides the arc
+        director = CINEMATIC
+    genre = style_genre(a) if callable(style_genre) else (style_genre or a.genre)
+    style = style_for(genre) if director != CINEMATIC else None
+    a.style = style.genre if style else ""
     groups = head_groups(rig) if rig else []
     lasers = laser_list(rig) if rig else []
     screen = bool(rig and rig.get("screen"))
     layout = "-".join(
-        x for x in (signature(groups), f"l{len(lasers)}" if lasers else None, "scr" if screen else None) if x
+        x
+        for x in (
+            signature(groups),
+            f"l{len(lasers)}" if lasers else None,
+            "scr" if screen else None,
+            f"s{style.genre}" if style else None,
+        )
+        if x
     )
     path = plan_path(wav, director, tempo, layout or None)
     if path.exists() and not redo:
@@ -79,14 +104,18 @@ def get_plan(
     model = f" ({MODEL})" if director == "openai" else ""
     print(f"Directing {len(a.phrases)} phrases with the {director} director{model} …")
     base = plan_path(wav, director, tempo).name.split(f".{_file_tag(director)}.")[0]
-    if director == "openai":
-        d = OpenAIDirector(CACHE / f"{base}.decisions-cache.json", groups=groups, lasers=lasers, screen=screen)
+    if director == CINEMATIC:
+        d = CinematicDirector()
+    elif director == "openai":
+        d = OpenAIDirector(
+            CACHE / f"{base}.decisions-cache.json", groups=groups, lasers=lasers, screen=screen, style=style
+        )
     elif director.startswith("ollama"):
         model = director.split(":", 1)[1] if ":" in director else "nimble"
         cache = CACHE / f"{base}.{_file_tag(director)}.decisions-cache.json"
-        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen)
+        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style)
     else:
-        d = RuleDirector(groups, lasers, screen)
+        d = RuleDirector(groups, lasers, screen, style)
     plan = direct(a, d, cancel=cancel, progress=progress)
     save_plan(plan, path)
     print(f"Plan saved to {path}")

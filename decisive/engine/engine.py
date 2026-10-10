@@ -17,6 +17,7 @@ import numpy as np
 from decisive.audio.model import DROP_THRESHOLD, Analysis
 from decisive.director import Decision
 from decisive.engine import zones
+from decisive.engine.cinematic import CinematicMixin
 from decisive.engine.lasers import LasersMixin
 from decisive.engine.looks import STUTTER_ON, XFADE, LooksMixin
 from decisive.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
@@ -26,7 +27,7 @@ from decisive.library import fixtures as fxlib
 from decisive.rig import geometry
 
 
-class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin):
+class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
     def __init__(self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False):
         """`real_output`: the DMX goes to real lights, so the laser guard insists on laser zones."""
         self.a = analysis
@@ -121,6 +122,12 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin):
         self.reach_uv = [self._reach(j) for j in range(len(self.heads))]
         self._move_beats = (1, 1)
         self._move_travel = (0.9, 0.9)
+        # a program of its own for the genre (cinematic: every hit played by its own fixtures)
+        self.program = (
+            "cinematic" if getattr(analysis, "genre", "") == "cinematic" and analysis.hits is not None else ""
+        )
+        if self.program == "cinematic":
+            self._init_cinematic(rig)
         self.traj = self._cached_trajectories()
         self._share_motors()
         self.traj_n = len(next(iter(self.traj.values()))[0]) if self.traj else 2
@@ -158,6 +165,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin):
 
     def render(self, t: float) -> tuple[int, dict[str, State]]:
         i, d = self.decision_at(t)
+        if self.program == "cinematic":
+            return i, self._finish(self._cinematic_scene(t), t)
         states = self._scene(d, t)
         ahead = self._drop_ahead(i, t)
         if ahead is not None:  # heads take the drop's colour/gobo/prism while dark, so the wheels are ready
@@ -170,11 +179,16 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin):
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
+        self._stutter_overlay(t, i, states)
+        self._drop_moment(t, states)
+        return i, self._finish(states, t)
+
+    def _finish(self, states: dict[str, State], t: float) -> dict[str, State]:
+        """What every look gets last: the heads' real and target positions, dark while crossing the eye band,
+        colours the wheels can make, and the laser guard."""
         f = t * MOTION_FPS
         i0 = int(min(max(f, 0), self.traj_n - 2))
         k = min(max(f - i0, 0.0), 1.0)
-        self._stutter_overlay(t, i, states)
-        self._drop_moment(t, states)
         fl = (t + DMX_LEAD_S) * MOTION_FPS
         g0 = int(min(max(fl, 0), self.traj_n - 2))
         gk = min(max(fl - g0, 0.0), 1.0)
@@ -198,7 +212,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin):
             s.dimmer, s.white = max(s.dimmer, s.white), 0.0
         if self.lasers:  # the very last word: nothing after this may light a laser again
             self._laser_guard(states, t)
-        return i, states
+        return states
 
     def dmx(self, states: dict[str, State]) -> dict[int, bytearray]:
         """Patch element states into one 512-byte buffer per universe."""

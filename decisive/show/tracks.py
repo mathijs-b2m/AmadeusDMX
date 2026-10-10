@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from decisive.director.style import SetGenre
 from decisive.engine import Engine
 
 
@@ -21,6 +22,10 @@ class TrackShows:
         self.status: dict[str, dict] = {}  # file → progress per step, for the visualiser
         self.pool = ThreadPoolExecutor(max_workers=2)
         self.lock = threading.Lock()
+        self.set_genre = SetGenre()  # the set's genre: tracks of a genre share a house style
+
+    def _style_genre(self, file: str):
+        return lambda a: self.set_genre.genre_for(file, a.genre, a.genre_source)
 
     def set_director(self, director: str):
         """Switch decision model: every known track gets a plan from the new one (cached plans are instant)."""
@@ -68,11 +73,12 @@ class TrackShows:
                 return
             if first:
                 self._step(file, analysis="running")
-                a, plan = get_plan(Path(file), "rules", False, rig=self.rig)  # immediately usable
+                style = self._style_genre(file)
+                a, plan = get_plan(Path(file), "rules", False, rig=self.rig, style_genre=style)  # immediately usable
                 self._step(file, analysis="done")
                 self._install(file, a, plan, "rules")
                 if self._separate(file):  # the lights run meanwhile; then the show gets the synth notes
-                    a, plan = get_plan(Path(file), "rules", False, rig=self.rig)
+                    a, plan = get_plan(Path(file), "rules", False, rig=self.rig, style_genre=style)
                     self._install(file, a, plan, "rules")
             done = "rules" if first else None
             while self.director != done:  # (re)build until the plan of the CURRENT model is installed
@@ -86,6 +92,7 @@ class TrackShows:
                         False,
                         cancel=lambda d=director: self.director != d,
                         rig=self.rig,
+                        style_genre=self._style_genre(file),
                         progress=lambda k, n, f=file: self.status[f].update(ai_done=k, ai_total=n),
                     )
                 except Cancelled:

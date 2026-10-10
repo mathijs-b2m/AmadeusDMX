@@ -4,6 +4,8 @@ const PALETTES = {
   neon: [[1,0,.8],[.4,1,0],[0,1,.9],[.8,0,1]],
   fire: [[1,0,0],[1,.35,0],[1,.9,.7],[.8,.05,0]],
   ice:  [[.85,.95,1],[.3,.8,1],[.1,.35,1],[1,1,1]],
+  gold: [[1,.65,.1],[.55,0,.9],[1,.85,.45],[.9,.3,.6]],
+  stage: [[1,.85,.65],[1,.55,.1],[.1,.2,.9],[1,1,1]],
 };
 const SECTIONS = ["intro","groove","buildup","drop","breakdown","outro"];
 const BANDS = ["sub","bass","mid","high","air"];
@@ -29,6 +31,13 @@ function onHello(msg) {
   const dir = $("director");
   dir.textContent = msg.director === "openai" ? "Decisions API · gpt-6-luna" : "rule-based director";
   dir.className = "badge " + msg.director;
+  const g = $("genre");  // the genre; a program of its own (cinematic) stands out
+  g.style.display = msg.genre ? "" : "none";
+  const styled = msg.style && msg.style !== msg.genre ? ` · ${msg.style.toUpperCase()} STYLE` : "";
+  g.textContent = msg.program === "cinematic" ? "🎬 CINEMATIC PROGRAM" : (msg.genre || "").toUpperCase() + styled;
+  g.style.background = msg.program === "cinematic" ? "linear-gradient(90deg, #f2731a, #8c1a99)" : "";
+  g.style.color = msg.program === "cinematic" ? "#fff" : "";
+  g.title = msg.program === "cinematic" ? "Every hit played by its own fixtures, exactly on time" : `genre (${msg.genre_source || "audio"})`;
   const tl = $("timeline");
   tl.querySelectorAll(".seg").forEach(e => e.remove());
   msg.plan.forEach((d, i) => {

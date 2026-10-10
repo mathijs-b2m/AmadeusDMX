@@ -42,6 +42,10 @@ struct DeckRow: View {
                     .background(deck.play ? Color.accentColor : Color.secondary.opacity(0.3), in: .circle)
                     .foregroundStyle(.white)
                 Text(deck.track).font(.callout.weight(.medium)).lineLimit(1)
+                if deck.genre == "cinematic" {  // a program of its own: say so
+                    Image(systemName: "film.stack").foregroundStyle(.orange).help("Cinematic program")
+                }
+                GenreChip(genre: deck.genre ?? "", style: deck.style ?? "")
                 Spacer()
                 Image(systemName: deck.play ? "play.fill" : "pause.fill").font(.caption).foregroundStyle(.secondary)
             }
