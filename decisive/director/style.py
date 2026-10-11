@@ -61,7 +61,8 @@ def _style(genre, text, palettes, avoid=None, prefer=None) -> Style:
 
 
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
-_CALM_AVOID = {"head_light": {"flick", "beat", "stutter"}, "movement": {"bounce", "ballyhoo", "step_on_beat"},
+_CALM_AVOID = {"head_light": {"flick", "beat", "stutter", "random"},
+               "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave"},
                "par_accent": {"stutter", "chase"}, "beam_fx": {"prism_spin", "gobo_spin", "gobo_shake"}}  # fmt: skip
 _CALM_PREFER = {"head_light": ("breathe", "steady"), "movement": ("sweep", "still", "circle"),
                 "par_accent": ("none", "pulse"), "beam_fx": ("open", "gobo_rotate")}  # fmt: skip

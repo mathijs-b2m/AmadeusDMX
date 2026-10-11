@@ -57,6 +57,14 @@ def _mix(cols, x: float):
     return tuple(a[i] * (1 - k) + b[i] * k for i in range(3))
 
 
+RANDOM_SHARE = 0.4  # random head light: the share of eighths a head would like to light
+
+
+def _chance(head: int, slot: int) -> bool:
+    """Random but repeatable: does this head light this eighth?"""
+    return math.sin(slot * 12.9898 + head * 78.233) * 43758.5453 % 1.0 < RANDOM_SHARE
+
+
 class LooksMixin:
     """Per-phrase looks: which fixtures light, in which colours, on which hits."""
 
@@ -283,6 +291,9 @@ class LooksMixin:
                 dim = 1.0 if phase < 0.5 else 0.0
             elif hl == "alternate":  # heads take turns per beat (within their group when the groups act apart)
                 dim = (1.0 if phase < 0.8 else 0.0) if (beat + role["idx"]) % 2 == 0 else 0.0
+            elif hl == "random":  # each head on its own random eighths: a snap on, held for the eighth, off
+                slot = int((beat + phase) * 2)
+                dim = 1.0 if _chance(j, slot) and not _chance(j, slot - 1) else 0.0
             else:
                 dim = {
                     "steady": 1.0,
@@ -335,7 +346,7 @@ class LooksMixin:
         if strength <= 0:
             return
         chopped = 1.0 - self.stut_depth * (1.0 - float(self.stut_gate[f]))
-        rhythmic_heads = self.plan[i].head_light in ("flick", "beat", "alternate", "stutter")
+        rhythmic_heads = self.plan[i].head_light in ("flick", "beat", "alternate", "stutter", "random")
         for e in self.rig["elements"]:
             if e["kind"] == "head" and rhythmic_heads:
                 continue

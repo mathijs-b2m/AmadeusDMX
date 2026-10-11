@@ -40,6 +40,10 @@ POINT_DISTANCE_M = 3.0  # focus/cross: how far in front of the rig the shared po
 WAVE_BEATS = 4.0  # a wave runs over the heads (of the rig or a group) within this many beats
 
 
+TILT_WAVE_DEG = 30.0  # tilt wave: how far each head tilts up and down (a little less at the fast peak tempo)
+TILT_WAVE_SPAN = 1.0  # …and how many waves the row shows at once (1: one full wave from end to end)
+
+
 AIMS = {  # direction aims: centre azimuth/elevation and swing; point aims: (y centre, y half-range, z) of a surface
     "crowd": {"az": 0, "el": -32, "az_amp": 60, "el_amp": 15, "plane": (2.2, 1.5, 0.0)},
     "stage": {"az": 180, "el": -35, "az_amp": 60, "el_amp": 18, "plane": (-2.2, 1.0, 0.0)},
@@ -383,6 +387,7 @@ class MotionMixin:
         role = self._role(d, j)
         side, idx, count = role["side"], role["idx"], role["count"]
         f, movement = role["formation"], role["movement"]
+        beats = pos + role["phase"]  # (the tilt wave makes its own offsets: by place in the row)
         if f == "wave":  # one beat per head, but a wave spans at most WAVE_BEATS (60 heads: not 60 beats)
             pos = pos - idx * min(1.0, WAVE_BEATS / max(count - 1, 1))
         pos = pos + role["phase"]
@@ -402,7 +407,19 @@ class MotionMixin:
         W = role["width"]
         az = aim["az"] + u * aim["az_amp"]
         el = aim["el"] + v * aim["el_amp"]
-        if f in ("focus", "cross"):  # a shared point: of the whole rig, or of this head's group
+        if movement == "tilt_wave":
+            # A row of heads tilting up and down in a wave that rolls over the row: each head a step behind its
+            # neighbour by where it hangs (left to right; mirrored: from the centre out). One wave per bar, every
+            # two beats at the peaks. The beams fan out a little so the row reads as a row.
+            period = 2.0 if d.intensity >= 3 else 4.0
+            amp = TILT_WAVE_DEG * (0.8 if period < 4 else 1.0)
+            across = abs(side) if f == "mirror" else (side + 1) / 2
+            wave = np.sin(2 * math.pi * (beats / period - across * TILT_WAVE_SPAN))
+            centre = aim["el"] - 8 if aim["el"] < 0 else aim["el"]  # over the crowd: room for the top of the wave
+            az = np.full_like(ts, aim["az"] + side * (30 if f == "fan" else 15), dtype=float)
+            el = centre + amp * wave + role["vside"] * 6
+            out = self._direction_v(az, el)
+        elif f in ("focus", "cross"):  # a shared point: of the whole rig, or of this head's group
             centre = np.mean(self.head_pos, axis=0) if role["centre"] is None else role["centre"]
             point = centre + self._direction_v(az, el) * POINT_DISTANCE_M
             if f == "cross":

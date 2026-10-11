@@ -109,6 +109,11 @@ HEAD_LIGHT = [
     ),
     ("beat", "Beams switch hard on and off with every beat: a punchy on/off rhythm."),
     ("alternate", "Heads take turns per beat (left, right, left...): call and response."),
+    (
+        "random",
+        "Every head pulses on its own random eighths: a sparkling, restless rig. Great while the heads do a "
+        "tilt wave; for energetic parts, not for calm ones.",
+    ),
     ("accents", "Beams mostly dim, flaring up on big hits."),
     (
         "breathe",
@@ -133,6 +138,12 @@ MOVEMENTS = [  # the path; how heads relate to each other is the formation
     ("bounce", "Snap up and down on every beat: fast and punchy."),
     ("swing", "Snap left and right on every beat: fast and punchy."),
     ("ballyhoo", "Fast, wide, unpredictable movement. Peaks only."),
+    (
+        "tilt_wave",
+        "A row of heads tilting up and down in a wave that rolls over the row, each head a step behind its "
+        "neighbour (mirror: from the centre out). One wave per bar, faster at the peaks. A classic for energetic "
+        "grooves and drops, with the light steady or pulsing at random; not for calm parts.",
+    ),
 ]
 
 FORMATIONS = [

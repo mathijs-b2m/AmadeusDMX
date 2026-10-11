@@ -148,8 +148,8 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 | `par_accent`: pars on a hit | none · pulse · color_pop · chase · alternate · sparkle · stutter · melody |
 | `trigger`: what a hit is | kick · backbeat · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
-| `head_light` | steady · pulse · flick · beat · alternate · accents · breathe · stutter · off |
-| `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo |
+| `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random eighths) · accents · breathe · stutter · off |
+| `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) |
 | `formation` | sync · mirror · wave · fan · focus (shared point) · cross |
 | `aim` | crowd · stage · sky |
 | `head_color` | base · accent · white · cycle |
@@ -167,6 +167,7 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 - **High energy keeps moving:** loud phrases with a running kick never get still or nodding heads.
 - **Variety:** a path, formation, head light or head colour repeated three phrases in a row is replaced by the model's next most likely option; drops differ from the previous drop; drops and breakdowns change the palette.
 - **No beat:** percussive triggers become `accents`; strong synth stutters switch the heads' light to `stutter`.
+- **Energetic moves stay energetic:** the tilt wave and randomly pulsing heads are for medium and intense moments; in intros, breakdowns, outros and quiet phrases they become a nod and a breathing light.
 - **Crisp beam:** frost only in intros/breakdowns/outros and at most once per 4 phrases.
 - **Hysteresis:** an unsure model (mean confidence < 0.35) in an unchanged section keeps the previous look. API errors or refusals fall back to the rules; the show never stops.
 
