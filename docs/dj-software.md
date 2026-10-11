@@ -62,6 +62,9 @@ labels, about 200 times a second, through the macOS Accessibility API.
   `sources/base.py`); the fixed offset between the two (about 145 ms here, djay's audio latency) is learnt as
   it plays. Any DJ software that syncs to Link can use the same lock.
 - **Files:** djay's library (`~/Music/djay/…/MediaLibrary.db`, read only) gives the file of a local track.
+  djay only records a newly added file there once it *plays*, so a track loaded for the first time is looked
+  up by its title in the folders of the tracks djay already knows (and the music folders): its show is
+  prepared while it is still cued, as with VirtualDJ.
   Streamed tracks (Spotify and the like) have no file to analyse, so they aren't lit.
 
 ### The Accessibility permission

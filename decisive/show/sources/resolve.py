@@ -40,7 +40,7 @@ def length_of(path: Path) -> float | None:
 
 
 class Resolver:
-    """Finds tracks in the music folders; the folders are indexed once, in the background."""
+    """Finds tracks in the music folders; the folders are indexed once, in the background (more can be added)."""
 
     def __init__(self, folders: list[Path] | None = None):
         self.folders = folders if folders is not None else roots()
@@ -48,18 +48,32 @@ class Resolver:
         self.by_name: dict[str, list[Path]] = {}
         self.ready = threading.Event()
         self.memo: dict[tuple, str | None] = {}
+        self.lock = threading.Lock()
         threading.Thread(target=self._index, daemon=True).start()
 
-    def _index(self):
+    def _index(self, folders: list[Path] | None = None):
         files = []
-        for root in self.folders:
+        for root in folders if folders is not None else self.folders:
             for dirpath, dirnames, names in os.walk(root):
                 dirnames[:] = [d for d in dirnames if not d.startswith(".")]
                 files += [Path(dirpath) / n for n in names if Path(n).suffix.lower() in AUDIO]
-        self.files = files
-        for f in files:
-            self.by_name.setdefault(f.name.lower(), []).append(f)
+        with self.lock:  # two indexings finishing together must not lose each other's files
+            by_name = {k: list(v) for k, v in self.by_name.items()}
+            for f in files:
+                by_name.setdefault(f.name.lower(), []).append(f)
+            self.files, self.by_name = self.files + files, by_name  # whole lists: a reader never sees half
+            self.memo = {k: v for k, v in self.memo.items() if v}  # what wasn't found may be there now
         self.ready.set()
+
+    def add(self, folders):
+        """More places to look (e.g. where the DJ software's known tracks are), indexed in the background."""
+        new = []
+        for f in {Path(f) for f in folders}:
+            if f.is_dir() and not any(f == r or r in f.parents for r in self.folders + new):
+                new = [n for n in new if f not in n.parents] + [f]
+        if new:
+            self.folders = self.folders + new
+            threading.Thread(target=self._index, args=(new,), daemon=True).start()
 
     def find(self, path: str = "", artist: str = "", title: str = "", length: float = 0.0, wait: float = 0.0) -> str:
         """The local file, or "" (unknown, or the music folders are still being indexed)."""

@@ -12,7 +12,9 @@ position is the least late (the same idea as the Decisive Link clock sync), whic
 within some 10 ms. A tick that lands outside its window means the DJ jumped (seek, loop, nudge): we start
 over from there, half a second uncertain until the next tick.
 
-The track's file comes from djay's own library (MediaLibrary.db, read only), by title and artist.
+The track's file comes from djay's own library (MediaLibrary.db, read only), by title and artist. djay only
+records a newly added file there once it plays; until then the file is looked up by its title in the folders
+djay's known tracks are in (and the music folders), so a track is analysed as soon as it is loaded.
 
 A deck on SYNC follows Ableton Link: then the deck also carries Link's beat phase, and live mode locks the
 position to it (base.PhaseLock): the label picks the beat, Link gives the exact moment (needs aalink).
@@ -118,8 +120,9 @@ class Playhead:
 class Library:
     """djay's library: a track's file by its title (and artist), read only."""
 
-    def __init__(self, path: Path = LIBRARY):
+    def __init__(self, path: Path = LIBRARY, found=None):
         self.path = path
+        self.found = found  # called with the folders of the files djay knows
         self.files: dict[tuple[str, str], str] = {}
         self.read_at = 0.0
 
@@ -136,6 +139,8 @@ class Library:
                     title = s[s.index("title") - 1] if "title" in s else ""
                     artist = s[s.index("artist") - 1] if "artist" in s else ""
                     self.files[(title, artist)] = unquote(urlparse(url).path)
+            if self.found:
+                self.found({str(Path(f).parent) for f in self.files.values()})
         except (sqlite3.Error, ValueError, IndexError) as e:
             print(f"  ⚠ djay library: {e}", flush=True)
 
@@ -215,8 +220,9 @@ class Djay(Source):
             except ImportError:
                 print("  djay: no Ableton Link (pip install aalink): positions from djay's window only", flush=True)
         self.window = Window()
-        self.library = Library()
         self.resolver = Resolver()
+        self.library = Library(found=self.resolver.add)
+        self.library._read()  # now: the folders it knows are indexed before the first track is loaded
         self.period = 1.0 / poll
         self.heads: dict[int, Playhead] = {}
         self.info: dict[int, dict] = {}

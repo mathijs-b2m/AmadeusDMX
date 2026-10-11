@@ -187,3 +187,18 @@ def test_the_phase_travels_with_emit():
     src.received([d], now=now)
     packet = probe.plugin_packet(src, now + 0.125, now)  # a quarter beat later at 120 BPM
     assert abs(packet["decks"][0]["phase"] - 0.5) < 1e-3
+
+
+def test_resolver_learns_more_folders(tmp_path):
+    (tmp_path / "music").mkdir()
+    (tmp_path / "elsewhere" / "sub").mkdir(parents=True)
+    sf.write(tmp_path / "elsewhere" / "sub" / "Artist - Far Away.wav", np.zeros(800), 8000)
+    r = Resolver([tmp_path / "music"])
+    assert r.find(title="Far Away", wait=5) == ""
+    r.add([str(tmp_path / "elsewhere"), str(tmp_path / "elsewhere" / "sub"), str(tmp_path / "music")])
+    assert r.folders == [tmp_path / "music", tmp_path / "elsewhere"]  # nothing indexed twice
+    for _ in range(200):
+        if r.find(title="Far Away"):
+            break
+        time.sleep(0.01)
+    assert r.find(title="Far Away").endswith("Artist - Far Away.wav")
