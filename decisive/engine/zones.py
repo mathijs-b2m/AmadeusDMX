@@ -21,6 +21,15 @@ import numpy as np
 from decisive.rig import geometry
 
 
+def _turn(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """The rotation matrix that turns unit vector a onto unit vector b (Rodrigues)."""
+    v, c = np.cross(a, b), float(a @ b)
+    if np.linalg.norm(v) < 1e-9:
+        return np.eye(3) if c > 0 else -np.eye(3)
+    k = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + k + k @ k / (1 + c)
+
+
 class Zone:
     def __init__(self, z: dict):
         self.id, self.name = z["id"], z.get("name", z["id"])
@@ -151,6 +160,23 @@ class Zones:
             ok &= ~(z.hit(pos, d) < L)
         return ok
 
+    def _into(self, z, pos, d0: np.ndarray) -> np.ndarray:
+        """Directions turned the least towards a point surely inside keep-in zone z until they land in it."""
+        safe_pt = z.c.copy()  # the zone's centre on the floor if it reaches the floor, else its centre
+        if z.c[2] - z.half[2] <= 0.05:
+            safe_pt[2] = 0.02
+        safe = safe_pt - pos
+        safe /= np.linalg.norm(safe)
+        lo, hi = np.zeros(len(d0)), np.ones(len(d0))
+        for _ in range(14):
+            mid = (lo + hi) / 2
+            cand = d0 * (1 - mid[:, None]) + safe * mid[:, None]
+            cand /= np.linalg.norm(cand, axis=1, keepdims=True)
+            ins = self._inside(z, pos, cand)
+            hi, lo = np.where(ins, mid, hi), np.where(ins, lo, mid)
+        cand = d0 * (1 - hi[:, None]) + safe * hi[:, None]
+        return cand / np.linalg.norm(cand, axis=1, keepdims=True)
+
     def filter(self, pos, d: np.ndarray) -> np.ndarray:
         """Target directions (M, 3) for a head at `pos`: into keep-in zones, off avoid zones."""
         if not self.heads:
@@ -161,22 +187,14 @@ class Zones:
             out = ~self._inside(z, pos, d)
             if not out.any():
                 continue
-            # a point surely inside: the zone's centre on the floor if it reaches the floor, else its centre
-            safe_pt = z.c.copy()
-            if z.c[2] - z.half[2] <= 0.05:
-                safe_pt[2] = 0.02
-            safe = safe_pt - pos
-            safe /= np.linalg.norm(safe)
-            d0 = d[out]
-            lo, hi = np.zeros(len(d0)), np.ones(len(d0))
-            for _ in range(14):  # the least turn towards the safe point that lands inside
-                mid = (lo + hi) / 2
-                cand = d0 * (1 - mid[:, None]) + safe * mid[:, None]
-                cand /= np.linalg.norm(cand, axis=1, keepdims=True)
-                ins = self._inside(z, pos, cand)
-                hi, lo = np.where(ins, mid, hi), np.where(ins, lo, mid)
-            cand = d0 * (1 - hi[:, None]) + safe * hi[:, None]
-            d[out] = cand / np.linalg.norm(cand, axis=1, keepdims=True)
+            if len(d) > 1 and out.mean() > 0.5:  # most of a path outside: turn the whole path in, keeping its shape
+                m = d.mean(axis=0)
+                if np.linalg.norm(m) > 1e-6:
+                    m /= np.linalg.norm(m)
+                    d = d @ _turn(m, self._into(z, pos, m[None])[0]).T
+                    out = ~self._inside(z, pos, d)
+            if out.any():  # (the rest: each just far enough in)
+                d[out] = self._into(z, pos, d[out])
         for _ in range(3):  # avoid zones: off over the nearest edge that really clears (a push can meet the next)
             blocked = ~self._clear(pos, d)
             if not blocked.any():

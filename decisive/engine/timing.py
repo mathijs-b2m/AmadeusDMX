@@ -22,9 +22,12 @@ def _decay(times: np.ndarray, strengths: np.ndarray, t: float, tau: float) -> fl
 FLASH_SNAP_S = 0.1  # a big accent this close to a kick flashes with it (further off: no flash)
 MIN_GAP_S = 0.3  # hits closer together than this are held through: a light never flickers faster
 NO_KICK_S = 2.0  # no kick for this long (a breakdown): kick-led light holds a steady middle level
-STROBE_HZ, STROBE_DUTY = 10.0, 0.35  # the deliberate strobe: a fixed fast rate, never the music's own rhythm
-STROBE_ON = 0.5  # how clear a synth stutter must be (per bar) before a "stutter" look strobes
-STROBE_REST_BARS = 16  # a strobe is rare: one bar at a time, then at least this many bars without
+STAB_GAP_S = 0.35  # accent lights: stabs at least this far apart (no flicker)
+STAB_STANDOUT = 1.4  # a stab: a synth note this much stronger than the notes around it…
+STAB_REST_S = 0.2  # …or one that comes after a rest this long
+STAB_HOLD_S, STAB_RELEASE_S = 0.06, 0.16  # the flash: on at once, held a moment, let go quickly but softly
+BREAK_MAX_BARS = 8  # a kick break builds over at most this many bars (the ones before the kick returns)
+BREAK_FROM, BREAK_TO = 0.35, 0.85  # kick break: kick-led light holds, building from this level to that
 
 
 def _release(dt: float, level: float, hold: float, release: float) -> float:
@@ -49,6 +52,36 @@ def note_env(times: np.ndarray, strengths: np.ndarray, t: float) -> tuple[float,
     if gap < MIN_GAP_S:
         return level, i - 1
     return _release(t - last, level, min(0.4 * gap, 0.6), min(0.5 * gap, 0.8)), i - 1
+
+
+def stab_env(times: np.ndarray, strengths: np.ndarray, t: float) -> float:
+    """A stab played on a key: full at once (two levels), held a moment, let go quickly but softly."""
+    i = bisect.bisect_right(times, t)
+    if i == 0:
+        return 0.0
+    level = 1.0 if float(strengths[i - 1]) >= 0.5 else 0.7
+    return _release(t - float(times[i - 1]), level, STAB_HOLD_S, STAB_RELEASE_S)
+
+
+def pick_stabs(times: np.ndarray, strengths: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The synth notes that are hits, not the run of a riff: clearly stronger than the notes around them
+    (±2 s) or after a rest; at least STAB_GAP_S apart (the stronger one wins). Strengths: 0..1 by standout."""
+    times, strengths = np.asarray(times, float), np.asarray(strengths, float)
+    if len(times) < 2:
+        return np.zeros(0), np.zeros(0)
+    lo, hi = np.searchsorted(times, times - 2.0), np.searchsorted(times, times + 2.0)
+    local = np.array([np.median(strengths[a:b]) for a, b in zip(lo, hi)])
+    standout = strengths / np.maximum(local, 1e-3)
+    rest = np.r_[np.inf, np.diff(times)] >= STAB_REST_S
+    cand = np.flatnonzero((standout >= STAB_STANDOUT) | (rest & (standout >= 1.0)))
+    chosen: list[int] = []
+    for k in cand[np.argsort(-standout[cand], kind="stable")]:  # strongest first, then keep the spacing
+        j = bisect.bisect_left([times[c] for c in chosen], times[k]) if chosen else 0
+        near = [chosen[x] for x in (j - 1, j) if 0 <= x < len(chosen)]
+        if all(abs(times[c] - times[k]) >= STAB_GAP_S for c in near):
+            chosen.insert(j, k)
+    idx = np.array(sorted(chosen), dtype=int)
+    return times[idx], np.clip((standout[idx] - 1.0) / 1.0, 0.0, 1.0)
 
 
 def _ease(x: float) -> float:
@@ -109,32 +142,28 @@ class TimingMixin:
         lo, hi = minimum_filter1d(x, w), maximum_filter1d(x, w)
         return np.clip((x - lo) / np.maximum(hi - lo, 3.0), 0, 1).astype(np.float32)
 
-    def _strobe_bars(self) -> np.ndarray:
-        """Per frame: may a "stutter" look strobe here? A bar where the synths clearly stutter, then a rest of
-        STROBE_REST_BARS; only when the set allows fast strobe."""
-        mask = np.zeros(len(self.chop), dtype=bool)
-        if not self.fast_strobe or len(self.downbeat_times) < 2:
-            return mask
-        fps, bars, rest_until = self.a.fps, self.downbeat_times, -1.0
-        for k in range(len(bars) - 1):
-            f0, f1 = int(bars[k] * fps), min(int(bars[k + 1] * fps), len(mask))
-            if f1 <= f0 or bars[k] < rest_until or float(self.chop[f0:f1].mean()) < STROBE_ON:
-                continue
-            mask[f0:f1] = True
-            rest_until = bars[k] + (STROBE_REST_BARS + 1) * (bars[k + 1] - bars[k])
-        return mask
-
-    def _strobe(self, t: float) -> float | None:
-        """The deliberate strobe: on/off at a fixed fast rate while the synths clearly stutter (and the set
-        allows fast strobe); None elsewhere. Never chopping along with the music: that reads as flicker."""
-        if not self.strobe_bars[self._frame(t)]:
-            return None
-        return 1.0 if (t * STROBE_HZ) % 1.0 < STROBE_DUTY else 0.0
-
-    def _stutter(self, t: float, calm: float) -> float:
-        """The strobe where the synths clearly stutter, else `calm`."""
-        s = self._strobe(t)
-        return calm if s is None else s
+    def _kick_breaks(self) -> list[tuple[float, float, bool]]:
+        """Where the kick drops out inside the music: (start, end, kick_returns) on bar lines. After a running
+        kick (two bars with 3+ kicks), a stretch of bars with at most two kicks that dips to one or none: the
+        kick thinning out (filtered away) and gone, a classic techno/house build within a section. Steady two
+        kicks a bar (half time) is a groove, not a break; a long stretch counts with its last BREAK_MAX_BARS."""
+        bars = self.downbeat_times
+        if len(bars) < 4 or not len(self.kick_t):
+            return []
+        counts = [int(((self.kick_t >= b0 - 0.05) & (self.kick_t < b1 - 0.05)).sum()) for b0, b1 in zip(bars, bars[1:])]
+        out, k = [], 2
+        while k < len(counts):
+            if counts[k] <= 2 and counts[k - 1] >= 3 and counts[k - 2] >= 3:
+                e = k
+                while e < len(counts) and counts[e] <= 2:
+                    e += 1
+                if min(counts[k:e]) <= 1:
+                    start = max(k, e - BREAK_MAX_BARS)
+                    returns = e < len(counts)
+                    out.append((float(bars[start]), float(bars[min(e, len(bars) - 1)]), returns))
+                k = e
+            k += 1
+        return out
 
     def _frame(self, t: float) -> int:
         return min(max(int(t * self.a.fps), 0), len(self.lead_pitch) - 1)

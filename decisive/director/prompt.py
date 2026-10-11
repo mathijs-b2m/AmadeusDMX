@@ -220,12 +220,7 @@ def build_prompt(
             "Analysis: the NEXT phrase starts with a drop, so this phrase is most likely the BUILDUP "
             "towards it (use the rise energy curve; the 'roll' trigger accelerates with the build)."
         )
-    if p.stutter > 0.35:
-        hints.append(
-            "Analysis: the synths stutter / gate rhythmically here. Let the LIGHT chop with it: heads light "
-            "'stutter' and/or pars 'stutter', with slow smooth movement (no per-beat moves needed)."
-        )
-    elif p.kick_ratio < 0.5:
+    if p.kick_ratio < 0.5:
         hints.append(
             "Analysis: little or no kick. Keep movement slow and smooth; let the light breathe with the "
             "music (heads 'breathe') rather than following individual notes or vocals."

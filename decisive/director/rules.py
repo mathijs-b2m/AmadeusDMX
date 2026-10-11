@@ -13,7 +13,7 @@ from decisive.director.vocabulary import DEFAULT_PALETTES
 RULE_LOOKS = {
     # (par_base, par_accent, trigger, head_light, movement, formation, aim, head_color, dynamics)
     "intro": [
-        ("dim", "stutter", "accents", "stutter", "sweep", "mirror", "sky", "base", "steady"),
+        ("dim", "sparkle", "accents", "breathe", "sweep", "mirror", "sky", "base", "steady"),
         ("fade", "none", "bars", "steady", "nod", "sync", "sky", "base", "steady"),
         ("dim", "sparkle", "accents", "accents", "sweep", "mirror", "sky", "white", "steady"),
     ],
@@ -43,7 +43,7 @@ RULE_LOOKS = {
         ("full", "color_pop", "kick", "steady", "tilt_wave", "mirror", "sky", "accent", "impact"),
     ],
     "breakdown": [
-        ("dim", "stutter", "accents", "breathe", "circle", "wave", "sky", "base", "steady"),
+        ("dim", "none", "accents", "breathe", "circle", "wave", "sky", "base", "steady"),
         ("fade", "sparkle", "accents", "accents", "sweep", "wave", "sky", "white", "steady"),
         ("dim", "none", "bars", "steady", "circle", "focus", "stage", "base", "steady"),
     ],

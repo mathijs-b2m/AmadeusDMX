@@ -100,7 +100,7 @@ class LasersMixin:
             "beat": 1.0 if phase < 0.5 else 0.0,
             "alternate": 1.0 if phase < 0.8 else 0.0,
             "breathe": 1.0,
-            "stutter": 1.0 if self._stutter(t, 1.0) > 0.5 else 0.0,
+            "stutter": 1.0 if env > 0.35 else 0.0,  # (older plans: as pulse)
             "off": 1.0,
         }.get(hl, 1.0)
         if move in ("pulse", "ripple"):  # the shape itself carries the rhythm: keep the beams on

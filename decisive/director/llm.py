@@ -28,7 +28,7 @@ MODEL = "gpt-6-luna"
 HOLD_CONFIDENCE = 0.35  # mean look confidence below this, in an unchanged section → keep the previous look
 
 
-PROMPT_VERSION = 22
+PROMPT_VERSION = 23
 
 
 class OpenAIDirector:
@@ -126,9 +126,6 @@ class OpenAIDirector:
             d.trigger, guarded = "accents", True
         if d.movement == "follow_lead":  # retired option (old cached answers)
             d.movement, guarded = "sweep", True
-        # Stuttering synths: chop the light with them.
-        if ph.stutter > 0.35 and d.head_light in ("steady", "breathe", "pulse"):
-            d.head_light, guarded = "stutter", True
 
         # Crisp beam by default: frost only as a rare soft moment in calm sections.
         recent_frost = any(h.beam_fx == "frost" for h in history[-3:])

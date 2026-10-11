@@ -166,10 +166,10 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 | Layer | Options |
 |---|---|
 | `par_base`: pars between hits | off · dim · full · fade |
-| `par_accent`: pars on a hit | none · pulse · color_pop · chase · alternate · sparkle · stutter · melody |
+| `par_accent`: pars on a hit | none · pulse · color_pop · chase · alternate · sparkle · melody |
 | `trigger`: what a hit is | kick · backbeat · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
-| `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · stutter · off |
+| `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · off |
 | `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) |
 | `formation` | sync · mirror · wave · fan · focus (shared point) · cross |
 | `aim` | crowd · stage · sky |
@@ -187,7 +187,7 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 - **Drops:** a detected drop is always `drop` with `impact`, intensity ≥ High, moving heads (no still/nod/sweep), lights on. The phrase before a drop is a `buildup` with `rise`.
 - **High energy keeps moving:** loud phrases with a running kick never get still or nodding heads.
 - **Variety:** a path, formation, head light or head colour repeated three phrases in a row is replaced by the model's next most likely option; drops differ from the previous drop; drops and breakdowns change the palette.
-- **No beat:** percussive triggers become `accents`; strong synth stutters switch the heads' light to `stutter`.
+- **No beat:** percussive triggers become `accents`.
 - **Energetic moves stay energetic:** the tilt wave and randomly pulsing heads are for medium and intense moments; in intros, breakdowns, outros and quiet phrases they become a nod and a breathing light.
 - **Crisp beam:** frost only in intros/breakdowns/outros and at most once per 4 phrases.
 - **Hysteresis:** an unsure model (mean confidence < 0.35) in an unchanged section keeps the previous look. API errors or refusals fall back to the rules; the show never stops.
@@ -225,7 +225,9 @@ on your rig by eye: lights late on the kick → raise it.
 - **Geometry:** a stage model in metres; paths become beam directions (or a shared spot for focus/cross, the heads spread around it), then pan/tilt by inverse kinematics, choosing the solution closest to where the motors actually are. Calibration per head: `mount` (stand/floor/hang), `pan_home_deg`, `pan_invert`, `tilt_home_deg`, `tilt_invert`.
 - **No flicker; the kick leads:** a light is played like a note: on at once, held, let go gently before the next hit. Hits closer than 0.3 s are held through, so no light ever blinks on and off faster than about 3 times a second. Fast triggers (`hats`, `eighths`, `sixteenths`, `roll`, `synth`) switch the lights on the kick, never per hi-hat or synth note; without a kick (a breakdown) kick-led light holds a steady middle level. White flashes land on the kick too.
 - **A group plays the kicks in parts:** per phrase the engine picks how a group (or a one-group rig) plays the kicks, left to right by position: all together, taking turns (odd/even), left against right, or a rotation through three or four sub-groups. Drops lean towards all together.
-- **The strobe is deliberate and rare:** a `stutter` look strobes at a fixed 10 Hz (never along with the music), only in a bar where the synths clearly stutter, one bar at a time with at least 16 bars between, and only when the set allows fast strobe (`allow_fast_strobe`). Elsewhere it plays the kick.
+- **Rhythm and accents:** even with a few lights, some keep the rhythm (the kick) and some play the accents: about one light in three (heads and pars together, spread over the rig by position; of two lights one) flashes on the synth's **stabs**, exactly on the note, in the accent colour (white in the big drops), dark in between, like keys hit on a synthesizer. A stab is a synth note that clearly stands out from the notes around it or comes after a rest (not every note of a riff), at least 0.35 s apart. The roles shift per phrase; only in grooves, build-ups and drops. A single light plays both. The separated synth instrument gives the best stabs; until a track is separated, the melody onsets stand in.
+- **Kick breaks:** where the kick thins out or drops away inside the music (after a running kick, bars with two kicks or fewer that dip to one or none: often a filtered kick, a subtle build within a section), the kick-led lights stop pulsing, hold and build up to the kick's return. After a break of two bars or more there's a breath of darkness on the last half beat, then the return hits: everything full with a white flash, settling over one beat. A real drop keeps its own, bigger drop moment.
+- **No strobing with the music:** nothing strobes along with synth stutters; the strobe fixtures flash on the beat into a drop and on the big hits in drops (always within `max_flash_hz`).
 - **Heads never freeze:** `still` is a slow drift, and an upward aim under a low ceiling comes down below it with a swing it can still make (in a living room, "sky" would otherwise be clamped flat).
 - **Beam effects** are mapped per fixture (`beam_fx` in the fixture JSON): gobos by style, rotation speed following the energy, mirrored heads rotating the opposite way.
 - **Colour wheels:** colours snap to the nearest wheel slot; flashes become a dimmer bump instead of moving the wheel.
@@ -271,7 +273,7 @@ Multicolour DMX lasers (kind `laser`, e.g. `fixtures/laserworld/cs-1000rgb-mk3.j
 
 ### What's in a set and a rig
 
-- **Set:** `artnet` (node IP, port, frame rate) or `output` (sACN, USB), `safety` (`master`, `max_flash_hz`, `allow_fast_strobe`), `director` (the decision model), and `fixtures`: id, library model, mode, universe, address and calibration.
+- **Set:** `artnet` (node IP, port, frame rate) or `output` (sACN, USB), `safety` (`master`, `max_flash_hz`), `director` (the decision model), and `fixtures`: id, library model, mode, universe, address and calibration.
 - **Rig:** `stage` (width, ceiling, room depth, `eye_safety`), `trusses`, `screen` (an LED wall), `zones`, and `placements`: per set, per fixture, where it hangs (`x`, `y_m`, `z_m`, `mount`, `truss`, …).
 
 The **setup page** (`/setup.html`) edits the active set on the active rig: pick the set and the rig (or make a new rig from a template and auto-mount the set on it), add fixtures from the library, modes, addresses, auto-address and layout, Identify (lights one fixture white for 2 s), find the node on the network, stage and safety, decision model. Saves with overlapping addresses are refused.
@@ -307,7 +309,7 @@ Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress
 ## Safety
 
 - **Flash limit:** white flashes and the software strobe go through one timeline capped at `max_flash_hz` (3 Hz, the photosensitive-epilepsy guideline). Fixture strobe channels are never driven.
-- **Fast strobe:** the only light faster than 3 Hz is the deliberate strobe (a `stutter` look, one bar at a time, see above), and only with `allow_fast_strobe: true`. Warn an audience about strobe effects.
+- **No fast strobe:** no light flashes faster than `max_flash_hz` (3 Hz, the photosensitive-epilepsy guideline); nothing chops along with the music. Warn an audience about strobe effects anyway.
 - **Eye safety:** `stage.eye_safety` (off by default; turn on for lasers or very bright beams) keeps beams towards the audience out of eye height, and heads go dark while crossing that band.
 - **High-output fixtures (alpha):** this is alpha software, not for a powerful rig in front of a real audience. Fixtures of risk group 2 or 3 (IEC 62471: `physical.risk_group` in the fixture file, from the manual or label) stay dark when the DMX goes to real lights; the visualiser still shows them. Without a rating a fixture counts as one when it packs a lot of light into a narrow beam (≥ 5,000 lm per beam and ≥ 200 lm per square degree: a Sharpy or a Pointe, not a Fuze, a Katana or a wash). Consumer lights play as usual, the audience included.
 - **No single point:** focus and cross looks aim the heads around a spot about 1.5 m wide instead of all into one point, and the cinematic "all on the DJ" picture rings the light above the DJ's head.

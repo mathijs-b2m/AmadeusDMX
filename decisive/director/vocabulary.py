@@ -70,11 +70,6 @@ PAR_ACCENT = [
     ("alternate", "Odd and even pars swap on each hit: ping-pong."),
     ("sparkle", "Each hit flashes one random par in the accent colour: sparse, glittery."),
     (
-        "stutter",
-        "A deliberate strobe: a short burst at a fixed fast rate where the synths clearly stutter (only if "
-        "the set allows fast strobe; at most a bar, rarely), otherwise the kick. Use sparingly.",
-    ),
-    (
         "melody",
         "Pars play the melody: each lead note lights the par matching its pitch (low notes left, high "
         "notes right) in a colour for that note, fading out slowly. Best with the 'lead' trigger in "
@@ -121,11 +116,6 @@ HEAD_LIGHT = [
         "breathe",
         "Beam brightness follows the loudness of the melody and pads: breathing with the music. "
         "For quiet, melodic parts.",
-    ),
-    (
-        "stutter",
-        "A deliberate strobe: a short burst at a fixed fast rate where the synths clearly stutter (only if "
-        "the set allows fast strobe; at most a bar, rarely), otherwise a kick pulse. Use sparingly.",
     ),
     ("off", "Moving heads dark: the pars carry the look."),
 ]

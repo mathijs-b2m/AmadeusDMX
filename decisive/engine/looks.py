@@ -8,7 +8,7 @@ import math
 from decisive.director import Decision
 from decisive.director.vocabulary import PALETTES
 from decisive.engine.state import State
-from decisive.engine.timing import NO_KICK_S, _decay, note_env
+from decisive.engine.timing import BREAK_FROM, BREAK_TO, NO_KICK_S, _decay, _ease, note_env, stab_env
 
 XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 
@@ -25,6 +25,11 @@ KICK_LED = {"hats", "eighths", "sixteenths", "synth", "roll"}
 # turns (odd/even), left against right, or a rotation through three or four sub-groups. Drops lean tutti.
 KICK_PATTERNS = ("all", "alternate", "sides", "rotate")
 DROP_PATTERNS = ("all", "all", "sides", "rotate")
+
+
+ACCENT_SHARE = 3  # one light in this many plays the accents (the synth's stabs); the others keep the rhythm
+ACCENT_SECTIONS = ("groove", "drop", "buildup")
+MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 
 
 def kick_turn(pattern: str, k: int, n: int, hit: int) -> bool:
@@ -229,6 +234,9 @@ class LooksMixin:
     def _note(self, name: str, t: float) -> tuple[float, int]:
         """The light of a trigger, played as notes (timing.note_env); fast triggers play the kick."""
         name = "kick" if name in KICK_LED else name
+        if name == "kick" and (brk := self._break_at(t)) is not None:  # the kick is out: hold and build
+            start, end, _ = brk
+            return BREAK_FROM + (BREAK_TO - BREAK_FROM) * _ease((t - start) / max(end - start, 1e-6)), -1
         times, strengths = self._trigger(name)
         env, hit = note_env(times, strengths, t)
         if name == "kick" and (hit < 0 or t - float(times[hit]) > NO_KICK_S):
@@ -236,6 +244,88 @@ class LooksMixin:
             if nxt >= len(times) or float(times[nxt]) - t > 0.5 * NO_KICK_S:  # no kick around: hold, don't blink
                 return 0.6, -1
         return env, hit
+
+    def _accents(self, d: Decision, t: float, out: dict, accent) -> None:
+        """Accent lights flash on the synth's stabs, exactly on the note, in the accent colour (white in the
+        big drops); dark in between. A single light layers the stabs over its rhythm."""
+        players = self._accent_players(d)
+        lights = self.__dict__.get("_lights_by_x", [])
+        solo = len(lights) == 1 and d.section in ACCENT_SECTIONS and d.intensity >= 1
+        if not players and not solo:
+            return
+        v = stab_env(self.stab_t, self.stab_s, t)
+        col = (1.0, 1.0, 1.0) if d.section == "drop" and d.intensity >= 3 else accent
+        for eid in players or lights:
+            s = out[eid]
+            if solo:
+                if v > s.dimmer:
+                    s.dimmer, (s.r, s.g, s.b) = v, col
+            else:
+                s.dimmer, (s.r, s.g, s.b), s.white = v, col, 0.0
+
+    def _break_at(self, t: float):
+        """The kick break t falls in, if any: (start, end, kick_returns)."""
+        k = bisect.bisect_right(self._break_starts, t) - 1
+        if k >= 0 and t < self.kick_breaks[k][1]:
+            return self.kick_breaks[k]
+        return None
+
+    @property
+    def _break_starts(self) -> list[float]:
+        if "_bs" not in self.__dict__:
+            self._bs = [b[0] for b in self.kick_breaks]
+        return self._bs
+
+    def _kick_return(self, t: float, states: dict[str, State]) -> None:
+        """The kick comes back after a break: a breath of darkness just before (after a break of two bars or
+        more), then everything hits on the downbeat: full, with a white flash, settling over one beat. A real
+        drop has its own, bigger moment (_drop_moment)."""
+        if not self.kick_breaks:
+            return
+        _, _, period = self.beat_info(t)
+        k = bisect.bisect_right(self._break_starts, t)  # breaks that started before t
+        for start, end, returns in self.kick_breaks[max(0, k - 1) : k + 1]:
+            if not returns or any(abs(dr - end) < 4 * period for dr in self.drops):
+                continue
+            if end - start >= 8 * period and 0 < end - t < period * 0.5:
+                for s in states.values():
+                    s.dimmer, s.white = 0.0, 0.0
+                return
+            since = t - end
+            if 0 <= since < period:
+                boost, flash = 1.0 - since / period, math.exp(-since / 0.15)
+                for s in states.values():
+                    s.dimmer = max(s.dimmer, boost)
+                    s.white = max(s.white, flash)
+                return
+
+    def _accent_players(self, d: Decision) -> set[str]:
+        """The lights that play the accents in this phrase: one in ACCENT_SHARE (heads and pars together, left
+        to right, so they're spread over the rig; of two lights one), shifting per phrase. None in calm parts or
+        where the synth has no stabs; a single light plays both (_scene layers the stabs over its rhythm)."""
+        if d.section not in ACCENT_SECTIONS or d.intensity < 1:
+            return set()
+        a, b = bisect.bisect_left(self.stab_t, d.start), bisect.bisect_left(self.stab_t, d.end)
+        if b - a < MIN_STABS:
+            return set()
+        lights = self.__dict__.get("_lights_by_x")
+        if lights is None:
+            both = [(e["id"], k, "par") for k, e in enumerate(self.pars)] + [
+                (e["id"], k, "head") for k, e in enumerate(self.heads)
+            ]
+            n = max(len(self.pars) - 1, 1)
+            width = float(self.stage.get("width_m", 8.0))
+
+            def x(item):  # pars by their order across the stage, heads by where they hang
+                eid, k, kind = item
+                return float(self.head_pos[k][0]) if kind == "head" else self.order.get(eid, k) / n * width
+
+            lights = self._lights_by_x = [eid for eid, _, _ in sorted(both, key=x)]
+        if len(lights) < 2:
+            return set()
+        share = 2 if len(lights) < 4 else ACCENT_SHARE
+        shift = d.phrase % share
+        return {eid for k, eid in enumerate(lights) if (k + shift) % share == share // 2}
 
     def _kick_pattern(self, d: Decision) -> str:
         """How the group plays the kicks in this phrase: varied per phrase, mostly tutti in drops."""
@@ -265,7 +355,6 @@ class LooksMixin:
         env, hit = self._note(d.trigger, t)
         hits = hit + 1  # hits so far: steps chases, alternation, sparkles
         pattern = self._kick_pattern(d)
-        strobe = self._strobe(t)
         flash = _decay(self.flash_t, self.flash_s, t, 0.07)
         rise = d.dynamics == "rise"
         out: dict[str, State] = {}
@@ -279,7 +368,7 @@ class LooksMixin:
             col = _mix(cols, ((beat + phase) / 32 + k / n) % 1.0) if d.par_base == "fade" else base
             dim = base_level
             a = d.par_accent
-            if a == "pulse":  # on its turn in the phrase's pattern
+            if a in ("pulse", "stutter"):  # on its turn in the phrase's pattern ("stutter": older plans)
                 dim = base_level + (1 - base_level) * (env if kick_turn(pattern, k, n, hit) else 0.0)
             elif a == "color_pop":
                 col, dim = _lerp(col, accent, env), max(base_level, env)
@@ -292,8 +381,6 @@ class LooksMixin:
             elif a == "sparkle":
                 if k == sparkle:
                     col, dim = _lerp(col, accent, env), max(base_level, env)
-            elif a == "stutter":  # a fixed-rate strobe in a clear synth stutter, else the kick
-                dim = strobe if strobe is not None else max(base_level, 0.3) + (1 - max(base_level, 0.3)) * env
             elif a == "melody":  # recent notes, each on the par of its pitch, coloured by its pitch class
                 i = bisect.bisect_right(self.lead_t, t)
                 for j in range(max(0, i - 6), i):
@@ -341,7 +428,7 @@ class LooksMixin:
                     "pulse": 0.25 + 0.75 * mine,
                     "accents": 0.12 + 0.88 * acc_env,
                     "breathe": 0.1 + 0.9 * float(self.breath[self._frame(t)]),
-                    "stutter": strobe if strobe is not None else 0.25 + 0.75 * mine,
+                    "stutter": 0.25 + 0.75 * mine,  # (older plans: a kick pulse now)
                     "off": 0.0,
                 }.get(hl, 1.0)
             layer = self._layer(d, j)
@@ -372,6 +459,7 @@ class LooksMixin:
         self._strobe_states(d, t, out, acc_env)
         if getattr(d, "special", "off") == "stars":
             self._stars(d, t, out)
+        self._accents(d, t, out, accent)
         master = INTENSITY_MASTER[max(0, min(3, d.intensity))] * self.rig["safety"]["master"]
         for st in out.values():
             st.dimmer *= master

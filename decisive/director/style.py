@@ -72,9 +72,9 @@ def _style(genre, text, palettes, avoid=None, prefer=None) -> Style:
 
 
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
-_CALM_AVOID = {"head_light": {"flick", "beat", "stutter", "random"},
+_CALM_AVOID = {"head_light": {"flick", "beat", "random"},
                "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave"},
-               "par_accent": {"stutter", "chase"}, "beam_fx": {"prism_spin", "gobo_spin", "gobo_shake"}}  # fmt: skip
+               "par_accent": {"chase"}, "beam_fx": {"prism_spin", "gobo_spin", "gobo_shake"}}  # fmt: skip
 _CALM_PREFER = {"head_light": ("breathe", "steady"), "movement": ("sweep", "still", "circle"),
                 "par_accent": ("none", "pulse"), "beam_fx": ("open", "gobo_rotate")}  # fmt: skip
 
@@ -96,7 +96,7 @@ STYLES: dict[str, Style] = {
             },
             {
                 "par_base": ("off", "dim"),
-                "par_accent": ("pulse", "chase", "stutter"),
+                "par_accent": ("pulse", "chase"),
                 "movement": ("sweep", "step_on_beat", "nod"),
                 "head_color": ("white", "base"),
                 "beam_fx": ("open", "gobo_shake"),
@@ -107,7 +107,7 @@ STYLES: dict[str, Style] = {
             "House: warm, groovy and soulful. Warm colours, swinging, rounded movement on the groove, colour pops "
             "on the hits; it dances rather than hits hard.",
             ["warm", "neon", "gold", "cool"],
-            {"movement": {"ballyhoo", "nod"}, "head_light": {"stutter"}, "par_base": {"off"}},
+            {"movement": {"ballyhoo", "nod"}, "par_base": {"off"}},
             {
                 "movement": ("swing", "figure8", "circle"),
                 "head_light": ("pulse", "steady"),
@@ -160,7 +160,7 @@ STYLES: dict[str, Style] = {
         ),  # fmt: skip
         _style(
             "dubstep",
-            "Dubstep and bass music: heavy half-time weight. Hits on the backbeat, light that stutters with the "
+            "Dubstep and bass music: heavy half-time weight. Hits on the backbeat, light that hits with the "
             "wobble, dark between the hits; fiery and neon colours.",
             ["fire", "neon", "cool"],
             {"movement": {"figure8", "swing", "circle"}, "par_base": {"fade", "full"}},
@@ -178,7 +178,7 @@ STYLES: dict[str, Style] = {
             "rnb",
             "R&B and soul: smooth and warm. Gold and warm colours, soft fades, slow sweeping movement; nothing harsh.",
             ["gold", "warm", "cool"],
-            {"head_light": {"flick", "stutter"}, "par_accent": {"stutter", "sparkle"}, "movement": {"ballyhoo"}},
+            {"head_light": {"flick"}, "par_accent": {"sparkle"}, "movement": {"ballyhoo"}},
             {"head_light": ("breathe", "steady"), "par_accent": ("pulse", "color_pop"), "movement": ("sweep", "swing")},
         ),  # fmt: skip
         _style(
@@ -186,7 +186,7 @@ STYLES: dict[str, Style] = {
             "Pop: bright and colourful, led by the song. Big colour on the choruses, the verses calmer; light "
             "that sings along rather than hammers.",
             ["neon", "warm", "gold", "cool"],
-            {"par_base": {"off"}, "head_light": {"stutter"}},
+            {"par_base": {"off"}, "head_light": {"random"}},
             {"par_base": ("dim", "full"), "head_light": ("pulse", "steady")},
         ),  # fmt: skip
         _style(

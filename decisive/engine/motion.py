@@ -51,8 +51,8 @@ def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np
     return point + across * side * r + up * float(np.clip(dz, -1, 1)) * r / 2
 
 
-DRIFT_U, DRIFT_V = 0.3, 0.4  # "still": a slow drift (share of the aim's swing): heads never freeze
-DRIFT_BEATS_U, DRIFT_BEATS_V = 32.0, 24.0  # …one slow drift sideways in 32 beats, up and down in 24
+DRIFT_U, DRIFT_V = 0.35, 0.4  # "still": a slow drift (share of the aim's swing, ~±20° / ±7°): never frozen
+DRIFT_BEATS_U, DRIFT_BEATS_V = 16.0, 12.0  # …sideways and back in 16 beats, up and down in 12 (not in step)
 
 
 WAVE_BEATS = 4.0  # a wave runs over the heads (of the rig or a group) within this many beats
@@ -237,7 +237,7 @@ class MotionMixin:
             u, v = self._shape(d.movement, pos, seed, tempo)
         if d.movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)  # faster loops, a bit smaller: speed stays reachable
-        if d.movement not in ("bounce", "swing", "step_on_beat", "follow_lead"):  # these keep their full size
+        if d.movement not in ("bounce", "swing", "step_on_beat", "follow_lead", "still"):  # these keep their size
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
@@ -439,7 +439,7 @@ class MotionMixin:
         u, v = self._shape_v(movement, pos, seed, tempo, j)
         if movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)
-        if movement not in ("bounce", "swing", "step_on_beat", "follow_lead"):
+        if movement not in ("bounce", "swing", "step_on_beat", "follow_lead", "still"):  # (the drift: as is)
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]

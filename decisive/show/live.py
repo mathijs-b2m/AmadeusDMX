@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import json
+import sys
 import threading
 import time
 from pathlib import Path
@@ -158,6 +159,31 @@ def _health_line(hs: dict, listener: Listener, shows: TrackShows):
     hs.update(t0=now, frames=0, worst=0.0, packets=listener.packets)
 
 
+class _Tee:
+    """Everything the live show prints also goes to .cache/live.log, each line with its clock time (to the
+    millisecond): what happened when, to look back at after a show (the app only keeps it on screen)."""
+
+    def __init__(self, out, path: Path):
+        self.out, self.file, self.fresh = out, open(path, "w", buffering=1), True  # noqa: SIM115 (open for the run)
+
+    def write(self, text: str) -> int:
+        self.out.write(text)
+        for line in text.splitlines(keepends=True):
+            if self.fresh:
+                now = time.time()
+                self.file.write(time.strftime("%H:%M:%S", time.localtime(now)) + f".{int(now % 1 * 1000):03d} ")
+            self.file.write(line)
+            self.fresh = line.endswith("\n")
+        return len(text)
+
+    def flush(self):
+        self.out.flush()
+        self.file.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.out, name)
+
+
 async def run(
     rig: dict,
     director: str | None,
@@ -179,6 +205,8 @@ async def run(
 
     from decisive.rig import store
 
+    if not isinstance(sys.stdout, _Tee):
+        sys.stdout = _Tee(sys.stdout, cache / "live.log")
     show = show or store.current()
     listener = open_listener(remote, code, cache, source, source_opts)
     dj = getattr(listener, "label", "VirtualDJ")
@@ -196,6 +224,7 @@ async def run(
     mixer, bands = Mixer(rig), Bands()
     locks: dict[int, PhaseLock] = {}  # per deck: its position locked to Ableton Link's beat, when it sends one
     showing = None  # (deck, file, director, plan) the visualiser's hello describes
+    phrase_of: dict[int, tuple] = {}  # per deck: (file, phrase) last logged
 
     httpd = serve_http(http_port, show)
     if remote:
@@ -249,6 +278,15 @@ async def run(
                     pos = locks.setdefault(deck.deck, PhaseLock()).at(deck, now, a.beats, deck.file)
                     t = min(max(pos + lead, 0.0), a.duration - 0.05)  # the lights a little ahead (clock.py)
                     i, states = engine.render(t)
+                    if phrase_of.get(deck.deck) != (deck.file, i):  # the log: where the show is vs the DJ software
+                        phrase_of[deck.deck] = (deck.file, i)
+                        d = show[1][i]
+                        print(
+                            f"  · deck {deck.deck} phrase {i} {d.section} ({d.start:.1f}s): show at {t:.2f}s, "
+                            f"{dj} reported {deck.pos:.2f}s {1000 * (now - deck.received):.0f} ms ago, "
+                            f"speed {deck.speed:.3f}, lead {lead * 1000:.0f} ms",
+                            flush=True,
+                        )
                     parts.append((weight, states, deck, show, t, i))
 
                 engine = None

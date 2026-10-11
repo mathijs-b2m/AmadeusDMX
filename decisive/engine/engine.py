@@ -22,7 +22,7 @@ from decisive.engine.lasers import LasersMixin
 from decisive.engine.looks import XFADE, LooksMixin
 from decisive.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
 from decisive.engine.state import State
-from decisive.engine.timing import TimingMixin, _ease, note_env
+from decisive.engine.timing import TimingMixin, _ease, note_env, pick_stabs
 from decisive.library import fixtures as fxlib
 from decisive.rig import geometry
 
@@ -75,19 +75,15 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
         self.lead_pc = analysis.lead_pc if analysis.lead_pc is not None else np.full(n, -1, np.int8)
         self.stut_gate = analysis.stutter_gate if analysis.stutter_gate is not None else np.zeros(n, np.float32)
         self.stut_str = analysis.stutter_strength if analysis.stutter_strength is not None else np.zeros(n, np.float32)
-        # A fast strobe is a photosensitive epilepsy risk: only with explicit opt-in.
-        self.fast_strobe = bool(rig["safety"].get("allow_fast_strobe"))
         self.lead_env = self._local_envelope(
             np.maximum(analysis.bands_db["mid"], analysis.bands_db["high"]), analysis.fps
         )
         # Light doesn't follow the volume syllable by syllable: an operator rides the fader per bar, in
-        # straight lines. breath: the loudness per bar, ramped linearly from bar to bar. chop: how clearly
-        # the synths stutter, per bar (where a "stutter" look may strobe, at a fixed rate).
+        # straight lines. breath: the loudness per bar, ramped linearly from bar to bar.
         self.breath = self._bar_ramp(
             np.maximum(analysis.bands_db["mid"], analysis.bands_db["high"]), deadband=0.08, relative_bars=8
         )
-        self.chop = self._bar_ramp(np.clip(self.stut_str * 1.5, 0, 1), deadband=0.15, snap=0.5)
-        self.strobe_bars = self._strobe_bars()
+        self.kick_breaks = self._kick_breaks()  # where the kick drops out: hold, build, hit on its return
         self.low = np.maximum(analysis.band_norm("sub"), analysis.band_norm("bass"))
         self.level = analysis.band_norm("mid") * 0.5 + self.low * 0.5
         self.flash_t, self.flash_s = self._flash_timeline(rig["safety"]["max_flash_hz"])
@@ -107,6 +103,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
             self.syn_t, self.syn_s = np.asarray(lt, float), np.asarray(ls, float)
             lp = analysis.lead_pitch if analysis.lead_pitch is not None else np.zeros(1)
             self.syn_p = np.array([float(lp[min(int(x * analysis.fps), len(lp) - 1)]) for x in lt])
+        self.stab_t, self.stab_s = pick_stabs(self.syn_t, self.syn_s)  # the synth's key hits, for accent lights
         self.gobo_groups = [
             {k: v for k, v in defn.get("gobo_groups", {}).items() if not k.startswith("_")} for _, defn in self.head_fx
         ]
@@ -183,6 +180,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
+        self._kick_return(t, states)
         self._drop_moment(t, states)
         return i, self._finish(states, t)
 

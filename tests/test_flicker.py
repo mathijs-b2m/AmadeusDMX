@@ -1,5 +1,5 @@
-"""Lights never flicker: the kick leads, fast triggers play the kick, the strobe is rare and at a fixed rate,
-and moving heads never freeze in quiet parts."""
+"""Lights never flicker: the kick leads, fast triggers play the kick, nothing strobes with the music, a kick
+break holds and builds and the kick's return hits, and moving heads never freeze in quiet parts."""
 
 from dataclasses import replace
 from pathlib import Path
@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from decisive.director import RuleDirector, direct
-from decisive.engine import Engine, timing
+from decisive.engine import Engine
 from decisive.engine import looks as L
 from decisive.rig.groups import head_groups, laser_list
 from decisive.rig.loader import load_rig
@@ -40,9 +40,9 @@ def track():
 
 
 @pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
-def test_no_light_flickers_without_a_strobe(track, path):
+def test_no_light_flickers(track, path):
     rig = load_rig(path)
-    rig["safety"]["allow_fast_strobe"] = False  # (the deliberate strobe is the only fast thing allowed)
+    rig["safety"]["allow_fast_strobe"] = True  # (even when the set would allow it)
     plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
     plan = [
         replace(d, trigger="sixteenths", head_light="stutter", par_accent="stutter") if d.section == "groove" else d
@@ -55,19 +55,34 @@ def test_no_light_flickers_without_a_strobe(track, path):
     assert sum(fast_cycles(c) for c in tr.T) == 0
 
 
-def test_the_strobe_is_rare_and_at_a_fixed_rate(track):
+def _with_kick_break(a, bars: tuple[int, int]):
+    """The synthetic track with the kick taken out of some bars of a groove."""
+    db = a.beats[a.downbeats]
+    kt, ks = a.onsets["kick"]
+    keep = (kt < db[bars[0]] - 0.05) | (kt >= db[bars[1]] - 0.05)
+    a2 = replace(a, onsets={**a.onsets, "kick": (kt[keep], ks[keep])})
+    return a2, float(db[bars[0]]), float(db[bars[1]])
+
+
+def test_a_kick_break_holds_and_builds_then_the_return_hits(track):
     rig = load_rig(SETS[0])
-    rig["safety"]["allow_fast_strobe"] = True
-    e = Engine(track, direct(track, RuleDirector(), verbose=False), rig)
-    e.chop[:] = 1.0  # the synths stutter all the time
-    bars = e._strobe_bars()
-    assert 0 < bars.mean() <= 1 / (timing.STROBE_REST_BARS + 1) + 0.02  # one bar in seventeen at most
-    e.strobe_bars = bars
-    t0 = np.flatnonzero(bars)[0] / track.fps
-    seq = [e._strobe(t0 + k / 1000) for k in range(1000)]
-    assert set(seq) == {0.0, 1.0}
-    flips = np.flatnonzero(np.diff(seq))
-    assert np.allclose(np.diff(flips[::2]), 1000 / timing.STROBE_HZ, atol=2)  # a fixed rate, not the music
+    plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
+    groove = max((d for d in plan if d.section == "groove"), key=lambda d: d.end - d.start)
+    first = int(np.searchsorted(track.beats[track.downbeats], groove.start)) + 1
+    a, start, end = _with_kick_break(track, (first, first + 3))
+    assert end < groove.end
+    plan = [replace(d, trigger="kick", par_accent="pulse", head_light="pulse") if d is groove else d for d in plan]
+    e = Engine(a, plan, rig)
+    assert any(abs(s - start) < 0.01 and abs(t - end) < 0.01 and r for s, t, r in e.kick_breaks)
+    head = next(h["id"] for h in e.heads if h["id"] not in e._accent_players(groove))  # a rhythm light
+    period = 60 / 128
+    ts = np.arange(start + 0.05, end - period, 0.05)
+    level = np.array([e.render(float(t))[1][head].dimmer for t in ts])
+    assert level.min() > 0.2 and np.all(np.diff(level) >= -1e-6)  # held, building: no pulses, no dark
+    assert level[-1] > level[0] + 0.2
+    assert e.render(end - 0.1)[1][head].dimmer == 0.0  # a breath of darkness just before…
+    hit = e.render(end + 0.02)[1][head]
+    assert max(hit.dimmer, hit.white) > 0.9  # …and the return hits
 
 
 def test_a_group_plays_the_kicks_in_parts():
