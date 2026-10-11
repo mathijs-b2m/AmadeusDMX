@@ -152,6 +152,21 @@ work and the window server's compositing of it. That is several times what the l
 - **Idle:** with nothing changing (no show frames, no camera move, no input), the 3D stage draws 4 frames a
   second instead of 60, so an open window with no show costs next to nothing.
 
+## Other DJ software (Mixxx, djay Pro)
+
+Start ▸ **Start Live Show (…)** lists every DJ software the engine can follow (from the engine's own list);
+the Start button and ⌘R then use the last one chosen. What each needs:
+[docs/dj-software.md](../docs/dj-software.md).
+
+- **Mixxx:** start the show first, then Mixxx; in Mixxx, enable the "Decisive Lightning" controller once.
+- **djay Pro:** macOS asks once to allow **Decisive Lightning** to "control this computer using
+  accessibility features". That is macOS's wording for any app with this permission. Decisive Lightning
+  uses it only to *read* djay's deck labels (track, elapsed time, play, tempo, volumes), only djay's, and
+  only while a show follows djay: it never clicks or types anywhere. Allow it in System Settings → Privacy &
+  Security → Accessibility, then start the show again; switching it off only stops following djay. The
+  permission belongs to the app and covers the engine it starts. A self-built app may need it switched off
+  and on again after a rebuild (ad-hoc signature). Details: [docs/dj-software.md](../docs/dj-software.md#the-accessibility-permission).
+
 ## Decisive Link (VirtualDJ on another computer)
 
 When the DJ and the lighting operator use different computers:

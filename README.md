@@ -62,6 +62,7 @@ For VirtualDJ: see [Live in VirtualDJ](#live-in-virtualdj).
 | `decisive set [NAME] [--new \| --copy-of SET]` | Your fixtures: list, switch or create sets |
 | `decisive rig [NAME] [--template T] [--automount [--all]]` | The venue: list, switch or create rigs (templates: floor, stands, booth, club, stage); mount the set on it |
 | `decisive monitor` | Watch VirtualDJ and the engine: CPU, memory, threads, GPU, crashes |
+| `decisive probe [NAME] [--emit 127.0.0.1:9123]` | Other DJ software (Mixxx, djay Pro, …): list, watch and measure one, or pass it to the Decisive Link app |
 
 (`decisive` = `.venv/bin/decisive`, or `python -m decisive`.) `--dmx` without an IP uses the node from the rig. Audio formats: WAV, MP3, FLAC, OGG, AIFF directly; M4A/AAC is decoded once with ffmpeg.
 
@@ -85,6 +86,14 @@ Restart VirtualDJ, then enable **DecisiveLink** as a **master** effect. Works wi
 - The plugin keeps its VirtualDJ queries low (~230/s: only real decks; file, length and original BPM twice per second).
 
 **Known VirtualDJ issue (not the plugin):** on macOS the VDJ interface can freeze after switching apps while audio keeps running. Workarounds from the VDJ forums: set the display to 60 Hz instead of ProMotion, avoid Stage Manager or toggle Full Screen/Windowed, try `experimentalUseMetal` or `skinFps` in VDJ's options.
+
+## Other DJ software
+
+Live mode also follows **Mixxx** and **djay Pro**: `decisive live --source mixxx` or `--source djay`, or
+Start ▸ *Start Live Show (…)* in the Mac app. `decisive probe` lists the integrations and measures one.
+djay is read from its window, which needs macOS's **Accessibility** permission: Decisive Lightning only
+*reads* djay's deck labels with it, never clicks or types. What each integration does, needs and has been
+tested on, and exactly what that permission is used for: [docs/dj-software.md](docs/dj-software.md).
 
 ## Genres and programs
 
@@ -307,7 +316,7 @@ Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress
 | `fixtures/` | The fixture library |
 | `examples/` | Example sets and rigs; your own go to `config/sets/` and `config/rigs/` |
 | `tests/` | Golden-master and unit tests |
-| `docs/` | [Architecture](docs/architecture.md), [sets and rigs](docs/rig-format.md), [protocols](docs/protocols.md) |
+| `docs/` | [Architecture](docs/architecture.md), [sets and rigs](docs/rig-format.md), [protocols](docs/protocols.md), [DJ software](docs/dj-software.md) |
 
 ## Known limits
 
@@ -315,6 +324,8 @@ Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress
 - Automatic half-time detection isn't reliable: use `--tempo half` for hip-hop.
 - Drop and stutter thresholds were tuned on house, techno, psytrance and melodic techno; other genres may need adjusting.
 - nimble is about 6× slower than OpenAI on this Mac (~2–4 minutes per track); in live mode the rule-based plan bridges the wait.
+- djay Pro is read from its window: a djay update that renames its controls can break it. Without SYNC its position is less precise (up to ~70 ms).
+- Mixxx must be started after the live show (it only looks for MIDI devices at start), unless the IAC bus is used.
 - The Fuze75S colour wheel colours are still guesses until named with `decisive colors`.
 
 ## Contributing and license
