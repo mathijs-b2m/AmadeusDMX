@@ -127,5 +127,10 @@ def test_resolver_finds_a_track_by_artist_and_title(tmp_path):
     assert r.find(title="Missing", wait=5) == ""
 
 
+def test_a_reported_rate_beats_the_tempo_ratio():
+    d = Deck(1, "a", 10.0, 300.0, True, 0.0, 0.0, 1.0, 0.0, rate=0.92)  # no beatgrid: no tempo
+    assert abs(d.now(1.0) - 10.92) < 1e-9
+
+
 def test_parse_opts():
     assert parse_opts(["port=50002", "host=10.0.0.5"]) == {"port": 50002, "host": "10.0.0.5"}

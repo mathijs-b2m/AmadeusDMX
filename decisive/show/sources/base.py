@@ -33,6 +33,7 @@ class Deck:
     title: str = ""
     artist: str = ""
     track_id: str = ""  # the DJ software's own id for the track, when it has one
+    rate: float = 0.0  # playback speed when the DJ software reports it (else from the tempo: bpm / bpm0)
 
     def now(self, t: float) -> float:
         """Track position right now: last reported position + time since, at the current playback speed."""
@@ -42,6 +43,8 @@ class Deck:
 
     @property
     def speed(self) -> float:
+        if self.rate:
+            return self.rate
         return self.bpm / self.bpm0 if self.bpm0 > 1 and self.bpm > 1 else 1.0
 
 
