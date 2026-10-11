@@ -1,0 +1,30 @@
+[
+  {
+    "name": "vdj",
+    "app": "VirtualDJ",
+    "module": "decisive.show.vdj",
+    "class": "Listener",
+    "about": "VirtualDJ on this computer: the DecisiveLink plugin (UDP 9123)",
+    "position": "exact",
+    "verified": "VirtualDJ 8.5 (macOS), live on a real rig"
+  },
+  {
+    "name": "mixxx",
+    "app": "Mixxx",
+    "module": "decisive.show.sources.mixxx",
+    "class": "Mixxx",
+    "about": "Mixxx: its controller scripting, over a virtual MIDI device (needs python-rtmidi); opts port, library",
+    "position": "exact",
+    "verified": "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Decisive Link p95 10 ms, max 13 ms"
+  },
+  {
+    "name": "replay",
+    "app": "a recording",
+    "module": "decisive.show.sources.replay",
+    "class": "Replay",
+    "about": "a recording of any source (decisive probe NAME --record FILE): opt file=FILE",
+    "position": "exact",
+    "verified": "unit tests",
+    "menu": false
+  }
+]

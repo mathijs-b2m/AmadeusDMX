@@ -7,6 +7,7 @@ from pathlib import Path
 
 from decisive import paths
 from decisive.cli.common import add_dmx_arg, add_set_args
+from decisive.show.sources import parse_opts
 
 
 def add_commands(sub) -> dict:
@@ -53,6 +54,7 @@ def add_commands(sub) -> dict:
         help="VirtualDJ on another computer: its Decisive Link app (HOST:PORT, dj:NAME, or 'auto' to find it)",
     )
     p.add_argument("--code", default=None, help="the pairing code the Decisive Link app shows")
+    _add_source_args(p)
     p.add_argument("--ws-port", type=int, default=8765, help="visualiser feed (a second show next to another)")
     p.add_argument("--port", type=int, default=8080)
     p.add_argument(
@@ -71,6 +73,13 @@ def add_commands(sub) -> dict:
     p.add_argument("wav", type=Path, metavar="TRACK")
     p.add_argument("genre", nargs="?", choices=[*GENRES, "auto"])
 
+    p = sub.add_parser("probe", help="watch a DJ software integration: decks, events, timing; record or pass it on")
+    p.add_argument("source", nargs="?", help="which DJ software (leave out for the list)")
+    p.add_argument("--opt", action="append", metavar="KEY=VALUE", help="an option for the integration (repeatable)")
+    p.add_argument("--seconds", type=float, default=0.0, help="stop after this long (default: Ctrl+C)")
+    p.add_argument("--emit", metavar="HOST:PORT", help="send the decks on in the plugin's format (127.0.0.1:9123)")
+    p.add_argument("--record", type=Path, metavar="FILE", help="keep every reading (JSON lines) for --source replay")
+
     p = sub.add_parser("monitor", help="watch VirtualDJ + live mode: CPU, memory, threads, GPU, crashes")
     p.add_argument("--interval", type=float, default=1.0)
     return {
@@ -80,6 +89,7 @@ def add_commands(sub) -> dict:
         "play": direct_or_play,
         "live": live,
         "monitor": monitor,
+        "probe": probe,
     }
 
 
@@ -156,11 +166,34 @@ def live(args):
                 health=args.health,
                 remote=args.remote,
                 code=args.code,
+                source=args.source,
+                source_opts=parse_opts(args.opt),
                 ws_port=args.ws_port,
             )
         )
     except KeyboardInterrupt:
         pass
+
+
+def _add_source_args(p):
+    p.add_argument(
+        "--source",
+        default=None,
+        metavar="NAME",
+        help="another DJ software than VirtualDJ (`decisive probe` lists them)",
+    )
+    p.add_argument("--opt", action="append", metavar="KEY=VALUE", help="an option for that DJ software's integration")
+
+
+def probe(args):
+    from decisive.show import probe as probelib
+    from decisive.show.sources import SOURCES
+
+    if not args.source:
+        for name, e in SOURCES.items():
+            print(f"{name:10} {e.position:8} {e.about}\n{'':19} verified: {e.verified}")
+        return
+    probelib.run(args.source, parse_opts(args.opt), args.seconds, args.emit, args.record)
 
 
 def monitor(args):

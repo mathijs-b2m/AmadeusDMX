@@ -16,6 +16,7 @@ the active ones (`decisive set NAME`, `decisive rig NAME`).
 
 decisive discover / simnode / test / gobos / colors / motion   hardware: find, simulate, calibrate
 decisive monitor                                               watch VirtualDJ and the engine run
+decisive probe [NAME] [--emit 127.0.0.1:9123] [--record F]     watch another DJ software's integration, pass it on
 """
 
 from __future__ import annotations

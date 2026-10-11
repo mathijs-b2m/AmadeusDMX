@@ -212,15 +212,19 @@ final class AppModel {
     /// The DJ laptop the show follows (Decisive Link), when it isn't this Mac.
     private(set) var remoteDJ: String?
 
-    /// Start live mode: the lights follow VirtualDJ (DecisiveLink plugin), on this Mac or on a DJ laptop.
-    func startLive(dj: String? = nil, code: String? = nil) {
+    /// Start live mode: the lights follow the DJ software on this Mac (VirtualDJ, Mixxx, …) or on a DJ laptop.
+    func startLive(dj: String? = nil, code: String? = nil, source: String? = nil) {
         guard let ws = workspace, !selectedSet.isEmpty else { return }
         playingFile = nil
         remoteDJ = dj
         remoteCode = code
+        if let source { UserDefaults.standard.set(source, forKey: "djSource") }
         runningWithDMX = sendArtNet
         var args = ["live", "--set", selectedSet, "--rig", selectedRig, "--health", "30"]
         if let dj, let code { args += ["--remote", "dj:" + dj, "--code", code] }
+        else if let source = source ?? UserDefaults.standard.string(forKey: "djSource"), source != "vdj" {
+            args += ["--source", source]   // another DJ software on this Mac (the last one chosen in the Start menu)
+        }
         if sendArtNet { args.insert("--artnet", at: 1) }
         engine.start(ws, args, environment: engineEnvironment, readyWhen: "Live mode", keepAwake: true)
     }

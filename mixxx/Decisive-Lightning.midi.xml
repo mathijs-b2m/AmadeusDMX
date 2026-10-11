@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MixxxControllerPreset mixxxVersion="2.4.0+" schemaVersion="1">
+    <info>
+        <name>Decisive Lightning</name>
+        <author>Decisive Lightning</author>
+        <description>Sends every deck's position, tempo, volume and the crossfader to Decisive Lightning (no controls: pick the "Decisive Lightning" MIDI device, which `decisive live --source mixxx` creates).</description>
+    </info>
+    <controller id="DecisiveLightning">
+        <scriptfiles>
+            <file filename="Decisive-Lightning-scripts.js" functionprefix="DecisiveLightning"/>
+        </scriptfiles>
+        <controls/>
+        <outputs/>
+    </controller>
+</MixxxControllerPreset>
