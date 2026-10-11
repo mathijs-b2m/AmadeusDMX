@@ -16,6 +16,7 @@ exactly as it carries VirtualDJ. --record FILE keeps every reading for `--source
 from __future__ import annotations
 
 import json
+import signal
 import socket
 import statistics
 import time
@@ -80,6 +81,10 @@ class Stats:
 
 
 def run(name: str, opts: dict, seconds: float = 0.0, emit: str | None = None, record: Path | None = None):
+    def stop(*_):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop)  # `kill`: stop the same way as Ctrl+C, with the summary
     src = open_source(name, **opts)
     print(f"Probing {src.name} ({SOURCES[name].position} position){' – Ctrl+C to stop' if not seconds else ''}")
     out = None
@@ -103,7 +108,10 @@ def run(name: str, opts: dict, seconds: float = 0.0, emit: str | None = None, re
                 seen_packets = src.packets
                 stats.reading(src, src.last, seeks)
                 if rec:
-                    rec.write(json.dumps({**plugin_packet(src, src.last, t0), "t": round(src.last - t0, 4)}) + "\n")
+                    rec.write(
+                        json.dumps({**plugin_packet(src, src.last, t0), "t": round(src.last - t0, 4), "at": src.last})
+                        + "\n"
+                    )
             if out and now >= next_emit:
                 next_emit += 1 / EMIT_HZ
                 if src.alive():
@@ -118,7 +126,7 @@ def run(name: str, opts: dict, seconds: float = 0.0, emit: str | None = None, re
         src.close()
         if rec:
             rec.close()
-    print(f"\n{src.name}: {stats.summary()}")
+    print(f"\n{src.name}: {stats.summary()}", flush=True)
     return stats
 
 
