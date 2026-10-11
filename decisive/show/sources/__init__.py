@@ -3,15 +3,17 @@
     open_source("vdj")                       VirtualDJ on this computer (the DecisiveLink plugin)
     open_source("replay", file="cap.jsonl")  a recording made with `decisive probe NAME --record`
 
-Each integration lives in its own module and registers itself in SOURCES below: its module, its class, what
-it needs and how good its position is (see Source.position). Options come from the command line as
-`--opt key=value` and are passed to the class as keyword arguments.
+Each integration lives in its own module and is listed in sources.json: its module, its class, what it needs
+and how good its position is (see Source.position). The Mac app reads the same list for its Start menu.
+Options come from the command line as `--opt key=value` and are passed to the class as keyword arguments.
 """
 
 from __future__ import annotations
 
 import importlib
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from decisive.show.sources.base import Deck, DeckBook, Event, Source
 
@@ -20,28 +22,20 @@ __all__ = ["SOURCES", "Deck", "DeckBook", "Event", "Source", "open_source"]
 
 @dataclass(frozen=True)
 class Entry:
+    name: str
+    app: str  # the DJ software's name, for people
     module: str
     cls: str
     about: str
     position: str  # exact | beat | metadata
     verified: str  # what has been tested for real, and on what
+    menu: bool = True  # offered in the Mac app's Start menu
 
 
+# sources.json: the one list of integrations, read by the engine and the Mac app alike
 SOURCES: dict[str, Entry] = {
-    "vdj": Entry(
-        "decisive.show.vdj",
-        "Listener",
-        "VirtualDJ on this computer: the DecisiveLink plugin (UDP 9123)",
-        "exact",
-        "VirtualDJ 8.5 (macOS), live on a real rig",
-    ),
-    "replay": Entry(
-        "decisive.show.sources.replay",
-        "Replay",
-        "a recording of any source (decisive probe NAME --record FILE): opt file=FILE",
-        "exact",
-        "unit tests",
-    ),
+    e["name"]: Entry(**{"cls" if k == "class" else k: v for k, v in e.items()})
+    for e in json.loads((Path(__file__).parent / "sources.json").read_text())
 }
 
 

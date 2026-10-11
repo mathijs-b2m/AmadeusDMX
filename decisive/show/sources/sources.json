@@ -1,0 +1,21 @@
+[
+  {
+    "name": "vdj",
+    "app": "VirtualDJ",
+    "module": "decisive.show.vdj",
+    "class": "Listener",
+    "about": "VirtualDJ on this computer: the DecisiveLink plugin (UDP 9123)",
+    "position": "exact",
+    "verified": "VirtualDJ 8.5 (macOS), live on a real rig"
+  },
+  {
+    "name": "replay",
+    "app": "a recording",
+    "module": "decisive.show.sources.replay",
+    "class": "Replay",
+    "about": "a recording of any source (decisive probe NAME --record FILE): opt file=FILE",
+    "position": "exact",
+    "verified": "unit tests",
+    "menu": false
+  }
+]

@@ -49,3 +49,6 @@ known-first-party = ["decisive"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+"decisive.show.sources" = ["*.json"]
