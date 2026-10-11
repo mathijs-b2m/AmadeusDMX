@@ -18,7 +18,7 @@ def show():
     a = synthetic_analysis()
     plan = direct(a, RuleDirector(), verbose=False)
     k = next(i for i, d in enumerate(plan) if d.section == "groove")
-    plan[k] = replace(plan[k], movement="tilt_wave", formation="wave", aim="sky", head_light="random", intensity=2)
+    plan[k] = replace(plan[k], movement="tilt_wave", formation="wave", aim="crowd", head_light="random", intensity=2)
     rig = load_rig("tests/sets/concert60.json")
     return a, plan, k, Engine(a, plan, rig, real_output=False)
 

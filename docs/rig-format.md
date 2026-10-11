@@ -77,6 +77,12 @@ rig is loaded. `reverse`, `width` and `group` are
 placement fields too. Fixtures on a truss are positioned by `decisive/rig/trusses.py`; the Mac editor uses the
 same rules.
 
+**DMX output.** A set says where its universes go with `"dmx"`: per universe a device from `config/devices.json`
+and which of its outputs (`{"1": {"device": "pocket", "output": 1}}`); the devices themselves (`type` artnet,
+sacn or enttec_pro, `ip`, `udp_port`, `first_universe`, `outputs`, `priority`, USB `port`/`serial`) are kept apart
+from the sets, see `decisive/dmx/devices.py`. Without `"dmx"` a set uses its own `"output"`/`"artnet"` blocks
+(`decisive/dmx/outputs.py`; an Art-Net output may have a `universe_offset`).
+
 Zones (`avoid`, `keep_in`, `laser_out`) are explained in `mac/README.md` and `decisive/engine/zones.py`.
 
 ## The combined view

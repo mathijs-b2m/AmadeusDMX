@@ -301,6 +301,7 @@ public enum RigElements {
                 info.fixture = f.id
                 info.body = def?.kind
                 info.rot = f.rotDeg
+                info.truss = f.truss
                 if kind == .head { info.up = f.up }
                 info.size = def.map { [$0.size.x, $0.size.y, $0.size.z] }
                 if n > 1 { info.cells = n; info.length = length }

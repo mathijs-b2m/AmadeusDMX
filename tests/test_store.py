@@ -167,3 +167,69 @@ def test_a_fixture_standing_on_a_tower_from_before_hangs_off_its_front():
     out = compose({"fixtures": [{"id": "h", "fixture": "x"}]}, rig, "s")
     f = out["fixtures"][0]
     assert f["mount"] == "hang" and f["truss_side"] == "front" and f["mount_roll_deg"] == 90
+
+
+def test_auto_mount_reads_the_structure_of_a_rig_without_trusses():
+    from decisive.rig import automount as am
+
+    merged = json.loads(Path("tests/sets/concert60.json").read_text())  # fixtures at fixed positions, no trusses
+    merged.pop("trusses", None)
+    for f in merged["fixtures"]:
+        f[store.UNPLACED] = True
+    places = am.automount(merged, [f["id"] for f in merged["fixtures"]])
+    kinds = sorted((t.get("vertical", False), t["length_m"]) for t in merged["trusses"])
+    assert sum(v for v, _ in kinds) == 2 and len(kinds) == 4  # two towers, two overhead trusses
+    assert all(p.get("truss") for p in places.values() if p.get("mount") == "hang")
+    assert not any(p.get("mount") == "stand" and not p.get("truss") for p in places.values())  # no field of stands
+
+
+def test_auto_mount_in_an_empty_room_builds_a_structure_first():
+    from decisive.rig import automount as am
+
+    merged = json.loads(Path("tests/sets/showcase.json").read_text())
+    merged.pop("trusses", None)
+    for f in merged["fixtures"]:
+        f.update(mount="floor", z_m=0.25, y_m=-0.3)
+        f.pop("truss", None)
+        f[store.UNPLACED] = True
+    places = am.automount(merged, [f["id"] for f in merged["fixtures"]])
+    assert merged["trusses"]  # a standard structure
+    heads = [p for f, p in places.items() if p.get("truss")]
+    assert len(heads) >= 10
+
+
+def test_renaming_a_fixture_keeps_where_it_hangs(config):
+    from types import SimpleNamespace
+
+    from decisive.web import rig as api
+
+    old_style(config, "showcase")
+    store.sets.load("showcase")  # (split into set and rig)
+    req = SimpleNamespace(body=lambda: {"set": "showcase", "from": "sharpy1", "to": "beam-left"}, client="test")
+    assert api.rename_fixture(req) == {"ok": True}
+    assert "beam-left" in {f["id"] for f in store.sets.load("showcase")["fixtures"]}
+    places = store.rigs.load("showcase")["placements"]["showcase"]
+    assert "beam-left" in places and "sharpy1" not in places
+    clash = SimpleNamespace(body=lambda: {"set": "showcase", "from": "sharpy2", "to": "beam-left"}, client="test")
+    assert api.rename_fixture(clash)[1] == 400  # names stay unique
+
+
+def test_mounting_new_fixtures_leaves_a_small_room_as_it_is():
+    """Two new heads in a living room with two heads on stands: on stands beside them, no trusses invented."""
+    from decisive.rig import automount as am
+
+    def fx(fid, x, y, z, mount, waiting=False):
+        f = {"id": fid, "fixture": "beamz/fuze75b-beam", "x": x, "y_m": y, "z_m": z, "mount": mount}
+        return {**f, "_unplaced": {}} if waiting else f
+
+    merged = {
+        "stage": {"width_m": 1.7, "ceiling_m": 2.6},
+        "fixtures": [fx("a", 0.1, -1.2, 1.8, "stand"), fx("b", 0.9, -1.2, 1.8, "stand"),
+                     fx("n1", 0.3, -0.3, 0.25, "floor", True), fx("n2", 0.6, -0.3, 0.25, "floor", True)],
+    }  # fmt: skip
+    places = am.automount(merged, ["n1", "n2"])
+    assert merged["trusses"] == []  # nothing invented (and nothing through the 2.6 m ceiling)
+    assert set(places) == {"n1", "n2"}  # the others stay where they are
+    xs = sorted(p["x"] for p in places.values())
+    assert all(min(abs(x - 0.1), abs(x - 0.9)) > 0.15 for x in xs)  # not on top of the ones already there
+    assert all(p["mount"] == "stand" for p in places.values())

@@ -45,8 +45,10 @@ import math
 
 import numpy as np
 
+from decisive.engine import motion
 from decisive.engine.state import State
 from decisive.library import fixtures as fxlib
+from decisive.rig import geometry
 
 VERSION = 3  # bump when the program changes what the heads do (their trajectories are cached)
 RETRIGGER_S = 0.33  # a fixture is not hit again within this (no flicker faster than ~3 Hz)
@@ -593,14 +595,16 @@ class CinematicMixin:
         centre = np.mean([p[0] for p in self.head_pos])
         span = max(np.ptp([p[0] for p in self.head_pos]) / 2, 0.5)
         side = [float(np.clip((p[0] - centre) / span, -1, 1)) for p in self.head_pos]
-        stage_point = np.array([self.stage["width_m"] / 2, -0.5, 1.4])
+        stage_point = np.array([self.stage["width_m"] / 2, -0.5, 2.6])  # over the DJ's head, not in their face
         pics = []
         pics.append([(0.0, 78.0)] * n)  # a cathedral: every beam straight up
         pics.append([(s_ * 38, 12.0) for s_ in side])  # a fan over the crowd
         pics.append([(-s_ * 28, -18.0) for s_ in side])  # crossing into the crowd
         focus = []
-        for p in self.head_pos:  # all on one point: the DJ
-            v = stage_point - p
+        dj_z = np.mean([p[2] for p in self.head_pos])
+        for p, s_ in zip(self.head_pos, side):  # all on the DJ: a ring of light around them, not one spot
+            spot = motion.focus_spread(stage_point, stage_point - p, s_, p[2] - dj_z)[0]
+            v = spot - p
             focus.append(
                 (math.degrees(math.atan2(v[0], v[1])), math.degrees(math.asin(v[2] / (np.linalg.norm(v) + 1e-9))))
             )
@@ -625,4 +629,5 @@ class CinematicMixin:
         head_pos = self.head_pos[j]
         if self.zones.heads:
             out = self.zones.filter(head_pos, out)
+        out = geometry.room_safe_v(out, head_pos, self.stage)  # off the ceiling, not back at the DJ
         return self._eye_safe_v(out, head_pos[2])

@@ -162,7 +162,9 @@ struct NewRigSheet: View {
             model.reloadSets()
             dismiss()
             model.section = .rig
-            model.choose(rig: rigName)   // offers to mount the set on it
+            model.editingRig = rigName   // open it on the Rigs page; sets are placed on it there
+            model.editingRigSet = ""
+            model.section = .rig
         } catch {
             self.error = error.localizedDescription
         }

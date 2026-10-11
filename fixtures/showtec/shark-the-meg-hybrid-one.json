@@ -1,0 +1,303 @@
+{
+  "manufacturer": "Showtec",
+  "model": "Shark The Meg Hybrid One",
+  "kind": "moving_head",
+  "source": "Open Fixture Library (showtec/shark-the-meg-hybrid-one), converted automatically: check it once with `decisive test`",
+  "ofl": {
+    "key": "showtec/shark-the-meg-hybrid-one",
+    "categories": [
+      "Moving Head",
+      "Color Changer"
+    ],
+    "converter": 1
+  },
+  "physical": {
+    "pan_deg": 540,
+    "tilt_deg": 270,
+    "beam_deg": 3.8,
+    "size_mm": [
+      283,
+      165,
+      435
+    ]
+  },
+  "modes": {
+    "8ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 246
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter_strobe",
+        "default": 47
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "default": 0
+      },
+      {
+        "attr": "channel_functions",
+        "default": 0
+      }
+    ],
+    "16ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 246
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter_strobe",
+        "default": 47
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo_rotation",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "channel_functions",
+        "default": 0
+      }
+    ],
+    "18ch": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 246
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "shutter_strobe",
+        "default": 47
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "gobo_rotation",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "channel_functions",
+        "default": 0
+      },
+      {
+        "attr": "color_time",
+        "default": 0
+      },
+      {
+        "attr": "gobo_time",
+        "default": 0
+      }
+    ]
+  },
+  "color_wheel": {
+    "verified": true,
+    "_note": "Slot colours from the Open Fixture Library.",
+    "slots": [
+      {
+        "name": "open",
+        "from": 0,
+        "to": 4,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 1",
+        "from": 10,
+        "to": 14,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 2",
+        "from": 20,
+        "to": 24,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 3",
+        "from": 30,
+        "to": 34,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 4",
+        "from": 40,
+        "to": 44,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 5",
+        "from": 50,
+        "to": 54,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 6",
+        "from": 60,
+        "to": 64,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 7",
+        "from": 70,
+        "to": 74,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 8",
+        "from": 80,
+        "to": 84,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "name": "color 9",
+        "from": 90,
+        "to": 127,
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "beam_fx": {
+    "open": {},
+    "prism": {
+      "prism": 95
+    },
+    "frost": {
+      "frost": 255
+    }
+  },
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160,
+    "accel_dps2": 800,
+    "_note": "Estimated; measure with `decisive motion`."
+  }
+}

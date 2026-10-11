@@ -86,12 +86,16 @@ final class FixtureModels {
         var scale: Float           // the model's size against a typical fixture of its kind
         var size: SIMD3<Float>?    // real housing size (m) when known
         var selected: Bool
+        var hovered = false
+        var onStand = false        // standing in the air, not on a truss: it has its own tripod stand
     }
 
     static let bodyColor: SIMD3<Float> = [0.075, 0.078, 0.088]
     static let yokeColor: SIMD3<Float> = [0.095, 0.098, 0.11]
     static let glassColor: SIMD3<Float> = [0.05, 0.06, 0.075]
     static let pick: SIMD3<Float> = [0.25, 0.55, 1.0]
+    static let lit: SIMD3<Float> = [0.35, 0.45, 0.6]  // under the pointer
+    static let standColor: SIMD3<Float> = [0.13, 0.135, 0.15]
 
     private(set) var units: [Unit] = []
     private var tiltAxis: [String: SIMD3<Float>] = [:]   // the last tilt axis per head (when the beam is along the pan axis)
@@ -134,16 +138,41 @@ final class FixtureModels {
             let scale = shape == .beamHead || shape == .spotHead || shape == .washHead
                 ? min(1.5, max(0.6, (size.map { max($0.x, $0.z) } ?? 0.55) / 0.55)) : 1
             let length = Float(f.length ?? Double(size?.x ?? 1))
+            let stand = f.mount == "stand" && f.truss == nil && p.z > 0.6
             units.append(Unit(id: k, shape: shape, idx: idx, p: p, up: up, across: across, length: length, scale: scale,
-                              size: size, selected: selected.contains("fixture:\(k)")))
+                              size: size, selected: selected.contains("fixture:\(k)"), hovered: selected.contains("hover:fixture:\(k)"),
+                              onStand: stand))
         }
     }
 
     // MARK: the parts that never move (built with the scenery)
 
+    /// A tripod stand from the floor up to `top`, under a fixture that stands in the air.
+    private func tripod(_ m: inout MeshBuilder, at p: SIMD3<Float>, top: Float, _ col: SIMD3<Float>, em: Float) {
+        guard top > 0.3 else { return }
+        m.cylinder(SIMD3(p.x, p.y, top / 2), [0, 0, 1], radius: 0.022, length: top, col, emissive: em, segments: 8)
+        m.cylinder(SIMD3(p.x, p.y, top - 0.01), [0, 0, 1], radius: 0.04, length: 0.03, col, emissive: em, segments: 8)
+        let hub = SIMD3<Float>(p.x, p.y, min(0.55, top * 0.4))
+        for k in 0..<3 {  // three legs out from the hub to the floor
+            let a = Float(k) / 3 * 2 * .pi + 0.5
+            let foot = SIMD3<Float>(p.x + cos(a) * 0.38, p.y + sin(a) * 0.38, 0.01)
+            let v = hub - foot
+            m.cylinder((hub + foot) / 2, simd_normalize(v), radius: 0.014, length: simd_length(v), col, emissive: em, segments: 6)
+        }
+    }
+
     func addStatic(into m: inout MeshBuilder) {
         for u in units {
-            let col = u.selected ? Self.pick : Self.bodyColor, em: Float = u.selected ? 0.7 : 0
+            let col = u.selected ? Self.pick : u.hovered ? Self.lit : Self.bodyColor, em: Float = u.selected ? 0.7 : u.hovered ? 0.3 : 0
+            if u.onStand {  // its own stand, under the fixture's lowest point
+                let bottom: Float
+                switch u.shape {
+                case .beamHead, .spotHead, .washHead: bottom = u.p.z - (headGeometry(u).armLen + 0.12 * u.scale)
+                case .movingBar: bottom = u.p.z - 0.25
+                default: bottom = u.p.z - 0.2
+                }
+                tripod(&m, at: u.p, top: bottom, u.selected ? Self.pick : u.hovered ? Self.lit : Self.standColor, em: em)
+            }
             switch u.shape {
             case .beamHead, .spotHead, .washHead:
                 let s = u.scale, g = headGeometry(u)
@@ -227,7 +256,7 @@ final class FixtureModels {
         var m = MeshBuilder()
         m.v.reserveCapacity(units.count * 400)
         for u in units {
-            let col = u.selected ? Self.pick : Self.yokeColor, em: Float = u.selected ? 0.7 : 0
+            let col = u.selected ? Self.pick : u.hovered ? Self.lit : Self.yokeColor, em: Float = u.selected ? 0.7 : u.hovered ? 0.3 : 0
             let hl = u.idx.contains { highlight.contains(fixtures[$0].id) }
             switch u.shape {
             case .beamHead, .spotHead, .washHead:

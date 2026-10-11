@@ -45,6 +45,7 @@ def element_info(rig: dict, e: dict, real=None) -> dict:
         "fixture": fx["id"],
         "body": defn["kind"],
         "rot": fx.get("rot_deg", 0.0),
+        "truss": fx.get("truss"),
         "size": [round(v / 1000, 3) for v in defn["physical"].get("size_mm", [])] or None,
     }
     if "offset_m" in e:

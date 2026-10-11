@@ -6,13 +6,13 @@ import Observation
 import Security
 
 enum Section: String, CaseIterable, Identifiable, Hashable {
-    case show, rig, set, engine
+    case show, set, rig, engine
     var id: String { rawValue }
     var title: String {
         switch self {
         case .show: "Show"
-        case .rig: "Rig"
-        case .set: "Set"
+        case .rig: "Rigs"
+        case .set: "Sets"
         case .engine: "Engine"
         }
     }
@@ -28,8 +28,8 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
     var help: String {
         switch self {
         case .show: "The show: the stage, the music and the director"
-        case .rig: "The venue: trusses, stage and zones, and where your fixtures hang"
-        case .set: "Your gear: the fixtures, their DMX patch and where the DMX goes"
+        case .rig: "Your rigs (the venues: trusses, stage, zones), and the sets placed on them"
+        case .set: "Your sets of fixtures: their DMX patch and where the DMX goes"
         case .engine: "The engine's log"
         }
     }

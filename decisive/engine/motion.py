@@ -35,6 +35,20 @@ MOVE_SCALE = [0.6, 0.8, 1.0, 1.2]  # movement size per intensity level: calm par
 
 
 POINT_DISTANCE_M = 3.0  # focus/cross: how far in front of the rig the shared point floats
+FOCUS_SPREAD_M = 1.5  # …and how wide the heads spread around it: never every beam into one single spot
+
+
+def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np.ndarray:
+    """Each head's own spot around a shared point (rows of `point`/`d`): across the beam by where the head
+    is in the rig (left to the left), up or down a little by its height, so the beams never meet in one spot."""
+    d = np.atleast_2d(d)
+    d = d / (np.linalg.norm(d, axis=1, keepdims=True) + 1e-9)
+    across = np.cross(d, [0.0, 0.0, 1.0])
+    flat = np.linalg.norm(across, axis=1, keepdims=True) < 1e-3  # straight up or down: across is x
+    across = np.where(flat, [1.0, 0.0, 0.0], across) / np.maximum(np.linalg.norm(across, axis=1, keepdims=True), 1e-3)
+    up = np.cross(across, d)
+    r = FOCUS_SPREAD_M / 2
+    return point + across * side * r + up * float(np.clip(dz, -1, 1)) * r / 2
 
 
 WAVE_BEATS = 4.0  # a wave runs over the heads (of the rig or a group) within this many beats
@@ -215,7 +229,8 @@ class MotionMixin:
             # A shared point that moves with the same angles as the other formations, at a fixed distance in
             # front of the middle of the rig; every head aims at it (cross: at a point shifted to the other side).
             centre = np.mean(self.head_pos, axis=0)
-            point = centre + geometry.direction(az, el) * POINT_DISTANCE_M
+            aim_d = geometry.direction(az, el)
+            point = focus_spread(centre + aim_d * POINT_DISTANCE_M, aim_d, side, head_pos[2] - centre[2])[0]
             if f == "cross":
                 point = point + np.array([-side * max(0.2 * W, 0.8), 0.0, 0.0])
             vec = point - head_pos
@@ -234,6 +249,7 @@ class MotionMixin:
             out /= np.linalg.norm(out) + 1e-9
         if self.zones.heads:  # artistic zones: off the walls/set, inside the keep-in area
             out = self.zones.filter(head_pos, out[None])[0]
+        out = geometry.room_safe_v(out[None], head_pos, self.stage)[0]
         return geometry.eye_safe(out, head_pos[2], self.stage)
 
     def _drop_ahead(self, i: int, t: float) -> int | None:
@@ -422,7 +438,8 @@ class MotionMixin:
             out = self._direction_v(az, el)
         elif f in ("focus", "cross"):  # a shared point: of the whole rig, or of this head's group
             centre = np.mean(self.head_pos, axis=0) if role["centre"] is None else role["centre"]
-            point = centre + self._direction_v(az, el) * POINT_DISTANCE_M
+            aim_d = self._direction_v(az, el)
+            point = focus_spread(centre + aim_d * POINT_DISTANCE_M, aim_d, side, head_pos[2] - centre[2])
             if f == "cross":
                 point = point + np.array([-side * max(0.2 * W, 0.8), 0.0, 0.0])
             vec = point - head_pos
@@ -443,6 +460,7 @@ class MotionMixin:
             out = out / (np.linalg.norm(out, axis=1, keepdims=True) + 1e-9)
         if self.zones.heads:
             out = self.zones.filter(head_pos, out)
+        out = geometry.room_safe_v(out, head_pos, self.stage)  # off the ceiling, not back at the DJ
         return self._eye_safe_v(out, head_pos[2])
 
     def _head_dirs_v(self, ts: np.ndarray, j: int) -> np.ndarray:

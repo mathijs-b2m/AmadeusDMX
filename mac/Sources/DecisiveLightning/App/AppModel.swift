@@ -34,6 +34,51 @@ final class AppModel {
     /// Goes up whenever sets or rigs were (re)read: views showing a file reload it.
     var configVersion = 0
     var mountPrompt: (rig: String, set: String)?
+    /// The Sets page edits this set (it has nothing to do with the show's choice).
+    var editingSet = ""
+    /// The Rigs page edits this rig, and the set placed on it whose placement is shown ("": the rig alone).
+    var editingRig = ""
+    var editingRigSet = ""
+
+    /// A set placed on a rig: what a show runs. Made on the Rigs page; the show picks one of these.
+    struct Combination: Hashable, Identifiable {
+        var rig: String
+        var set: String
+        var id: String { "\(set)@\(rig)" }
+        var label: String { "\(set) on \(rig)" }
+    }
+
+    /// Every set placed on a rig (with or without fixtures mounted yet).
+    var combinations: [Combination] {
+        let names = Set(sets.map(\.name))
+        return rigs.flatMap { r in r.mounted.keys.sorted().filter { names.contains($0) }.map { Combination(rig: r.name, set: $0) } }
+    }
+
+    /// The sets placed on a rig.
+    func setsOn(_ rig: String) -> [String] { combinations.filter { $0.rig == rig }.map(\.set) }
+
+    /// The show runs this combination.
+    func chooseShow(_ c: Combination) {
+        guard !engineRunning else { return }
+        selectedRig = c.rig
+        selectedSet = c.set
+    }
+
+    /// Puts a set on a rig (a new combination), auto-mounting its fixtures or leaving them to place by hand.
+    func placeSet(_ set: String, on rig: String, auto: Bool) async throws {
+        guard await ensureSetupService() else { throw SetupAPIError.notRunning }
+        try await api.placeSet(set, on: rig, auto: auto)
+        reloadSets()
+        editingRigSet = set
+    }
+
+    /// Takes a set off a rig (its placements there are forgotten).
+    func unplaceSet(_ set: String, from rig: String) async throws {
+        guard await ensureSetupService() else { throw SetupAPIError.notRunning }
+        try await api.unplaceSet(set, from: rig)
+        if editingRigSet == set { editingRigSet = "" }
+        reloadSets()
+    }
     /// Visualise / Perform / both (-showMode perform). Perform ↔ both switches live; DMX on/off restarts the show.
     var mode: ShowMode = .both {
         didSet {
@@ -107,6 +152,14 @@ final class AppModel {
             selectedRig = UserDefaults.standard.string(forKey: "lastRig").flatMap { n in rigs.contains { $0.name == n } ? n : nil }
                 ?? ws.activeRig ?? rigs.first?.name ?? ""
         }
+        // the show runs a combination made on the Rigs page (never a set and a rig that were never put together)
+        if !combinations.contains(Combination(rig: selectedRig, set: selectedSet)), let c = combinations.first {
+            selectedRig = c.rig
+            selectedSet = c.set
+        }
+        if editingSet.isEmpty || !sets.contains(where: { $0.name == editingSet }) { editingSet = selectedSet }
+        if editingRig.isEmpty || !rigs.contains(where: { $0.name == editingRig }) { editingRig = selectedRig }
+        if !editingRigSet.isEmpty && !setsOn(editingRig).contains(editingRigSet) { editingRigSet = "" }
         previewCache = nil
         configVersion += 1
     }
@@ -130,8 +183,6 @@ final class AppModel {
         guard !engineRunning else { return }
         if let rig { selectedRig = rig }
         if let set { selectedSet = set }
-        let m = mounted
-        if m.total > 0 && m.placed == 0 { mountPrompt = (selectedRig, selectedSet) }
     }
 
     /// Auto-mount the set's fixtures that aren't mounted on the rig yet (or all of them).

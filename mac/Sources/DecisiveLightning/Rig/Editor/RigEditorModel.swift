@@ -33,8 +33,30 @@ final class RigEditorModel: StageEditing {
     var group: Set<String> = []
     /// While something is dragged over the stage from the inspector: the truss it would land on.
     private(set) var dropTarget: String?
+    /// What the pointer is over (a click would pick it): lit a little.
+    @ObservationIgnored private var hovered: String?
     var snap = true
     var showZones = true { didSet { version += 1 } }
+
+    // building trusses in the stage, like a construction game: draw a truss on the floor, click to set a tower,
+    // drag a truss's end handles to stretch or turn it, a tower's top to make it taller
+    enum Tool: String {
+        case select, truss, tower
+
+        var hint: String? {
+            switch self {
+            case .select: nil
+            case .truss: "Drag on the floor to draw a truss (½ m steps, 15° turns; ⌥: free). Esc: done"
+            case .tower: "Click on the floor to set a tower. Esc: done"
+            }
+        }
+    }
+    var tool: Tool = .select { didSet { message = tool.hint } }
+    var buildHeight = 4.5     // a new truss goes up to this height (m)
+    var towerHeight = 4.0     // a new tower is this tall (m)
+    static let buildGrid = 0.5, buildAngle = 15.0
+    @ObservationIgnored private var stretch: (id: String, fixed: SIMD2<Double>, planeZ: Double, before: RigDocument, new: Bool)?
+    @ObservationIgnored private var raise: (id: String, before: RigDocument)?
     var message: String?
     var busy = false
     @ObservationIgnored var undoManager: UndoManager?
@@ -110,6 +132,7 @@ final class RigEditorModel: StageEditing {
         var selected = selection.map { [$0.key] } ?? []
         selected += group.map { "fixture:\($0)" }
         if let t = dropTarget { selected.append("truss:\(t)") }
+        if let h = hovered, !selected.contains(h) { selected.append("hover:" + h) }
         return StageInput(key: "edit:\(doc.label):\(version)", fixtures: els, stage: doc.stage, screen: doc.hasScreen, hello: nil,
                           trusses: doc.trusses, selected: Set(selected), keepCamera: true,
                           zones: doc.zones.filter { z in showZones || selection == .zone(z.id) })
@@ -142,7 +165,12 @@ final class RigEditorModel: StageEditing {
     func updateStage(_ name: String = "Change Stage", _ body: (inout Stage) -> Void) {
         change(name) { d in
             body(&d.stage)
-            d.raw["stage"] = try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage))
+            // merged into what was there: the stage keeps the settings the editor doesn't show (eye safety…)
+            var merged = d.raw["stage"]?.object ?? [:]
+            if let o = (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage)))?.object {
+                merged.merge(o) { _, new in new }
+            }
+            d.raw["stage"] = .object(merged)
         }
     }
 
@@ -405,8 +433,12 @@ final class RigEditorModel: StageEditing {
         do {
             guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
             guard let layout = try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any] else { return }
-            let places = try await model.api.automountPlacements(layout: layout, ids: ids, all: all)
-            apply(places, name: places.count == 1 ? "Auto-Mount Fixture" : "Auto-Mount \(places.count) Fixtures")
+            let (places, trusses) = try await model.api.automountPlacements(layout: layout, ids: ids, all: all)
+            apply(places, trusses: trusses, name: places.count == 1 ? "Auto-Mount Fixture" : "Auto-Mount \(places.count) Fixtures")
+            if let trusses, !trusses.isEmpty, doc.trusses.count == trusses.count {
+                message = "The rig had no trusses: it has \(trusses.count) now (where its fixtures hung, or a standard set-up)"
+                return
+            }
             message = places.isEmpty ? "Everything is mounted already" : "Mounted \(places.count) fixture\(places.count == 1 ? "" : "s")"
         } catch {
             message = error.localizedDescription
@@ -414,8 +446,9 @@ final class RigEditorModel: StageEditing {
     }
 
     /// Placements (fixture id → position fields, as in a rig file) onto the fixtures.
-    func apply(_ places: [String: [String: JSONValue]], name: String) {
+    func apply(_ places: [String: [String: JSONValue]], trusses: [Truss]? = nil, name: String) {
         change(name) { d in
+            if let trusses, d.trusses.isEmpty { d.trusses = trusses }  // a rig without trusses got its structure
             for i in d.fixtures.indices {
                 guard let p = places[d.fixtures[i].id] else { continue }
                 var f = d.fixtures[i]
@@ -566,6 +599,26 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    /// ↑ / ↓ on fixtures clamped to a truss: round the truss to its next side (under → front → top → back), or
+    /// round a tower to its next face (front → right → back → left). False if none of them is on a truss.
+    func rollAround(_ step: Int) -> Bool {
+        guard case .fixture = selection else { return false }
+        let ids = selectedFixtures
+        guard doc.fixtures.contains(where: { ids.contains($0.id) && $0.truss != nil }) else { return false }
+        change(step > 0 ? "Round the Truss" : "Round the Truss Back") { d in
+            for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
+                guard let tid = d.fixtures[i].truss, let t = d.trusses.first(where: { $0.id == tid }) else { continue }
+                let order = t.vertical ? ["front", "right", "back", "left"] : ["under", "front", "top", "back"]
+                let now = d.fixtures[i].side ?? (t.vertical ? "front" : (d.fixtures[i].mount == "stand" ? "top" : "under"))
+                let k = order.firstIndex(of: now) ?? 0
+                d.fixtures[i].side = order[((k + step) % order.count + order.count) % order.count]
+                d.fixtures[i].waiting = false
+                Self.place(&d.fixtures[i], on: t, at: d.fixtures[i].trussPos ?? 0, width: d.width)
+            }
+        }
+        return true
+    }
+
     static func wrap(_ a: Double) -> Double {
         var a = a.truncatingRemainder(dividingBy: 360)
         if a > 180 { a -= 360 }
@@ -579,7 +632,11 @@ final class RigEditorModel: StageEditing {
     func save(_ model: AppModel) async throws {
         guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
         guard let layout = try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any] else { return }
-        try await model.api.saveRig(layout, rigName: doc.rig, setName: doc.set)
+        if doc.set.isEmpty {  // the rig alone
+            try await model.api.saveRigStructure(layout, rig: doc.rig)
+        } else {
+            try await model.api.saveRig(layout, rigName: doc.rig, setName: doc.set)
+        }
         saved = doc
         message = "Saved \(doc.rig)"
         model.reloadSets()
@@ -635,24 +692,144 @@ final class RigEditorModel: StageEditing {
         return best.map { ($0.0, $0.1) }
     }
 
+    // MARK: - building trusses
+
+    private static func plane(_ o: SIMD3<Double>, _ d: SIMD3<Double>, z: Double) -> SIMD2<Double>? {
+        guard abs(d.z) > 1e-4 else { return nil }
+        let t = (z - o.z) / d.z
+        guard t > 0 else { return nil }
+        let p = o + d * t
+        return SIMD2(p.x, p.y)
+    }
+
+    private func snapped(_ p: SIMD2<Double>) -> SIMD2<Double> {
+        guard snap else { return p }
+        let g = Self.buildGrid
+        return SIMD2((p.x / g).rounded() * g, (p.y / g).rounded() * g)
+    }
+
+    private func newTrussID(_ base: String) -> String {
+        "\(base)\((1...).first { i in !doc.trusses.contains { $0.id == "\(base)\(i)" } }!)"
+    }
+
+    /// The end points of a horizontal truss, seen from above.
+    private static func ends(_ t: Truss) -> (SIMD2<Double>, SIMD2<Double>) {
+        let a = t.point(-t.lengthM / 2), b = t.point(t.lengthM / 2)
+        return (SIMD2(a.x, a.y), SIMD2(b.x, b.y))
+    }
+
+    /// A press in a build tool, or on a selected truss's handle: true if it starts a build drag.
+    private func pickBuild(_ o: SIMD3<Double>, _ d: SIMD3<Double>) -> Bool {
+        switch tool {
+        case .truss:
+            guard let p = Self.plane(o, d, z: 0).map(snapped) else { return false }
+            let before = doc
+            let t = Truss(id: newTrussID("truss"), lengthM: 0, xM: p.x, yM: p.y, zM: buildHeight)
+            doc.trusses.append(t)
+            selection = .truss(t.id)
+            stretch = (t.id, p, 0, before, true)
+            refresh()
+            return true
+        case .tower:
+            guard let p = Self.plane(o, d, z: 0).map(snapped) else { return false }
+            let t = Truss(id: newTrussID("tower"), lengthM: towerHeight, xM: p.x, yM: p.y, zM: towerHeight / 2, vertical: true)
+            change("Place Tower") { $0.trusses.append(t) }
+            selection = .truss(t.id)
+            return true
+        case .select:
+            guard case .truss(let id) = selection, let t = doc.trusses.first(where: { $0.id == id }) else { return false }
+            if t.vertical {  // the handle on top: taller or shorter
+                let top = SIMD3(t.xM, t.yM, t.zM + t.lengthM / 2)
+                if Self.rayToSegment(o, d, top, top + [0, 0, 0.01]).0 < 0.35 { raise = (id, doc); return true }
+                return false
+            }
+            let (a, b) = Self.ends(t)
+            for (end, other) in [(a, b), (b, a)] {
+                let p = SIMD3(end.x, end.y, t.zM)
+                if Self.rayToSegment(o, d, p, p + [0, 0, 0.01]).0 < 0.35 {  // an end handle: stretch or turn
+                    stretch = (id, other, t.zM, doc, false)
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
+    /// Dragging a build: true if one is going on.
+    private func dragBuild(_ o: SIMD3<Double>, _ d: SIMD3<Double>, free: Bool) -> Bool {
+        if let st = stretch {
+            guard let i = doc.trusses.firstIndex(where: { $0.id == st.id }), var p = Self.plane(o, d, z: st.planeZ) else { return true }
+            if !free { p = snapped(p) }
+            var v = p - st.fixed
+            var length = simd_length(v)
+            var angle = atan2(v.y, v.x) * 180 / .pi
+            if snap && !free {
+                length = (length / Self.buildGrid).rounded() * Self.buildGrid
+                angle = (angle / Self.buildAngle).rounded() * Self.buildAngle
+            }
+            let r = angle * .pi / 180
+            v = SIMD2(cos(r), sin(r)) * length
+            doc.trusses[i].lengthM = length
+            doc.trusses[i].rotDeg = Self.wrap(angle)
+            doc.trusses[i].xM = st.fixed.x + v.x / 2
+            doc.trusses[i].yM = st.fixed.y + v.y / 2
+            Self.followTruss(&doc, doc.trusses[i])
+            message = String(format: "%.1f m at %.0f°", length, Self.wrap(angle))
+            refresh()
+            return true
+        }
+        if let r = raise {
+            guard let i = doc.trusses.firstIndex(where: { $0.id == r.id }) else { return true }
+            let t = doc.trusses[i]
+            // the pointer on an upright plane through the tower, facing the camera
+            let n = simd_normalize(SIMD3(d.x, d.y, 0) + [1e-9, 0, 0])
+            let a = SIMD3(t.xM, t.yM, 0.0)
+            let den = simd_dot(d, n)
+            guard abs(den) > 1e-6 else { return true }
+            let z = (o + d * (simd_dot(a - o, n) / den)).z
+            var length = max(1, z)
+            if snap && !free { length = max(1, (length / Self.buildGrid).rounded() * Self.buildGrid) }
+            doc.trusses[i].lengthM = length
+            doc.trusses[i].zM = length / 2
+            Self.followTruss(&doc, doc.trusses[i])
+            message = String(format: "tower %.1f m", length)
+            refresh()
+            return true
+        }
+        return false
+    }
+
     func pick(origin: SIMD3<Float>, dir: SIMD3<Float>, extend: Bool) -> Bool {
         let o = s(origin), d = s(dir)
+        if pickBuild(o, d) { return true }
+        if tool != .select { return true }  // building: the camera doesn't turn under the pointer
+        guard let b = hit(o, d) else { return false }
+        return grab(b, extend: extend)
+    }
+
+    /// What is under the pointer: a fixture when the ray passes right over it, else the nearest truss (as seen
+    /// from the camera: a tolerance of about 1.5° of view, at least 30 cm), else a zone.
+    private func hit(_ o: SIMD3<Double>, _ d: SIMD3<Double>) -> (sel: EditorSelection, score: Double, at: SIMD3<Double>)? {
         var best: (sel: EditorSelection, score: Double, at: SIMD3<Double>)?
         func consider(_ sel: EditorSelection, _ a: SIMD3<Double>, _ b: SIMD3<Double>, radius: Double) {
             let (dist, t) = Self.rayToSegment(o, d, a, b)
-            // fixtures win from the truss they hang on (it's right in front of them, seen from above); between
-            // fixtures, the one closest to the pointer
-            let score = t - (sel.isFixture ? 0.8 - dist * 3 : 0)
-            if dist < radius, best == nil || score < best!.score {
-                best = (sel, score, o + d * t)
-            }
+            let tolerance = max(radius, t * Self.pickAngle)
+            guard dist < tolerance else { return }
+            // how close the pointer is, as seen from the camera; a fixture right under the pointer wins from the
+            // truss it hangs on, but a click on the truss between fixtures is the truss
+            var score = dist / max(t, 0.5)
+            if sel.isFixture && dist < Self.fixtureCore { score -= 1 }
+            if best == nil || score < best!.score { best = (sel, score, o + d * t) }
         }
         for f in doc.fixtures {
             let p = f.position(width: doc.width)
             let def = definition(f.key)
             let L = (def?.cells(f.mode) ?? 1) > 1 ? (def?.size.x ?? 1) : 0.0
             let r = f.rotDeg * .pi / 180, ax = SIMD3(cos(r), sin(r), 0) * (L / 2)
-            consider(.fixture(f.id), p - ax, p + ax, radius: 0.28)
+            consider(.fixture(f.id), p - ax, p + ax, radius: 0.22)
+            if f.mount == "stand" && f.truss == nil && p.z > 0.6 {  // its stand is the fixture too
+                consider(.fixture(f.id), [p.x, p.y, 0], [p.x, p.y, p.z - 0.2], radius: 0.15)
+            }
         }
         for t in doc.trusses {
             if t.vertical {
@@ -672,7 +849,19 @@ final class RigEditorModel: StageEditing {
             }
             if let p = pickZone { best = (.zone(p.z.id), p.t, o + d * p.t) }
         }
-        guard let b = best else { return false }
+        return best
+    }
+
+    static let pickAngle = 0.026          // ~1.5° of view: how close to something a click must be
+    static let fixtureCore = 0.2          // a click this close to a fixture (m) is the fixture, not its truss
+
+    /// The pointer moved over the stage: light up what a click would pick.
+    func hover(origin: SIMD3<Float>, dir: SIMD3<Float>) {
+        let key = tool == .select ? hit(s(origin), s(dir)).map { $0.sel.key } : nil
+        if key != hovered { hovered = key; refresh() }
+    }
+
+    private func grab(_ b: (sel: EditorSelection, score: Double, at: SIMD3<Double>), extend: Bool) -> Bool {
         if case .fixture(let id) = b.sel {
             if extend {  // ⇧-click: add to (or take out of) the selection
                 var all = selectedFixtures
@@ -705,6 +894,7 @@ final class RigEditorModel: StageEditing {
     }
 
     func drag(origin: SIMD3<Float>, dir: SIMD3<Float>, free: Bool) {
+        if dragBuild(s(origin), s(dir), free: free) { return }
         guard let g = drag else { return }
         let o = s(origin), d = s(dir)
         // move in the horizontal plane at the height where it was grabbed
@@ -798,6 +988,21 @@ final class RigEditorModel: StageEditing {
     }
 
     func endDrag() {
+        if let st = stretch {
+            stretch = nil
+            if let t = doc.trusses.first(where: { $0.id == st.id }), t.lengthM < Self.buildGrid {  // a click, no drag
+                doc.trusses.removeAll { $0.id == st.id }
+                if st.new { selection = nil }
+            }
+            if doc != st.before { registerUndo(st.new ? "Draw Truss" : "Stretch Truss", st.before) }
+            refresh()
+            return
+        }
+        if let r = raise {
+            raise = nil
+            if doc != r.before { registerUndo("Change Tower Height", r.before) }
+            return
+        }
         guard let g = drag else { return }
         drag = nil
         if doc != g.before {
@@ -856,19 +1061,33 @@ final class RigEditorModel: StageEditing {
         let step = shift ? 0.5 : 0.1
         switch e.keyCode {
         case 51, 117: deleteSelection(); return selection == nil  // ⌫ / ⌦
-        case 123: nudge(-step, 0); return true                       // ←
+        case 123 where !e.modifierFlags.contains(.option): nudge(-step, 0); return true  // ←
         case 124: nudge(step, 0); return true                        // →
-        case 125: nudge(0, step); return true                        // ↓ (towards the audience)
-        case 126: nudge(0, -step); return true                       // ↑ (towards the back)
+        case 125 where !e.modifierFlags.contains(.option):  // ↓: round the truss back, or towards the audience
+            if !rollAround(-1) { nudge(0, step) }
+            return true
+        case 126 where !e.modifierFlags.contains(.option):  // ↑: round the truss, or towards the back
+            if !rollAround(1) { nudge(0, -step) }
+            return true
         default: break
         }
         if e.modifierFlags.contains(.command), e.charactersIgnoringModifiers == "a" {  // ⌘A: every fixture
             select(fixtures: doc.fixtures.map(\.id))
             return true
         }
+        if e.modifierFlags.contains(.option), e.keyCode == 126 || e.keyCode == 125, case .truss(let id) = selection {
+            let up = e.keyCode == 126 ? 0.25 : -0.25  // ⌥↑ / ⌥↓: raise or lower the truss
+            updateTruss(id, up > 0 ? "Raise Truss" : "Lower Truss") { t in
+                if t.vertical { t.lengthM = max(1, t.lengthM + up); t.zM = t.lengthM / 2 } else { t.zM = max(0.5, t.zM + up) }
+            }
+            return true
+        }
         switch e.charactersIgnoringModifiers?.lowercased() {
         case "r": rotateSelection(by: shift ? 90 : 15); return true
-        case "\u{1b}": clickedEmpty(); return true
+        case "t": tool = .truss; return true
+        case "\u{1b}":
+            if tool != .select { tool = .select } else { clickedEmpty() }
+            return true
         default: return false
         }
     }

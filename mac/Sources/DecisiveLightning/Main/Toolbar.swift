@@ -5,37 +5,32 @@ import SwiftUI
 /// The rig and the set the show runs with: "showcase on club". Most people have one set, and a rig per venue.
 struct SetMenu: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Menu {
-            SwiftUI.Section("Rig: the venue") {
-                Picker("Rig", selection: Binding(get: { model.selectedRig }, set: { model.choose(rig: $0) })) {
-                    ForEach(model.rigs) { r in
-                        Text("\(r.name) — \(r.summary)").tag(r.name)
-                    }
+            let combos = model.combinations
+            if combos.isEmpty {
+                Text("No set is placed on a rig yet")
+            } else {
+                Picker("Show", selection: Binding(get: { AppModel.Combination(rig: model.selectedRig, set: model.selectedSet) },
+                                                  set: { model.chooseShow($0) })) {
+                    ForEach(combos) { c in Text(c.label).tag(c) }
                 }
                 .pickerStyle(.inline)
-                Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
-                Button("Edit the Rig", systemImage: "square.split.bottomrightquarter") { model.section = .rig }
             }
-            SwiftUI.Section("Set: your fixtures") {
-                if model.sets.count > 1 {
-                    Picker("Set", selection: Binding(get: { model.selectedSet }, set: { model.choose(set: $0) })) {
-                        ForEach(model.sets) { s in Text("\(s.name) — \(s.fixtureCount) fixtures").tag(s.name) }
-                    }
-                    .pickerStyle(.inline)
-                }
-                Button("Fixtures and Patch", systemImage: "light.overhead.right") { model.section = .set }
-                Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
+            Divider()
+            Button("Place Sets on Rigs…", systemImage: "square.split.bottomrightquarter") {
+                model.editingRig = model.selectedRig
+                model.editingRigSet = model.selectedSet
+                model.section = .rig
             }
         } label: {
-            Label(model.showLabel, systemImage: "square.split.bottomrightquarter")
+            Label(model.combinations.isEmpty ? "No Combination" : model.showLabel, systemImage: "square.split.bottomrightquarter")
                 .labelStyle(.titleAndIcon)
         }
         .disabled(model.engineRunning)
-        .help(model.engineRunning ? "A show runs on this rig with this set; stop it to switch"
-              : "The venue (rig) and your fixtures (set) the show runs with")
+        .help(model.engineRunning ? "A show runs with this set on this rig; stop it to switch"
+              : "The set on the rig the show runs with: the combinations made on the Rigs page")
     }
 }
 

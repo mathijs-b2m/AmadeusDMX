@@ -27,7 +27,13 @@ DEFAULT_STAGE = {
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …
     "audience_min_up_deg": 35.0,  # … or this far up (heads below 2.5 m); 10° for higher heads
+    "ceiling_guard": True,  # moving-head beams stay off the ceiling (they reach it no nearer than CEILING_RUN_M)
+    "back_guard": True,  # … and never swing back past the rig towards the stage and the DJ
 }
+CEILING_RUN_M = (4.0, 10.0)  # a beam going up reaches the ceiling at least the room's depth away (in this range)
+CEILING_CLEAR_M = 0.3  # (measured from this far under the ceiling)
+BACK_Y = 0.2  # a beam may point back at most this much (y of the unit direction; 0.2 ≈ 12° past straight down/up)
+BACK_DOWN_DEG = -55.0  # … unless it points down steeper than this: onto the floor near the fixture
 MOUNTS = {  # default position per mount type: (y, z) in metres
     "stand": (-0.6, 1.8),
     "hang": (-1.0, 3.0),
@@ -183,6 +189,36 @@ def eye_safe(d: np.ndarray, head_z: float, st: dict) -> np.ndarray:
         az = math.degrees(math.atan2(d[0], d[1]))
         return direction(az, elev)
     return d
+
+
+def room_safe_v(d: np.ndarray, head_pos, st: dict) -> np.ndarray:
+    """Default limits for moving-head beams (rows of unit directions), for every rig unless switched off:
+    off the ceiling (`ceiling_guard`: up only so far that the beam reaches the ceiling at least the room's depth
+    away) and not backwards (`back_guard`: never back past the rig towards the stage and the DJ, unless steeply
+    down onto the floor near the fixture)."""
+    d = np.asarray(d, dtype=float)
+    el = np.degrees(np.arcsin(np.clip(d[:, 2], -1, 1)))
+    az = np.degrees(np.arctan2(d[:, 0], d[:, 1]))
+    changed = np.zeros(len(d), dtype=bool)
+    if st.get("ceiling_guard", True):
+        lo, hi = CEILING_RUN_M
+        run = min(hi, max(lo, float(st.get("room_depth_m", 6.0))))
+        room = float(st.get("ceiling_m", 4.5)) - CEILING_CLEAR_M - float(head_pos[2])
+        top = math.degrees(math.atan2(room, run)) if room > 0 else 0.0
+        over = el > top
+        el = np.where(over, top, el)
+        changed |= over
+    if st.get("back_guard", True):
+        h = np.cos(np.radians(el))
+        limit = np.degrees(np.arccos(np.clip(-BACK_Y / np.maximum(h, 1e-6), -1, 1)))  # the widest |azimuth| allowed
+        back = (np.abs(az) > limit) & (el > BACK_DOWN_DEG)
+        az = np.where(back, np.sign(az + 1e-9) * limit, az)
+        changed |= back
+    if not changed.any():
+        return d
+    a, e = np.radians(az), np.radians(el)
+    fixed = np.stack([np.cos(e) * np.sin(a), np.cos(e) * np.cos(a), np.sin(e)], axis=-1)
+    return np.where(changed[:, None], fixed, d)
 
 
 def beam_end(pos, d, st: dict, max_len: float = 12.0):

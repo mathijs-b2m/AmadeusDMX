@@ -1,5 +1,5 @@
 // Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library), choose its mode and how
-// many. They get free DMX addresses, then wait to be mounted on the rig (the app offers to do it right away).
+// many. They get free DMX addresses. Where they hang is done on the Rigs page.
 import DecisiveKit
 import SwiftUI
 
@@ -19,8 +19,8 @@ struct AddToSetSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Add Fixtures to \(model.selectedSet)").font(.title2.weight(.semibold))
-            Text("Search by brand or model. They get free DMX addresses; then you mount them on the rig.")
+            Text("Add Fixtures to \(model.editingSet)").font(.title2.weight(.semibold))
+            Text("Search by brand or model. They get free DMX addresses; where they hang is set on the Rigs page.")
                 .foregroundStyle(.secondary)
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -105,10 +105,10 @@ struct AddToSetSheet: View {
         guard let key, let definition, let ws = model.workspace else { return }
         busy = true
         defer { busy = false }
-        let rig = model.selectedRig, set = model.selectedSet
+        let set = model.editingSet
         do {
-            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
-            var layout = try await model.api.rig(rig: rig, set: set)
+            guard await model.ensureSetupService(), let data = ws.composed(rig: "", set: set),
+                  var layout = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw SetupAPIError.notRunning }
             var fixtures = layout["fixtures"] as? [[String: Any]] ?? []
             // free addresses after what is patched, universe by universe
             let footprint = max(1, definition.channels(mode))
@@ -133,11 +133,10 @@ struct AddToSetSheet: View {
                 fixtures.append(["id": "\(base)\(n)", "fixture": key, "mode": mode, "universe": u, "address": a])
             }
             layout["fixtures"] = fixtures
-            try await model.api.saveRig(layout, rigName: rig, setName: set)
+            try await model.api.saveSet(layout, set: set)
             model.reloadSets()
             onDone()
             dismiss()
-            model.mountPrompt = (rig, set)   // the new ones don't hang anywhere yet
         } catch {
             self.error = error.localizedDescription
         }

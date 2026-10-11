@@ -65,6 +65,25 @@ def heads(defn: dict, mode: str) -> list[int]:
     return hs or [0]  # 0 = the whole fixture is one element
 
 
+# Fixtures that can hurt eyes: risk group 2 and 3 (IEC 62471, `physical.risk_group` from the manual or label).
+# This is alpha software: those stay dark with real lights. Without a rating we estimate it from the light
+# packed into each beam: a Sharpy or a Pointe counts, a Fuze, a Katana or a wash doesn't.
+POWERFUL_LUMENS = 5000  # per beam
+POWERFUL_LM_PER_DEG2 = 200  # lumens per square degree of beam
+
+
+def high_risk(defn: dict) -> bool:
+    """Risk group 2 or 3, or (unrated) a narrow beam with real power."""
+    phys = defn.get("physical", {})
+    if phys.get("risk_group") is not None:
+        return int(phys["risk_group"]) >= 2
+    lumens, beam = phys.get("lumens"), phys.get("beam_deg")
+    if not lumens or not beam or defn.get("kind") not in MOVING:
+        return False
+    per_beam = lumens / len(heads(defn, default_mode(defn)))
+    return per_beam >= POWERFUL_LUMENS and per_beam / float(beam) ** 2 >= POWERFUL_LM_PER_DEG2
+
+
 def bar_length_m(fx: dict, defn: dict) -> float:
     """Length of a multi-cell fixture (LED bar, moving bar): the rig's `length_m`, else its housing."""
     if fx.get("length_m"):

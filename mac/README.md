@@ -57,28 +57,46 @@ Needs Xcode 26 (Swift 6.2+) and macOS 26. You can also open `Package.swift` in X
 
 The set-up assistant (first launch, or *New Set…*) follows the three steps: your **fixtures** and where the DMX
 goes (the set), the **rig** (a new one from a template, or one you have), and how the set goes on it
-(**auto-mount**, or by hand in the rig editor). Later:
+(**auto-mount**, or by hand in the rig editor). After that, three pages, each about one thing:
 
-- **Set page:** every fixture you own, grouped by model, with its patch and where it hangs on the current rig.
-  *Add Fixtures…* searches our library, QLC+ and the Open Fixture Library and gives free addresses; then the app
-  offers to mount the new ones. Right-click to identify fixtures on the real rig, mount them, or remove them.
-  The set's name is a menu for the rare second set (new, duplicate, rename, delete).
-- **New Rig…** (the toolbar menu, or the rig's name in the editor): templates with a sketch of each (an empty
-  room, two stands, a truss over the booth, a club, a concert stage), sized with sliders. Choosing a rig the set
-  doesn't hang on yet asks: *Auto-Mount* or *I'll place them myself*.
+- **Sets:** a list of your sets of fixtures. Pick one to see every fixture, grouped by model, with its DMX
+  patch and mode. *Add Fixtures…* searches our library, QLC+ and the Open Fixture Library and gives free
+  addresses; right-click to identify fixtures on the real lights or remove them; the set's name is a menu to
+  duplicate, rename or delete it. **Select a fixture** to edit it on the right: its name (renaming keeps where it
+  hangs on your rigs), DMX mode, universe and start address (checked against the 512 channels and the other
+  fixtures, with *Next Free*), and for moving heads invert pan / tilt. Select several to give them one mode or
+  universe, or *Patch in a Row* from an address. Every change is saved at once. Nothing about rigs here.
+- **Rigs:** a list of your rigs (venues). Pick one to edit its structure in 3D. **On this rig** chooses what you
+  edit: *the rig alone*, or one of the sets placed on it (where its fixtures hang). **Place a Set** puts another
+  set on this rig, auto-mounted or to place by hand: that is the only place auto-mount is offered. *Take Off…*
+  removes a set from the rig. **New Rig…** (under the list) offers templates with a sketch of each (an empty room,
+  two stands, a truss over the booth, a club, a concert stage), sized with sliders.
+- **Show:** the toolbar picker lists the **combinations**: the sets placed on rigs. A show runs one of those;
+  there is no picking a set and a rig that were never put together.
 
-## Rig editor (the Rig page)
+## Rig editor (the Rigs page)
 
 - **The set on this rig:** with nothing selected, the inspector shows how much of the set is mounted and lists
   it by model. Fixtures without a place wait on the floor in front of the stage. **Drag a group** (or one
   fixture) from the list onto a truss: a group hangs in a row, 60 cm apart (more for long bars), on a free
   stretch of the truss. Click a group to select all of it. **Auto-Mount** (toolbar or inspector) hangs what's
   waiting, re-mounts the selection, or re-mounts everything: one undoable step, saved with ⌘S.
+- **Stands:** a fixture standing in the air (not on a truss) has its own tripod stand, part of the fixture:
+  click the stand or the fixture to select it, and the stand moves with it. Only real trusses and towers (from
+  the Truss menu or the Draw Truss / Place Tower tools) are selected and moved as trusses.
+- **Picking:** what the pointer is over lights up a little, so you see what a click will pick. A click picks a
+  fixture only right on it; on a truss between its fixtures it picks the truss. The tolerance is about 1.5° of
+  the view (at least 30 cm), so a truss is as easy to pick from far away as up close.
 - **Selecting several:** ⇧-click adds fixtures, ⌘A selects every fixture. Drag one of them and the rest come
   along: onto a truss they hang in a row, on the floor they keep their spacing. The inspector then sets their
   side of the truss for all of them, auto-mounts or unmounts them.
-- **Trusses:** add box truss (quatro, 1–10 m) or towers, drag them, and set their height, length and
-  rotation. **Venue:** stage width, ceiling, room depth and the LED wall, in the inspector.
+- **Building trusses:** the toolbar's tools build the rig like a construction game. **Draw Truss** (T): drag
+  on the floor; the truss stretches from where you pressed, in ½ m lengths and 15° turns (⌥: free), at the
+  height set next to the tool. **Place Tower**: click on the floor (its height next to the tool). A selected
+  truss shows **handles** at its ends: drag one to stretch or turn it while the other end stays put; a tower's
+  handle on top makes it taller or shorter. ⌥↑ / ⌥↓ raise or lower the selected truss by 25 cm, Esc goes back
+  to selecting. The Truss menu still adds ready-made lengths; the inspector has exact values. **Venue:**
+  stage width, ceiling, room depth and the LED wall, in the inspector.
 - **Fixtures on trusses:** fixtures snap onto the nearest truss while you drag them (25 cm steps; hold ⌥ to
   place freely), onto its front or back face when you drag across it. They move and turn with their truss.
   Drag one off a truss and it goes to the floor.
@@ -94,11 +112,21 @@ goes (the set), the **rig** (a new one from a template, or one you have), and ho
   When DMX goes to real lights, a set with lasers needs a laser zone, or its lasers stay dark. This is a
   software guard on top of the laser's masking plate, scan safety and E-stop, never instead of them.
   For lasers, set their **Aim** (measured on the real laser) in the inspector.
-- **Keys:** R rotates 15° (⇧R 90°), arrow keys nudge, ⌫ unmounts fixtures (back to waiting; they stay in the
+- **Keys:** R rotates 15° (⇧R 90°), arrow keys nudge (on a truss: ← → slide along it, ↑ ↓ go round it: under → front → top → back, or round a tower's faces), ⌫ unmounts fixtures (back to waiting; they stay in the
   set) or deletes a truss or zone, ⌘Z undoes, ⌘S saves.
 - **Saving** goes through the engine's setup API: the rig file gets the trusses, stage, zones and where the
   set hangs; the set file gets any fixtures you added. The editor rereads the files when they change
   elsewhere, unless it has unsaved changes.
+
+## DMX devices and output (Show → DMX Devices & Output…, ⇧⌘D)
+
+Your DMX controllers are kept apart from the sets: an Art-Net node, an sACN node or multicast, a USB DMX
+interface, each set up once (name, address, its number of outputs and whether its first output is universe 0
+or 1). **Search** finds Art-Net nodes on the network and USB interfaces on this Mac; add them with one click,
+or by hand. For the selected set the window lists its universes (with how many fixtures each) and where each
+goes: a device and its output, showing the universe that goes out on the wire. Save writes your devices
+(`config/devices.json`) and the set's mapping; a running show uses it from its next start. The sidebar's
+output line and the Set page's *DMX output* open the window too.
 
 ## Performance: the lights first
 

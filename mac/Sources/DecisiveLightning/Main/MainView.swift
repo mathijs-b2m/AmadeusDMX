@@ -37,9 +37,6 @@ struct MainView: View {
                  : "The show restarts without sending to the lights: the lights black out.")
         }
         .sheet(isPresented: $model.showNewRig) { NewRigSheet().environment(model) }
-        .sheet(isPresented: Binding(get: { model.mountPrompt != nil }, set: { if !$0 { model.mountPrompt = nil } })) {
-            if let p = model.mountPrompt { MountPromptSheet(rig: p.rig, set: p.set).environment(model) }
-        }
         .navigationTitle(model.section == .show ? (model.showState.isActive ? model.feed.hello?.title ?? "Show" : "Show")
                          : model.section.title)
         .navigationSubtitle(subtitle)
@@ -49,6 +46,17 @@ struct MainView: View {
     }
 
     private var subtitle: String {
+        switch model.section {  // each page about its own thing
+        case .set:
+            return model.sets.first { $0.name == model.editingSet }.map { "\($0.fixtureCount) fixtures" } ?? ""
+        case .rig:
+            let r = model.rigs.first { $0.name == model.editingRig }
+            return r.map { $0.summary + (model.editingRigSet.isEmpty ? "" : " · \(model.editingRigSet) on it") } ?? ""
+        case .engine:
+            return ""
+        case .show:
+            break
+        }
         switch model.showState {
         case .live, .playing, .attached:
             if let h = model.feed.hello { return "\(Int(h.bpm.rounded())) BPM · \(model.showState.title)" }
@@ -62,8 +70,10 @@ struct MainView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            SetMenu()
+        if model.section == .show {  // the combination the show runs: only on the Show page
+            ToolbarItem(placement: .navigation) {
+                SetMenu()
+            }
         }
         ToolbarItem(placement: .principal) {
             StatusPill()

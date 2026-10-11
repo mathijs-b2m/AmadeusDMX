@@ -32,13 +32,21 @@ struct EditorInspector: View {
     private var overview: some View {
         let fixtures = editor.doc.fixtures
         let waiting = editor.doc.waitingCount
+        if editor.setName.isEmpty {  // the rig alone
+            SwiftUI.Section {
+                Label("The rig alone: its structure. Choose a set under “On this rig” to arrange its fixtures here.",
+                      systemImage: "building.2")
+                    .font(.callout).foregroundStyle(.secondary)
+                if editor.isDirty { Label("Unsaved changes", systemImage: "circle.fill").foregroundStyle(.orange).font(.callout) }
+            }
+        } else {
         SwiftUI.Section {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "light.overhead.right").foregroundStyle(.tint)
                     Text("Set “\(editor.setName)”").font(.headline)
                     Spacer()
-                    Button("Fixtures…") { model.section = .set }.buttonStyle(.link).font(.caption)
+                    Button("Fixtures…") { model.editingSet = editor.setName; model.section = .set }.buttonStyle(.link).font(.caption)
                 }
                 if !fixtures.isEmpty {
                     ProgressView(value: Double(fixtures.count - waiting), total: Double(fixtures.count))
@@ -66,17 +74,24 @@ struct EditorInspector: View {
         SwiftUI.Section("Fixtures by Model") {
             if fixtures.isEmpty {
                 Text("The set has no fixtures yet.").foregroundStyle(.secondary)
-                Button("Add Fixtures to the Set…") { model.section = .set }
+                Button("Add Fixtures to the Set…") { model.editingSet = editor.setName; model.section = .set }
             }
             ForEach(modelGroups(fixtures), id: \.key) { g in
                 ModelGroupRow(editor: editor, key: g.key, fixtures: g.fixtures)
             }
+        }
         }
         SwiftUI.Section("Venue") {
             ValueSlider(title: "Stage width", value: stageBinding(\.widthM), range: 2...30, step: 0.5)
             ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
             ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
+            Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
+                                                               set: { v in editor.updateStage { $0.ceilingGuard = v } }))
+                .help("Moving heads only go up so far that their beam reaches the ceiling at least the room's depth away")
+            Toggle("Beams never shine back at the DJ", isOn: Binding(get: { editor.doc.stage.backGuard },
+                                                                     set: { v in editor.updateStage { $0.backGuard = v } }))
+                .help("Moving heads never swing back past the rig towards the stage (pointing steeply down is fine)")
         }
         SwiftUI.Section("Trusses") {
             if editor.doc.trusses.isEmpty {

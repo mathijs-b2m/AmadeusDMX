@@ -154,6 +154,49 @@ enum EditorSelfTest {
         await e.autoMount(model)
         check("auto-mount", e.doc.waitingCount == 0 && fx("sharpy4").truss != nil,
               "waiting \(e.doc.waitingCount), sharpy4 on \(fx("sharpy4").truss ?? "-")")
+        // 13a. ↑ / ↓ round a fixture about its truss: under → front → top → back
+        e.select(fixtures: ["sharpy1"])
+        e.setSide("sharpy1", "under")
+        _ = e.rollAround(1)
+        let side1 = fx("sharpy1").side
+        _ = e.rollAround(1)
+        let side2 = fx("sharpy1").side
+        _ = e.rollAround(-1); _ = e.rollAround(-1); _ = e.rollAround(-1)
+        check("↑/↓ round the truss", side1 == "front" && side2 == "top" && fx("sharpy1").side == "back" && fx("sharpy1").mountRoll == 270,
+              "\(side1 ?? "-") \(side2 ?? "-") \(fx("sharpy1").side ?? "-")")
+        // 13b. building: draw a truss on the floor, stretch it by an end handle, set a tower and raise it by its top
+        let trussesBefore = e.doc.trusses.count
+        e.tool = .truss
+        _ = e.pick(origin: above(1.1, -6.1), dir: down, extend: false)
+        e.drag(origin: above(4.1, -6.1), dir: down, free: false)
+        e.endDrag()
+        let drawn = e.doc.trusses.last!
+        check("draw a truss (½ m grid, 15° steps)", e.doc.trusses.count == trussesBefore + 1 && abs(drawn.lengthM - 3) < 0.01
+              && abs(drawn.rotDeg) < 0.01 && abs(drawn.xM - 2.5) < 0.01 && abs(drawn.yM + 6) < 0.01 && abs(drawn.zM - e.buildHeight) < 0.01,
+              "\(drawn.lengthM) m at \(drawn.rotDeg)° (\(drawn.xM), \(drawn.yM), \(drawn.zM))")
+        e.tool = .select
+        e.selection = .truss(drawn.id)
+        let grabbed = e.pick(origin: SIMD3(4.0, -6.0, 30), dir: down, extend: false)
+        e.drag(origin: above(5.1, -6.0), dir: down, free: false)
+        e.endDrag()
+        let stretched = tr(drawn.id)
+        check("stretch it by an end", grabbed && abs(stretched.lengthM - 4) < 0.01 && abs(stretched.xM - 3) < 0.01,
+              "\(stretched.lengthM) m, x \(stretched.xM)")
+        e.tool = .tower
+        _ = e.pick(origin: above(7.2, -2.9), dir: down, extend: false)
+        e.endDrag()
+        let tower = e.doc.trusses.last!
+        check("place a tower", tower.vertical && abs(tower.xM - 7) < 0.01 && abs(tower.yM + 3) < 0.01 && abs(tower.lengthM - e.towerHeight) < 0.01,
+              "(\(tower.xM), \(tower.yM)) \(tower.lengthM) m")
+        e.tool = .select
+        e.selection = .truss(tower.id)
+        let eye = SIMD3<Float>(7, 10, 6)
+        let toTop = simd_normalize(SIMD3<Float>(7, -3, Float(tower.lengthM) + 0.2) - eye)
+        let raised = e.pick(origin: eye, dir: toTop, extend: false)
+        e.drag(origin: eye, dir: simd_normalize(SIMD3<Float>(7, -3, 5.5) - eye), free: false)
+        e.endDrag()
+        check("raise the tower by its top", raised && abs(tr(tower.id).lengthM - 5.5) < 0.01 && abs(tr(tower.id).zM - 2.75) < 0.01,
+              "\(tr(tower.id).lengthM) m")
         // 14. save (through the engine: the rig and the set files) and read back; a waiting fixture stays unmounted
         e.unmount(["sharpy4"])
         do {

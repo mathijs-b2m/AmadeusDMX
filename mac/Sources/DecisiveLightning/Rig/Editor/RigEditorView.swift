@@ -57,6 +57,24 @@ struct RigEditorView: View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
                 RigMenu(editor: editor)
+                Picker("Tool", selection: $editor.tool) {
+                    Label("Select", systemImage: "cursorarrow").tag(RigEditorModel.Tool.select)
+                    Label("Draw Truss", systemImage: "line.diagonal").tag(RigEditorModel.Tool.truss)
+                    Label("Place Tower", systemImage: "arrow.up.to.line").tag(RigEditorModel.Tool.tower)
+                }
+                .pickerStyle(.segmented)
+                .labelStyle(.iconOnly)
+                .fixedSize()
+                .help("Select and move · Draw a truss on the floor (T) · Click to set a tower · Esc: back to select")
+                if editor.tool == .truss {
+                    Stepper(String(format: "at %.1f m", editor.buildHeight), value: $editor.buildHeight, in: 1...15, step: 0.25)
+                        .fixedSize()
+                        .help("The height a new truss goes up to")
+                } else if editor.tool == .tower {
+                    Stepper(String(format: "%.1f m tall", editor.towerHeight), value: $editor.towerHeight, in: 1...12, step: 0.5)
+                        .fixedSize()
+                        .help("How tall a new tower is")
+                }
                 Menu {
                     SwiftUI.Section("Box truss (quatro, 30 cm)") {
                         ForEach([1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0], id: \.self) { l in
@@ -166,7 +184,7 @@ struct RigEditorView: View {
     }
 }
 
-/// The rig's name: switch to another rig, make a new one, duplicate, rename, delete.
+/// The rig's name: make a new one, duplicate, rename, delete (switching rigs is the list on the Rigs page).
 private struct RigMenu: View {
     @Environment(AppModel.self) private var model
     let editor: RigEditorModel
@@ -176,39 +194,34 @@ private struct RigMenu: View {
 
     var body: some View {
         Menu {
-            Picker("Rig", selection: Binding(get: { model.selectedRig }, set: { model.choose(rig: $0) })) {
-                ForEach(model.rigs) { r in Text("\(r.name) — \(r.summary)").tag(r.name) }
-            }
-            .pickerStyle(.inline)
-            Divider()
             Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
             Button("Duplicate", systemImage: "plus.square.on.square") {
-                let r = model.selectedRig
+                let r = model.editingRig
                 run { try await model.api.createRig(name: unique(r + "-copy"), copyOf: r) }
             }
-            Button("Rename…", systemImage: "pencil") { renaming = model.selectedRig }
+            Button("Rename…", systemImage: "pencil") { renaming = model.editingRig }
             Button("Show in Finder", systemImage: "folder") {
-                if let url = model.workspace?.rigURL(model.selectedRig) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                if let url = model.workspace?.rigURL(model.editingRig) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             }
             Divider()
             Button("Delete…", systemImage: "trash", role: .destructive) { confirmDelete = true }
                 .disabled(model.rigs.count <= 1)
         } label: {
-            Label(editor.isDirty ? "\(model.selectedRig) •" : model.selectedRig, systemImage: "building.2")
+            Label(editor.isDirty ? "\(model.editingRig) •" : model.editingRig, systemImage: "building.2")
         }
         .buttonStyle(.glass)
         .disabled(model.engineRunning)
-        .help("The rig: switch, make a new one, rename… (unsaved changes are kept until you switch)")
+        .help("The rig: a new one, duplicate, rename, delete")
         .alert("Rename the Rig", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: Binding(get: { renaming ?? "" }, set: { renaming = $0 }))
             Button("Rename") {
-                let old = model.selectedRig, new = renaming ?? old
-                run { try await model.api.renameRig(old, to: new); await MainActor.run { model.selectedRig = new.lowercased() } }
+                let old = model.editingRig, new = renaming ?? old
+                run { try await model.api.renameRig(old, to: new); await MainActor.run { model.editingRig = new.lowercased() } }
             }
             Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog("Delete the rig “\(model.selectedRig)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) { let r = model.selectedRig; run { try await model.api.deleteRig(r) } }
+        .confirmationDialog("Delete the rig “\(model.editingRig)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { let r = model.editingRig; run { try await model.api.deleteRig(r) } }
         } message: {
             Text("Its trusses, zones and where every set hung on it are removed. Your sets (the fixtures) stay.")
         }

@@ -98,12 +98,27 @@ struct Scenery {
         // trusses: the set's own (rig editor), else: hanging fixtures at the same depth and height share one bar
         let truss: SIMD3<Float> = [0.16, 0.17, 0.2]
         let pick: SIMD3<Float> = [0.25, 0.55, 1.0]
+        let lit: SIMD3<Float> = [0.35, 0.45, 0.6]  // under the pointer: what a click would pick
         for t in trusses {
             let sel = selected.contains("truss:\(t.id)")
+            let hov = selected.contains("hover:truss:\(t.id)")
+            let handle: SIMD3<Float> = [0.85, 0.95, 1.0]
             if t.vertical {
-                trussTower(Float(t.xM), Float(t.yM), Float(t.zM + t.lengthM / 2), color: sel ? pick : truss, emissive: sel ? 0.6 : 0)
+                trussTower(Float(t.xM), Float(t.yM), Float(t.zM + t.lengthM / 2), color: sel ? pick : hov ? lit : truss,
+                           emissive: sel ? 0.6 : hov ? 0.3 : 0)
+                if sel {  // the handle on top: drag it to make the tower taller or shorter
+                    let x = Float(t.xM), y = Float(t.yM), z = Float(t.zM + t.lengthM / 2) + 0.2
+                    box(x - 0.13, x + 0.13, y - 0.13, y + 0.13, z - 0.13, z + 0.13, handle, emissive: 1.5)
+                }
             } else {
-                trussBeam(t, color: sel ? pick : truss, emissive: sel ? 0.6 : 0)
+                trussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
+                if sel {  // the end handles: drag one to stretch or turn the truss
+                    let r = Float(t.rotDeg) * .pi / 180, ax = SIMD3<Float>(cos(r), sin(r), 0)
+                    for e: Float in [-1, 1] {
+                        let p = SIMD3<Float>(Float(t.xM), Float(t.yM), Float(t.zM)) + ax * (Float(t.lengthM) / 2 * e)
+                        box(p.x - 0.13, p.x + 0.13, p.y - 0.13, p.y + 0.13, p.z - 0.13, p.z + 0.13, handle, emissive: 1.5)
+                    }
+                }
             }
         }
         var rows: [SIMD2<Int>: [FixtureInfo]] = [:]
@@ -119,21 +134,7 @@ struct Scenery {
                 }
             }
         }
-        // towers / stands for standing fixtures
-        var poles: [SIMD2<Int>: Float] = [:]
-        for f in fixtures where f.mount != "hang" && f.pos.z > 0.4 && trusses.isEmpty {
-            let k = SIMD2(Int((f.pos.x * 4).rounded()), Int((f.pos.y * 4).rounded()))
-            poles[k] = max(poles[k] ?? 0, Float(f.pos.z))
-        }
-        for (k, h) in poles {
-            let x = Float(k.x) / 4, y = Float(k.y) / 4
-            if h > 1.6 {
-                trussTower(x, y, h)
-            } else {
-                box(x - 0.025, x + 0.025, y - 0.025, y + 0.025, 0, h - 0.12, truss)
-                box(x - 0.25, x + 0.25, y - 0.25, y + 0.25, 0, 0.02, truss)
-            }
-        }
+        // (a fixture standing in the air has its own stand: part of the fixture, see FixtureModels)
 
         // the fixtures: what never moves now, the moving parts and lenses every frame (FixtureModels)
         var mb = MeshBuilder()

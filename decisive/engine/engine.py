@@ -100,6 +100,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
         self.head_pos = [np.array(geometry.position(rig, e, fixtures[e["fixture"]])) for e in self.heads]
         self.zones = zones.Zones(rig)  # where beams may (not) go: drawn in the rig editor
         self.head_fx = [(fixtures[e["fixture"]], fxlib.get(fixtures[e["fixture"]]["fixture"])) for e in self.heads]
+        self._init_high_risk(rig, fixtures)
         self._init_groups(rig)
         self._init_lasers(rig, fixtures)
         # synth/melody notes for the lasers to play: from the separated synth instrument when available
@@ -228,6 +229,19 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
                 s.r, s.g, s.b = accent
         return states
 
+    def _init_high_risk(self, rig: dict, fixtures: dict):
+        """Risk group 2 and 3 fixtures (fixtures.high_risk) stay dark when the DMX goes to real lights: this is
+        alpha software, not for a powerful rig in front of an audience. The visualiser still shows them."""
+        risky = sorted({f["id"] for f in fixtures.values() if fxlib.high_risk(fxlib.get(f["fixture"]))})
+        self.dark_high_risk = [e["id"] for e in rig["elements"] if e["fixture"] in risky] if self.real_output else []
+        if self.dark_high_risk:
+            notes = self.__dict__.setdefault("guard_notes", {})
+            for eid in self.dark_high_risk:
+                notes[eid] = "dark: risk group 2/3 fixture (not driven by this alpha version)"
+            print(
+                f"  ⚠ {', '.join(risky)}: risk group 2/3, stays dark with real lights in this alpha version", flush=True
+            )
+
     def _finish(self, states: dict[str, State], t: float) -> dict[str, State]:
         """What every look gets last: the heads' real and target positions, dark while crossing the eye band,
         colours the wheels can make, and the laser guard."""
@@ -249,6 +263,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
             fx, defn = self.head_fx[j]
             if geometry.in_eye_band(geometry.fk(fx, defn, s.pan, s.tilt), self.head_pos[j][2], self.stage):
                 s.dimmer, s.white = 0.0, 0.0
+        for eid in self.dark_high_risk:  # risk group 2/3 with real lights: dark (alpha software)
+            states[eid].dimmer, states[eid].white = 0.0, 0.0
         for eid, defn in self.wheels.items():  # show only colours the wheel can actually make
             s = states[eid]
             # A mechanical wheel can't follow 70 ms white flashes: those become a dimmer bump instead.

@@ -188,6 +188,32 @@ public struct SetupAPI: Sendable {
         let _: [String: JSONValue] = try await post("api/rigs", ["active": name])
     }
 
+    /// Puts a set on a rig: a combination the show can run (`auto`: auto-mount its fixtures).
+    public func placeSet(_ set: String, on rig: String, auto: Bool) async throws {
+        let _: [String: JSONValue] = try await post("api/rigs", ["rig": rig, "place": set, "auto": auto], timeout: 120)
+    }
+
+    /// Takes a set off a rig (its placements there are forgotten).
+    public func unplaceSet(_ set: String, from rig: String) async throws {
+        let _: [String: JSONValue] = try await post("api/rigs", ["rig": rig, "unplace": set])
+    }
+
+    /// Renames a fixture of a set, and where it hangs on every rig.
+    public func renameFixture(_ old: String, to new: String, in set: String) async throws {
+        let _: [String: JSONValue] = try await post("api/fixture/rename", ["set": set, "from": old, "to": new])
+    }
+
+    /// Saves a set alone (its fixtures, patch, output): no rig is touched.
+    public func saveSet(_ layout: [String: Any], set: String) async throws {
+        let r: SaveResult = try await post("api/rig", layout, query: ["set": set, "setonly": "1"])
+        if r.saved == false { throw SetupAPIError.server((r.problems ?? []).joined(separator: "\n")) }
+    }
+
+    /// Saves a rig's structure alone (stage, trusses, zones, LED wall), no set placed on it.
+    public func saveRigStructure(_ layout: [String: Any], rig: String) async throws {
+        let _: SaveResult = try await post("api/rig", layout, query: ["rig": rig, "structure": "1"])
+    }
+
     public func deleteRig(_ name: String) async throws {
         let _: [String: JSONValue] = try await post("api/rigs", ["delete": name])
     }
@@ -227,13 +253,15 @@ public struct SetupAPI: Sendable {
         let _: [String: JSONValue] = try await post("api/automount", body, query: pair(rig, set))
     }
 
-    /// Auto-mount on an unsaved layout (a combined set-on-rig dict): only the placements come back.
-    public func automountPlacements(layout: [String: Any], ids: [String]?, all: Bool) async throws -> [String: [String: JSONValue]] {
-        struct R: Decodable { var placements: [String: [String: JSONValue]] }
+    /// Auto-mount on an unsaved layout (a combined set-on-rig dict): the placements come back, and for a rig
+    /// that had no trusses the structure it got (read from where its fixtures hang, or a standard one).
+    public func automountPlacements(layout: [String: Any], ids: [String]?, all: Bool) async throws
+        -> (placements: [String: [String: JSONValue]], trusses: [Truss]?) {
+        struct R: Decodable { var placements: [String: [String: JSONValue]]; var trusses: [Truss]? }
         var body: [String: Any] = ["rig": layout, "all": all]
         if let ids { body["ids"] = ids }
         let r: R = try await post("api/automount", body)
-        return r.placements
+        return (r.placements, r.trusses)
     }
 
     /// Free start addresses for `count` fixtures of a mode: tightly packed, or on easy-to-dial numbers.
@@ -253,5 +281,75 @@ public struct SetupAPI: Sendable {
     public func identify(fixture: String, rig rigName: String? = nil, set: String? = nil) async throws {
         let rig = try await rig(rig: rigName, set: set)
         let _: [String: JSONValue] = try await post("api/identify", ["fixture": fixture, "rig": rig])
+    }
+}
+
+// MARK: - DMX devices (config/devices.json): the controllers, apart from the sets
+
+/// A DMX device you have: an Art-Net node, an sACN node or a USB interface. A set maps its universes onto them.
+public struct DMXDevice: Codable, Sendable, Identifiable, Hashable {
+    public var id: String
+    public var name: String
+    public var type: String            // artnet | sacn | enttec_pro
+    public var ip: String?             // Art-Net: the node; sACN: unicast to it (nil: multicast)
+    public var udpPort: Int?           // Art-Net (default 6454)
+    public var priority: Int?          // sACN
+    public var firstUniverse: Int?     // the protocol universe of its first output (Art-Net usually 0, sACN 1)
+    public var outputs: Int?           // how many DMX outputs it has
+    public var port: String?           // USB: the device path, or "auto"
+    public var serial: String?         // USB: the widget's serial (to recognise it)
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, type, ip, udpPort = "udp_port", priority, firstUniverse = "first_universe", outputs, port, serial
+    }
+
+    public init(id: String, name: String, type: String) { self.id = id; self.name = name; self.type = type }
+
+    public var kindText: String {
+        switch type {
+        case "sacn": "sACN"
+        case "enttec_pro": "USB"
+        default: "Art-Net"
+        }
+    }
+
+    public var addressText: String {
+        switch type {
+        case "sacn": ip ?? "multicast"
+        case "enttec_pro": port.map { $0 == "auto" ? "first one found" : ($0 as NSString).lastPathComponent } ?? "auto"
+        default: ip ?? "–"
+        }
+    }
+
+    /// How many outputs to offer (a USB interface has one).
+    public var outputCount: Int { type == "enttec_pro" ? 1 : max(1, outputs ?? 4) }
+
+    /// JSON for the setup API (nil fields left out).
+    public var json: [String: Any] {
+        var o: [String: Any] = ["id": id, "name": name, "type": type]
+        if let ip, !ip.isEmpty { o["ip"] = ip }
+        if let udpPort { o["udp_port"] = udpPort }
+        if let priority { o["priority"] = priority }
+        if let firstUniverse { o["first_universe"] = firstUniverse }
+        if let outputs { o["outputs"] = outputs }
+        if let port { o["port"] = port }
+        if let serial, !serial.isEmpty { o["serial"] = serial }
+        return o
+    }
+}
+
+extension SetupAPI {
+    /// Your DMX devices, and the USB DMX interfaces plugged in now.
+    public func dmxDevices() async throws -> (devices: [DMXDevice], usb: [USBInterface]) {
+        struct R: Decodable { var devices: [DMXDevice]; var usb: [USBInterface] }
+        let r: R = try await get("api/devices")
+        return (r.devices, r.usb)
+    }
+
+    /// Saves your DMX devices; returns the problems (nothing saved if any).
+    public func saveDMXDevices(_ devices: [DMXDevice]) async throws -> [String] {
+        struct R: Decodable { var ok: Bool; var problems: [String] }
+        let r: R = try await post("api/devices", ["devices": devices.map(\.json)])
+        return r.problems
     }
 }

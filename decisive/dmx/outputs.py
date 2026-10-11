@@ -9,6 +9,7 @@ A set chooses its output with an optional "output" block (without one it uses it
 before):
 
     "output": {"type": "artnet"}                                          the "artnet" block's node
+    "output": {"type": "artnet", "ip": "2.0.0.10", "universe_offset": -1} universe 1 → Art-Net universe 0
     "output": {"type": "sacn"}                                            multicast, universe = rig universe
     "output": {"type": "sacn", "ip": "2.0.0.10", "priority": 100}         unicast to one node
     "output": {"type": "enttec_pro", "port": "auto", "universe": 1}       first USB widget found
@@ -68,14 +69,20 @@ class Output:
 
 
 class ArtNetOutput(Output):
-    def __init__(self, ip: str, port: int = 6454, **kw):
+    """`universe_offset`: the set's universe 1 goes out as Art-Net universe 1 + offset (-1: as universe 0, the
+    first output of most nodes)."""
+
+    def __init__(self, ip: str, port: int = 6454, universe_offset: int = 0, universe_map: dict | None = None, **kw):
         super().__init__(**kw)
         self.sender = ArtNetSender(ip, port, owner=True)  # the hold is checked here, in Output
-        self.ip, self.port = ip, port
+        self.ip, self.port, self.offset = ip, port, universe_offset
+        self.map = {int(k): int(v) for k, v in (universe_map or {}).items()}  # set universe → Art-Net universe
 
     def _send(self, universes):
-        if universes:
-            self.sender.send(universes)
+        out = {self.map.get(u, u + self.offset): d for u, d in universes.items()}
+        out = {u: d for u, d in out.items() if u >= 0}
+        if out:
+            self.sender.send(out)
 
     def describe(self):
         return f"Art-Net → {self.ip}:{self.port}"
@@ -92,10 +99,12 @@ class SacnOutput(Output):
         priority: int = 100,
         name: str = "Decisive Lightning",
         universe_offset: int = 0,
+        universe_map: dict | None = None,
         **kw,
     ):
         super().__init__(**kw)
         self.ip, self.priority, self.offset = ip, max(0, min(200, priority)), universe_offset
+        self.map = {int(k): int(v) for k, v in (universe_map or {}).items()}  # set universe → sACN universe
         self.cid = uuid.uuid5(uuid.NAMESPACE_DNS, f"decisive-lightning.{socket.gethostname()}").bytes
         self.name = name.encode()[:63].ljust(64, b"\x00")
         self.seq: dict[int, int] = {}
@@ -128,7 +137,7 @@ class SacnOutput(Output):
 
     def _send(self, universes, terminated=False):
         for uni, data in universes.items():
-            u = uni + self.offset
+            u = self.map.get(uni, uni + self.offset)
             if 1 <= u <= 63999:
                 self.sock.sendto(self.packet(u, data, terminated), self._addr(u))
                 self.sent.add(uni)
@@ -225,8 +234,7 @@ def drives_real_lights(sender: Output | None, rig: dict) -> bool:
 def open_output(rig: dict, ip: str | None = None, owner: bool = False) -> Output:
     """The output a set asks for. `ip`: a node address given on the command line (`--artnet IP`), which
     replaces the network output's address."""
-    spec = rig.get("output") or {"type": "artnet"}
-    specs = spec if isinstance(spec, list) else [spec]
+    specs = _specs(rig)
     outs = [_one(s, rig, ip, owner) for s in specs]
     return outs[0] if len(outs) == 1 else MultiOutput(outs)
 
@@ -237,19 +245,42 @@ def _one(s: dict, rig: dict, ip: str | None, owner: bool) -> Output:
     if kind == "artnet":
         art = rig.get("artnet", {})
         return ArtNetOutput(
-            ip or s.get("ip") or art.get("ip", "127.0.0.1"), int(s.get("port") or art.get("port", 6454)), **common
+            ip or s.get("ip") or art.get("ip", "127.0.0.1"),
+            int(s.get("port") or art.get("port", 6454)),
+            universe_offset=int(s.get("universe_offset", 0)),
+            universe_map=s.get("universe_map"),
+            **common,
         )
     if kind == "sacn":
         return SacnOutput(
-            ip or s.get("ip"), int(s.get("priority", 100)), universe_offset=int(s.get("universe_offset", 0)), **common
+            ip or s.get("ip"),
+            int(s.get("priority", 100)),
+            universe_offset=int(s.get("universe_offset", 0)),
+            universe_map=s.get("universe_map"),
+            **common,
         )
     if kind == "enttec_pro":
         return EnttecProOutput(s.get("port", "auto"), int(s.get("universe", 1)), **common)
     raise SystemExit(f"Unknown output type '{kind}' (use one of: {', '.join(TYPES)})")
 
 
+def _specs(rig: dict) -> list[dict]:
+    """The outputs a set uses: from its universes mapped onto your DMX devices (decisive/dmx/devices.py), else
+    its own "output" / "artnet" blocks (as sets always did)."""
+    if "dmx" in rig:
+        from decisive.dmx import devices
+
+        return devices.resolve(rig) or [{"type": "artnet", "ip": "127.0.0.1"}]  # nothing mapped: the visualiser
+    spec = rig.get("output") or {"type": "artnet"}
+    return spec if isinstance(spec, list) else [spec]
+
+
 def describe(rig: dict) -> str:
     """How a set's DMX goes out, in words (without opening anything)."""
+    if "dmx" in rig:
+        from decisive.dmx import devices
+
+        return devices.describe(rig)
     spec = rig.get("output") or {"type": "artnet"}
     parts = []
     for s in spec if isinstance(spec, list) else [spec]:
@@ -327,7 +358,11 @@ def find_enttec() -> str | None:
 
 
 def validate(rig: dict) -> list[str]:
-    """Problems with a set's "output" block (empty: fine)."""
+    """Problems with a set's "output" block, or its "dmx" mapping onto your devices (empty: fine)."""
+    if "dmx" in rig:
+        from decisive.dmx import devices
+
+        return devices.check_mapping(rig)
     spec = rig.get("output")
     if spec is None:
         return []

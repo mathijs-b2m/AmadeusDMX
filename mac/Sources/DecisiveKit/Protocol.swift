@@ -50,8 +50,14 @@ public struct Stage: Codable, Sendable, Equatable {
     public var widthM: Double
     public var ceilingM: Double
     public var roomDepthM: Double
+    /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
+    public var ceilingGuard = true
+    public var backGuard = true
 
-    enum CodingKeys: String, CodingKey { case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m" }
+    enum CodingKeys: String, CodingKey {
+        case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
+        case backGuard = "back_guard"
+    }
 
     public init(widthM: Double = 6, ceilingM: Double = 4.5, roomDepthM: Double = 6) {
         self.widthM = widthM; self.ceilingM = ceilingM; self.roomDepthM = roomDepthM
@@ -62,6 +68,8 @@ public struct Stage: Codable, Sendable, Equatable {
         widthM = try c.decodeIfPresent(Double.self, forKey: .widthM) ?? 6
         ceilingM = try c.decodeIfPresent(Double.self, forKey: .ceilingM) ?? 4.5
         roomDepthM = try c.decodeIfPresent(Double.self, forKey: .roomDepthM) ?? 6
+        ceilingGuard = try c.decodeIfPresent(Bool.self, forKey: .ceilingGuard) ?? true
+        backGuard = try c.decodeIfPresent(Bool.self, forKey: .backGuard) ?? true
     }
 }
 
@@ -93,6 +101,8 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
     public var dir: SIMD3<Double>?
     /// Base → head (moving heads): down when hanging, up on a stand, out of a truss face when side-mounted.
     public var up: SIMD3<Double>?
+    /// The truss it is clamped to (nil: on the floor, or on its own stand).
+    public var truss: String?
 
     public init(id: String, kind: FixtureKind, label: String, pos: SIMD3<Double>, mount: String, beamDeg: Double,
                 beamWide: Double? = nil) {
@@ -102,7 +112,7 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, kind, label, pos, mount, beamDeg = "beam_deg", beamWide = "beam_wide", output, outputWide = "output_wide"
-        case fixture, body, rot, size, cells, length, dir, up
+        case fixture, body, rot, size, cells, length, dir, up, truss
     }
 
     public init(from decoder: Decoder) throws {
@@ -125,6 +135,7 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
         length = try c.decodeIfPresent(Double.self, forKey: .length)
         if let d = try c.decodeIfPresent([Double].self, forKey: .dir), d.count == 3 { dir = SIMD3(d[0], d[1], d[2]) }
         if let u = try c.decodeIfPresent([Double].self, forKey: .up), u.count == 3 { up = SIMD3(u[0], u[1], u[2]) }
+        truss = try c.decodeIfPresent(String.self, forKey: .truss)
     }
 
     public func encode(to encoder: Encoder) throws {

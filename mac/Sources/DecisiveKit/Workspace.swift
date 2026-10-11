@@ -106,8 +106,14 @@ public struct Workspace: Sendable, Equatable {
     /// The set placed on the rig, in the shape the engine reads (decisive/rig/store.py compose): fixtures with
     /// their places on this rig; fixtures without one wait in a row on the floor at the front ("_unplaced").
     public func composed(rig: String, set: String) -> Data? {
-        guard let setData = try? Data(contentsOf: setURL(set)),
-              let setDoc = try? JSONDecoder().decode([String: JSONValue].self, from: setData) else { return nil }
+        let setDoc: [String: JSONValue]
+        if set.isEmpty {  // the rig alone: its structure, no set on it
+            setDoc = ["fixtures": .array([])]
+        } else {
+            guard let setData = try? Data(contentsOf: setURL(set)),
+                  let d = try? JSONDecoder().decode([String: JSONValue].self, from: setData) else { return nil }
+            setDoc = d
+        }
         let rigDoc = (try? Data(contentsOf: rigURL(rig))).flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
         return try? JSONEncoder().encode(RigDocument.compose(set: setDoc, rig: rigDoc, setName: set))
     }
@@ -166,9 +172,31 @@ public struct RigFile: Codable, Sendable {
     public var screen: JSONValue?
     /// Where the DMX goes (decisive/outputs.py): absent = Art-Net to `artnet.ip`.
     public var output: JSONValue?
+    /// The set's universes mapped onto your DMX devices (decisive/dmx/devices.py): set universe → device + output.
+    /// When present it decides the output (the blocks above are the old way).
+    public var dmx: [String: JSONValue]?
+
+    /// The devices the set's universes go to (ids), in universe order.
+    public var mappedDevices: [String] {
+        guard let dmx else { return [] }
+        var out: [String] = []
+        for key in dmx.keys.sorted(by: { (Int($0) ?? 0) < (Int($1) ?? 0) }) {
+            if let d = dmx[key]?.object?["device"]?.string, !out.contains(d) { out.append(d) }
+        }
+        return out
+    }
 
     /// The output in words, like the engine says it.
     public var outputText: String {
+        if dmx != nil {
+            let devs = mappedDevices
+            return devs.isEmpty ? "Visualiser only" : "→ " + devs.joined(separator: ", ")
+        }
+        return legacyOutputText
+    }
+
+    /// The set's own output blocks in words (sets without a device mapping).
+    public var legacyOutputText: String {
         let specs: [[String: JSONValue]] = switch output {
         case .some(.object(let o)): [o]
         case .some(.array(let a)): a.compactMap(\.object)
@@ -184,7 +212,10 @@ public struct RigFile: Codable, Sendable {
     }
 
     /// Only the visualiser: Art-Net to this Mac, no other output.
-    public var isVirtual: Bool { output == nil && (artnet?.ip == nil || artnet?.ip == "127.0.0.1") }
+    public var isVirtual: Bool {
+        if dmx != nil { return mappedDevices.isEmpty }
+        return output == nil && (artnet?.ip == nil || artnet?.ip == "127.0.0.1")
+    }
 
     public var hasScreen: Bool {
         if case .some(.null) = screen { return false }

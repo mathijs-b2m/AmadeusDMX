@@ -18,6 +18,12 @@ struct DecisiveLightningApp: App {
         .defaultSize(width: 1440, height: 900)
         .commands { AppCommands(model: model) }
 
+        Window("DMX Devices & Output", id: "dmx") {
+            DMXWindow()
+                .environment(model)
+        }
+        .defaultSize(width: 900, height: 620)
+
         Window("Set Up a Rig", id: "wizard") {
             WizardView()
                 .environment(model)
@@ -80,6 +86,10 @@ struct AppCommands: Commands {
             Button("Play a Track…") { PlayPanel.choose(model) }
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(model.workspace == nil || model.engineRunning)
+            Divider()
+            Button("DMX Devices & Output…") { openWindow(id: "dmx") }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .disabled(model.workspace == nil)
             Divider()
             Picker("Mode", selection: Binding(get: { model.mode }, set: { model.setMode($0) })) {
                 ForEach(ShowMode.allCases) { m in Label(m.title, systemImage: m.symbol).tag(m) }

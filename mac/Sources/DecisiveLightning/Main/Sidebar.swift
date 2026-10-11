@@ -23,10 +23,6 @@ struct Sidebar: View {
 
     private func badge(_ s: Section) -> Text? {
         if s == .engine, case .failed = model.showState { return Text("!") }
-        if s == .rig {  // fixtures of the set that don't hang on the rig yet
-            let m = model.mounted
-            if m.placed < m.total { return Text("\(m.total - m.placed)") }
-        }
         return nil
     }
 }
@@ -34,6 +30,7 @@ struct Sidebar: View {
 /// The engine at a glance, at the bottom of the sidebar.
 struct EngineFooter: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let state = model.showState
@@ -67,8 +64,12 @@ struct EngineFooter: View {
                 Text("An engine started outside the app is running; the app shows its lights.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if let set = model.currentSet {
-                Text(set.isVirtual || !model.sendArtNet ? "Visualiser only" : set.outputText)
-                    .font(.caption).foregroundStyle(.secondary)
+                Button { openWindow(id: "dmx") } label: {
+                    Label(set.isVirtual || !model.sendArtNet ? "Visualiser only" : set.outputText, systemImage: "cable.connector")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("DMX Devices & Output… (⇧⌘D)")
             }
         }
         .padding(12)

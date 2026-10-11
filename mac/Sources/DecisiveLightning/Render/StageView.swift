@@ -18,12 +18,15 @@ protocol StageEditing: AnyObject {
     func dropHover(origin: SIMD3<Float>, dir: SIMD3<Float>)
     func drop(_ payload: String, origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool
     func dropEnded()
+    /// The pointer moved over the stage (no button down).
+    func hover(origin: SIMD3<Float>, dir: SIMD3<Float>)
 }
 
 extension StageEditing {
     func dropHover(origin: SIMD3<Float>, dir: SIMD3<Float>) {}
     func drop(_ payload: String, origin: SIMD3<Float>, dir: SIMD3<Float>) -> Bool { false }
     func dropEnded() {}
+    func hover(origin: SIMD3<Float>, dir: SIMD3<Float>) {}
 }
 
 final class StageMTKView: MTKView {
@@ -84,7 +87,17 @@ final class StageMTKView: MTKView {
         return editor.drop(text, origin: o, dir: d)
     }
 
-    override func mouseMoved(with e: NSEvent) { renderer?.wake(); super.mouseMoved(with: e) }
+    override func mouseMoved(with e: NSEvent) {
+        renderer?.wake()
+        if let editor, let (o, d) = ray(e) { editor.hover(origin: o, dir: d) }
+        super.mouseMoved(with: e)
+    }
+
+    override func updateTrackingAreas() {  // mouse-moved events (the editor lights what a click would pick)
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self))
+    }
 
     override func mouseDown(with e: NSEvent) {
         renderer?.wake()

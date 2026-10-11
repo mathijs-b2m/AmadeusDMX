@@ -26,6 +26,8 @@ GET  /api/sets               the sets (rigs side by side) and which one is activ
 POST /api/sets               {"active": "name"}: edit / default to that set · {"copy": "from", "name": "new"}
 POST /api/rig/add            {"key", "mode", "addresses", "universe"}: add fixtures to the saved rig
 GET  /api/outputs            DMX outputs: the set's, in words, and the USB DMX interfaces plugged in
+GET  /api/devices            your DMX devices (config/devices.json) and the USB DMX interfaces plugged in
+POST /api/devices            {"devices": [...]}: save them (a set maps its universes onto them: "dmx")
 """
 
 from __future__ import annotations

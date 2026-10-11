@@ -22,8 +22,26 @@ def get_rig(req):
 
 def save_rig(req):
     from decisive.dmx import outputs
+    from decisive.rig import store
 
     rig = req.body()
+    if req.query.get("setonly") and req.query.get("set"):  # the set alone (its fixtures and patch): no rig touched
+        problems = fxlib.validate(rig) + outputs.validate(rig)
+        if not problems:
+            name = store.safe_name(req.query["set"])
+            set_doc, _ = store.split(rig, name, {})
+            store.sets.save(name, set_doc)
+        return {"saved": not problems, "problems": problems}
+    if req.query.get("structure") and req.query.get("rig"):  # the rig alone (no set placed on it)
+        name = store.safe_name(req.query["rig"])
+        doc = store.rigs.load(name)
+        for k in store.RIG_KEYS:
+            if k in rig:
+                doc[k] = rig[k]
+            else:
+                doc.pop(k, None)
+        store.rigs.save(name, doc)
+        return {"saved": True, "problems": []}
     problems = fxlib.validate(rig) + outputs.validate(rig)
     if not problems:
         req.show.save(rig)
@@ -86,6 +104,21 @@ def outputs_info(req):
     }
 
 
+def get_devices(req):
+    """Your DMX devices (config/devices.json), and the USB DMX interfaces plugged in now."""
+    from decisive.dmx import devices, outputs
+
+    return {"devices": devices.load(), "usb": outputs.usb_ports()}
+
+
+def save_devices(req):
+    """{"devices": [...]}: save your DMX devices (nothing saved if there are problems)."""
+    from decisive.dmx import devices
+
+    problems = devices.save(list(req.body().get("devices", [])))
+    return {"ok": not problems, "problems": problems}
+
+
 def list_sets(req):
     """The sets (your gear) and the rigs (venues), which ones are active, and which ones this server is fixed to."""
     from decisive.rig import store, templates
@@ -128,14 +161,57 @@ def change_sets(req):
     return list_sets(req)
 
 
+def rename_fixture(req):
+    """{"set", "from", "to"}: rename a fixture of a set, and where it hangs on every rig."""
+    from decisive.rig import store
+
+    b = req.body()
+    set_name, old, new = store.safe_name(b["set"]), str(b["from"]), str(b["to"]).strip()
+    doc = store.sets.load(set_name)
+    ids = {f["id"] for f in doc.get("fixtures", [])}
+    if not new or not all(c.isalnum() or c in "-_." for c in new):
+        return {"error": "A fixture name may only use letters, digits, - _ ."}, 400
+    if new in ids:
+        return {"error": f"The set already has a fixture called {new}"}, 400
+    for f in doc.get("fixtures", []):
+        if f["id"] == old:
+            f["id"] = new
+    store.sets.save(set_name, doc)
+    for r in store.rigs.names():
+        rig = store.rigs.load(r)
+        places = rig.get("placements", {}).get(set_name, {})
+        if old in places:
+            places[new] = places.pop(old)
+            store.rigs.save(r, rig)
+    event(f"{req.client} set {set_name}: fixture {old} → {new}")
+    return {"ok": True}
+
+
 def change_rigs(req):
     """{"active": name} switches; {"name", "template"|"copy", "width", "height", "depth", "screen"} creates (and
-    switches); {"delete": name} deletes; {"rename": old, "to": new} renames."""
+    switches); {"delete": name} deletes; {"rename": old, "to": new} renames. {"rig", "place": set, "auto": bool}
+    puts a set on a rig (a combination; "auto": auto-mount it), {"rig", "unplace": set} takes it off."""
     from decisive.rig import manage, store
 
     b = req.body()
     if req.fixed:
         return {"error": f"this server was started for {req.fixed.label}"}, 409
+    if b.get("place") and b.get("rig"):
+        rig, set_name = store.safe_name(b["rig"]), store.safe_name(b["place"])
+        doc = store.rigs.load(rig)
+        doc.setdefault("placements", {}).setdefault(set_name, {})
+        store.rigs.save(rig, doc)
+        if b.get("auto"):
+            manage.mount(store.Selection(rig=rig, set=set_name))
+        event(f"{req.client} rig: {set_name} placed on {rig}")
+        return list_sets(req)
+    if b.get("unplace") and b.get("rig"):
+        rig = store.safe_name(b["rig"])
+        doc = store.rigs.load(rig)
+        doc.get("placements", {}).pop(store.safe_name(b["unplace"]), None)
+        store.rigs.save(rig, doc)
+        event(f"{req.client} rig: {b['unplace']} taken off {rig}")
+        return list_sets(req)
     if b.get("delete"):
         store.rigs.delete(store.safe_name(b["delete"]))
         event(f"{req.client} rig: deleted {b['delete']}")
@@ -188,7 +264,9 @@ def automount(req):
         for f in merged.get("fixtures", []):
             if f["id"] in ids:
                 f[store.UNPLACED] = True
-        return {"placements": am.automount(merged, ids)}
+        had = bool(merged.get("trusses"))
+        places = am.automount(merged, ids)
+        return {"placements": places, "trusses": None if had else merged.get("trusses", [])}
     show = req.show
     places = manage.mount(show, b.get("ids"), everything=bool(b.get("all")))
     event(f"{req.client} automount: {len(places)} fixtures of {show.label}")
@@ -267,6 +345,7 @@ GET = {
     "/api/rig": get_rig,
     "/api/directors": directors,
     "/api/outputs": outputs_info,
+    "/api/devices": get_devices,
     "/api/sets": list_sets,
     "/api/rigs": list_sets,
 }
@@ -280,4 +359,6 @@ POST = {
     "/api/discover": discover,
     "/api/identify": identify,
     "/api/log": page_log,
+    "/api/devices": save_devices,
+    "/api/fixture/rename": rename_fixture,
 }

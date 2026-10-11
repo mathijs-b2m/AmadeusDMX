@@ -26,3 +26,23 @@ def test_ik_inverts_fk(head, rot, roll):
         phi, theta = geometry.ik(fx, defn, d, None)
         back = geometry.fk(fx, defn, *geometry.to_dmx(fx, defn, phi, theta))
         assert np.allclose(back, d, atol=1e-6)
+
+
+def test_beams_stay_off_the_ceiling_and_never_shine_back_at_the_dj():
+    import numpy as np
+
+    from decisive.rig import geometry as g
+
+    room = {**g.DEFAULT_STAGE, "ceiling_m": 2.6, "room_depth_m": 4.0}
+    up, back, back_down, crowd = (
+        g.direction(0, 60),
+        g.direction(170, -20),
+        g.direction(180, -70),
+        g.direction(30, -30),
+    )
+    out = g.room_safe_v(np.array([up, back, back_down, crowd]), (0, -1, 2.2), room)
+    assert np.degrees(np.arcsin(out[0, 2])) < 3  # a living room: about level, not onto the ceiling
+    assert out[1, 1] >= -g.BACK_Y - 1e-9  # not back at the DJ
+    assert np.allclose(out[2], back_down) and np.allclose(out[3], crowd)  # steeply down, and onto the crowd: fine
+    free = {**room, "ceiling_guard": False, "back_guard": False}
+    assert np.allclose(g.room_safe_v(np.array([up, back]), (0, -1, 2.2), free), [up, back])  # switched off
