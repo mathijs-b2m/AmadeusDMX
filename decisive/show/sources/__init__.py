@@ -35,6 +35,13 @@ SOURCES: dict[str, Entry] = {
         "exact",
         "VirtualDJ 8.5 (macOS), live on a real rig",
     ),
+    "mixxx": Entry(
+        "decisive.show.sources.mixxx",
+        "Mixxx",
+        "Mixxx: its controller scripting, over a virtual MIDI device (needs python-rtmidi); opts port, library",
+        "exact",
+        "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Decisive Link p95 10 ms, max 13 ms",
+    ),
     "replay": Entry(
         "decisive.show.sources.replay",
         "Replay",
