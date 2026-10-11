@@ -73,6 +73,9 @@ goes (the set), the **rig** (a new one from a template, or one you have), and ho
   two stands, a truss over the booth, a club, a concert stage), sized with sliders.
 - **Show:** the toolbar picker lists the **combinations**: the sets placed on rigs. A show runs one of those;
   there is no picking a set and a rig that were never put together.
+- **Decision model:** next to it, **Rules** or **AI** says who decides the show: the rules (instant, offline) or an
+  AI model (OpenAI, or a local one through Ollama). It belongs to the set, and a running live show follows a
+  change: the rules' quick plan plays until the AI's plan is ready.
 
 ## Rig editor (the Rigs page)
 

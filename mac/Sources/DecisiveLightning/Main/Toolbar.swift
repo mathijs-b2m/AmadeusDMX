@@ -74,6 +74,63 @@ struct StatusPill: View {
     }
 }
 
+/// Who decides the show: the rules (instant, offline) or an AI model. It belongs to the set; a running live
+/// show follows a change (the rules' plan plays until the AI's plan is ready).
+struct DirectorMenu: View {
+    @Environment(AppModel.self) private var model
+    @State private var options: [DirectorOption] = []
+    @State private var current = ""
+    @State private var problem: String?
+
+    var body: some View {
+        Menu {
+            Picker("Decision Model", selection: Binding(get: { current }, set: { choose($0) })) {
+                ForEach(options) { d in
+                    Text(d.available ? d.label : "\(d.label) (\(d.note ?? "not available"))").tag(d.value)
+                        .selectionDisabled(!d.available)
+                }
+            }
+            .pickerStyle(.inline)
+            if let problem { Text(problem) }
+        } label: {
+            Label(short, systemImage: current == "rules" || current.isEmpty ? "list.bullet.rectangle" : "sparkles")
+                .labelStyle(.titleAndIcon)
+        }
+        .disabled(model.selectedSet.isEmpty)
+        .help("Decision model of this set: \(options.first { $0.value == current }?.label ?? current)")
+        .task(id: "\(model.selectedRig)|\(model.selectedSet)") { await load() }
+    }
+
+    private var short: String {
+        switch current {
+        case "", "rules": "Rules"
+        case let d where d.hasPrefix("ollama:"): "AI · " + d.dropFirst(7)
+        default: "AI"
+        }
+    }
+
+    private func load() async {
+        guard !model.selectedSet.isEmpty, await model.ensureSetupService() else { return }
+        options = (try? await model.api.directors()) ?? []
+        let raw = try? await model.api.rig(rig: model.selectedRig, set: model.selectedSet)
+        current = raw?["director"] as? String ?? "rules"
+    }
+
+    private func choose(_ value: String) {
+        let before = current
+        current = value
+        Task {
+            do {
+                try await model.api.setDirector(value, rig: model.selectedRig, set: model.selectedSet)
+                problem = nil
+            } catch {
+                current = before
+                problem = "Couldn't switch: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
 struct ModeMenu: View {
     @Environment(AppModel.self) private var model
 

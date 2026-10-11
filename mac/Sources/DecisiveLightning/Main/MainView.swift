@@ -74,6 +74,9 @@ struct MainView: View {
             ToolbarItem(placement: .navigation) {
                 SetMenu()
             }
+            ToolbarItem(placement: .navigation) {
+                DirectorMenu()
+            }
         }
         ToolbarItem(placement: .principal) {
             StatusPill()
