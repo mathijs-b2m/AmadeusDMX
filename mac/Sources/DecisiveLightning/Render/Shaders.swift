@@ -227,7 +227,11 @@ fragment float4 composite_fragment(FSOut in [[stage_in]], texture2d<float> hdr [
                                    constant Uniforms &u [[buffer(1)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
     float3 c = clean(hdr.sample(smp, in.uv).rgb);
-    c += clean(bloomA.sample(smp, in.uv).rgb) * 0.55 + clean(bloomB.sample(smp, in.uv).rgb) * 0.45;
+    // bloom only from what is really bright (a soft knee), so lenses glow without hiding the rig in halos
+    float3 ba = clean(bloomA.sample(smp, in.uv).rgb), bb = clean(bloomB.sample(smp, in.uv).rgb);
+    ba *= saturate((max(ba.r, max(ba.g, ba.b)) - 0.35) / 1.2);
+    bb *= saturate((max(bb.r, max(bb.g, bb.b)) - 0.35) / 1.2);
+    c += ba * 0.45 + bb * 0.3;
     c *= u.params.z;
     // a soft vignette, like a camera
     float2 q = in.uv - 0.5;

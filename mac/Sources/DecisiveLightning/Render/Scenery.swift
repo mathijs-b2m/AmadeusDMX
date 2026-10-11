@@ -1,5 +1,5 @@
 // The solid part of the scene, built once per rig: floor, back wall, stage deck, DJ riser + booth + DJ,
-// trusses and towers the fixtures hang on, the fixtures' bodies and the LED wall's frame.
+// trusses and towers the fixtures hang on, the fixtures' fixed parts and the LED wall's frame.
 import DecisiveKit
 import Foundation
 import simd
@@ -29,9 +29,11 @@ struct Scenery {
     var big: Bool
     var top: Float
     var djHead: SIMD3<Float> = .zero
+    var models: FixtureModels
 
     init(fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss] = [], selected: Set<String> = []) {
         room = Room(stage: stage, fixtures: fixtures)
+        models = FixtureModels(fixtures: fixtures, selected: selected)
         let W = room.width, cx = W / 2
         let heads = fixtures.filter { $0.kind == .head }.count
         big = W >= 6 || heads >= 8
@@ -133,51 +135,10 @@ struct Scenery {
             }
         }
 
-        // fixture bodies: one housing per fixture (a bar's cells share theirs), turned with the fixture
-        var groups: [String: [FixtureInfo]] = [:], order: [String] = []
-        for f in fixtures {
-            let k = f.fixture ?? f.id
-            if groups[k] == nil { order.append(k) }
-            groups[k, default: []].append(f)
-        }
-        for k in order {
-            let cells = groups[k]!, f = cells[0]
-            let c = cells.reduce(SIMD3<Double>.zero) { $0 + $1.pos } / Double(cells.count)
-            let p = SIMD3<Float>(Float(c.x), Float(c.y), Float(c.z))
-            let sel = selected.contains("fixture:\(k)")
-            let col: SIMD3<Float> = sel ? pick : [0.09, 0.095, 0.11]
-            let em: Float = sel ? 0.7 : 0
-            let rot = Float(f.rot)
-            let size = f.size.map { SIMD3<Float>(Float($0[0]), Float($0[1]), Float($0[2])) }
-            let up: Float = f.mount == "hang" ? 1 : -1
-            switch f.body ?? (f.kind == .head ? "moving_head" : f.kind.rawValue) {
-            case "moving_bar", "par_bar":
-                let L = Float(f.length ?? Double(size?.x ?? 1)), d = min(0.3, size?.z ?? 0.1), h = min(0.3, size?.y ?? 0.12)
-                rotatedBox(p, [L, d, h], rot, col, emissive: em)
-                if f.body == "moving_bar" {  // the yoke ends that carry the tilting bar
-                    for e: Float in [-1, 1] {
-                        let q = p + SIMD3(cos(rot * .pi / 180) * (L / 2 + 0.04) * e, sin(rot * .pi / 180) * (L / 2 + 0.04) * e, 0)
-                        rotatedBox(q + [0, 0, up * h * 0.6], [0.06, d * 1.3, h * 1.6], rot, col * 0.9, emissive: em)
-                    }
-                }
-            case "moving_head":
-                // base → head: down when hanging, up on a stand, out of the face when on a truss's side
-                let u = f.up.map { simd_normalize(SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z))) }
-                    ?? SIMD3<Float>(0, 0, up > 0 ? -1 : 1)
-                let r = rot * .pi / 180, ex = SIMD3<Float>(cos(r), sin(r), 0)
-                orientedBox(p - u * 0.14, ex, u, [0.3, 0.22, 0.1], col, emissive: em)            // base
-                orientedBox(p - u * 0.06, ex, u, [0.32, 0.08, 0.12], col * 0.9, emissive: em)   // yoke
-                orientedBox(p, ex, u, [0.2, 0.2, 0.2], col * 0.8, emissive: em)                  // head
-            case "strobe":
-                rotatedBox(p, [Float(size?.x ?? 0.42), 0.16, Float(size?.y ?? 0.24)], rot, col, emissive: em)
-            case "laser":
-                rotatedBox(p, [0.24, 0.18, 0.12], rot, col * 0.7, emissive: em)
-            case "blinder":
-                rotatedBox(p, [0.4, 0.12, 0.22], rot, col * 0.7, emissive: em)
-            default:
-                rotatedBox(p + [0, 0, -0.03], [0.2, 0.2, 0.17], rot, col, emissive: em)
-            }
-        }
+        // the fixtures: what never moves now, the moving parts and lenses every frame (FixtureModels)
+        var mb = MeshBuilder()
+        models.addStatic(into: &mb)
+        vertices += mb.v
     }
 
     // MARK: building blocks

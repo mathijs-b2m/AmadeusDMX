@@ -41,13 +41,7 @@ extension StageRenderer {
             if highlight.contains(fx.id) { dim = max(dim, 0.9); col = [1, 1, 1] }
             let cm = max(col.max(), 1)
             col /= cm
-            if dim <= 0.01 {
-                // a dark fixture: just a faint lens so the rig stays readable
-                sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.12 + 0.1 * workLight),
-                                              color: SIMD4(0.12 + 0.5 * workLight, 0.13 + 0.55 * workLight, 0.16 + 0.6 * workLight,
-                                                           0.25 + 0.5 * workLight), extra: .zero))
-                continue
-            }
+            if dim <= 0.01 { continue }   // a dark fixture: its model shows it (dark glass in the lens)
             lightSum += col * dim
 
             switch fx.kind {
@@ -72,15 +66,16 @@ extension StageRenderer {
                 var a = (frost ? dim * 0.45 : rays.count > 1 ? dim * 0.6 : dim) * density * strength * 0.75
                 if highlight.contains(fx.id) { a = 2.5 }
                 for r in rays { beam(p, r, spreadDeg: spread, color: col, intensity: a) }
-                // the lens: a flare when the head points at the viewer (audience scanning)
+                // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
+                // smaller for the cells of a bar (many small lenses, not one big one)
                 let toEye = simd_normalize(eye - p)
-                let facing = max(0, simd_dot(d, toEye))
-                let flare = 1 + 5 * pow(facing, 8)
-                let camDist = simd_length(eye - p)
-                // a head aimed at the camera glares, but never fills the picture: size capped to its distance
-                let size = min(0.18 * flare, max(0.12, camDist * 0.045))
-                sprites.append(SpriteInstance(centerSize: SIMD4(p, size), color: SIMD4(col, min(3.0, dim * (0.9 + flare))),
-                                              extra: [facing > 0.9 ? 1 : 0.3, 0, 0, 0]))
+                let glare = pow(max(0, simd_dot(d, toEye)), 8)
+                if glare > 0.05 {
+                    let cellK = 1 / Float(max(1, fx.cells ?? 1)).squareRoot()
+                    let size = min(0.08 + 0.3 * glare, max(0.1, simd_length(eye - p) * 0.035)) * cellK
+                    sprites.append(SpriteInstance(centerSize: SIMD4(p, size), color: SIMD4(col, min(2.0, dim * glare * 2) * cellK),
+                                                  extra: [glare > 0.6 ? 1 : 0.3, 0, 0, 0]))
+                }
             case .laser:
                 guard let beamsLZ = frame.flatMap({ i < $0.lz.count ? $0.lz[i] : nil }), !beamsLZ.isEmpty else {
                     if highlight.contains(fx.id) {
@@ -109,16 +104,14 @@ extension StageRenderer {
             case .blinder:
                 let bd = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 1, 0.12)
                 beam(p, simd_normalize(bd), spreadDeg: 70, color: col, intensity: dim * 0.5, maxLen: 5, spot: false)
-                for off: Float in [-0.09, 0.09] {
-                    sprites.append(SpriteInstance(centerSize: SIMD4(p + SIMD3(off, 0.05, 0), 0.22 * (1 + 2.5 * dim)),
-                                                  color: SIMD4(simd_mix(col, [1, 0.95, 0.85], SIMD3(repeating: 0.5)), dim * 3),
-                                                  extra: [1, 0, 0, 0]))
-                }
+                sprites.append(SpriteInstance(centerSize: SIMD4(p + simd_normalize(bd) * 0.02, 0.18 * (1 + dim)),
+                                              color: SIMD4(simd_mix(col, [1, 0.95, 0.85], SIMD3(repeating: 0.5)), dim * 0.9),
+                                              extra: [0.3, 0, 0, 0]))
             case .strobe:
                 // one blinding white flash from the face, flooding the room for a moment
                 let sd = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 1, 0.14)
                 beam(p, simd_normalize(sd), spreadDeg: 100, color: [1, 1, 1], intensity: dim * 0.9, maxLen: 8)
-                sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.5 * (1 + 3 * dim)), color: SIMD4(0.9, 0.95, 1, dim * 6),
+                sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.35 * (1 + 1.5 * dim)), color: SIMD4(0.9, 0.95, 1, dim * 3),
                                               extra: [1, 0, 0, 0]))
                 lightSum += SIMD3(repeating: dim * 8)   // the whole room lights up
             case .par, .other:
@@ -127,8 +120,9 @@ extension StageRenderer {
                 let pd = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 0.18, 1)
                 beam(p, simd_normalize(pd), spreadDeg: min(Float(fx.beamDeg), 40), color: col, intensity: dim * 0.8 * cellK,
                      maxLen: 3.5)
-                sprites.append(SpriteInstance(centerSize: SIMD4(p, (fx.cells ?? 1) > 1 ? 0.12 : 0.35),
-                                              color: SIMD4(col, dim * 0.8 * (cellK * 2).squareRoot()), extra: .zero))
+                if (fx.cells ?? 1) <= 1 {   // a bar's cells glow in its model; a single par gets a soft halo
+                    sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.16), color: SIMD4(col, dim * 0.35), extra: .zero))
+                }
             }
         }
         ambient = lightSum / Float(max(1, inp.fixtures.count)) * 0.8

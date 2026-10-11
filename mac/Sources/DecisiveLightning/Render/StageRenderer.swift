@@ -220,6 +220,16 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 enc.setVertexBuffer(sb, offset: 0, index: 0)
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: sceneryCount)
             }
+            // the fixtures' moving parts and lenses: where the beams point, in the colours they play
+            if let s = scenery, let inp {
+                let parts = s.models.dynamic(fixtures: inp.fixtures, frame: frame, highlight: highlight)
+                if !parts.isEmpty, let buf = device.makeBuffer(bytes: parts, length: parts.count * MemoryLayout<SolidVertex>.stride) {
+                    enc.setRenderPipelineState(solidPipe)
+                    enc.setDepthStencilState(solidDepth)
+                    enc.setVertexBuffer(buf, offset: 0, index: 0)
+                    enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: parts.count)
+                }
+            }
             if let wb = wallBuffer {
                 enc.setRenderPipelineState(wallPipe)
                 enc.setDepthStencilState(solidDepth)
