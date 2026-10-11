@@ -106,5 +106,10 @@ be). `--emit 127.0.0.1:9123` passes it on as the DecisiveLink plugin's packets (
 laptop the Decisive Link app (section 3) carries any DJ software to the lighting computer unchanged.
 `--record FILE` keeps the readings for `--source replay --opt file=FILE`.
 
+A deck of DJ software synced to Ableton Link also carries `phase` (its beat phase, 0..1, also in the plugin
+format that `--emit` sends): live mode then locks that deck to Link's beat (`sources/base.py`, `PhaseLock`):
+the DJ software's own position picks the beat, Link gives the exact moment, and the fixed offset between
+the two is learnt as it plays.
+
 A track that the DJ software only names (artist, title, length) or reports with a path from another
 computer is looked up in the music folders (`DECISIVE_MUSIC`, folders separated by `:`, default `~/Music`).

@@ -18,6 +18,15 @@
     "verified": "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Decisive Link p95 10 ms, max 13 ms"
   },
   {
+    "name": "djay",
+    "app": "djay Pro",
+    "module": "decisive.show.sources.djay",
+    "class": "Djay",
+    "about": "djay Pro (macOS): its window read through Accessibility (needs pyobjc-framework-ApplicationServices and the Accessibility permission)",
+    "position": "exact",
+    "verified": "djay Pro 5.6.8 (macOS): on SYNC with Ableton Link, within 6 ms (sd) of Link's beat; without SYNC, the label alone: sd 12-17 ms, up to ~70 ms"
+  },
+  {
     "name": "replay",
     "app": "a recording",
     "module": "decisive.show.sources.replay",

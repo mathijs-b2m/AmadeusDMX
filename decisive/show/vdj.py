@@ -15,9 +15,10 @@ UDP_PORT = 9123
 def plugin_decks(msg: dict, now: float) -> list[Deck]:
     """The decks in one of the plugin's packets (also the format `decisive probe --emit` sends)."""
     return [
-        Deck(d["deck"], d["file"], d["pos"], d["len"], bool(d["play"]), d["bpm"], d["bpm0"], d["vol"], now)
+        Deck(d["deck"], d["file"], d["pos"], d["len"], bool(d["play"]), d["bpm"], d["bpm0"], d["vol"], now,
+             phase=d.get("phase"))  # phase: from `decisive probe --emit`, for DJ software synced to Link
         for d in msg.get("decks", [])
-    ]
+    ]  # fmt: skip
 
 
 class Listener(Source):

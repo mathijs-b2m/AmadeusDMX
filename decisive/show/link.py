@@ -279,7 +279,16 @@ class RemoteListener:
                 self.moved[d["deck"]] = (d["pos"], changed)
                 playing = bool(d["play"]) and now - changed < FROZEN_S
                 decks[d["deck"]] = Deck(
-                    d["deck"], local, d["pos"], d["len"], playing, d["bpm"], d["bpm0"], d["vol"], at
+                    d["deck"],
+                    local,
+                    d["pos"],
+                    d["len"],
+                    playing,
+                    d["bpm"],
+                    d["bpm0"],
+                    d["vol"],
+                    at,
+                    phase=d.get("phase"),
                 )
             self.decks = decks
 

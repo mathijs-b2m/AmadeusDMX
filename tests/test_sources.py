@@ -151,3 +151,39 @@ def test_latency_moves_positions_later(tmp_path):
 
 def test_parse_opts():
     assert parse_opts(["port=50002", "host=10.0.0.5"]) == {"port": 50002, "host": "10.0.0.5"}
+
+
+def test_snap_moves_to_the_nearest_point_at_that_phase():
+    from decisive.show.sources.base import snap
+
+    beats = np.arange(0, 100) * 0.5  # 120 BPM
+    assert abs(snap(10.1, beats, 0.0) - 10.0) < 1e-9
+    assert abs(snap(10.4, beats, 0.0) - 10.5) < 1e-9  # the next beat is nearer
+    assert abs(snap(10.1, beats, 0.5) - 10.25) < 1e-9
+
+
+def test_phase_lock_learns_a_fixed_offset_near_half_a_beat():
+    """The DJ software's position runs 0.2 s (0.4 beat) ahead of what Link says is heard, with ±50 ms noise:
+    the lock still picks the right beat every time, and ends exactly on Link's phase."""
+    from decisive.show.sources.base import PhaseLock
+
+    beats, rnd, lock = np.arange(0, 400) * 0.5, np.random.default_rng(3), PhaseLock()
+    for k in range(200):
+        t = k * 0.05
+        heard = 30.0 + t  # the truth
+        d = Deck(1, "a", heard + 0.2 + rnd.uniform(-0.05, 0.05), 300.0, True, 120.0, 120.0, 1.0, t)
+        d.phase = (heard / 0.5) % 1.0
+        got = lock.at(d, t, beats, "a")
+        if k > 10:
+            assert abs(got - heard) < 1e-6, (k, got, heard)
+    assert abs(sorted(lock.moves)[len(lock.moves) // 2] + 0.2) < 0.03
+
+
+def test_the_phase_travels_with_emit():
+    src = Source()
+    now = time.monotonic()
+    d = deck(5.0, now, bpm=120.0)
+    d.phase = 0.25
+    src.received([d], now=now)
+    packet = probe.plugin_packet(src, now + 0.125, now)  # a quarter beat later at 120 BPM
+    assert abs(packet["decks"][0]["phase"] - 0.5) < 1e-3

@@ -24,6 +24,7 @@ from decisive.engine.realism import Realism
 from decisive.library import fixtures as fxlib
 from decisive.show import feed as feedlib
 from decisive.show.mixer import Mixer
+from decisive.show.sources.base import PhaseLock
 from decisive.show.tracks import TrackShows
 from decisive.show.vdj import UDP_PORT, Listener
 from decisive.web.server import serve as serve_http
@@ -191,6 +192,7 @@ async def run(
     real = Realism(rig)
     feed = feedlib.Feed(rig, real, period)
     mixer, bands = Mixer(rig), Bands()
+    locks: dict[int, PhaseLock] = {}  # per deck: its position locked to Ableton Link's beat, when it sends one
     showing = None  # (deck, file, director, plan) the visualiser's hello describes
 
     httpd = serve_http(http_port, show)
@@ -242,7 +244,8 @@ async def run(
                     if show is None or weight <= 0.01:
                         continue
                     a, _, engine, _ = show
-                    t = min(max(deck.now(now), 0.0), a.duration - 0.05)
+                    pos = locks.setdefault(deck.deck, PhaseLock()).at(deck, now, a.beats, deck.file)
+                    t = min(max(pos, 0.0), a.duration - 0.05)
                     i, states = engine.render(t)
                     parts.append((weight, states, deck, show, t, i))
 

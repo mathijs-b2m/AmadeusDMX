@@ -34,12 +34,18 @@ class Deck:
     artist: str = ""
     track_id: str = ""  # the DJ software's own id for the track, when it has one
     rate: float = 0.0  # playback speed when the DJ software reports it (else from the tempo: bpm / bpm0)
+    phase: float | None = None  # beat phase 0..1 at `received` from a shared clock (Ableton Link), when synced
 
     def now(self, t: float) -> float:
         """Track position right now: last reported position + time since, at the current playback speed."""
         if not self.play:
             return self.pos
         return self.pos + (t - self.received) * self.speed
+
+    def phase_at(self, t: float) -> float | None:
+        if self.phase is None:
+            return None
+        return (self.phase + (t - self.received) * self.bpm / 60.0) % 1.0 if self.play and self.bpm else self.phase
 
     @property
     def speed(self) -> float:
@@ -160,3 +166,39 @@ class Source:
 
     def close(self):
         pass
+
+
+def snap(pos: float, beats, phase: float) -> float:
+    """The position nearest `pos` where the track (its beats, in seconds) is at beat phase `phase`."""
+    import numpy as np
+
+    if beats is None or len(beats) < 2:
+        return pos
+    i = int(np.clip(np.searchsorted(beats, pos) - 1, 0, len(beats) - 2))
+    near = [beats[j] + phase * (beats[j + 1] - beats[j]) for j in (i - 1, i, i + 1) if 0 <= j < len(beats) - 1]
+    return float(min(near, key=lambda p: abs(p - pos)))
+
+
+class PhaseLock:
+    """A deck's position locked to a shared beat clock: the DJ software's own position picks the beat, the clock
+    gives the exact phase. What the snap moves is mostly a fixed offset (audio latency): learnt from the last
+    snaps and applied first, so the right beat is picked even when that offset nears half a beat."""
+
+    KEEP = 50
+
+    def __init__(self):
+        self.moves: deque[float] = deque(maxlen=self.KEEP)
+        self.track = None
+
+    def at(self, deck: Deck, t: float, beats, track) -> float:
+        pos = deck.now(t)
+        phase = deck.phase_at(t)
+        if track != self.track:
+            self.track = track
+            self.moves.clear()
+        if phase is None or not deck.play:
+            return pos
+        offset = sorted(self.moves)[len(self.moves) // 2] if self.moves else 0.0
+        locked = snap(pos + offset, beats, phase)
+        self.moves.append(locked - pos)
+        return locked

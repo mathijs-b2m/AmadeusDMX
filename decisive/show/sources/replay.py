@@ -29,6 +29,7 @@ def reading(msg: dict, now: float) -> list[Deck]:
             d.get("title", ""),
             d.get("artist", ""),
             d.get("id", ""),
+            phase=d.get("phase"),
         )
         for d in msg.get("decks", [])
     ]

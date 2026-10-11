@@ -45,6 +45,7 @@ def plugin_packet(src: Source, now: float, t0: float) -> dict:
                 **({"title": d.title} if d.title else {}),
                 **({"artist": d.artist} if d.artist else {}),
                 **({"id": d.track_id} if d.track_id else {}),
+                **({"phase": round(d.phase_at(now), 4)} if d.phase is not None else {}),
             }
             for d in sorted(src.decks.values(), key=lambda d: d.deck)
         ],
