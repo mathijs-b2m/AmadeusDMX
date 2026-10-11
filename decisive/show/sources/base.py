@@ -63,7 +63,7 @@ class DeckBook:
     def __init__(self, dedupe_mirrors: bool = False):
         self.dedupe = dedupe_mirrors
         self.decks: dict[int, Deck] = {}
-        self.moved: dict[int, tuple[float, float]] = {}  # deck → (last position, when it last changed)
+        self.moved: dict[int, tuple] = {}  # deck → (last position, when it last changed, its reading's time)
         self.back: dict[int, float] = {}  # deck → where its last backward jump landed (loop detection)
         self.events: deque[Event] = deque(maxlen=256)
         self.count = 0
@@ -77,10 +77,10 @@ class DeckBook:
                 if sig in seen:  # a non-existent deck mirroring a real one (VirtualDJ does this)
                     continue
                 seen.add(sig)
-            last_pos, changed = self.moved.get(d.deck, (None, now))
-            if last_pos is None or abs(d.pos - last_pos) > 1e-3:
-                changed = now
-            self.moved[d.deck] = (d.pos, changed)
+            last_pos, changed, at = self.moved.get(d.deck, (None, now, None))
+            if last_pos is None or abs(d.pos - last_pos) > 1e-3 or d.received == at:
+                changed = now  # moved, or the same reading again (another deck's news): not frozen
+            self.moved[d.deck] = (d.pos, changed, d.received)
             d.play = d.play and now - changed < FROZEN_S  # "playing" with a frozen position = stalled
             self._events(self.decks.get(d.deck), d)
             decks[d.deck] = d

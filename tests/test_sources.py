@@ -54,6 +54,14 @@ def test_playing_with_a_frozen_position_counts_as_stopped():
     assert not book.decks[1].play
 
 
+def test_a_deck_repeated_from_its_last_reading_is_not_frozen():
+    """Sources that report on change send a deck's last playhead again when another deck has news."""
+    book = DeckBook()
+    book.update([deck(5.0, 0.0)], 0.0)
+    book.update([deck(5.0, 0.0)], FROZEN_S + 0.1)  # same reading (received 0.0), later
+    assert book.decks[1].play
+
+
 def test_mirrored_decks_are_dropped_only_when_asked():
     two = [deck(5.0, 0.0, n=1), deck(5.0, 0.0, n=3)]
     assert len(DeckBook().update(list(two), 0.0)) == 2
