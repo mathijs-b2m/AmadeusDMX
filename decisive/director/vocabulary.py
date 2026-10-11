@@ -64,12 +64,16 @@ PAR_BASE = [
 
 PAR_ACCENT = [
     ("none", "Pars don't react to hits: a static or fading look."),
-    ("pulse", "Brightness pumps on each hit, same colour."),
+    ("pulse", "On with each kick, held, let go: the pars play the kick, all together or taking turns."),
     ("color_pop", "On each hit the pars jump to the accent colour and fade back to the base colour."),
     ("chase", "Each hit lights the next par in the accent colour: light runs across the stage."),
     ("alternate", "Odd and even pars swap on each hit: ping-pong."),
     ("sparkle", "Each hit flashes one random par in the accent colour: sparse, glittery."),
-    ("stutter", "Pars chop on and off with the stutters / gates in the synths, at the speed of the sound."),
+    (
+        "stutter",
+        "A deliberate strobe: a short burst at a fixed fast rate where the synths clearly stutter (only if "
+        "the set allows fast strobe; at most a bar, rarely), otherwise the kick. Use sparingly.",
+    ),
     (
         "melody",
         "Pars play the melody: each lead note lights the par matching its pitch (low notes left, high "
@@ -79,40 +83,38 @@ PAR_ACCENT = [
 ]
 
 TRIGGERS = [
-    ("kick", "Every kick drum (four to the floor): the main pulse."),
+    ("kick", "Every kick drum (four to the floor): the main pulse, and what leads the lights on and off."),
     ("backbeat", "Snares and claps, usually beats 2 and 4: a looser, bouncier feel."),
-    ("hats", "Hi-hats: fast and busy, for energetic grooves."),
+    ("hats", "Hi-hats: an energetic groove; the lights still switch on the kick (never blinking per hat)."),
     ("accents", "Only big hits and impacts: sparse and dramatic."),
     ("bars", "Only the first beat of each bar: slow and stately."),
-    ("eighths", "Every 1/8 note, locked to the beat grid: tatatatata, driving and busy."),
-    ("sixteenths", "Every 1/16 note: a very fast rattle; for short peaks."),
+    ("eighths", "Driving 1/8 notes in the music; the lights switch on the kick (never faster)."),
+    ("sixteenths", "A 1/16 rattle in the music; the lights switch on the kick (never faster)."),
     (
         "roll",
-        "Accelerates through the phrase: quarter notes, then eighths, then sixteenths, like a buildup "
-        "snare roll. Made for buildups.",
+        "A buildup snare roll in the music; the lights switch on the kick (never faster). For buildups.",
     ),
     ("lead", "The notes of the melody / synth lead / vocal: for quiet parts without a beat."),
     (
         "synth",
-        "The notes of a steady synth riff / arpeggio, snapped to the beat grid (rests included): "
-        "follows a 1/8 or 1/16 synth line tightly; vocals and loose notes are ignored.",
+        "A steady synth riff / arpeggio in the music; the lights switch on the kick (never blinking per note).",
     ),
 ]
 
 HEAD_LIGHT = [
     ("steady", "Beams stay on: the movement is the show."),
-    ("pulse", "Beams pulse with the hits."),
+    ("pulse", "Beams pulse with the kick, dimmed to full: all heads together or split into parts taking turns."),
     (
         "flick",
         "Beams are dark while the head moves and snap on when it lands, every beat: move, on, move, "
         "off... Sharp and very rhythmic; best with bounce, swing or step_on_beat.",
     ),
-    ("beat", "Beams switch hard on and off with every beat: a punchy on/off rhythm."),
-    ("alternate", "Heads take turns per beat (left, right, left...): call and response."),
+    ("beat", "Beams on with the kick, held, then off: a punchy on/off rhythm, the group split into parts."),
+    ("alternate", "Heads take turns per kick (left, right, left...): call and response."),
     (
         "random",
-        "Every head pulses on its own random eighths: a sparkling, restless rig. Great while the heads do a "
-        "tilt wave; for energetic parts, not for calm ones.",
+        "Every head lights on its own random kicks: a restless rig, each head its own rhythm. Great while "
+        "the heads do a tilt wave; for energetic parts, not for calm ones.",
     ),
     ("accents", "Beams mostly dim, flaring up on big hits."),
     (
@@ -122,14 +124,14 @@ HEAD_LIGHT = [
     ),
     (
         "stutter",
-        "Beams chop on and off with the stutters / gates in the synths, at the speed of the sound. "
-        "Gorgeous when a lead or pad is gated or stuttered; combine with slow, smooth movement.",
+        "A deliberate strobe: a short burst at a fixed fast rate where the synths clearly stutter (only if "
+        "the set allows fast strobe; at most a bar, rarely), otherwise a kick pulse. Use sparingly.",
     ),
     ("off", "Moving heads dark: the pars carry the look."),
 ]
 
 MOVEMENTS = [  # the path; how heads relate to each other is the formation
-    ("still", "Hold a position."),
+    ("still", "Hold a position, drifting slowly (heads never freeze)."),
     ("sweep", "Side-to-side sweep; slow in calm parts, faster as the energy rises."),
     ("nod", "Up-and-down movement; slow in calm parts, faster as the energy rises."),
     ("circle", "Smooth circles; one per two bars when calm, one per bar or faster at high energy."),

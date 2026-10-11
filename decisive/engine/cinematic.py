@@ -619,9 +619,10 @@ class CinematicMixin:
         q = np.searchsorted(self.cine_moves, ts + PRE_IMPACT_S, side="right")  # already at the coming picture
         az = np.array([self.cine_pictures[k % len(self.cine_pictures)][j][0] for k in q])
         el = np.array([self.cine_pictures[k % len(self.cine_pictures)][j][1] for k in q])
-        # in melodic passages the picture drifts: swaying slowly, lifting with the melody
+        # the picture always drifts a little (heads never freeze); in melodic passages more: swaying slowly,
+        # lifting with the melody
         grid = np.arange(len(self.cine_fill)) / GRID_HZ
-        fill = np.interp(ts, grid, self.cine_fill)
+        fill = np.maximum(np.interp(ts, grid, self.cine_fill), 0.35)
         contour = np.interp(ts, grid, self.cine_contour)
         az = az + fill * 14.0 * np.sin(2 * np.pi * ts / 7.0 + j * 0.9)
         el = el + fill * 16.0 * (contour - 0.5)

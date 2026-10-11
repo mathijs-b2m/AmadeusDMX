@@ -12,8 +12,6 @@ levels, hits), `motion` (where heads point and how their motors get there) and
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 
 from decisive.audio.model import DROP_THRESHOLD, Analysis
@@ -21,10 +19,10 @@ from decisive.director import Decision
 from decisive.engine import zones
 from decisive.engine.cinematic import CinematicMixin
 from decisive.engine.lasers import LasersMixin
-from decisive.engine.looks import STUTTER_ON, XFADE, LooksMixin
+from decisive.engine.looks import XFADE, LooksMixin
 from decisive.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
 from decisive.engine.state import State
-from decisive.engine.timing import TimingMixin, _ease
+from decisive.engine.timing import TimingMixin, _ease, note_env
 from decisive.library import fixtures as fxlib
 from decisive.rig import geometry
 
@@ -77,21 +75,19 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
         self.lead_pc = analysis.lead_pc if analysis.lead_pc is not None else np.full(n, -1, np.int8)
         self.stut_gate = analysis.stutter_gate if analysis.stutter_gate is not None else np.zeros(n, np.float32)
         self.stut_str = analysis.stutter_strength if analysis.stutter_strength is not None else np.zeros(n, np.float32)
-        # Full on/off chopping is a fast strobe (photosensitive epilepsy risk): only with explicit opt-in.
-        self.stut_depth = 1.0 if rig["safety"].get("allow_fast_strobe") else 0.5
+        # A fast strobe is a photosensitive epilepsy risk: only with explicit opt-in.
+        self.fast_strobe = bool(rig["safety"].get("allow_fast_strobe"))
         self.lead_env = self._local_envelope(
             np.maximum(analysis.bands_db["mid"], analysis.bands_db["high"]), analysis.fps
         )
         # Light doesn't follow the volume syllable by syllable: an operator rides the fader per bar, in
-        # straight lines. breath: the loudness per bar, ramped linearly from bar to bar. chop: whether the
-        # light chops with a stuttering synth, decided per bar (the chop itself still follows the gate).
+        # straight lines. breath: the loudness per bar, ramped linearly from bar to bar. chop: how clearly
+        # the synths stutter, per bar (where a "stutter" look may strobe, at a fixed rate).
         self.breath = self._bar_ramp(
             np.maximum(analysis.bands_db["mid"], analysis.bands_db["high"]), deadband=0.08, relative_bars=8
         )
         self.chop = self._bar_ramp(np.clip(self.stut_str * 1.5, 0, 1), deadband=0.15, snap=0.5)
-        self.chop_overlay = self._bar_ramp(
-            np.clip((self.stut_str - STUTTER_ON) / (1 - STUTTER_ON) * 2.0, 0, 1), snap=0.5
-        )
+        self.strobe_bars = self._strobe_bars()
         self.low = np.maximum(analysis.band_norm("sub"), analysis.band_norm("bass"))
         self.level = analysis.band_norm("mid") * 0.5 + self.low * 0.5
         self.flash_t, self.flash_s = self._flash_timeline(rig["safety"]["max_flash_hz"])
@@ -187,7 +183,6 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
-        self._stutter_overlay(t, i, states)
         self._drop_moment(t, states)
         return i, self._finish(states, t)
 
@@ -205,7 +200,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
 
     def _pickup(self, i: int, t: float, states: dict[str, State]) -> dict[str, State]:
         """The next section starts before its downbeat: a vocal or melody leading in brings its look in early
-        (about two thirds there by the downbeat, which lands it); a fill is played by the lights, hit by hit,
+        (about two thirds there by the downbeat, which lands it); a fill is played by the lights, beat by beat,
         in the next section's accent colour, growing into the downbeat."""
         p = self._pickup_of(i + 1)
         if p is None or not p.pickup_start <= t < self.plan[i + 1].start:
@@ -219,7 +214,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
         hits = self.fill_t[(self.fill_t >= p.pickup_start - 0.02) & (self.fill_t <= t)]
         if not len(hits):
             return states
-        v = math.exp(-(t - float(hits[-1])) / 0.12) * (0.55 + 0.45 * progress)
+        beats = self.beats[self.beats >= p.pickup_start - 0.02]  # the fill on the beats (not snare by snare)
+        v = note_env(beats, np.ones(len(beats)), t)[0] * (0.55 + 0.45 * progress)
         cols = self._colours(nxt)
         accent = cols[2 % len(cols)]
         for e in self.pars + self.heads:

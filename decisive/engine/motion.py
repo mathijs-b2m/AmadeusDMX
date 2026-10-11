@@ -51,6 +51,10 @@ def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np
     return point + across * side * r + up * float(np.clip(dz, -1, 1)) * r / 2
 
 
+DRIFT_U, DRIFT_V = 0.3, 0.4  # "still": a slow drift (share of the aim's swing): heads never freeze
+DRIFT_BEATS_U, DRIFT_BEATS_V = 32.0, 24.0  # …one slow drift sideways in 32 beats, up and down in 24
+
+
 WAVE_BEATS = 4.0  # a wave runs over the heads (of the rig or a group) within this many beats
 
 
@@ -66,6 +70,9 @@ AIMS = {  # direction aims: centre azimuth/elevation and swing; point aims: (y c
 
 
 LOW_HEAD_M = 1.0  # heads below this (on the floor) aim up and over the crowd instead of down onto it
+
+
+LOW_CEILING_SWING_DEG = 12.0  # an upward aim under a low ceiling: this much swing below the ceiling limit
 
 
 LOW_AIMS = {
@@ -192,7 +199,23 @@ class MotionMixin:
                 amp * (rnd(seg) + (rnd(seg + 1) - rnd(seg)) * a),
                 amp * (rnd(seg + 1000) + (rnd(seg + 1001) - rnd(seg + 1000)) * a),
             )
-        return 0.0, 0.0  # still
+        w = seed * 1.3  # still: a slow drift, never frozen
+        return (
+            DRIFT_U * math.sin(2 * math.pi * pos / DRIFT_BEATS_U + w),
+            DRIFT_V * math.sin(2 * math.pi * pos / DRIFT_BEATS_V + 2 * w),
+        )
+
+    def _fit_aim(self, name: str, head_pos) -> dict:
+        """An aim for this head: floor heads aim up over the crowd; an aim up into a low ceiling comes down
+        under it with a swing it can still make (clamped flat it would freeze the movement)."""
+        aim = AIMS.get(name, AIMS["crowd"])
+        if head_pos[2] < LOW_HEAD_M:
+            aim = {**aim, **LOW_AIMS.get(name, {})}
+        top = geometry.ceiling_top_deg(head_pos, self.stage)
+        if top is not None and aim["el"] + aim["el_amp"] > top and aim["el"] > 0:
+            amp = min(aim["el_amp"], LOW_CEILING_SWING_DEG)
+            aim = {**aim, "el": top - amp, "el_amp": amp}
+        return aim
 
     def _head_dir(self, d: Decision, t: float, j: int) -> np.ndarray:
         """World direction head j should point in: shape × formation × aim."""
@@ -218,9 +241,7 @@ class MotionMixin:
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
-        aim = AIMS.get(d.aim, AIMS["crowd"])
-        if head_pos[2] < LOW_HEAD_M:
-            aim = {**aim, **LOW_AIMS.get(d.aim, {})}
+        aim = self._fit_aim(d.aim, head_pos)
         W = self.stage["width_m"]
 
         az = aim["az"] + u * aim["az_amp"]
@@ -373,7 +394,11 @@ class MotionMixin:
                 amp * (rnd(seg) + (rnd(seg + 1) - rnd(seg)) * a),
                 amp * (rnd(seg + 1000) + (rnd(seg + 1001) - rnd(seg + 1000)) * a),
             )
-        return z, z
+        w = seed * 1.3  # still: a slow drift, never frozen
+        return (
+            DRIFT_U * np.sin(2 * math.pi * pos / DRIFT_BEATS_U + w),
+            DRIFT_V * np.sin(2 * math.pi * pos / DRIFT_BEATS_V + 2 * w),
+        )
 
     @staticmethod
     def _direction_v(az, el):
@@ -418,9 +443,7 @@ class MotionMixin:
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
-        aim = AIMS.get(d.aim, AIMS["crowd"])
-        if head_pos[2] < LOW_HEAD_M:
-            aim = {**aim, **LOW_AIMS.get(d.aim, {})}
+        aim = self._fit_aim(d.aim, head_pos)
         W = role["width"]
         az = aim["az"] + u * aim["az_amp"]
         el = aim["el"] + v * aim["el_amp"]

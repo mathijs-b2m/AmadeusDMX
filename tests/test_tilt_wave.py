@@ -42,7 +42,7 @@ def test_the_heads_tilt_in_a_wave_that_rolls_over_the_row(show):
     assert lags[-1] != lags[0] and np.all(np.diff(lags[1:]) * np.sign(lags[-1] - lags[0]) >= 0)
 
 
-def test_random_heads_pulse_on_their_own_eighths(show):
+def test_random_heads_pulse_on_their_own_kicks(show):
     _, plan, k, e = show
     d = plan[k]
     ts = np.arange(d.start + 0.5, d.end - 0.5, 0.02)
@@ -51,7 +51,7 @@ def test_random_heads_pulse_on_their_own_eighths(show):
     share = lit.mean()
     assert 0.1 < share < 0.5  # on part of the time
     assert len({tuple(col) for col in lit.T}) == len(heads)  # every head its own pattern
-    for j in range(16):  # never two eighths in a row: pulses, not a flicker into steady light
+    for j in range(16):  # never two kicks in a row: pulses, not a flicker into steady light
         on = [L._chance(j, s) and not L._chance(j, s - 1) for s in range(200)]
         assert not any(a and b for a, b in zip(on, on[1:]))
 

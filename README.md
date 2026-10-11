@@ -16,7 +16,7 @@ Your lighting is described in two parts: a **set** (your fixtures: what you own 
                       └────────────────────────────────────────────────────────┘
  position in the track ─► engine (40 fps) ─► DMX ─► node / USB ─► fixtures
  (audio clock, or VirtualDJ   kick pumps, beat-landed moves,      └► 3D browser visualiser
-  via the DecisiveLink plugin) drop moment, stutter overlay…
+  via the DecisiveLink plugin) drop moment, kick-led light…   
 ```
 
 **The AI chooses the look; it never triggers individual hits.** Choices are made once per phrase (4–16 bars). Everything time-critical (kick pumps, flashes, beat-locked head moves, the drop hit, synth stutters) comes from the analysis, so it's exact to the beat.
@@ -169,7 +169,7 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 | `par_accent`: pars on a hit | none · pulse · color_pop · chase · alternate · sparkle · stutter · melody |
 | `trigger`: what a hit is | kick · backbeat · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
-| `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random eighths) · accents · breathe · stutter · off |
+| `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · stutter · off |
 | `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) |
 | `formation` | sync · mirror · wave · fan · focus (shared point) · cross |
 | `aim` | crowd · stage · sky |
@@ -210,13 +210,15 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 
 `decisive/engine/` renders 40 frames per second from the plan and the analysis:
 
-- **Pickups:** a section that leads in early has its look coming in on the pickup (about two thirds of the way by the downbeat, which lands it), and the moving heads move into its positions during the pickup so they arrive on the downbeat. A fill is played by the lights hit by hit, in the next section's accent colour, growing into the downbeat. Pickups into a drop leave the drop moment alone. The decision models are told about them.
+- **Pickups:** a section that leads in early has its look coming in on the pickup (about two thirds of the way by the downbeat, which lands it), and the moving heads move into its positions during the pickup so they arrive on the downbeat. A fill is played by the lights beat by beat, in the next section's accent colour, growing into the downbeat. Pickups into a drop leave the drop moment alone. The decision models are told about them.
 - **The drop moment:** moving heads go dark two beats before a drop and already move to the drop's position, colour and gobo ("move in black"); everything is dark for the last half beat; on the downbeat a hard cut, a white flash and full intensity for one bar.
 - **Beat-landed head moves:** bounce, swing and step-on-beat are sized from the fixture's **measured** motion (`decisive motion`): one beat per move if ≥ 30° fits, otherwise two beats (far bigger moves). Each move starts exactly its travel time before the landing beat. Pan/tilt targets go out 120 ms early and the fixture moves at its own speed; the motor model only predicts the real position (for the visualiser and timing).
 - **Room limits (on by default):** moving-head beams stay off the ceiling (they only go up so far that they reach it at least the room's depth away, 4–10 m: in a living room that is about level) and never swing back past the rig towards the stage and the DJ (pointing steeply down is fine). Beams on the audience are fine: only laser audience scanning is not done. Switch either off per rig in the Venue settings (`stage.ceiling_guard`, `stage.back_guard`).
 - **Geometry:** a stage model in metres; paths become beam directions (or a shared spot for focus/cross, the heads spread around it), then pan/tilt by inverse kinematics, choosing the solution closest to where the motors actually are. Calibration per head: `mount` (stand/floor/hang), `pan_home_deg`, `pan_invert`, `tilt_home_deg`, `tilt_invert`.
-- **Stutter overlay:** wherever the synths clearly stutter, the lights chop along, at the speed of the sound, on top of any look.
-- **Subdivisions:** `eighths`, `sixteenths` and `roll` (quarter → eighth → sixteenth through a build-up) come from the beat grid; `synth` follows grid-snapped synth notes.
+- **No flicker; the kick leads:** a light is played like a note: on at once, held, let go gently before the next hit. Hits closer than 0.3 s are held through, so no light ever blinks on and off faster than about 3 times a second. Fast triggers (`hats`, `eighths`, `sixteenths`, `roll`, `synth`) switch the lights on the kick, never per hi-hat or synth note; without a kick (a breakdown) kick-led light holds a steady middle level. White flashes land on the kick too.
+- **A group plays the kicks in parts:** per phrase the engine picks how a group (or a one-group rig) plays the kicks, left to right by position: all together, taking turns (odd/even), left against right, or a rotation through three or four sub-groups. Drops lean towards all together.
+- **The strobe is deliberate and rare:** a `stutter` look strobes at a fixed 10 Hz (never along with the music), only in a bar where the synths clearly stutter, one bar at a time with at least 16 bars between, and only when the set allows fast strobe (`allow_fast_strobe`). Elsewhere it plays the kick.
+- **Heads never freeze:** `still` is a slow drift, and an upward aim under a low ceiling comes down below it with a swing it can still make (in a living room, "sky" would otherwise be clamped flat).
 - **Beam effects** are mapped per fixture (`beam_fx` in the fixture JSON): gobos by style, rotation speed following the energy, mirrored heads rotating the opposite way.
 - **Colour wheels:** colours snap to the nearest wheel slot; flashes become a dimmer bump instead of moving the wheel.
 
@@ -297,7 +299,7 @@ Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress
 ## Safety
 
 - **Flash limit:** white flashes and the software strobe go through one timeline capped at `max_flash_hz` (3 Hz, the photosensitive-epilepsy guideline). Fixture strobe channels are never driven.
-- **Fast pulsing:** stutters, eighths, sixteenths and rolls pulse faster than 3 Hz. With `allow_fast_strobe: false` they pulse at half depth; with `true` they go fully on/off. Warn an audience about strobe effects.
+- **Fast strobe:** the only light faster than 3 Hz is the deliberate strobe (a `stutter` look, one bar at a time, see above), and only with `allow_fast_strobe: true`. Warn an audience about strobe effects.
 - **Eye safety:** `stage.eye_safety` (off by default; turn on for lasers or very bright beams) keeps beams towards the audience out of eye height, and heads go dark while crossing that band.
 - **High-output fixtures (alpha):** this is alpha software, not for a powerful rig in front of a real audience. Fixtures of risk group 2 or 3 (IEC 62471: `physical.risk_group` in the fixture file, from the manual or label) stay dark when the DMX goes to real lights; the visualiser still shows them. Without a rating a fixture counts as one when it packs a lot of light into a narrow beam (≥ 5,000 lm per beam and ≥ 200 lm per square degree: a Sharpy or a Pointe, not a Fuze, a Katana or a wash). Consumer lights play as usual, the audience included.
 - **No single point:** focus and cross looks aim the heads around a spot about 1.5 m wide instead of all into one point, and the cinematic "all on the DJ" picture rings the light above the DJ's head.

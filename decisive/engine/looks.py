@@ -5,12 +5,10 @@ from __future__ import annotations
 import bisect
 import math
 
-import numpy as np
-
 from decisive.director import Decision
 from decisive.director.vocabulary import PALETTES
 from decisive.engine.state import State
-from decisive.engine.timing import _decay
+from decisive.engine.timing import NO_KICK_S, _decay, note_env
 
 XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 
@@ -18,24 +16,30 @@ XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 PREDROP_BEATS = 2.0  # heads go dark and move to the drop's position/colour/gobo this many beats early
 
 
-TRIGGER_TAU = {
-    "kick": 0.16,
-    "backbeat": 0.18,
-    "hats": 0.07,
-    "accents": 0.35,
-    "bars": 0.5,
-    "lead": 0.45,
-    "eighths": 0.08,
-    "sixteenths": 0.045,
-    "roll": 0.08,
-    "synth": 0.09,
-}  # hit decay (s)
+# The kick leads: triggers faster than the kick switch the lights on the kick instead (a light that blinks with
+# every hi-hat or synth note reads as a broken bulb, not as rhythm).
+KICK_LED = {"hats", "eighths", "sixteenths", "synth", "roll"}
+
+
+# How a group plays the kicks, a different way per phrase (left to right by position): all together, taking
+# turns (odd/even), left against right, or a rotation through three or four sub-groups. Drops lean tutti.
+KICK_PATTERNS = ("all", "alternate", "sides", "rotate")
+DROP_PATTERNS = ("all", "all", "sides", "rotate")
+
+
+def kick_turn(pattern: str, k: int, n: int, hit: int) -> bool:
+    """Does element k (of n, left to right) play kick number `hit` in this pattern?"""
+    if hit < 0 or n < 2 or pattern == "all":
+        return True
+    if pattern == "alternate":
+        return (k + hit) % 2 == 0
+    if pattern == "sides":
+        return (k * 2 // n) == hit % 2
+    m = min(4, n) if n > 4 else min(3, n)  # rotate
+    return (k * m // n) == hit % m
 
 
 MELODY_TAU = 0.7  # how long a melody note keeps its par lit
-
-
-STUTTER_ON = 0.35  # frame-level stutter strength above which the lights chop along automatically
 
 
 PAR_BASE_LEVEL = {"off": 0.0, "dim": 0.22, "full": 0.75, "fade": 0.5}
@@ -57,7 +61,7 @@ def _mix(cols, x: float):
     return tuple(a[i] * (1 - k) + b[i] * k for i in range(3))
 
 
-RANDOM_SHARE = 0.4  # random head light: the share of eighths a head would like to light
+RANDOM_SHARE = 0.4  # random head light: the share of kicks a head would like to light
 STAR_SLOT_S = 2.4  # stars: each star light twinkles at most once in this long, at its own moment in it
 STAR_RATE, STAR_RATE_BUSY = 1.5, 3.0  # new stars per second over the whole set (calm / drop)
 STAR_RISE_S, STAR_HOLD_S, STAR_RELEASE_S = 0.08, 0.25, 0.7  # comes up, holds, fades gently
@@ -78,7 +82,7 @@ def envelope_release(dt: float, level: float, hold: float, release: float) -> fl
 
 
 def _chance(head: int, slot: int) -> bool:
-    """Random but repeatable: does this head light this eighth?"""
+    """Random but repeatable: does this head light this kick?"""
     return math.sin(slot * 12.9898 + head * 78.233) * 43758.5453 % 1.0 < RANDOM_SHARE
 
 
@@ -109,7 +113,8 @@ class LooksMixin:
     def _strobe_states(self, d: Decision, t: float, out: dict, acc_env: float):
         """Strobes: flashes, never a steady light. Dark by default. A build-up into a drop flashes on the beat
         over its last quarter, twice per beat over its last bar (never faster than the set's max_flash_hz);
-        in a drop (intensity 2+) they hit the big accents. The drop moment itself flashes everything anyway."""
+        in a drop (intensity 2+) they flash on the big hits, on the kick. The drop moment itself flashes
+        everything anyway."""
         strobes = getattr(self, "_strobes", None)
         if strobes is None:
             strobes = self._strobes = [e for e in self.rig["elements"] if e["kind"] == "strobe"]
@@ -129,8 +134,8 @@ class LooksMixin:
                     every *= 2
                 since = ((beat + phase) % every) * period
                 dim = math.exp(-since / 0.06) * (0.6 + 0.4 * (1 - left / max(span * 0.25, 4 * period)))
-        elif d.section == "drop" and d.intensity >= 2:
-            dim = max(0.0, (acc_env - 0.55) / 0.45) ** 0.7
+        elif d.section == "drop" and d.intensity >= 2:  # the big hits, on the kick (the flash timeline)
+            dim = _decay(self.flash_t, self.flash_s, t, 0.06)
         for e in strobes:
             out[e["id"]] = State(dimmer=dim, r=1.0, g=1.0, b=1.0)
 
@@ -209,11 +214,6 @@ class LooksMixin:
         return PALETTES.get(d.palette, PALETTES["cool"])[1]
 
     def _trigger(self, name: str, d: Decision | None = None, t: float = 0.0):
-        if name == "roll":  # quarter notes → eighths → sixteenths through the phrase
-            progress = (t - d.start) / max(d.end - d.start, 1e-6) if d else 0.0
-            name = "kick_grid" if progress < 0.5 else "eighths" if progress < 0.8 else "sixteenths"
-            if name == "kick_grid":
-                return self.beats, np.ones(len(self.beats), dtype=np.float32)
         return {
             "eighths": (self.eighth_t, self.eighth_s),
             "sixteenths": (self.sixteenth_t, self.sixteenth_s),
@@ -226,6 +226,32 @@ class LooksMixin:
             "lead": (self.lead_t, self.lead_s),
         }[name]
 
+    def _note(self, name: str, t: float) -> tuple[float, int]:
+        """The light of a trigger, played as notes (timing.note_env); fast triggers play the kick."""
+        name = "kick" if name in KICK_LED else name
+        times, strengths = self._trigger(name)
+        env, hit = note_env(times, strengths, t)
+        if name == "kick" and (hit < 0 or t - float(times[hit]) > NO_KICK_S):
+            nxt = bisect.bisect_right(times, t)
+            if nxt >= len(times) or float(times[nxt]) - t > 0.5 * NO_KICK_S:  # no kick around: hold, don't blink
+                return 0.6, -1
+        return env, hit
+
+    def _kick_pattern(self, d: Decision) -> str:
+        """How the group plays the kicks in this phrase: varied per phrase, mostly tutti in drops."""
+        options = DROP_PATTERNS if d.section == "drop" and d.intensity >= 3 else KICK_PATTERNS
+        return options[int(_hash(d.phrase, 0, 5) * len(options))]
+
+    def _x_rank(self, elements: list[dict]) -> dict[str, int]:
+        """Elements ranked left to right (cached per list)."""
+        cache = self.__dict__.setdefault("_x_ranks", {})
+        key = id(elements)
+        if key not in cache:
+            xs = {e["id"]: (self.order.get(e["id"], k) if elements is self.pars else float(self.head_pos[k][0]))
+                  for k, e in enumerate(elements)}  # fmt: skip
+            cache[key] = {eid: r for r, eid in enumerate(sorted(xs, key=lambda e: xs[e]))}
+        return cache[key]
+
     def _scene(self, d: Decision, t: float) -> dict[str, State]:
         """Render one look from its layers: par base, par accent, trigger, head light/colour, dynamics."""
         cols = self._colours(d)
@@ -236,11 +262,10 @@ class LooksMixin:
         progress = min(max((t - d.start) / max(d.end - d.start, 1e-6), 0.0), 1.0)
         if progress >= 0.5 and (d.end - d.start) > 20:  # long phrase: swap colours halfway for variation
             base, accent = accent, base
-        trig_t, trig_s = self._trigger(d.trigger, d, t)
-        env = _decay(trig_t, trig_s, t, TRIGGER_TAU.get(d.trigger, 0.15))
-        if d.trigger in ("eighths", "sixteenths", "roll") and self.stut_depth < 1.0:
-            env = 0.5 + 0.5 * env  # >3 pulses/s: half-depth unless allow_fast_strobe (photosensitivity)
-        hits = bisect.bisect_right(trig_t, t)  # hits so far: steps chases, alternation, sparkles
+        env, hit = self._note(d.trigger, t)
+        hits = hit + 1  # hits so far: steps chases, alternation, sparkles
+        pattern = self._kick_pattern(d)
+        strobe = self._strobe(t)
         flash = _decay(self.flash_t, self.flash_s, t, 0.07)
         rise = d.dynamics == "rise"
         out: dict[str, State] = {}
@@ -254,8 +279,8 @@ class LooksMixin:
             col = _mix(cols, ((beat + phase) / 32 + k / n) % 1.0) if d.par_base == "fade" else base
             dim = base_level
             a = d.par_accent
-            if a == "pulse":
-                dim = base_level + (1 - base_level) * env
+            if a == "pulse":  # on its turn in the phrase's pattern
+                dim = base_level + (1 - base_level) * (env if kick_turn(pattern, k, n, hit) else 0.0)
             elif a == "color_pop":
                 col, dim = _lerp(col, accent, env), max(base_level, env)
             elif a == "chase":
@@ -267,8 +292,8 @@ class LooksMixin:
             elif a == "sparkle":
                 if k == sparkle:
                     col, dim = _lerp(col, accent, env), max(base_level, env)
-            elif a == "stutter":  # the whole par chops with the synth
-                dim = max(base_level * 0.5, self._stutter(t, max(base_level, 0.35)))
+            elif a == "stutter":  # a fixed-rate strobe in a clear synth stutter, else the kick
+                dim = strobe if strobe is not None else max(base_level, 0.3) + (1 - max(base_level, 0.3)) * env
             elif a == "melody":  # recent notes, each on the par of its pitch, coloured by its pitch class
                 i = bisect.bisect_right(self.lead_t, t)
                 for j in range(max(0, i - 6), i):
@@ -287,14 +312,13 @@ class LooksMixin:
                 st.white = flash
             out[f["id"]] = st
 
-        acc_env = _decay(self.acc_t, self.acc_s, t, 0.35)
+        acc_env = note_env(self.acc_t, self.acc_s, t)[0]  # big hits as notes: close ones held through
         head_trig = getattr(d, "head_trigger", "same")
         if head_trig not in ("same", d.trigger):  # layering: heads pulse on their own rhythm
-            ht, hs = self._trigger(head_trig, d, t)
-            env = _decay(ht, hs, t, TRIGGER_TAU.get(head_trig, 0.15))
-            if head_trig in ("eighths", "sixteenths", "roll") and self.stut_depth < 1.0:
-                env = 0.5 + 0.5 * env
+            env, hit = self._note(head_trig, t)
         grouping = d.grouping if self.multi else "unison"
+        head_pattern = pattern if grouping == "unison" else "all"  # groups acting apart have their own roles
+        rank, nh = self._x_rank(self.heads), len(self.heads)
         for j, f in enumerate(self.heads):
             role = self._role(d, j)
             hc = d.head_color
@@ -302,22 +326,22 @@ class LooksMixin:
                 hc = {"base": "accent", "white": "accent", "accent": "base"}.get(hc, hc)
             col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + bar) % len(cols)]}[hc]
             hl = d.head_light
+            mine = env if kick_turn(head_pattern, rank[f["id"]], nh, hit) else 0.0  # this head's kick
             if hl == "flick":  # on around the beat, when the head arrives and turns; dark while travelling
                 dim = 1.0 if (phase < 0.22 or phase > 0.85) else 0.0
-            elif hl == "beat":  # hard on/off with every beat
-                dim = 1.0 if phase < 0.5 else 0.0
-            elif hl == "alternate":  # heads take turns per beat (within their group when the groups act apart)
-                dim = (1.0 if phase < 0.8 else 0.0) if (beat + role["idx"]) % 2 == 0 else 0.0
-            elif hl == "random":  # each head on its own random eighths: a snap on, held for the eighth, off
-                slot = int((beat + phase) * 2)
-                dim = 1.0 if _chance(j, slot) and not _chance(j, slot - 1) else 0.0
+            elif hl == "beat":  # on with the kick, held, let go: on/off (the phrase's pattern splits the group)
+                dim = mine
+            elif hl == "alternate":  # heads take turns per kick (within their group when the groups act apart)
+                dim = env if (hit + role["idx"]) % 2 == 0 else 0.0
+            elif hl == "random":  # each head on its own random kicks: hit, held, let go
+                dim = env if _chance(j, hit) and not _chance(j, hit - 1) else 0.0
             else:
                 dim = {
                     "steady": 1.0,
-                    "pulse": 0.25 + 0.75 * env,
+                    "pulse": 0.25 + 0.75 * mine,
                     "accents": 0.12 + 0.88 * acc_env,
                     "breathe": 0.1 + 0.9 * float(self.breath[self._frame(t)]),
-                    "stutter": self._stutter(t, 0.15 + 0.85 * float(self.breath[self._frame(t)])),
+                    "stutter": strobe if strobe is not None else 0.25 + 0.75 * mine,
                     "off": 0.0,
                 }.get(hl, 1.0)
             layer = self._layer(d, j)
@@ -399,25 +423,6 @@ class LooksMixin:
             if v > 0.01:  # a glint of star white (on a lit light the white is the star), at least as bright
                 st.r, st.g, st.b = _lerp((st.r, st.g, st.b), (1.0, 0.97, 0.92), min(1.0, v * 1.2))
                 st.dimmer = max(st.dimmer, v)
-
-    def _stutter_overlay(self, t: float, i: int, states: dict[str, State]) -> None:
-        """Wherever the synths clearly stutter, chop the lights with them, whatever look is running.
-
-        Stutters often last a few seconds inside a long phrase, so a per-phrase choice misses them;
-        an operator would punch this in. Weighted by how clear the stutter is; skipped for heads
-        that are already rhythmic on their own.
-        """
-        f = self._frame(t)
-        strength = float(self.chop_overlay[f])  # per bar: a clear stutter section, not single flickers
-        if strength <= 0:
-            return
-        chopped = 1.0 - self.stut_depth * (1.0 - float(self.stut_gate[f]))
-        rhythmic_heads = self.plan[i].head_light in ("flick", "beat", "alternate", "stutter", "random")
-        for e in self.rig["elements"]:
-            if e["kind"] == "head" and rhythmic_heads:
-                continue
-            s = states[e["id"]]
-            s.dimmer *= (1 - strength) + chopped * strength
 
     def _drop_moment(self, t: float, states: dict[str, State]) -> None:
         """What an operator does at a drop: a breath of darkness just before it, then everything hits.

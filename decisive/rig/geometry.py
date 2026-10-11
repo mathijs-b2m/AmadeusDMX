@@ -191,6 +191,16 @@ def eye_safe(d: np.ndarray, head_z: float, st: dict) -> np.ndarray:
     return d
 
 
+def ceiling_top_deg(head_pos, st: dict) -> float | None:
+    """The highest elevation a head's beam may have under the ceiling guard (None: guard off)."""
+    if not st.get("ceiling_guard", True):
+        return None
+    lo, hi = CEILING_RUN_M
+    run = min(hi, max(lo, float(st.get("room_depth_m", 6.0))))
+    room = float(st.get("ceiling_m", 4.5)) - CEILING_CLEAR_M - float(head_pos[2])
+    return math.degrees(math.atan2(room, run)) if room > 0 else 0.0
+
+
 def room_safe_v(d: np.ndarray, head_pos, st: dict) -> np.ndarray:
     """Default limits for moving-head beams (rows of unit directions), for every rig unless switched off:
     off the ceiling (`ceiling_guard`: up only so far that the beam reaches the ceiling at least the room's depth
@@ -200,11 +210,8 @@ def room_safe_v(d: np.ndarray, head_pos, st: dict) -> np.ndarray:
     el = np.degrees(np.arcsin(np.clip(d[:, 2], -1, 1)))
     az = np.degrees(np.arctan2(d[:, 0], d[:, 1]))
     changed = np.zeros(len(d), dtype=bool)
-    if st.get("ceiling_guard", True):
-        lo, hi = CEILING_RUN_M
-        run = min(hi, max(lo, float(st.get("room_depth_m", 6.0))))
-        room = float(st.get("ceiling_m", 4.5)) - CEILING_CLEAR_M - float(head_pos[2])
-        top = math.degrees(math.atan2(room, run)) if room > 0 else 0.0
+    top = ceiling_top_deg(head_pos, st)
+    if top is not None:
         over = el > top
         el = np.where(over, top, el)
         changed |= over

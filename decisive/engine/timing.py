@@ -19,6 +19,38 @@ def _decay(times: np.ndarray, strengths: np.ndarray, t: float, tau: float) -> fl
     return best
 
 
+FLASH_SNAP_S = 0.1  # a big accent this close to a kick flashes with it (further off: no flash)
+MIN_GAP_S = 0.3  # hits closer together than this are held through: a light never flickers faster
+NO_KICK_S = 2.0  # no kick for this long (a breakdown): kick-led light holds a steady middle level
+STROBE_HZ, STROBE_DUTY = 10.0, 0.35  # the deliberate strobe: a fixed fast rate, never the music's own rhythm
+STROBE_ON = 0.5  # how clear a synth stutter must be (per bar) before a "stutter" look strobes
+STROBE_REST_BARS = 16  # a strobe is rare: one bar at a time, then at least this many bars without
+
+
+def _release(dt: float, level: float, hold: float, release: float) -> float:
+    """Held at `level` for `hold`, then let go gently (a soft curve) over `release`."""
+    if dt < hold:
+        return level
+    if dt < hold + release:
+        return level * 0.5 * (1 + math.cos(math.pi * (dt - hold) / release))
+    return 0.0
+
+
+def note_env(times: np.ndarray, strengths: np.ndarray, t: float) -> tuple[float, int]:
+    """A light played like a note on each hit: on at once (to a clear, quantised level), held, then released
+    gently before the next hit. Hits closer than MIN_GAP_S are held through instead of flickering.
+    Returns (level 0..1, index of the hit it plays: -1 before the first)."""
+    i = bisect.bisect_right(times, t)
+    if i == 0:
+        return 0.0, -1
+    last = float(times[i - 1])
+    gap = float(times[i]) - last if i < len(times) else 0.5
+    level = round((0.6 + 0.4 * min(1.0, float(strengths[i - 1]))) * 5) / 5
+    if gap < MIN_GAP_S:
+        return level, i - 1
+    return _release(t - last, level, min(0.4 * gap, 0.6), min(0.5 * gap, 0.8)), i - 1
+
+
 def _ease(x: float) -> float:
     return 0.5 - 0.5 * math.cos(math.pi * min(max(x, 0.0), 1.0))
 
@@ -77,12 +109,32 @@ class TimingMixin:
         lo, hi = minimum_filter1d(x, w), maximum_filter1d(x, w)
         return np.clip((x - lo) / np.maximum(hi - lo, 3.0), 0, 1).astype(np.float32)
 
+    def _strobe_bars(self) -> np.ndarray:
+        """Per frame: may a "stutter" look strobe here? A bar where the synths clearly stutter, then a rest of
+        STROBE_REST_BARS; only when the set allows fast strobe."""
+        mask = np.zeros(len(self.chop), dtype=bool)
+        if not self.fast_strobe or len(self.downbeat_times) < 2:
+            return mask
+        fps, bars, rest_until = self.a.fps, self.downbeat_times, -1.0
+        for k in range(len(bars) - 1):
+            f0, f1 = int(bars[k] * fps), min(int(bars[k + 1] * fps), len(mask))
+            if f1 <= f0 or bars[k] < rest_until or float(self.chop[f0:f1].mean()) < STROBE_ON:
+                continue
+            mask[f0:f1] = True
+            rest_until = bars[k] + (STROBE_REST_BARS + 1) * (bars[k + 1] - bars[k])
+        return mask
+
+    def _strobe(self, t: float) -> float | None:
+        """The deliberate strobe: on/off at a fixed fast rate while the synths clearly stutter (and the set
+        allows fast strobe); None elsewhere. Never chopping along with the music: that reads as flicker."""
+        if not self.strobe_bars[self._frame(t)]:
+            return None
+        return 1.0 if (t * STROBE_HZ) % 1.0 < STROBE_DUTY else 0.0
+
     def _stutter(self, t: float, calm: float) -> float:
-        """Brightness that chops with the synth's stutter/gate where there is one, else `calm`."""
-        f = self._frame(t)
-        strength = float(self.chop[f])  # per bar, not flickering between chopping and calm
-        chopped = 1.0 - self.stut_depth * (1.0 - float(self.stut_gate[f]))
-        return calm * (1 - strength) + chopped * strength
+        """The strobe where the synths clearly stutter, else `calm`."""
+        s = self._strobe(t)
+        return calm if s is None else s
 
     def _frame(self, t: float) -> int:
         return min(max(int(t * self.a.fps), 0), len(self.lead_pitch) - 1)
@@ -105,18 +157,20 @@ class TimingMixin:
         return max(i, 0)
 
     def _flash_timeline(self, max_hz: float):
-        """Candidate flashes from the scenes that use them, thinned to at most max_hz."""
+        """White flashes from the scenes that use them: on the kick (a big accent is snapped to the kick it lands
+        with; one between kicks would make the light peak twice a beat), thinned to at most max_hz."""
         cand = []
+        kicks = self.kick_t if len(self.kick_t) else self.beats
         for d in self.plan:
             if d.dynamics == "impact" or (d.dynamics == "rise" and d.par_accent != "none"):
                 m = (self.acc_t >= d.start) & (self.acc_t < d.end) & (self.acc_s > 0.5)
-                cand += list(zip(self.acc_t[m], self.acc_s[m]))
-            if d.dynamics == "rise":  # snare-roll flashes, rate-limited below
-                m = (self.snare_t >= d.start) & (self.snare_t < d.end)
-                cand += [(t, 0.6 * s) for t, s in zip(self.snare_t[m], self.snare_s[m])]
+                for t, s in zip(self.acc_t[m], self.acc_s[m]):
+                    k = int(np.argmin(np.abs(kicks - t))) if len(kicks) else -1
+                    if k >= 0 and abs(kicks[k] - t) <= FLASH_SNAP_S:
+                        cand.append((float(kicks[k]), float(s)))
             if d.dynamics == "impact" and d.intensity >= 3:
-                m = (self.beats >= d.start) & (self.beats < d.end)
-                cand += [(t, 1.0) for t in self.beats[m]]
+                m = (kicks >= d.start) & (kicks < d.end)
+                cand += [(float(t), 1.0) for t in kicks[m]]
         cand.sort()
         out_t, out_s, last = [], [], -1e9
         for t, s in cand:
