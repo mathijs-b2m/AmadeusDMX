@@ -28,6 +28,11 @@ class Phrase:
     stutter: float = 0.0  # 0..1: how strongly the synths are chopped/gated rhythmically (stutters, trance gates)
     lead_density: float = 0.0  # melody/lead note onsets per beat
     lead_presence: float = 0.0  # 0..1: how clearly a pitched lead is there (tonal, not noise)
+    # an anacrusis: the section already starts this many beats before its downbeat (`start`), and how:
+    # "fill" (a burst of drum hits leading in) or "early" (the new part's sound, e.g. a vocal line, starts early)
+    pickup_beats: int = 0
+    pickup_kind: str = ""
+    pickup_start: float = 0.0  # when the pickup starts (= start when there is none)
 
 
 @dataclass

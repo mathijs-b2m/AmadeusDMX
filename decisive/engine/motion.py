@@ -276,6 +276,7 @@ class MotionMixin:
                     self.rig.get("zones", []),
                     self.program,  # a program's head pictures depend on its hits
                     [len(self.cine_hits), float(self.cine_hits.t.sum()), self.CINE_VERSION] if self.program else None,
+                    [(p.pickup_kind, round(p.pickup_start, 3)) for p in self.a.phrases if p.pickup_beats],
                 ],
                 sort_keys=True,
                 default=str,
@@ -456,7 +457,16 @@ class MotionMixin:
             t_i = ts[sel]
             d = self.plan[i]
             res = self._head_dir_v(d, t_i, j)
-            if i > 0 and i not in self.drop_idx:
+            lead = self._pickup_of(i + 1)
+            if lead is not None and lead.pickup_kind == "early":  # the next section leads in: move into it now
+                into = t_i >= lead.pickup_start
+                if into.any():
+                    k = (t_i[into] - lead.pickup_start) / max(self.plan[i + 1].start - lead.pickup_start, 1e-6)
+                    k = (0.5 - 0.5 * np.cos(math.pi * np.clip(k, 0.0, 1.0)))[:, None]
+                    nxt = self._head_dir_v(self.plan[i + 1], t_i[into], j)
+                    blend = res[into] * (1 - k) + nxt * k
+                    res[into] = blend / (np.linalg.norm(blend, axis=1, keepdims=True) + 1e-9)
+            if i > 0 and i not in self.drop_idx and not self._led_in(i):  # (led in: already there)
                 xf = (t_i - d.start) < XFADE
                 if xf.any():
                     k = np.clip((t_i[xf] - d.start) / XFADE, 0.0, 1.0)

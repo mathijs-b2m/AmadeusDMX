@@ -48,7 +48,9 @@ GENRES = {
     "funk": "funk, disco, nu-disco, boogie",
     "jazz": "jazz, swing, blues",
 }
-MIN_CONFIDENCE = 0.5  # the model less sure than this: the fallbacks decide
+MIN_CONFIDENCE = 0.3  # the model less sure than this (with the artist known): the fallbacks decide. Low on
+# purpose: what it loses to is a tag or the audio's tempo family, and torn between pop and edm for Coldplay
+# (0.39) it is still far better than "house" from 124 BPM
 MIN_CONFIDENCE_TITLE_ONLY = 0.85  # no artist known: a title alone ("Symphony") is a weak clue
 BEATLESS = {"cinematic", "classical", "ambient"}  # the model may only say these when the audio agrees
 OVERRIDES = paths.CONFIG / "genres.json"

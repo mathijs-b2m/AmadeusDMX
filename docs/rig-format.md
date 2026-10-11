@@ -69,7 +69,11 @@ is metres), `y` towards the audience (0 = the stage's front edge, the back is ne
 A placement's fields: `x`, `y_m`, `z_m`, `mount` (`hang`, `stand`, `floor`), `rot_deg` (turned counter-clockwise
 seen from above), `aim` (`[azimuth°, elevation°]`, fixtures without motors), and on a truss `truss`,
 `truss_pos_m` (from its centre along it; from its base for a tower), `truss_side` (`under`, `top`, `front`,
-`back`) and `mount_roll_deg` (90 on the front face, 270 on the back). `reverse`, `width` and `group` are
+`back`) and `mount_roll_deg` (90 on the front face, 270 on the back). A tower has four faces, `front`, `back`,
+`left` and `right`: a fixture there hangs off the face (`mount: hang`, `mount_roll_deg: 90`, `rot_deg` turning it
+to that face), its base against the truss and its head pointing out; only on `top` of a tower does a fixture
+stand. Tower fixtures from before tower faces stood in front of it; they are moved onto the front face when the
+rig is loaded. `reverse`, `width` and `group` are
 placement fields too. Fixtures on a truss are positioned by `decisive/rig/trusses.py`; the Mac editor uses the
 same rules.
 

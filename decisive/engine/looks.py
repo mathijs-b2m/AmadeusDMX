@@ -58,6 +58,23 @@ def _mix(cols, x: float):
 
 
 RANDOM_SHARE = 0.4  # random head light: the share of eighths a head would like to light
+STAR_SLOT_S = 2.4  # stars: each star light twinkles at most once in this long, at its own moment in it
+STAR_RATE, STAR_RATE_BUSY = 1.5, 3.0  # new stars per second over the whole set (calm / drop)
+STAR_RISE_S, STAR_HOLD_S, STAR_RELEASE_S = 0.08, 0.25, 0.7  # comes up, holds, fades gently
+
+
+def _hash(k: int, slot: int, salt: int) -> float:
+    """A repeatable random number 0..1."""
+    return math.sin(slot * 12.9898 + k * 78.233 + salt * 37.719) * 43758.5453 % 1.0
+
+
+def envelope_release(dt: float, level: float, hold: float, release: float) -> float:
+    """Held at `level` for `hold`, then let go gently (a soft curve) over `release`."""
+    if dt < hold:
+        return level
+    if dt < hold + release:
+        return level * 0.5 * (1 + math.cos(math.pi * (dt - hold) / release))
+    return 0.0
 
 
 def _chance(head: int, slot: int) -> bool:
@@ -329,10 +346,59 @@ class LooksMixin:
         self._laser_states(d, t, out, env, acc_env, beat, phase, cols, base, accent, bar)
         self._blinder_states(d, t, out, acc_env)
         self._strobe_states(d, t, out, acc_env)
+        if getattr(d, "special", "off") == "stars":
+            self._stars(d, t, out)
         master = INTENSITY_MASTER[max(0, min(3, d.intensity))] * self.rig["safety"]["master"]
         for st in out.values():
             st.dimmer *= master
         return out
+
+    def _star_lights(self) -> list[str]:
+        """The lights that play the stars: one set of small ones, not the rig. The cells of one kind of pixel
+        fixture (the one with the most; a second kind if that's under a dozen), else pars, else every other
+        moving head."""
+        if not hasattr(self, "_stars_cache"):
+            model = {f["id"]: f["fixture"] for f in self.rig["fixtures"]}
+            kinds: dict[str, list[str]] = {}
+            for e in self.rig["elements"]:
+                if "offset_m" in e and e["kind"] in ("par", "head"):
+                    kinds.setdefault(model.get(e["fixture"], e["fixture"]), []).append(e["id"])
+            cells: list[str] = []
+            for ids in sorted(kinds.values(), key=len, reverse=True):
+                if len(cells) >= 12:
+                    break
+                cells += ids
+            self._stars_cache = cells or [e["id"] for e in self.pars] or [e["id"] for e in self.heads][::2]
+        return self._stars_cache
+
+    def _stars(self, d: Decision, t: float, out: dict) -> None:
+        """A starfield over the show (a track about stars, director/themes.py): subtle accents. A set of small
+        lights twinkles, each star at its own random moment (no shared beat: a whole rig stepping at once looks
+        like a game dropping frames), coming up quickly, holding a moment and fading gently, in star white; the
+        rest of the show plays on underneath. A few at a time in calm parts, more in a drop."""
+        busy = d.section in ("drop", "buildup") or d.intensity >= 3
+        lights = self._star_lights()
+        rate = STAR_RATE_BUSY if busy else STAR_RATE  # new stars per second over the set, whatever its size
+        share = min(0.6, rate * STAR_SLOT_S / max(len(lights), 1))
+        slot0 = int(t // STAR_SLOT_S)
+        for k, eid in enumerate(lights):
+            st = out.get(eid)
+            if st is None:
+                continue
+            v = 0.0
+            for slot in (slot0 - 1, slot0):  # this light's star in this slot of time, and the one before
+                if _hash(k, slot, 1) >= share:
+                    continue
+                t0 = (slot + 0.6 * _hash(k, slot, 2)) * STAR_SLOT_S  # at its own moment in the slot
+                level = 0.6 + 0.4 * _hash(k, slot, 3)
+                dt = t - t0
+                if 0 <= dt < STAR_RISE_S:
+                    v = max(v, level * dt / STAR_RISE_S)
+                elif dt >= STAR_RISE_S:
+                    v = max(v, envelope_release(dt - STAR_RISE_S, level, STAR_HOLD_S, STAR_RELEASE_S))
+            if v > 0.01:  # a glint of star white (on a lit light the white is the star), at least as bright
+                st.r, st.g, st.b = _lerp((st.r, st.g, st.b), (1.0, 0.97, 0.92), min(1.0, v * 1.2))
+                st.dimmer = max(st.dimmer, v)
 
     def _stutter_overlay(self, t: float, i: int, states: dict[str, State]) -> None:
         """Wherever the synths clearly stutter, chop the lights with them, whatever look is running.

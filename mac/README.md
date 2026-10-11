@@ -100,6 +100,27 @@ goes (the set), the **rig** (a new one from a template, or one you have), and ho
   set hangs; the set file gets any fixtures you added. The editor rereads the files when they change
   elsewhere, unless it has unsaved changes.
 
+## Performance: the lights first
+
+The 3D stage is by far the heaviest part of the app. Measured during a live show on a 60-head rig, the light
+engine took about 10% of one core (0.4 W of CPU power); the 3D stage about 35% of a core (0.8 W) plus its GPU
+work and the window server's compositing of it. That is several times what the lights themselves cost.
+
+- **Show modes** (Show menu): *Perform + Visualise*, *Perform Only* (the lights, no 3D stage: the computer's
+  power goes to the show) and *Visualise Only* (no DMX).
+- **Power meter:** while a show runs, the sidebar's engine panel shows the light engine and the 3D stage side by
+  side: CPU use, CPU power and the stage's GPU load (measured per process every 2 s, no admin rights needed).
+- **Warning:** with the lights on and the 3D stage open, the panel warns when the stage takes clearly more
+  than the lights (over twice), or the Mac is on battery, in Low Power Mode or getting hot, and offers
+  *Perform Only* in one click. On a laptop or a smaller Mac, use Perform Only for a gig.
+- **Frame rate and resolution:** a running show changes 40 times a second, so the stage draws 40 frames a
+  second, and 60 only while the camera moves. The scene renders at a share of the window's pixels that adapts
+  to the GPU: when a frame takes more than 9 ms the resolution goes down (to half at most; beams and bloom are
+  soft, so it barely shows), and back up when there is room. A 60-head rig on a Retina screen is where this
+  matters.
+- **Idle:** with nothing changing (no show frames, no camera move, no input), the 3D stage draws 4 frames a
+  second instead of 60, so an open window with no show costs next to nothing.
+
 ## Decisive Link (VirtualDJ on another computer)
 
 When the DJ and the lighting operator use different computers:

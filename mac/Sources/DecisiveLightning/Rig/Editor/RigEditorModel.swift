@@ -46,12 +46,33 @@ final class RigEditorModel: StageEditing {
     static let hangDrop = 0.42    // a fixture under a truss: its beam centre below the truss centre
     static let sideOut = 0.4      // a fixture on the front/back face: its centre out from the truss centre
     static let sides = ["under", "top", "front", "back"]
+    static let towerSides = ["front", "back", "left", "right", "top"]
+    static let towerOut = 0.32    // a fixture on a tower's face: its centre out from the tower's centre
+    static let towerTop = 0.3     // a fixture on top of a tower: its centre above the top
+
+    /// The outward direction of a tower's face (front: towards the audience; left/right: across the stage).
+    static func towerNormal(_ t: Truss, _ side: String) -> SIMD2<Double> {
+        let r = t.rotDeg * .pi / 180, front = SIMD2(-sin(r), cos(r))
+        switch side {
+        case "back": return -front
+        case "right": return SIMD2(front.y, -front.x)
+        case "left": return SIMD2(-front.y, front.x)
+        default: return front
+        }
+    }
     static let grid = 0.25        // snapping step (m)
     static let spacing = 0.6      // fixtures dropped or dragged as a group: this far apart on a truss
     static let payloadPrefix = "fixtures:"
 
     init?(workspace: Workspace, rig: String, set: String) {
-        guard let d = workspace.document(rig: rig, set: set) else { return nil }
+        guard var d = workspace.document(rig: rig, set: set) else { return nil }
+        // fixtures placed on a tower before towers had faces stood in front of it: onto its front face now
+        for i in d.fixtures.indices {
+            guard let tid = d.fixtures[i].truss, let t = d.trusses.first(where: { $0.id == tid }), t.vertical,
+                  !Self.towerSides.contains(d.fixtures[i].side ?? "") else { continue }
+            d.fixtures[i].side = "front"
+            Self.place(&d.fixtures[i], on: t, at: d.fixtures[i].trussPos ?? t.lengthM - 0.3, width: d.width)
+        }
         self.workspace = workspace
         doc = d
         saved = d
@@ -172,14 +193,31 @@ final class RigEditorModel: StageEditing {
         f.truss = t.id
         f.trussPos = u
         f.waiting = false
-        if t.vertical {  // clamped to the tower's front, facing the audience
+        if t.vertical {
+            // a tower's four faces: the fixture hangs off the face (base against the truss, head out of it, like
+            // on a box truss's side); only on top does it stand
+            let side = f.side.flatMap { towerSides.contains($0) ? $0 : nil } ?? "front"
             let base = t.zM - t.lengthM / 2
-            f.x = t.xM / width
-            f.yM = t.yM + 0.32
-            f.zM = base + u
-            f.side = nil
-            f.mountRoll = nil
-            f.mount = "stand"
+            f.side = side
+            if side == "top" {
+                f.trussPos = t.lengthM
+                f.x = t.xM / width
+                f.yM = t.yM
+                f.zM = base + t.lengthM + towerTop
+                f.mount = "stand"
+                f.mountRoll = nil
+            } else {
+                let n = towerNormal(t, side)
+                f.trussPos = max(0.2, min(t.lengthM - 0.2, u))
+                f.x = (t.xM + n.x * towerOut) / width
+                f.yM = t.yM + n.y * towerOut
+                f.zM = base + f.trussPos!
+                f.mount = "hang"
+                f.mountRoll = 90
+                var r = atan2(-n.x, n.y) * 180 / .pi
+                if r < 0 { r += 360 }
+                f.rotDeg = (r * 10).rounded() / 10
+            }
         } else {
             // the box truss's four sides: under it, on top, on the front (audience) or the back face
             let side = f.side.flatMap { sides.contains($0) ? $0 : nil } ?? (f.mount == "stand" ? "top" : "under")
@@ -209,7 +247,8 @@ final class RigEditorModel: StageEditing {
     func setSide(_ ids: Set<String>, _ side: String) {
         change("Move to \(side.capitalized)") { d in
             for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
-                guard let tid = d.fixtures[i].truss, let t = d.trusses.first(where: { $0.id == tid }), !t.vertical else { continue }
+                guard let tid = d.fixtures[i].truss, let t = d.trusses.first(where: { $0.id == tid }),
+                      (t.vertical ? Self.towerSides : Self.sides).contains(side) else { continue }
                 d.fixtures[i].side = side
                 Self.place(&d.fixtures[i], on: t, at: d.fixtures[i].trussPos ?? 0, width: d.width)
             }
@@ -296,7 +335,7 @@ final class RigEditorModel: StageEditing {
             guard let i = d.fixtures.firstIndex(where: { $0.id == id }) else { continue }
             if d.fixtures[i].truss != t.id {
                 d.fixtures[i].side = side
-                if d.fixtures[i].mount == "floor" || d.fixtures[i].waiting { d.fixtures[i].mount = t.vertical ? "stand" : "hang" }
+                if d.fixtures[i].mount == "floor" || d.fixtures[i].waiting { d.fixtures[i].mount = "hang" }
             }
             place(&d.fixtures[i], on: t, at: start + step * Double(k), width: d.width)
         }
@@ -348,7 +387,7 @@ final class RigEditorModel: StageEditing {
                     let span = t.vertical ? t.lengthM : t.lengthM * 0.9
                     let pos = t.vertical ? span * (Double(k) + 1) / Double(count + 1)
                         : -span / 2 + span * (Double(k) + 0.5) / Double(count)
-                    f.mount = t.vertical ? "stand" : "hang"
+                    f.mount = "hang"
                     Self.place(&f, on: t, at: pos, width: d.width)
                 }
                 d.fixtures.append(f)
@@ -699,8 +738,13 @@ final class RigEditorModel: StageEditing {
             if let (tr, pr) = near, snap || !free {
                 var u = tr.vertical ? (f.truss == tr.id ? (f.trussPos ?? 1) : min(tr.lengthM - 0.3, 1.0)) : pr.u
                 if snapOn && !tr.vertical { u = (u / grid).rounded() * grid }
-                if f.truss != tr.id && f.mount == "floor" { f.mount = tr.vertical ? "stand" : "hang"; f.side = nil }
-                if !tr.vertical {  // dragged across the truss: onto its front or back face (centre: under / on top)
+                if f.truss != tr.id && f.mount == "floor" { f.mount = "hang"; f.side = nil }
+                if tr.vertical {  // dragged off one side of the tower: onto that face (on top stays on top)
+                    let off = p2 - SIMD2(tr.xM, tr.yM)
+                    if simd_length(off) > 0.12 && f.side != "top" {
+                        f.side = ["front", "back", "left", "right"].max { simd_dot(off, Self.towerNormal(tr, $0)) < simd_dot(off, Self.towerNormal(tr, $1)) }
+                    } else if f.truss != tr.id { f.side = "front" }
+                } else {  // dragged across the truss: onto its front or back face (centre: under / on top)
                     let r = tr.rotDeg * .pi / 180, n = SIMD2(-sin(r), cos(r))
                     let across = simd_dot(p2 - SIMD2(tr.point(pr.u).x, tr.point(pr.u).y), n)
                     if across > 0.2 { f.side = "front" }

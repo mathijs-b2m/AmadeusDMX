@@ -131,7 +131,21 @@ def compose(set_doc: dict, rig_doc: dict, set_name: str) -> dict:
     for f, spot in zip(waiting, waiting_row(len(waiting))):
         f.update(spot)
         f[UNPLACED] = dict(spot)
+    _onto_tower_faces(out)
     return out
+
+
+def _onto_tower_faces(rig: dict):
+    """Fixtures placed on a tower before towers had faces stood in front of it: they hang off its front face
+    now (only on top of a tower does a fixture stand)."""
+    from decisive.rig import geometry, trusses
+
+    towers = {t["id"]: t for t in rig.get("trusses", []) if t.get("vertical")}
+    width = geometry.stage(rig)["width_m"]
+    for f in rig.get("fixtures", []):
+        t = towers.get(f.get("truss"))
+        if t and f.get("truss_side") not in trusses.TOWER_SIDES:
+            trusses.place(f, t, f.get("truss_pos_m", t["length_m"] - 0.3), width, "front")
 
 
 def waiting_row(n: int) -> list[dict]:

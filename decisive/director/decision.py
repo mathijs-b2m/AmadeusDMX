@@ -29,6 +29,9 @@ LASER_NAMES = ["laser_look", "laser_move", "laser_color"]  # only for rigs with 
 SCREEN_NAMES = ["screen"]  # only for rigs with an LED wall
 
 
+SPECIAL_NAMES = ["special"]  # only for tracks with a theme in their title (director/themes.py)
+
+
 @dataclass
 class Decision:
     phrase: int
@@ -66,6 +69,7 @@ class Decision:
     laser_move: str = "still"  # still | scan | rotate | wave | chase
     laser_color: str = "base"  # base | accent | white | cycle (palette colours)
     screen: str = "off"  # LED wall: off | ambient | figure | words | equalizer | psychedelic
+    special: str = "off"  # a theme's own look, switched on at key moments: off | stars
 
     def look(self) -> tuple:
         return tuple(getattr(self, n) for n in LAYER_NAMES)
@@ -83,6 +87,8 @@ class Decision:
             grp += f" laser:{self.laser_look}/{self.laser_move}/{self.laser_color}"
         if self.screen != "off":
             grp += f" wall:{self.screen}"
+        if self.special != "off":
+            grp += f" ✦{self.special}"
         if self.grouping != "unison":
             grp = (
                 f" [{self.grouping}"

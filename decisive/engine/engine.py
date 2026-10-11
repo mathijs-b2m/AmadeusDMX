@@ -12,6 +12,8 @@ levels, hits), `motion` (where heads point and how their motors get there) and
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from decisive.audio.model import DROP_THRESHOLD, Analysis
@@ -25,6 +27,8 @@ from decisive.engine.state import State
 from decisive.engine.timing import TimingMixin, _ease
 from decisive.library import fixtures as fxlib
 from decisive.rig import geometry
+
+PICKUP_LEAD = 0.65  # a section that leads in early: how far its look has come in by the downbeat (which lands it)
 
 
 class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
@@ -114,6 +118,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
             for _, defn in self.head_fx
         ]
         self.drop_idx = {i for i, d in enumerate(plan) if getattr(d, "drop_score", 0) >= DROP_THRESHOLD}
+        on = analysis.onsets
+        self.fill_t = np.sort(np.concatenate([on["snare"][0], on["accent"][0]])) if on else np.zeros(0)  # fill hits
         self.drops = [plan[i].start for i in sorted(self.drop_idx)]
         self.goals: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         self._reach_uv = (1.0, 1.0)
@@ -175,13 +181,52 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
                 s = drop_look[e["id"]]
                 s.dimmer, s.white = 0.0, 0.0
                 states[e["id"]] = s
-        if i > 0 and t - d.start < XFADE and i not in self.drop_idx:  # drops are a hard cut, no fade
+        states = self._pickup(i, t, states)
+        if i > 0 and t - d.start < XFADE and i not in self.drop_idx and not self._led_in(i):  # drops: a hard cut
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
         self._stutter_overlay(t, i, states)
         self._drop_moment(t, states)
         return i, self._finish(states, t)
+
+    def _pickup_of(self, i: int):
+        """Phrase i's anacrusis (it starts before its downbeat), if it has one the lights act on: not into a
+        drop (the drop moment has its own timing)."""
+        if not 0 < i < len(self.plan) or i in self.drop_idx or i >= len(self.a.phrases):
+            return None
+        p = self.a.phrases[i]
+        return p if getattr(p, "pickup_beats", 0) and p.pickup_start < self.plan[i].start else None
+
+    def _led_in(self, i: int) -> bool:
+        p = self._pickup_of(i)
+        return p is not None and p.pickup_kind == "early"
+
+    def _pickup(self, i: int, t: float, states: dict[str, State]) -> dict[str, State]:
+        """The next section starts before its downbeat: a vocal or melody leading in brings its look in early
+        (about two thirds there by the downbeat, which lands it); a fill is played by the lights, hit by hit,
+        in the next section's accent colour, growing into the downbeat."""
+        p = self._pickup_of(i + 1)
+        if p is None or not p.pickup_start <= t < self.plan[i + 1].start:
+            return states
+        nxt = self.plan[i + 1]
+        progress = (t - p.pickup_start) / max(nxt.start - p.pickup_start, 1e-6)
+        if p.pickup_kind == "early":
+            ahead = self._scene(nxt, t)
+            k = PICKUP_LEAD * _ease(progress)
+            return {fid: s.blend(ahead[fid], k) for fid, s in states.items()}
+        hits = self.fill_t[(self.fill_t >= p.pickup_start - 0.02) & (self.fill_t <= t)]
+        if not len(hits):
+            return states
+        v = math.exp(-(t - float(hits[-1])) / 0.12) * (0.55 + 0.45 * progress)
+        cols = self._colours(nxt)
+        accent = cols[2 % len(cols)]
+        for e in self.pars + self.heads:
+            s = states[e["id"]]
+            if v > s.dimmer:
+                s.dimmer = v
+                s.r, s.g, s.b = accent
+        return states
 
     def _finish(self, states: dict[str, State], t: float) -> dict[str, State]:
         """What every look gets last: the heads' real and target positions, dark while crossing the eye band,

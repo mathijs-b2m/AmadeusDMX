@@ -185,6 +185,7 @@ private struct MultiFixtureInspector: View {
         let fixtures = editor.doc.fixtures.filter { ids.contains($0.id) }
         let models = Set(fixtures.map(\.key))
         let onBoxTruss = fixtures.allSatisfy { f in f.truss.flatMap { t in editor.doc.trusses.first { $0.id == t } }.map { !$0.vertical } ?? false }
+        let onTower = fixtures.allSatisfy { f in f.truss.flatMap { t in editor.doc.trusses.first { $0.id == t } }.map(\.vertical) ?? false }
         SwiftUI.Section {
             HStack {
                 Image(systemName: "square.stack.3d.up").font(.title2).foregroundStyle(.tint)
@@ -203,6 +204,15 @@ private struct MultiFixtureInspector: View {
                 Picker("Side", selection: Binding(get: { Set(fixtures.compactMap(\.side)).count == 1 ? fixtures.first?.side ?? "under" : "" },
                                                   set: { editor.setSide(ids, $0) })) {
                     Text("Under").tag("under"); Text("Front").tag("front"); Text("Top").tag("top"); Text("Back").tag("back")
+                }
+                .pickerStyle(.segmented)
+            }
+        } else if onTower {
+            SwiftUI.Section("Position on the Tower") {
+                Picker("Face", selection: Binding(get: { Set(fixtures.compactMap(\.side)).count == 1 ? fixtures.first?.side ?? "front" : "" },
+                                                  set: { editor.setSide(ids, $0) })) {
+                    Text("Front").tag("front"); Text("Left").tag("left"); Text("Right").tag("right"); Text("Back").tag("back")
+                    Text("Top").tag("top")
                 }
                 .pickerStyle(.segmented)
             }
@@ -284,6 +294,14 @@ struct FixtureInspector: View {
                     Text("Under 0°").tag("under"); Text("Front 90°").tag("front"); Text("Top 180°").tag("top"); Text("Back 270°").tag("back")
                 }
                 .pickerStyle(.segmented)
+            } else if let t = truss, t.vertical {
+                Picker("Face", selection: Binding(get: { fixture.side ?? "front" }, set: { editor.setSide(fixture.id, $0) })) {
+                    Text("Front").tag("front"); Text("Left").tag("left"); Text("Right").tag("right"); Text("Back").tag("back")
+                    Text("Top").tag("top")
+                }
+                .pickerStyle(.segmented)
+                Text(fixture.side == "top" ? "Standing on top of the tower." : "Hanging off the tower's face, the head pointing out.")
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
             Picker("Mount", selection: Binding(get: { fixture.mount }, set: { m in
                 editor.updateFixture(fixture.id, "Change Mount") { f in

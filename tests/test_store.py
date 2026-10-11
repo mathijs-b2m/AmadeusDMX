@@ -4,6 +4,7 @@ import json
 import shutil
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from decisive.library import fixtures as fxlib
@@ -44,12 +45,14 @@ def test_old_sets_split_into_set_and_rig_and_load_the_same(config, name):
     assert not store.is_combined(set_doc)
     assert "fixtures" not in rig_doc and set(rig_doc["placements"]) == {name}
     show = store.Selection(rig=name, set=name)
+    store._onto_tower_faces(old)  # (the one thing that changes: tower fixtures hang off the tower's face now)
     assert load_rig_dict(show.load()) == load_rig_dict(old)
 
 
 def test_saving_the_combined_view_changes_nothing(config):
     old_style(config, "showcase")
     show = store.Selection(rig="showcase", set="showcase")
+    show.save(show.load())  # (once: tower fixtures from before tower faces get theirs)
     before = [p.read_text() for p in show.paths]
     show.save(show.load())
     assert [p.read_text() for p in show.paths] == before
@@ -139,3 +142,28 @@ def test_automount_leaves_mounted_fixtures_and_their_room_alone(config):
     clash = [f for f in after.values() if f["id"] != first["id"] and f.get("truss") == truss["id"]
              and f.get("truss_side") == "under" and abs(f["truss_pos_m"]) < 0.4]  # fmt: skip
     assert not clash
+
+
+def test_a_tower_has_four_faces_and_a_top():
+    from decisive.rig import geometry
+    from decisive.rig import trusses as T
+
+    tower = {"id": "tw", "vertical": True, "x_m": 0.0, "y_m": -1.5, "z_m": 1.5, "length_m": 3.0}
+    out = {"front": (0, 1, 0), "back": (0, -1, 0), "left": (-1, 0, 0), "right": (1, 0, 0)}
+    for side, n in out.items():
+        f = T.place({"id": "h", "mount": "stand"}, tower, 2.0, 8.0, side)
+        assert f["mount"] == "hang" and f["z_m"] == 2.0  # hanging off the face…
+        assert np.allclose(geometry.mount_up(f), n, atol=1e-6)  # …the head pointing out of it
+    top = T.place({"id": "h"}, tower, 2.0, 8.0, "top")
+    assert top["mount"] == "stand" and top["z_m"] > 3.0  # only on top it stands
+
+
+def test_a_fixture_standing_on_a_tower_from_before_hangs_off_its_front():
+    from decisive.rig.store import compose
+
+    rig = {"trusses": [{"id": "tw", "vertical": True, "x_m": 0.0, "y_m": -1.5, "z_m": 1.5, "length_m": 3.0}],
+           "placements": {"s": {"h": {"truss": "tw", "truss_pos_m": 2.0, "mount": "stand", "x": 0.0, "y_m": -1.18,
+                                      "z_m": 2.0}}}}  # fmt: skip
+    out = compose({"fixtures": [{"id": "h", "fixture": "x"}]}, rig, "s")
+    f = out["fixtures"][0]
+    assert f["mount"] == "hang" and f["truss_side"] == "front" and f["mount_roll_deg"] == 90

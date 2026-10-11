@@ -42,9 +42,52 @@ final class StageRenderer: NSObject, MTKViewDelegate {
 
     // inputs
     var input: (() -> (StageInput?, Frame?))?
-    var highlight: Set<String> = []
-    var haze: Float = 0.75
-    var exposure: Float = 1.0
+    var highlight: Set<String> = [] { didSet { wake() } }
+    var haze: Float = 0.75 { didSet { wake() } }
+    var exposure: Float = 1.0 { didSet { wake() } }
+
+    static let wallInterval: CFTimeInterval = 0.05
+    private var wallOut: WallOutput?
+    private var wallAt: CFTimeInterval = 0
+    private var wallDt: Float = 0
+
+    /// Every frame's GPU time (seconds), for the power meter.
+    static var onGPUTime: ((Double) -> Void)?
+
+    // idle: with nothing changing (no show frames, no camera move, no input) the stage draws only a few frames a
+    // second, so an open window with no show doesn't keep the GPU (and the window server) busy
+    // a running show changes 40 times a second (the engine's frame rate): drawn at 40; at 60 only while the camera
+    // moves (you, an animation, auto-orbit), which is where smoothness shows
+    static let activeFPS = 60, showFPS = 40, idleFPS = 4
+    static let idleAfter: CFTimeInterval = 1.5, interactionFor: CFTimeInterval = 2
+    private var lastActive = CACurrentMediaTime()
+    private var lastInteraction = 0.0
+    private var lastShowT: Double?
+    private weak var drawingView: MTKView?
+
+    // adaptive resolution: the scene renders at a share of the window's pixels, lowered while the GPU takes too long
+    // per frame (beams and bloom are soft: it barely shows) and raised again when there's room
+    static let gpuBudgetMs = 9.0, gpuRoomMs = 4.5, minScale: CGFloat = 0.5
+    private(set) var renderScale: CGFloat = 1
+    private var gpuMs = 0.0
+    private var scaledAt = CACurrentMediaTime()
+
+    /// Something changed (input, a setting): draw at full rate again.
+    func wake() {
+        lastActive = CACurrentMediaTime()
+        lastInteraction = lastActive
+        if let v = drawingView, v.preferredFramesPerSecond != Self.activeFPS { v.preferredFramesPerSecond = Self.activeFPS }
+    }
+
+    private func adaptScale(_ now: CFTimeInterval) {
+        guard now - scaledAt > 1 else { return }
+        scaledAt = now
+        if gpuMs > Self.gpuBudgetMs && renderScale > Self.minScale {
+            renderScale = max(Self.minScale, renderScale * 0.85)
+        } else if gpuMs < Self.gpuRoomMs && renderScale < 1 {
+            renderScale = min(1, renderScale * 1.1)
+        }
+    }
     var autoExposure: Float = 1.0
     lazy var statsTexture: MTLTexture? = {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: 1, height: 1, mipmapped: false)
@@ -52,10 +95,10 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         return device.makeTexture(descriptor: d)
     }()
     lazy var statsBuf: MTLBuffer? = device.makeBuffer(length: 16, options: .storageModeShared)
-    var autoOrbit = false
+    var autoOrbit = false { didSet { wake() } }
     /// Light the room so the rig is easy to see (rig pages, no show).
-    var workLight: Float = 0
-    var wallScene: WallScene { get { wall.force } set { wall.force = newValue } }
+    var workLight: Float = 0 { didSet { wake() } }
+    var wallScene: WallScene { get { wall.force } set { wall.force = newValue; wake() } }
     /// What the wall shows right now (for the UI).
     private(set) var wallNow: WallScene = .off
 
@@ -91,6 +134,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     // MARK: camera
 
     func setPreset(_ p: CameraPreset, animated: Bool = true) {
+        wake()
         preset = p
         guard let s = scenery else { return }
         let target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling)
@@ -107,17 +151,20 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     }
 
     func orbit(dx: Float, dy: Float) {
+        wake()
         goal = nil
         pose.yaw -= dx * 0.005
         pose.pitch = min(1.45, max(-0.05, pose.pitch + dy * 0.004))
     }
 
     func zoom(_ factor: Float) {
+        wake()
         goal = nil
         pose.distance = min(80, max(2, pose.distance * factor))
     }
 
     func pan(dx: Float, dy: Float) {
+        wake()
         goal = nil
         let eye = pose.eye, f = simd_normalize(pose.target - eye)
         let r = simd_normalize(simd_cross(f, [0, 0, 1])), u = simd_cross(r, f)
@@ -153,6 +200,12 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         let dt = Float(min(0.1, now - lastTime))
         lastTime = now
         let (inp, frame) = input?() ?? (nil, nil)
+        drawingView = view
+        if let f = frame, f.t != lastShowT { lastShowT = f.t; lastActive = now }  // the show moves
+        if goal != nil || autoOrbit || (inp.map { $0.key != sceneryKey } ?? false) { lastActive = now; lastInteraction = now }
+        let moving = now - lastInteraction < Self.interactionFor
+        let fps = now - lastActive > Self.idleAfter ? Self.idleFPS : moving ? Self.activeFPS : Self.showFPS
+        if view.preferredFramesPerSecond != fps { view.preferredFramesPerSecond = fps }
         if Self.gpuStats, let f = frame, f.t != Self.lastFrameT { Self.lastFrameT = f.t; Self.newFrames += 1 }
         if let inp, inp.key != sceneryKey { rebuildScenery(inp) }
         if let g = goal {
@@ -161,7 +214,9 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         }
         if autoOrbit && goal == nil { pose.yaw += dt * 0.05 }
 
-        ensureTargets(view.drawableSize)
+        adaptScale(now)
+        ensureTargets(CGSize(width: (view.drawableSize.width * renderScale).rounded(),
+                             height: (view.drawableSize.height * renderScale).rounded()))
         guard let hdr, let depth, let halfA, let halfB, let quarterA, let quarterB,
               let drawable = view.currentDrawable, let cmd = queue.makeCommandBuffer() else { return }
 
@@ -186,12 +241,20 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         // the wall's picture
         var wp = WallParams(info: .zero, bands: .zero, pal: (.zero, .zero, .zero, .zero))
         if let inp, let h = inp.hello, let frame, scenery?.wall != nil {
-            let out = wall.update(frame: frame, hello: h, dt: dt)
-            wallNow = out.scene
-            if !out.psychedelic, let data = wall.context.data {
-                wallTexture.replace(region: MTLRegionMake2D(0, 0, WallRenderer.W, WallRenderer.H), mipmapLevel: 0,
-                                    withBytes: data, bytesPerRow: WallRenderer.W * 4)
+            // the wall's picture is drawn on the CPU: 20 times a second is plenty for a picture on a wall
+            wallDt += dt
+            if wallOut == nil || now - wallAt >= Self.wallInterval {
+                let o = wall.update(frame: frame, hello: h, dt: wallDt)
+                wallOut = o
+                wallAt = now
+                wallDt = 0
+                if !o.psychedelic, let data = wall.context.data {
+                    wallTexture.replace(region: MTLRegionMake2D(0, 0, WallRenderer.W, WallRenderer.H), mipmapLevel: 0,
+                                        withBytes: data, bytesPerRow: WallRenderer.W * 4)
+                }
             }
+            let out = wallOut!
+            wallNow = out.scene
             let p = out.palette + Array(repeating: out.palette.last ?? .one, count: max(0, 4 - out.palette.count))
             wp = WallParams(info: [out.level, out.psychedelic ? 1 : 0, Float(now - startTime), 0], bands: out.bands,
                             pal: (SIMD4(p[0], 1), SIMD4(p[1], 1), SIMD4(p[2], 1), SIMD4(p[3], 1)))
@@ -339,10 +402,20 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 }
             } else { blit.endEncoding() }
         }
+        cmd.addCompletedHandler { [weak self] b in  // the stage's GPU time: the power meter, the adaptive resolution
+            let s = max(0, b.gpuEndTime - b.gpuStartTime)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    StageRenderer.onGPUTime?(s)
+                    if let self { self.gpuMs = self.gpuMs * 0.9 + s * 1000 * 0.1 }
+                }
+            }
+        }
         if Self.gpuStats {  // -gpuStats YES: average GPU time per frame → $TMPDIR/gpu-stats.txt
             cmd.addCompletedHandler { b in
                 let ms = (b.gpuEndTime - b.gpuStartTime) * 1000
-                DispatchQueue.main.async { StageRenderer.recordGPU(ms, beams: beams.count, size: view.drawableSize) }
+                let size = CGSize(width: hdr.width, height: hdr.height)  // what was rendered (adaptive resolution)
+                DispatchQueue.main.async { StageRenderer.recordGPU(ms, beams: beams.count, size: size) }
             }
         }
         cmd.commit()

@@ -24,9 +24,19 @@ def test_the_rule_director_keeps_to_the_style():
     for genre in ("techno", "rock", "ambient"):
         style = STYLES[genre]
         plan = direct(a, RuleDirector(style=style), verbose=False)
-        assert {d.palette for d in plan} <= set(style.palettes)
-        misfits = sum(not style.allows(layer, getattr(d, layer)) for d in plan for layer in style.avoid)
-        assert misfits <= len(plan) // 4  # (the song's arc and the drops may still insist now and then)
+        assert {d.palette for d in plan} <= set(style.palettes)  # the genre's colours all through
+        grooves = [d for d in plan if d.section == "groove"]
+        misfits = sum(not style.allows(layer, getattr(d, layer)) for d in grooves for layer in style.avoid)
+        assert misfits <= max(1, len(grooves) // 4)  # its looks in the grooves (the arc may still insist)
+
+
+def test_the_other_parts_follow_their_own_music():
+    a = synthetic_analysis()
+    plain = direct(a, RuleDirector(), verbose=False)
+    jazz = direct(a, RuleDirector(style=STYLES["jazz"]), verbose=False)
+    for p, j in zip(plain, jazz):
+        if p.section in ("drop", "buildup") and j.section == p.section:
+            assert (p.movement, p.head_light) == (j.movement, j.head_light)  # a drop stays a drop, also in jazz
 
 
 def test_two_genres_look_different():
@@ -37,26 +47,26 @@ def test_two_genres_look_different():
     assert [d.look() for d in techno] != [d.look() for d in rock]
 
 
-def test_the_models_get_the_style_and_only_options_that_fit():
+def test_the_models_get_the_colours_and_the_style_as_a_lean():
     style = STYLES["techno"]
     qs = {q["name"]: q for q in questions_for(None, style=style)}
     assert [c["value"] for c in qs["palette"]["choices"]] == list(style.palettes)
-    for layer, bad in style.avoid.items():
-        if layer in qs:
-            assert not bad & {c["value"] for c in qs[layer]["choices"]}
+    plain = {q["name"]: q for q in questions_for(None)}
+    assert all(qs[n] == plain[n] for n in qs if n != "palette")  # every move and light still open
     prompt = build_prompt(synthetic_analysis(), 2, [], style=style)
-    assert "STYLE: this part of the set is techno" in prompt
+    assert "STYLE: this part of the set is techno" in prompt and "LEAN, not a rule" in prompt
 
 
 def test_the_set_keeps_its_genre_until_a_new_one_lasts():
     s = SetGenre()
-    assert s.genre_for("a.mp3", "house") == "house"
-    assert s.genre_for("b.mp3", "house") == "house"
-    assert s.genre_for("c.mp3", "pop") == "house"  # one pop track in a house set: played as house
-    assert s.genre_for("c.mp3", "pop") == "house"  # (decided once per track)
-    assert s.genre_for("d.mp3", "house") == "house"
-    assert s.genre_for("e.mp3", "techno") == "house"
-    assert s.genre_for("f.mp3", "techno") == "techno"  # two in a row: the set has moved on
+    assert s.genre_for("a.mp3", "house", "audio") == "house"
+    assert s.genre_for("b.mp3", "house", "audio") == "house"
+    assert s.genre_for("c.mp3", "pop", "audio") == "house"  # one pop guess in a house set: played as house
+    assert s.genre_for("c.mp3", "pop", "audio") == "house"  # (decided once per track)
+    assert s.genre_for("d.mp3", "house", "audio") == "house"
+    assert s.genre_for("e.mp3", "techno", "audio") == "house"
+    assert s.genre_for("f.mp3", "techno", "audio") == "techno"  # two in a row: the set has moved on
     assert s.genre_for("g.mp3", "rock", source="you") == "rock"  # your own choice counts for its track
-    assert s.genre_for("h.mp3", "cinematic") == "cinematic"  # a program of its own…
-    assert s.genre_for("i.mp3", "pop") == "techno"  # …and the set's genre stays
+    assert s.genre_for("h.mp3", "pop", source="ai") == "pop"  # so does a genre known from artist and title
+    assert s.genre_for("i.mp3", "cinematic") == "cinematic"  # a program of its own…
+    assert s.genre_for("j.mp3", "pop", "audio") == "pop"  # …and leaves the set alone: pop twice, the set is pop

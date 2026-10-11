@@ -4,15 +4,22 @@ Every track is directed on its own; without a style two techno tracks in a row c
 and a disco ball. A **style sheet** per genre says what fits: the palettes, what doesn't belong (a fading
 wash in hardstyle, a spinning prism in techno), what to use instead, and a few lines for the decision model.
 
-- The rule director uses the genre's palettes and swaps a look's misfits for what fits.
-- The decision models get the style in the prompt, and only the options that fit as answers.
+A style is a lean, not a rule: the genre sets the COLOURS, the music of each part decides the moves. A song
+is not one genre all the way through (a pop song's piano ballad, then a mainstage drop):
+
+- The rule director uses the genre's palettes everywhere, and swaps a look's misfits only in the grooves (the
+  body of a genre); intros, breakdowns, buildups and drops follow their own music.
+- The decision models get the genre's palettes as the only colour answers, and the rest of the style in the
+  prompt as a lean, with every option still open.
 
 Nothing here knows a rig: a style talks about looks (palettes, movement, light), the rig plays them.
 
-The **set's genre** smooths the per-track call in a live set: detection is noisy, and one house track
-called "pop" must not flip the style for one song. A new genre takes over after two tracks in a row; your own
-choice (config/genres.json) always counts for its track. A genre with a program of its own (cinematic)
-plays that program and leaves the set's genre alone.
+The **set's genre** smooths the per-track call in a live set where it is a guess: a genre from the audio
+alone (a tempo family) is noisy, and one such track must not flip the style for one song; it is lit in the
+set's genre, and a new genre takes over after two tracks in a row. A track whose genre is known (your
+choice, the Decisions API from its artist and title, its tag) is lit in its own style: a Coldplay song in a
+techno set is still pop. A genre with a program of its own (cinematic) plays that program and leaves the
+set's genre alone.
 """
 
 from __future__ import annotations
@@ -23,6 +30,7 @@ from dataclasses import dataclass, field
 from decisive.director.vocabulary import DEFAULT_PALETTES, PALETTES
 
 SWITCH_AFTER = 2  # a different genre this many tracks in a row becomes the set's genre
+KNOWN = {"you", "ai", "tag"}  # where a genre is known, not guessed from the audio: the track keeps its own style
 
 
 @dataclass(frozen=True)
@@ -37,10 +45,13 @@ class Style:
         return value not in self.avoid.get(layer, ())
 
     def adjust(self, d, k: int) -> bool:
-        """Swap the misfits of decision `d` for what fits the style (k: rotates the choice). True if changed."""
+        """The genre's colours for decision `d`, and in a groove its misfits swapped for what fits (k: rotates
+        the choice). True if changed."""
         changed = False
         if d.palette not in self.palettes:
             d.palette, changed = self.palettes[k % len(self.palettes)], True
+        if d.section != "groove":
+            return changed  # intros, breakdowns, buildups and drops: their own music decides
         for layer, bad in self.avoid.items():
             if getattr(d, layer, None) in bad:
                 fits = [v for v in self.prefer.get(layer, ()) if v not in bad]
@@ -288,7 +299,8 @@ def check() -> list[str]:
 
 class SetGenre:
     """The genre a live set is in, from the tracks as they come: a new genre takes over only after
-    SWITCH_AFTER tracks in a row (detection is noisy); your own choice always counts for its track."""
+    SWITCH_AFTER tracks in a row. A known genre (you, the Decisions API, a tag) is the track's own style; only
+    a guess from the audio follows the set."""
 
     def __init__(self):
         self.current: str | None = None
@@ -309,7 +321,7 @@ class SetGenre:
                 if self.current not in (None, genre):
                     print(f"  ⇄ the set is {genre} now (was {self.current})")
                 self.current = genre
-            out = genre if source == "you" else self.current
+            out = genre if source in KNOWN else self.current
             if out != genre:
                 print(f"  ♫ {file.rsplit('/', 1)[-1]}: {genre}, played in the set's {out} style")
             self.decided[file] = out

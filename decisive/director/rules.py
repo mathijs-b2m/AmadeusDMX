@@ -171,11 +171,13 @@ class RuleDirector:
         lasers: list[dict] | None = None,
         screen: bool = False,
         style: Style | None = None,
+        theme: str | None = None,
     ):
         self.groups = groups
         self.lasers = lasers
         self.screen = screen
         self.style = style  # the genre's house style, if any
+        self.theme = theme  # what the title is about (director/themes.py), if anything
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
         p = a.phrases[i]
@@ -233,6 +235,11 @@ class RuleDirector:
         )
         if self.style:
             self.style.adjust(d, n_before)
+        if self.theme == "stars":  # a starfield in the calm parts and as each drop lands
+            first_drop = section == "drop" and not (last and last.section == "drop")
+            twice = len(history) >= 2 and all(h.special == "stars" for h in history[-2:])
+            if (section == "breakdown" or first_drop) and not twice:  # key moments: two phrases at most
+                d.special = "stars"
         apply_groups(d, self.groups, n_before)
         apply_lasers(d, self.lasers, n_before)
         apply_screen(d, self.screen, n_before)

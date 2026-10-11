@@ -10,6 +10,8 @@ import Security
 final class AppModel {
     var workspace: Workspace?
     let engine = EngineProcess(name: "show")
+    /// What the show costs the computer: the light engine against the 3D stage.
+    let power = PowerMeter()
     let setup = EngineProcess(name: "setup")
     let feed = LiveFeed()
     let api = SetupAPI(port: 8181)

@@ -48,6 +48,12 @@ struct EngineFooter: View {
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 }
             }
+            if model.engineRunning && model.power.measured {
+                PowerLine(power: model.power, stageOn: model.mode.renders3D)
+                if model.mode.sendsDMX && model.mode.renders3D && model.power.stageIsHeavy {
+                    PowerWarning(power: model.power) { model.setMode(.perform) }
+                }
+            }
             if case .failed(let why) = state {
                 Text(why).font(.caption).foregroundStyle(.secondary).lineLimit(3)
             } else if let link = model.feed.link, model.engineRunning {
@@ -68,6 +74,16 @@ struct EngineFooter: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .onAppear { meter(model.engineRunning) }
+        .onChange(of: model.engineRunning) { _, running in meter(running) }
+    }
+
+    private func meter(_ running: Bool) {
+        if StageRenderer.onGPUTime == nil {
+            let power = model.power
+            StageRenderer.onGPUTime = { power.gpuSeconds += $0 }
+        }
+        if running { model.power.start { [engine = model.engine] in engine.pid } } else { model.power.stop() }
     }
 
     private func color(_ s: ShowState) -> Color {
@@ -78,5 +94,56 @@ struct EngineFooter: View {
         case .failed: .red
         case .stopped: .secondary
         }
+    }
+}
+
+
+/// What the show costs the computer: the lights against the 3D stage.
+struct PowerLine: View {
+    let power: PowerMeter
+    let stageOn: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            row("Lights", power.engine.cpu, power.engine.watts, gpu: nil)
+            if stageOn { row("3D stage", power.stage.cpu, power.stage.watts, gpu: power.gpu) }
+        }
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .help("CPU use (100% = one core) and CPU power of the light engine and of the app's 3D stage, and the GPU time the "
+              + "stage takes. Measured every \(Int(PowerMeter.interval)) s.")
+    }
+
+    private func row(_ name: String, _ cpu: Double, _ watts: Double, gpu: Double?) -> some View {
+        HStack(spacing: 6) {
+            Text(name).frame(width: 58, alignment: .leading)
+            Text(String(format: "%3.0f%% CPU · %.1f W", cpu * 100, watts))
+            if let gpu { Text(String(format: "· GPU %.0f%%", gpu * 100)) }
+        }
+    }
+}
+
+/// The 3D stage costs more than the show can spare: say so, and offer Perform Only.
+struct PowerWarning: View {
+    let power: PowerMeter
+    let performOnly: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(reason, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Perform Only", action: performOnly)
+                .controlSize(.small)
+                .help("The lights only, no 3D stage: the computer's power goes to the show.")
+        }
+    }
+
+    private var reason: String {
+        let why = power.hot ? "The Mac is getting hot" : power.lowPower ? "Low Power Mode is on"
+            : power.onBattery ? "On battery" : nil
+        let ratio = (power.stage.cpu + power.gpu) / max(power.engine.cpu, 0.05)
+        let cost = ratio >= 1.5 ? "the 3D stage takes \(Int(ratio.rounded()))× what the lights do" : "the 3D stage adds to the load"
+        return (why.map { "\($0): " } ?? "") + cost + ". During a gig, Perform Only keeps the lights on time."
     }
 }

@@ -44,6 +44,16 @@ final class StageMTKView: MTKView {
                 MainActor.assumeIsolated { self?.isPaused = paused }
             }
         }
+        // nor while the app is hidden (⌘H): nobody sees it, the lights don't need it
+        for (name, paused) in [(NSApplication.didHideNotification, true), (NSApplication.didUnhideNotification, false)] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.isPaused = paused || (self.window?.isMiniaturized ?? false)
+                    if !paused { self.renderer?.wake() }
+                }
+            }
+        }
         isPaused = false
         registerForDraggedTypes([.string])
     }
@@ -74,7 +84,10 @@ final class StageMTKView: MTKView {
         return editor.drop(text, origin: o, dir: d)
     }
 
+    override func mouseMoved(with e: NSEvent) { renderer?.wake(); super.mouseMoved(with: e) }
+
     override func mouseDown(with e: NSEvent) {
+        renderer?.wake()
         last = e.locationInWindow
         window?.makeFirstResponder(self)
         if let editor, let (o, d) = ray(e) {

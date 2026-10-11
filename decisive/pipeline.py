@@ -21,6 +21,7 @@ from decisive.director import (
 from decisive.director.cinematic import NAME as CINEMATIC
 from decisive.director.cinematic import CinematicDirector
 from decisive.director.style import style_for
+from decisive.director.themes import theme_of
 from decisive.rig.groups import head_groups, laser_list, signature
 
 CACHE = paths.CACHE
@@ -63,6 +64,15 @@ def plan_path(wav: Path, director: str, tempo: str | None = None, layout: str | 
     return CACHE / f"{base}.{_file_tag(director)}.v{PROMPT_VERSION}{suffix}.plan.json"
 
 
+def _sections_key(a) -> str:
+    """The track's sections (they can change once its instruments are separated: vocal lead-ins), for the plan
+    cache: a plan always fits the sections it was made for."""
+    import hashlib
+
+    starts = ",".join(f"{p.start:.2f}" for p in a.phrases)
+    return "p" + hashlib.sha1(starts.encode()).hexdigest()[:6]
+
+
 def get_plan(
     wav: Path,
     director: str,
@@ -85,6 +95,7 @@ def get_plan(
     genre = style_genre(a) if callable(style_genre) else (style_genre or a.genre)
     style = style_for(genre) if director != CINEMATIC else None
     a.style = style.genre if style else ""
+    theme = theme_of(wav) if director != CINEMATIC else None
     groups = head_groups(rig) if rig else []
     lasers = laser_list(rig) if rig else []
     screen = bool(rig and rig.get("screen"))
@@ -95,6 +106,8 @@ def get_plan(
             f"l{len(lasers)}" if lasers else None,
             "scr" if screen else None,
             f"s{style.genre}" if style else None,
+            f"t{theme}" if theme else None,
+            _sections_key(a),
         )
         if x
     )
@@ -108,14 +121,19 @@ def get_plan(
         d = CinematicDirector()
     elif director == "openai":
         d = OpenAIDirector(
-            CACHE / f"{base}.decisions-cache.json", groups=groups, lasers=lasers, screen=screen, style=style
+            CACHE / f"{base}.decisions-cache.json",
+            groups=groups,
+            lasers=lasers,
+            screen=screen,
+            style=style,
+            theme=theme,
         )
     elif director.startswith("ollama"):
         model = director.split(":", 1)[1] if ":" in director else "nimble"
         cache = CACHE / f"{base}.{_file_tag(director)}.decisions-cache.json"
-        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style)
+        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style, theme=theme)
     else:
-        d = RuleDirector(groups, lasers, screen, style)
+        d = RuleDirector(groups, lasers, screen, style, theme)
     plan = direct(a, d, cancel=cancel, progress=progress)
     save_plan(plan, path)
     print(f"Plan saved to {path}")

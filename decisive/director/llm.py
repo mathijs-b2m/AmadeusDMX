@@ -10,7 +10,14 @@ from pathlib import Path
 
 from decisive.audio.model import DROP_THRESHOLD, Analysis
 from decisive.director.arc import apply_arc, laser_star, song_arc
-from decisive.director.decision import GROUP_NAMES, LASER_NAMES, LAYER_NAMES, SCREEN_NAMES, Decision
+from decisive.director.decision import (
+    GROUP_NAMES,
+    LASER_NAMES,
+    LAYER_NAMES,
+    SCREEN_NAMES,
+    SPECIAL_NAMES,
+    Decision,
+)
 from decisive.director.prompt import build_prompt, questions_for, synth_riff
 from decisive.director.rules import PER_BEAT, RuleDirector
 from decisive.director.style import Style
@@ -21,7 +28,7 @@ MODEL = "gpt-6-luna"
 HOLD_CONFIDENCE = 0.35  # mean look confidence below this, in an unchanged section → keep the previous look
 
 
-PROMPT_VERSION = 20
+PROMPT_VERSION = 21
 
 
 class OpenAIDirector:
@@ -37,6 +44,7 @@ class OpenAIDirector:
         lasers: list[dict] | None = None,
         screen: bool = False,
         style: Style | None = None,
+        theme: str | None = None,
     ):
         from openai import OpenAI  # imported lazily so the rules mode works without a key
 
@@ -44,9 +52,9 @@ class OpenAIDirector:
         self.model = model
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
-        self.groups, self.lasers, self.screen, self.style = groups, lasers, screen, style
-        self.questions = questions_for(groups, lasers, screen, style)
-        self.fallback = RuleDirector(groups, lasers, screen, style)
+        self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
+        self.questions = questions_for(groups, lasers, screen, style, theme)
+        self.fallback = RuleDirector(groups, lasers, screen, style, theme)
         self.timings = []
 
     timings: list[float]
@@ -62,7 +70,7 @@ class OpenAIDirector:
         return self.cache[key]
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
-        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen, self.style)
+        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen, self.style, self.theme)
         d = self.fallback.decide(a, i, history)  # supplies any refused or failed answer
         d.prompt = prompt
         try:
@@ -72,7 +80,7 @@ class OpenAIDirector:
             return d
 
         d.source = self.name
-        for name in ["section", "palette", *LAYER_NAMES, *GROUP_NAMES, *LASER_NAMES, *SCREEN_NAMES]:
+        for name in ["section", "palette", *LAYER_NAMES, *GROUP_NAMES, *LASER_NAMES, *SCREEN_NAMES, *SPECIAL_NAMES]:
             ans = answers.get(name)
             if ans and ans.get("type") == "choice":
                 setattr(d, name, ans["choice"])
@@ -181,6 +189,10 @@ class OpenAIDirector:
                     if alt:
                         d.featured, guarded = alt, True
 
+        # A theme's special look is for key moments: at most two phrases in a row.
+        if d.special != "off" and len(history) >= 2 and all(h.special == d.special for h in history[-2:]):
+            d.special, guarded = "off", True
+
         # Hysteresis: a model that's unsure across the board, in an unchanged section, keeps the previous look.
         last = history[-1] if history else None
         look_conf = [d.confidence[n] for n in LAYER_NAMES if n in d.confidence]
@@ -214,14 +226,15 @@ class OllamaDirector(OpenAIDirector):
         lasers: list[dict] | None = None,
         screen: bool = False,
         style: Style | None = None,
+        theme: str | None = None,
     ):
         self.model, self.host = model, host
         self.name = f"ollama-{model.replace(':', '-').replace('/', '-')}"
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
-        self.groups, self.lasers, self.screen, self.style = groups, lasers, screen, style
-        self.questions = questions_for(groups, lasers, screen, style)
-        self.fallback = RuleDirector(groups, lasers, screen, style)
+        self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
+        self.questions = questions_for(groups, lasers, screen, style, theme)
+        self.fallback = RuleDirector(groups, lasers, screen, style, theme)
         self.timings = []
 
     def _questions(self) -> dict:

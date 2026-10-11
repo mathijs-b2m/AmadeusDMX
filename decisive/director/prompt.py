@@ -26,6 +26,7 @@ from decisive.director.vocabulary import (
     PALETTES,
     SCREEN_MODES,
     SECTIONS,
+    SPECIALS,
 )
 
 
@@ -124,6 +125,7 @@ def build_prompt(
     lasers: list[dict] | None = None,
     screen: bool = False,
     style: Style | None = None,
+    theme: str | None = None,
 ) -> str:
     phrases = a.phrases
     p = phrases[i]
@@ -151,8 +153,9 @@ def build_prompt(
     ]
     if style:
         parts.append(
-            f"STYLE: this part of the set is {style.genre}. Keep this house style for every {style.genre} track, "
-            f"so the set looks like one show (vary within it): {style.text}"
+            f"STYLE: this part of the set is {style.genre}. Its house style, as a LEAN, not a rule: {style.text} "
+            f"Keep its colours, so the set looks like one show. For movement and light, let the music of THIS "
+            f"phrase decide (a song changes: a quiet piano part, a big drop), leaning towards the style where it fits."
         )
     if groups and len(groups) > 1:
         from decisive.rig.groups import describe as describe_groups
@@ -179,6 +182,13 @@ def build_prompt(
             "something: ambient colour in calm parts, playful outlined characters (a runner, a dancer, a "
             "jumping crowd, pong) or big words in grooves and builds, and full psychedelic visuals only for "
             "the biggest moments. Keep it fun to watch, not only abstract; vary it."
+        )
+    if theme == "stars":
+        parts.append(
+            "This track is ABOUT STARS (it is in the title): you have a special STARFIELD look (the 'special' "
+            "question). Switch it on at the moments that carry the song: a deep, still starfield in a calm or "
+            "breakdown part, a bright one on a big chorus or drop. A few phrases, not all the time (never "
+            "more than two phrases in a row); the rest of the song is lit as usual."
         )
     if lasers and re.search(r"la[sz]er", Path(str(a.path)).stem, re.I):
         parts.append(
@@ -235,6 +245,14 @@ def build_prompt(
             f"Analysis (separated instruments): a clear synth line plays ({line:.1f} notes per beat). The "
             f"lasers can play it note for note (laser movement 'melody'); heads or pars can follow it too."
         )
+    for q, which in ((p, "This section"), (nxt, "The NEXT section")):
+        if q is not None and getattr(q, "pickup_beats", 0):
+            how = "a drum fill" if q.pickup_kind == "fill" else "the new part (a vocal or melody line) coming in early"
+            hints.append(
+                f"Analysis: {which} starts with an anacrusis: {q.pickup_beats} beat(s) of {how} before its "
+                f"downbeat. The lights lead into it on the pickup (unless it is a drop); its look lands on the "
+                f"downbeat."
+            )
     hint = arc_hint(song_arc(a)[i])
     if hint:
         hints.append(hint)
@@ -273,23 +291,29 @@ QUESTIONS = [
 
 
 def questions_for(
-    groups: list[dict] | None, lasers: list[dict] | None = None, screen: bool = False, style: Style | None = None
+    groups: list[dict] | None,
+    lasers: list[dict] | None = None,
+    screen: bool = False,
+    style: Style | None = None,
+    theme: str | None = None,
 ) -> list[dict]:
     """The questions for this rig: group/layer questions only with several groups of heads, laser questions
-    only with lasers. With a genre's style only the options that fit it are offered."""
+    only with lasers. With a genre's style its palettes are the colours offered (the rest of a style is a lean,
+    in the prompt). A track with a theme in its title gets the theme's special look as a question."""
     qs = _questions_for(groups, lasers, screen)
-    return [_styled(q, style) for q in qs] if style else qs
+    if style:
+        qs = [_styled(q, style) for q in qs]
+    if theme:
+        options = [(v, d) for v, d in SPECIALS if v in ("off", theme)]
+        qs = qs + [_choice("special", options, f"Switch on the {theme} look for the CURRENT phrase?")]
+    return qs
 
 
 def _styled(q: dict, style: Style) -> dict:
-    """A question with only the options that fit the style (its palettes, no misfits)."""
-    if q["type"] != "choice":
+    """The palette question with the style's palettes only; the other questions as they are."""
+    if q["type"] != "choice" or q["name"] != "palette":
         return q
-    if q["name"] == "palette":
-        choices = [{"value": v, "description": PALETTES[v][0]} for v in style.palettes]
-    else:
-        choices = [c for c in q["choices"] if style.allows(q["name"], c["value"])] or q["choices"]
-    return {**q, "choices": choices}
+    return {**q, "choices": [{"value": v, "description": PALETTES[v][0]} for v in style.palettes]}
 
 
 def _questions_for(groups: list[dict] | None, lasers: list[dict] | None = None, screen: bool = False) -> list[dict]:

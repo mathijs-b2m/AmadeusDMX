@@ -329,6 +329,16 @@ INTENSITY_LEVELS = [
 HEAD_TRIGGERS = [("same", "The same hits as the pars.")] + [(v, d) for v, d in TRIGGERS if v != "lead"]
 
 # Look layers in question order: (field name, options, question shown to the model)
+SPECIALS = [  # a theme's own look (only offered when the track's title has the theme)
+    ("off", "No special look: the layers above are the show."),
+    (
+        "stars",
+        "A STARFIELD over the look: a set of small lights (pixel cells, pars) twinkles here and there in star "
+        "white, each star on its own; subtle accents, the rest of the look plays on. A few stars in calm parts, "
+        "more in a drop. For the moments that carry a song about stars, not all the time.",
+    ),
+]
+
 LAYERS = [
     ("par_base", PAR_BASE, "What should the pars do BETWEEN hits?"),
     ("par_accent", PAR_ACCENT, "What should the pars do ON a hit?"),

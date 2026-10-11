@@ -91,7 +91,7 @@ Restart VirtualDJ, then enable **DecisiveLink** as a **master** effect. Works wi
 Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, dnb, dubstep, hiphop, rnb, pop, rock, metal, latin, funk, jazz), shown with the track in the app and the visualiser:
 
 1. **your choice** (`decisive genre TRACK GENRE`, kept in `config/genres.json`);
-2. the **Decisions API**, given the artist and title (from the file's tags, or its name), when there's a key and it is confident. A title alone ("Symphony") has to be very sure, and a beat-less genre (cinematic, classical, ambient) only counts when the audio has no groove either;
+2. the **Decisions API**, given the artist and title (from the file's tags, or its name), when there's a key and it is reasonably sure (30% with the artist known: torn between pop and edm for Coldplay is still far better than a tempo guess). A title alone ("Symphony") has to be very sure, and a beat-less genre (cinematic, classical, ambient) only counts when the audio has no groove either;
 3. a **genre tag** in the file;
 4. the **audio**, as the fallback: how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
 
@@ -103,9 +103,21 @@ Every genre has a **style sheet** ([decisive/director/style.py](decisive/directo
 - what to use instead;
 - a few lines describing the style.
 
-The **rule director** keeps to the genre's palettes and swaps a misfit for what fits. The **decision models** get the style in their prompt, and only the options that fit are offered as answers. The song's arc and the drop rules still have the last word. A style describes looks, not fixtures, so it works on any rig. Tracks without a genre are directed as before.
+A style is a **lean, not a rule**: the genre sets the colours, and the music of each part decides the moves, because a song is not one genre all the way through (a piano ballad part, then a mainstage drop).
+- The **rule director** uses the genre's palettes everywhere. It swaps a look's misfits only in the grooves, the body of a genre; intros, breakdowns, buildups and drops follow their own music.
+- The **decision models** get the genre's palettes as their colour choices. The rest of the style is a lean in the prompt, and every move and light stays open.
 
-**The set's genre (live).** Detection is noisy: one house track called "pop" must not flip the style for one song. In a live set, a new genre takes over only after **two tracks in a row**. Until then, a track is lit in the set's style, and the app shows it as `POP → HOUSE`. Your own genre choice always counts for its track. A cinematic track plays its own program and leaves the set's genre alone. For a single track, `--style GENRE` lights it in another genre's style.
+The song's arc and the drop rules have the last word. A style describes looks, not fixtures, so it works on any rig. Tracks without a genre are directed as before.
+
+**The set's genre (live).** A genre guessed from the audio alone is noisy: one such track must not flip the style for one song. In a live set, a guessed track is lit in the set's style, and the app shows it as `POP → HOUSE`; a new genre takes over after **two tracks in a row**. A track whose genre is known (your choice, the Decisions API from its artist and title, its tag) keeps its own style: a Coldplay song in a techno set is still pop. A cinematic track plays its own program and leaves the set's genre alone. For a single track, `--style GENRE` lights it in another genre's style.
+
+### Themes from the title
+
+A title can carry a theme with a look of its own ([decisive/director/themes.py](decisive/director/themes.py)). A track about **stars** ("A Sky Full of Stars", "Starlight", "Galaxy") gives the director a **starfield** it switches on at the moments that carry the song: never more than two phrases in a row. The rules use it in the breakdowns and as each drop lands; the decision models get it as a question.
+
+The starfield is subtle accents over the running show, not the whole rig. One set of small lights twinkles: the cells of one kind of pixel fixture, else pars, else every other head. Each star comes at its own random moment (never the rig stepping at once), comes up quickly, holds a moment and fades gently in star white; on a light that is already lit it is a white glint. About 1.5 new stars a second in calm parts and 3 in a drop, whatever the size of the rig.
+
+A title about **lasers** makes the lasers the star of that track.
 
 A genre can also have a **program**: a show of its own.
 
@@ -178,7 +190,9 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 - **Beats and tempo:** onset envelope → windowed autocorrelation → dynamic-programming beat tracker (follows tempo drift). Downbeats per 64-beat window, 4/4 assumed. Hip-hop is often detected at double tempo: use `--tempo half`.
 - **Onsets:** kicks checked on every beat in the 100–200 Hz punch (lower bands are masked by offbeat bass), snares, hats, accents, melodic notes.
 - **Phrases:** 4–16-bar segments at novelty peaks.
-- **Drops:** per phrase a `drop_score` (relative jump in loudness and low end, kick returning; the first drop of a track is often quieter than the last). The phrase boundary is then moved to the **exact bar** where kick and low end come in.
+- **Drops:** first, wherever the phrase grid is, the bars where a drop lands: the kick starts **running** (on most beats of this bar and the next, after bars with at most half) and the low end jumps in with it. A phrase boundary within 6 bars moves onto that bar, or the phrase is split there. Songs don't keep a 4-bar grid from their first bar (a piano intro, a bar of silence before the drop), and a long phrase that only gets its beat halfway must not count as a drop from its beatless first bar. Then per phrase a `drop_score` (relative jump in loudness and low end, kick returning; the first drop of a track is often quieter than the last), and the boundary is fine-tuned to the **exact bar** where kick and low end come in.
+- **Build-ups:** a long section before a drop often holds a chorus and then the build. The build gets its own section: of the 4 to 16 bars before the drop, the longest stretch over which the tension (loudness and brightness) rises about as steadily as the best one, starting from where it was last low (the breath bar right before the drop left out). That section is lit as the build-up, not the chorus before it.
+- **Anacrusis (pickups):** a section can start before its downbeat. A **fill** is a burst of snare and accent hits in the last beats before the boundary. An **early** start is the last beats already sounding like the next section; once the instruments are separated, it can also be a **vocal line** that comes in after a pause one to three beats before a downbeat. A vocal lead-in also moves a nearby section boundary (within two bars, never a drop's) onto the downbeat it leads into. Plans are cached per set of section times, so a track whose sections change after separation gets a new plan.
 - **Synth stutters / gates:** fast regular chopping (1/8–1/32 notes) of the 250–2000 Hz range, as a per-frame gate signal and strength.
 - **Synth riffs:** how tightly melodic notes sit on the 1/16 grid (vocals score ~0, arps ~0.8+).
 - **Melody:** pitch contour, pitch class, tonality.
@@ -187,6 +201,7 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 
 `decisive/engine/` renders 40 frames per second from the plan and the analysis:
 
+- **Pickups:** a section that leads in early has its look coming in on the pickup (about two thirds of the way by the downbeat, which lands it), and the moving heads move into its positions during the pickup so they arrive on the downbeat. A fill is played by the lights hit by hit, in the next section's accent colour, growing into the downbeat. Pickups into a drop leave the drop moment alone. The decision models are told about them.
 - **The drop moment:** moving heads go dark two beats before a drop and already move to the drop's position, colour and gobo ("move in black"); everything is dark for the last half beat; on the downbeat a hard cut, a white flash and full intensity for one bar.
 - **Beat-landed head moves:** bounce, swing and step-on-beat are sized from the fixture's **measured** motion (`decisive motion`): one beat per move if ≥ 30° fits, otherwise two beats (far bigger moves). Each move starts exactly its travel time before the landing beat. Pan/tilt targets go out 120 ms early and the fixture moves at its own speed; the motor model only predicts the real position (for the visualiser and timing).
 - **Geometry:** a stage model in metres; paths become beam directions (or a shared point for focus/cross), then pan/tilt by inverse kinematics, choosing the solution closest to where the motors actually are. Calibration per head: `mount` (stand/floor/hang), `pan_home_deg`, `pan_invert`, `tilt_home_deg`, `tilt_invert`.
@@ -211,7 +226,7 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 .venv/bin/decisive play TRACK.mp3 --set mine --rig rotterdam --mute
 ```
 
-**Mounting a set on a rig:** fixtures the rig has no place for yet wait on the floor in front of the stage. **Auto-mount** hangs them the way a lighting tech would start: lasers high at the back, moving heads under the trusses (some on the towers), strobes and blinders on the front, bars and pars on the floor, every model mirrored around the middle. In the Mac app's rig editor you can then drag any fixture, a ⇧-selection, or a whole group from the list onto a truss; a group hangs in a row. The same set can be mounted on as many rigs as you like; each rig remembers where it hangs. The file format and the rules are in [docs/rig-format.md](docs/rig-format.md).
+**Mounting a set on a rig:** fixtures the rig has no place for yet wait on the floor in front of the stage. **Auto-mount** hangs them the way a lighting tech would start: lasers high at the back, moving heads under the trusses (some on the towers), strobes and blinders on the front, bars and pars on the floor, every model mirrored around the middle. In the Mac app's rig editor you can then drag any fixture, a ⇧-selection, or a whole group from the list onto a truss; a group hangs in a row. On a tower a fixture hangs off one of its four faces (front, back, left, right; the side you drag it off picks the face), its head pointing out; only on top of a tower does it stand. The same set can be mounted on as many rigs as you like; each rig remembers where it hangs. The file format and the rules are in [docs/rig-format.md](docs/rig-format.md).
 
 Sets from before rigs existed (fixtures with positions and the stage in one file) are split into a set and a rig of the same name the first time you run the engine or the Mac app; nothing changes for the show.
 

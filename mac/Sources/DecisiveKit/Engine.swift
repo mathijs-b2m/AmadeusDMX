@@ -36,6 +36,9 @@ public final class EngineProcess {
 
     public init(name: String) { self.name = name }
 
+    /// The engine's process id while it runs (for the power meter).
+    public var pid: Int32? { process.flatMap { $0.isRunning ? $0.processIdentifier : nil } }
+
     public var isRunning: Bool {
         switch state { case .running, .starting: true; default: false }
     }

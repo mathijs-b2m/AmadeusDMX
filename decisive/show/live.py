@@ -10,6 +10,7 @@ follow the dominant deck.
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import threading
 import time
@@ -30,11 +31,34 @@ DEFAULT_LINK_PORT = 7123
 DJ_LOOKUP_TRIES = 5  # × 3 s: how long to look for a DJ laptop by name before giving up
 
 
+def port_in_use_message() -> str:
+    """Why the plugin's port is taken, and what to do: the Decisive Link app on this Mac, or another engine."""
+    import subprocess
+
+    def running(name: str) -> bool:
+        return subprocess.run(["pgrep", "-f", name], capture_output=True).returncode == 0
+
+    if running("DecisiveLink.app") or running("Decisive Link.app"):
+        return (
+            f"VirtualDJ's port ({UDP_PORT}) is taken by the Decisive Link app on this Mac. Decisive Link is for a DJ "
+            "laptop that isn't this computer: quit it here and start the live show again. (If VirtualDJ runs on "
+            "another laptop, start with that laptop instead: --remote auto --code NNNN.)"
+        )
+    if running("decisive live") or running("-m decisive live"):
+        return f"VirtualDJ's port ({UDP_PORT}) is taken by another live show already running: stop that one first."
+    return f"VirtualDJ's port ({UDP_PORT}) is taken by another program on this computer: close it and try again."
+
+
 def open_listener(remote: str | None, code: str | None, cache: Path):
     """The decks: from the plugin on this computer, or (`remote`) from a DJ laptop's Decisive Link app:
     'dj:NAME' (its Bonjour name, as the Mac app lists it), 'auto' (the first one found) or HOST[:PORT]."""
     if not remote:
-        return Listener()
+        try:
+            return Listener()
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE:
+                raise
+            raise SystemExit(port_in_use_message()) from None
     from decisive.show.link import RemoteListener, browse, resolve
 
     if remote.startswith("dj:"):

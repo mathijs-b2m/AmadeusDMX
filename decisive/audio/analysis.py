@@ -27,7 +27,7 @@ from decisive.audio.features import (
 from decisive.audio.model import Analysis, Phrase
 from decisive.audio.phrases import build_phrases
 
-ANALYSIS_VERSION = 14
+ANALYSIS_VERSION = 24
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -141,11 +141,23 @@ def _finish(a: Analysis, path: Path) -> Analysis:
     from decisive.audio import genre, hits
 
     a = _with_notes(a, path)
+    _with_vocal_pickups(a, path)
     call = genre.detect(a)
     a.genre, a.genre_source, a.genre_facts = call.genre, call.source, call.facts
     if call.program == "cinematic":
         a.hits = hits.load_or_detect(path)
     return a
+
+
+def _with_vocal_pickups(a: Analysis, path: Path) -> None:
+    """Vocal lead-ins into sections, once the track has been separated (decisive/audio/phrases.py)."""
+    from decisive.audio import stems as stemlib
+    from decisive.audio.phrases import vocal_pickups
+
+    got = stemlib.vocal_envelope(path)
+    if got is not None:
+        db = a.downbeats if a.downbeats.dtype.kind == "f" else a.beats[a.downbeats]
+        vocal_pickups(a.phrases, a.beats, db, *got)
 
 
 def _with_notes(a: Analysis, path: Path) -> Analysis:

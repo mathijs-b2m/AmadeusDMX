@@ -131,6 +131,28 @@ def cached_part(path: str | Path, name: str) -> np.ndarray | None:
     return np.load(f).astype(np.float32) if f.exists() and load_notes(path) is not None else None
 
 
+VOCAL_ENV_HOP = 1024  # the vocal envelope: one value per this many samples (~46 ms)
+
+
+def vocal_envelope(path: str | Path) -> tuple[np.ndarray, float] | None:
+    """The separated vocal's loudness (dB) over time and its frame rate, if the track has been separated
+    (computed once, cached next to the parts)."""
+    d = _dir(Path(path))
+    f = d / "vocal_env.npz"
+    if f.exists():
+        z = np.load(f)
+        return z["env"], float(z["fps"])
+    v = cached_part(path, "vocals")
+    if v is None:
+        return None
+    n = len(v) // VOCAL_ENV_HOP
+    frames = v[: n * VOCAL_ENV_HOP].reshape(n, VOCAL_ENV_HOP)
+    env = (10 * np.log10((frames**2).mean(axis=1) + 1e-10)).astype(np.float32)
+    fps = STEM_SR / VOCAL_ENV_HOP
+    np.savez_compressed(f, env=env, fps=fps)
+    return env, fps
+
+
 def load_notes(path: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """The synth/melody notes of a track if it has been separated already (cheap), else None."""
     f = _dir(Path(path)) / "notes.npz"
