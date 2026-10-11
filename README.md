@@ -196,7 +196,7 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 
 `decisive/audio/`, numpy/scipy only, cached per file:
 
-- **Beats and tempo:** onset envelope → windowed autocorrelation → dynamic-programming beat tracker (follows tempo drift). Downbeats per 64-beat window, 4/4 assumed. Hip-hop is often detected at double tempo: use `--tempo half`.
+- **Beats and tempo:** onset envelope (frames centred on their own time) → windowed autocorrelation → dynamic-programming beat tracker (follows tempo drift). A tempo the whole track fits much better (a comb over 80–180 BPM on the low end) makes it track again from there. Each beat is refined between frames and steadied by its neighbours. A track made at one tempo (most club music, also a mix held at one tempo) gets **one straight grid**: tempo and phase from where the low end, sub included, rises most on evenly spaced lines over the whole track, so on the kick, also where the off-beats are as loud. Finally the grid moves to where the beat is **heard**: the attack of the average hit on the beat, at sample precision. Downbeats per 64-beat window, 4/4 assumed. Hip-hop is often detected at double tempo: use `--tempo half`.
 - **Onsets:** kicks checked on every beat in the 100–200 Hz punch (lower bands are masked by offbeat bass), snares, hats, accents, melodic notes.
 - **Phrases:** 4–16-bar segments at novelty peaks.
 - **Drops:** first, wherever the phrase grid is, the bars where a drop lands: the kick starts **running** (on most beats of this bar and the next, after bars with at most half) and the low end jumps in with it. A phrase boundary within 6 bars moves onto that bar, or the phrase is split there. Songs don't keep a 4-bar grid from their first bar (a piano intro, a bar of silence before the drop), and a long phrase that only gets its beat halfway must not count as a drop from its beatless first bar. Then per phrase a `drop_score` (relative jump in loudness and low end, kick returning; the first drop of a track is often quieter than the last), and the boundary is fine-tuned to the **exact bar** where kick and low end come in.
@@ -205,6 +205,14 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 - **Synth stutters / gates:** fast regular chopping (1/8–1/32 notes) of the 250–2000 Hz range, as a per-frame gate signal and strength.
 - **Synth riffs:** how tightly melodic notes sit on the 1/16 grid (vocals score ~0, arps ~0.8+).
 - **Melody:** pitch contour, pitch class, tonality.
+
+Measured: a click track within 3 ms of every click; six tracks within +2…+15 ms of Mixxx's beat grid (Mixxx
+marks where its detector reacts, we where the hit is heard) and at Mixxx's tempo, against 42–49 ms early and up
+to 0.7 % off before.
+
+**Light lead:** the lights are rendered a little ahead of the music (`"artnet": {"lead_ms": 50}` in the set,
+50 ms by default) for the time a light takes to show what it is sent and the DJ software's audio buffer. Tune it
+on your rig by eye: lights late on the kick → raise it.
 
 ## The engine
 

@@ -14,7 +14,18 @@ import numpy as np
 import soundfile as sf
 
 from decisive import paths
-from decisive.audio.beats import beat_kicks, downbeats, local_tempo, set_bpm, track_beats
+from decisive.audio.beats import (
+    attack_offset,
+    beat_kicks,
+    comb_score,
+    constant_grid,
+    downbeats,
+    local_tempo,
+    refine_beats,
+    set_bpm,
+    strongest_tempo,
+    track_beats,
+)
 from decisive.audio.features import (
     BANDS,
     HOP,
@@ -27,7 +38,7 @@ from decisive.audio.features import (
 from decisive.audio.model import Analysis, Phrase
 from decisive.audio.phrases import build_phrases
 
-ANALYSIS_VERSION = 24
+ANALYSIS_VERSION = 37
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -92,6 +103,14 @@ def analyze(
     bpm_curve = local_tempo(onset_env, fps)
     log("  tracking beats …")
     beat_frames = track_beats(onset_env, bpm_curve, fps)
+    low = 10 * np.log10(10 ** (feats["sub"] / 10) + 10 ** (feats["bass"] / 10))  # the low end, sub included
+    low_rise = normalize(np.maximum(0, np.diff(low, prepend=low[0])))
+    if not tempo:  # a tempo the whole track agrees on much more than the tracker's: track again from it
+        tracked = 60 * fps / float(np.median(np.diff(beat_frames)))
+        bpm, score = strongest_tempo(low_rise, fps)
+        if abs(bpm / tracked - 1) > 0.03 and comb_score(low_rise, fps, tracked) < 0.8 * score:
+            log(f"  tempo: {tracked:.1f} BPM tracked, {bpm:.2f} BPM fits the whole track better: tracking again")
+            beat_frames = track_beats(onset_env, np.full_like(bpm_curve, bpm), fps)
     if tempo == "half":  # manual: the song is half as fast as counted (e.g. hip-hop counted double)
         strength = np.array([onset_env[max(b - 1, 0) : b + 2].max() for b in beat_frames])
         keep = 0 if strength[0::2].mean() >= strength[1::2].mean() else 1
@@ -101,8 +120,19 @@ def analyze(
         mids = (beat_frames[:-1] + beat_frames[1:]) // 2
         beat_frames = np.sort(np.concatenate([beat_frames, mids]))
         log(f"  tempo doubled on request: {60 * fps / np.median(np.diff(beat_frames)):.1f} BPM")
-    beat_times = beat_frames / fps
-    onsets["kick"] = beat_kicks(feats["flux_kick"], beat_frames, fps)
+    beat_times = refine_beats(beat_frames, onset_env, fps)
+    grid = constant_grid(beat_times, low_rise, fps)
+    if grid is not None:  # a track at one tempo: one grid, on the kick
+        beat_times = grid
+        beat_frames = np.round(beat_times * fps).astype(int)
+    log(f"  beat grid: {'one tempo' if grid is not None else 'following the tempo'}")
+    audio, audio_sr = sf.read(str(path), dtype="float32", always_2d=True)
+    heard = attack_offset(audio.mean(axis=1), audio_sr, beat_times)
+    del audio
+    beat_times = beat_times + heard  # onsets are noticed a little before they are loud: date them as heard
+    onsets = {k: (t + heard, s) for k, (t, s) in onsets.items()}
+    log(f"  beats on the attack: {heard * 1000:+.0f} ms")
+    onsets["kick"] = beat_kicks(feats["flux_kick"], beat_frames, fps, beat_times)
     accent_env = normalize(feats["flux_all"]) + normalize(
         np.maximum(0, np.diff(feats["bass"], prepend=feats["bass"][0]))
     )
