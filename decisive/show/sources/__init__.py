@@ -5,7 +5,8 @@
 
 Each integration lives in its own module and is listed in sources.json: its module, its class, what it needs
 and how good its position is (see Source.position). The Mac app reads the same list for its Start menu.
-Options come from the command line as `--opt key=value` and are passed to the class as keyword arguments.
+Options come from the command line as `--opt key=value` and are passed to the class as keyword arguments,
+except `latency` (ms, every source): how much later than reported the DJ software is heard (its audio buffer).
 """
 
 from __future__ import annotations
@@ -43,8 +44,10 @@ def open_source(name: str, **opts) -> Source:
     if name not in SOURCES:
         raise SystemExit(f"Unknown DJ software '{name}'. Known: {', '.join(SOURCES)}")
     e = SOURCES[name]
-    cls = getattr(importlib.import_module(e.module), e.cls)
-    return cls(**opts)
+    latency = float(opts.pop("latency", 0))
+    src = getattr(importlib.import_module(e.module), e.cls)(**opts)
+    src.latency = latency / 1000
+    return src
 
 
 def parse_opts(items: list[str] | None) -> dict:

@@ -127,6 +127,7 @@ class Source:
         self.last = 0.0
         self.packets = 0
         self.name = self.label
+        self.latency = 0.0  # seconds: we are heard this much later than reported (positions are moved back)
 
     @property
     def decks(self) -> dict[int, Deck]:
@@ -139,6 +140,9 @@ class Source:
     def received(self, readings: list[Deck], master: int = 0, now: float | None = None):
         """One reading from the DJ software: every deck it reported."""
         now = time.monotonic() if now is None else now
+        if self.latency:
+            for d in readings:
+                d.received += self.latency  # this position is heard `latency` later
         self.book.update(readings, now)
         self.master = master or self._loudest()
         self.last = now

@@ -140,5 +140,14 @@ def test_a_reported_rate_beats_the_tempo_ratio():
     assert abs(d.now(1.0) - 10.92) < 1e-9
 
 
+def test_latency_moves_positions_later(tmp_path):
+    f = tmp_path / "cap.jsonl"
+    f.write_text(json.dumps({"t": 0, "decks": [{"deck": 1, "pos": 10.0, "play": 1}]}))
+    src = open_source("replay", file=str(f), latency="20")
+    assert src.done.wait(2)
+    d = src.decks[1]
+    assert abs(d.now(d.received - 0.02) - 10.0 + 0.02) < 1e-9 and abs(src.latency - 0.02) < 1e-12
+
+
 def test_parse_opts():
     assert parse_opts(["port=50002", "host=10.0.0.5"]) == {"port": 50002, "host": "10.0.0.5"}
