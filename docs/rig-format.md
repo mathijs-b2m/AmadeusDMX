@@ -83,6 +83,10 @@ sacn or enttec_pro, `ip`, `udp_port`, `first_universe`, `outputs`, `priority`, U
 from the sets, see `decisive/dmx/devices.py`. Without `"dmx"` a set uses its own `"output"`/`"artnet"` blocks
 (`decisive/dmx/outputs.py`; an Art-Net output may have a `universe_offset`).
 
+`"artnet": {"lead_ms": 50}`: how far ahead of the music the lights are rendered (default 50 ms), for the time
+your lights take to show what they are sent and the DJ software's audio buffer. The beat grid is where the music
+is heard; this is the only place the rig's own delay goes.
+
 Zones (`avoid`, `keep_in`, `laser_out`) are explained in `mac/README.md` and `decisive/engine/zones.py`.
 
 ## The combined view

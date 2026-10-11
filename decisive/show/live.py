@@ -23,6 +23,7 @@ from decisive.engine import State
 from decisive.engine.realism import Realism
 from decisive.library import fixtures as fxlib
 from decisive.show import feed as feedlib
+from decisive.show.clock import light_lead
 from decisive.show.mixer import Mixer
 from decisive.show.sources.base import PhaseLock
 from decisive.show.tracks import TrackShows
@@ -189,6 +190,7 @@ async def run(
     universes = sorted({f["universe"] for f in rig["fixtures"]})
     ids = [e["id"] for e in rig["elements"]]
     period = 1.0 / rig["artnet"].get("fps", 40)
+    lead = light_lead(rig)
     real = Realism(rig)
     feed = feedlib.Feed(rig, real, period)
     mixer, bands = Mixer(rig), Bands()
@@ -245,7 +247,7 @@ async def run(
                         continue
                     a, _, engine, _ = show
                     pos = locks.setdefault(deck.deck, PhaseLock()).at(deck, now, a.beats, deck.file)
-                    t = min(max(pos, 0.0), a.duration - 0.05)
+                    t = min(max(pos + lead, 0.0), a.duration - 0.05)  # the lights a little ahead (clock.py)
                     i, states = engine.render(t)
                     parts.append((weight, states, deck, show, t, i))
 

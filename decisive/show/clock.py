@@ -7,6 +7,15 @@ import time
 
 import soundfile as sf
 
+LEAD_MS = 50  # default light lead: what a beat grid ~50 ms early used to give, and the rig was judged by
+
+
+def light_lead(rig: dict) -> float:
+    """How much earlier than the music the lights are rendered (seconds): the time a light takes to show what
+    it is sent (Art-Net, the fixture's own processing) and the DJ software's audio buffer, together.
+    `"artnet": {"lead_ms": …}` in the rig sets it; the beat grid itself is where the music is heard."""
+    return float(rig.get("artnet", {}).get("lead_ms", LEAD_MS)) / 1000
+
 
 class AudioClock:
     """Plays the file and reports the song position that is audible *right now*."""

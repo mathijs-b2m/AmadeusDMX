@@ -55,7 +55,9 @@ def spectral_features(path: Path):
     to_chroma[np.arange(mel.sum()), pc_of_bin] = 1
     lead_band = (freqs >= 250) & (freqs < 4000)
     log_f = np.log2(np.maximum(freqs[lead_band], 1)).astype(np.float32)
-    carry = np.zeros(0, dtype=np.float32)
+    # half a window of silence first: frame i is then centred on i·HOP (its own time), not starting there, so
+    # an onset in it is dated where it is heard instead of ~46 ms early
+    carry = np.zeros(N_FFT // 2, dtype=np.float32)
     prev_log = None
 
     for block in sf.blocks(str(path), blocksize=src_sr * 20, dtype="float32", always_2d=True):

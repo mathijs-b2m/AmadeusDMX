@@ -11,7 +11,7 @@ from decisive.dmx.outputs import drives_real_lights, open_output
 from decisive.engine import Engine
 from decisive.engine.realism import Realism
 from decisive.show import feed as feedlib
-from decisive.show.clock import AudioClock, WallClock
+from decisive.show.clock import AudioClock, WallClock, light_lead
 from decisive.web.server import serve as serve_http
 
 
@@ -34,6 +34,7 @@ async def play(
     engine = Engine(a, plan, rig, real_output=drives_real_lights(sender, rig))
     universes = sorted({f["universe"] for f in rig["fixtures"]})
     period = 1.0 / rig["artnet"]["fps"]
+    lead = light_lead(rig)
     real = Realism(rig)
     feed = feedlib.Feed(rig, real, period)
     feed.set_hello(feedlib.hello(a, plan, rig, real, title=feedlib.track_title(a.path), director=director))
@@ -52,7 +53,7 @@ async def play(
         try:
             while not clock.finished.is_set():
                 next_tick += period  # absolute schedule: sleep jitter doesn't accumulate
-                t = clock.now()
+                t = clock.now() + lead  # the lights a little ahead, so they show on the beat
                 if t >= a.duration:
                     break
                 i, states = engine.render(t)
