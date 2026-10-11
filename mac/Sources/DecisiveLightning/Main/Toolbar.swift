@@ -111,7 +111,10 @@ struct EngineButton: View {
             .help("Stop the show (the lights black out) ⌘R")
         } else {
             Menu {
-                Button("Start Live Show (VirtualDJ)", systemImage: "dot.radiowaves.left.and.right") { model.startLive() }
+                ForEach(model.workspace?.djSources() ?? [], id: \.name) { dj in
+                    Button("Start Live Show (\(dj.app)\(dj.verified.hasPrefix("not yet") ? ", untested" : ""))",
+                           systemImage: "dot.radiowaves.left.and.right") { model.startLive(source: dj.name) }
+                }
                 Button("Start with a DJ Laptop…", systemImage: "laptopcomputer.and.arrow.down") { showDJ = true }
                 Button("Play a Track…", systemImage: "music.note") { PlayPanel.choose(model) }
             } label: {
