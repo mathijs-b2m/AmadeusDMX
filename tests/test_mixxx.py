@@ -70,3 +70,30 @@ def test_library_finds_the_track_by_its_length(tmp_path):
     lib = mixxx.Library(db)
     assert lib.find(int(2 * 44100 * 200.5), 44100, 128.0) == ("/m/a.mp3", "A", "Song A")
     assert lib.find(int(2 * 48000 * 200.5), 48000, 128.0) == ("", "", "")
+
+
+def _u7(v, n):
+    return [(int(v) >> (7 * i)) & 127 for i in reversed(range(n))]
+
+
+def test_an_existing_midi_port_is_used_as_it_is(tmp_path):
+    """Like the IAC bus: a port that is already there (here: a stand-in made by the test) is opened, not created."""
+    rtmidi = pytest.importorskip("rtmidi")
+    import time
+
+    bus = rtmidi.MidiOut()
+    bus.open_virtual_port("DL Test Bus")
+    src = mixxx.Mixxx(port="DL Test Bus", library=str(tmp_path / "none.sqlite"))
+    try:
+        assert src.out is None and "MIDI port" in src.name
+        body = [0x01, 1, 1, *_u7(2**30 + 12345, 5), *_u7(2 * 44100 * 60, 5), *_u7(44100, 3)]
+        body += [*_u7(2**27 + 10**6, 4), *_u7(128000, 4), *_u7(16383, 2), *_u7(1, 2)]
+        bus.send_message([*mixxx.HEADER, *body, 0xF7])
+        for _ in range(100):
+            if src.state:
+                break
+            time.sleep(0.01)
+        assert src.state[1]["pos"] == 12.345 and src.state[1]["bpm"] == 128.0
+    finally:
+        src.close()
+        bus.close_port()

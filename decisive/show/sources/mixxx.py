@@ -9,7 +9,8 @@ SysEx (format in mixxx/Decisive-Lightning-scripts.js).
 A script can't read a track's title or file, so we find the track in Mixxx's own library (read only) by
 its exact length in samples and its sample rate.
 
-Options: port (the MIDI device's name), library (mixxxdb.sqlite, default: Mixxx's own).
+Options: port (the MIDI device's name; an existing port, like the IAC bus, is used as it is), library
+(mixxxdb.sqlite, default: Mixxx's own).
 """
 
 from __future__ import annotations
@@ -144,14 +145,22 @@ class Mixxx(Source):
         self.state: dict[int, dict] = {}
         self.lost = 0
         self.seq = -1
-        # Mixxx pairs a device's input and output by name: one of each
-        self.out = rtmidi.MidiOut()
-        self.out.open_virtual_port(port)
+        # Mixxx pairs a device's input and output by name: one of each. Mixxx only looks for MIDI devices
+        # when it starts, so a device of our own means starting Mixxx after us; a port that is always there
+        # (the IAC bus: --opt port="IAC Driver Bus 1") keeps working when we restart.
         self.inp = rtmidi.MidiIn()
         self.inp.ignore_types(sysex=False, timing=True, active_sense=True)
-        self.inp.open_virtual_port(port)
+        existing = [i for i, n in enumerate(self.inp.get_ports()) if n == port or n.endswith(" " + port)]
+        if existing:
+            self.out = None
+            self.inp.open_port(existing[0])
+            self.name = f"Mixxx (MIDI port '{port}')"
+        else:
+            self.out = rtmidi.MidiOut()
+            self.out.open_virtual_port(port)
+            self.inp.open_virtual_port(port)
+            self.name = f"Mixxx (MIDI device '{port}': start Mixxx after this)"
         self.inp.set_callback(self._midi)
-        self.name = f"Mixxx (MIDI device '{port}')"
 
     def _midi(self, event, _=None):
         now = time.monotonic()
@@ -196,4 +205,5 @@ class Mixxx(Source):
 
     def close(self):
         self.inp.close_port()
-        self.out.close_port()
+        if self.out:
+            self.out.close_port()
