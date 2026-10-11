@@ -92,3 +92,19 @@ reported are served. The engine checks the SHA-256 and caches the file in `.cach
 The code protects against accidental and casual misuse on a shared network (a wrong code can't pair, and
 packets can't be forged without the key); it is not meant to stand up to an attacker who can watch the
 pairing.
+
+## 4. Other DJ software: integrations
+
+`decisive/show/sources/` holds one integration per DJ software. Each one is a `Source`: it fills `decks`
+(track file, position at a moment, tempo, volume, plus title/artist when known) and derives the same events
+for all of them (`track_loaded`, `playback_started`, `playback_stopped`, `seek`, `loop`). Live mode follows
+one with `decisive live --source NAME [--opt key=value …]`.
+
+`decisive probe NAME` shows what an integration sees and how well it keeps time (readings per second, the
+longest gap, and the drift between what a reading says and where the previous one predicted the deck would
+be). `--emit 127.0.0.1:9123` passes it on as the DecisiveLink plugin's packets (section 1), so on a DJ
+laptop the Decisive Link app (section 3) carries any DJ software to the lighting computer unchanged.
+`--record FILE` keeps the readings for `--source replay --opt file=FILE`.
+
+A track that the DJ software only names (artist, title, length) or reports with a path from another
+computer is looked up in the music folders (`DECISIVE_MUSIC`, folders separated by `:`, default `~/Music`).

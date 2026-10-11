@@ -6,75 +6,45 @@ import json
 import socket
 import threading
 import time
-from dataclasses import dataclass
+
+from decisive.show.sources.base import FROZEN_S, STALE_S, Deck, DeckBook, Source  # noqa: F401  (Deck: used by link)
 
 UDP_PORT = 9123
 
 
-STALE_S = 1.0  # no packet for this long: VirtualDJ (or the plugin) stopped
+def plugin_decks(msg: dict, now: float) -> list[Deck]:
+    """The decks in one of the plugin's packets (also the format `decisive probe --emit` sends)."""
+    return [
+        Deck(d["deck"], d["file"], d["pos"], d["len"], bool(d["play"]), d["bpm"], d["bpm0"], d["vol"], now)
+        for d in msg.get("decks", [])
+    ]
 
 
-FROZEN_S = 0.5  # "playing" but the position hasn't moved for this long: treat as stopped
-
-
-@dataclass
-class Deck:
-    deck: int
-    file: str
-    pos: float
-    length: float
-    play: bool
-    bpm: float
-    bpm0: float
-    vol: float
-    received: float
-
-    def now(self, t: float) -> float:
-        """Track position right now: last reported position + time since, at the current playback speed."""
-        if not self.play:
-            return self.pos
-        speed = self.bpm / self.bpm0 if self.bpm0 > 1 else 1.0
-        return self.pos + (t - self.received) * speed
-
-
-class Listener:
+class Listener(Source):
     """Receives the plugin's UDP packets; keeps the latest state per deck."""
 
-    def __init__(self, port: int = UDP_PORT):
+    label = "VirtualDJ"
+
+    def __init__(self, port: int = UDP_PORT, host: str = "127.0.0.1"):
+        super().__init__()
+        self.book = DeckBook(dedupe_mirrors=True)  # VirtualDJ reports copies of real decks to master effects
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(("127.0.0.1", port))
-        self.decks: dict[int, Deck] = {}
-        self.master = 0
-        self.last = 0.0
-        self.moved: dict[int, tuple[float, float]] = {}  # deck → (last position, when it last changed)
-        self.packets = 0  # received, for --health
+        self.sock.bind((host, port))
         threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self):
         while True:
-            data, _ = self.sock.recvfrom(65535)
+            try:
+                data, _ = self.sock.recvfrom(65535)
+            except OSError:  # closed
+                return
             now = time.monotonic()
             try:
                 msg = json.loads(data)
             except json.JSONDecodeError:
                 continue
-            self.master, self.last = int(msg.get("master", 0)), now
-            self.packets += 1
-            decks, seen = {}, set()
-            for d in sorted(msg.get("decks", []), key=lambda x: x["deck"]):
-                sig = (d["file"], round(d["pos"], 2), round(d["vol"], 3), d["play"])
-                if sig in seen:  # a non-existent deck mirroring a real one (VirtualDJ does this for master effects)
-                    continue
-                seen.add(sig)
-                last_pos, changed = self.moved.get(d["deck"], (None, now))
-                if last_pos is None or abs(d["pos"] - last_pos) > 1e-3:
-                    changed = now
-                self.moved[d["deck"]] = (d["pos"], changed)
-                playing = bool(d["play"]) and now - changed < FROZEN_S  # "playing" with a frozen position = stalled
-                decks[d["deck"]] = Deck(
-                    d["deck"], d["file"], d["pos"], d["len"], playing, d["bpm"], d["bpm0"], d["vol"], now
-                )
-            self.decks = decks
+            self.received(plugin_decks(msg, now), int(msg.get("master", 0)), now)
+            self.master = int(msg.get("master", 0))  # the plugin's own word, even 0
 
-    def alive(self) -> bool:
-        return time.monotonic() - self.last < STALE_S
+    def close(self):
+        self.sock.close()

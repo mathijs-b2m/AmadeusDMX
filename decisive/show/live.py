@@ -1,4 +1,5 @@
-"""Live mode: follow a VirtualDJ mix, played on this computer or on a DJ laptop (Decisive Link).
+"""Live mode: follow a DJ's mix: VirtualDJ on this computer or on a DJ laptop (Decisive Link), or another DJ
+software through its integration (`--source NAME`, see decisive/show/sources).
 
 VirtualDJ's DecisiveLink plugin streams every deck's track, position, play state, tempo and volume. Every
 track that appears is analysed and planned (rules immediately, the AI director in the background), and each
@@ -49,9 +50,14 @@ def port_in_use_message() -> str:
     return f"VirtualDJ's port ({UDP_PORT}) is taken by another program on this computer: close it and try again."
 
 
-def open_listener(remote: str | None, code: str | None, cache: Path):
+def open_listener(remote: str | None, code: str | None, cache: Path, source: str | None = None, opts=None):
     """The decks: from the plugin on this computer, or (`remote`) from a DJ laptop's Decisive Link app:
-    'dj:NAME' (its Bonjour name, as the Mac app lists it), 'auto' (the first one found) or HOST[:PORT]."""
+    'dj:NAME' (its Bonjour name, as the Mac app lists it), 'auto' (the first one found) or HOST[:PORT];
+    or (`source`) from another DJ software's integration, with its options."""
+    if source and source != "vdj":
+        from decisive.show.sources import open_source
+
+        return open_source(source, **(opts or {}))
     if not remote:
         try:
             return Listener()
@@ -137,9 +143,10 @@ def _health_line(hs: dict, listener: Listener, shows: TrackShows):
     )
     silent = now - listener.last if listener.last else float("inf")
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6  # bytes on macOS → MB (peak)
-    flag = "  ⚠ VirtualDJ sends nothing" if pkts == 0 else ("  ⚠ light loop late" if hs["worst"] > 0.1 else "")
+    dj = getattr(listener, "label", "VirtualDJ")
+    flag = f"  ⚠ {dj} sends nothing" if pkts == 0 else ("  ⚠ light loop late" if hs["worst"] > 0.1 else "")
     print(
-        f"  ♥ {time.strftime('%H:%M:%S')} vdj {pkts / dt:4.1f} pkt/s (last {min(silent, 999):.1f}s ago) "
+        f"  ♥ {time.strftime('%H:%M:%S')} {dj} {pkts / dt:4.1f} pkt/s (last {min(silent, 999):.1f}s ago) "
         f"decks [{decks}] · loop {hs['frames'] / dt:4.1f} fps, worst late {hs['worst'] * 1000:.0f} ms · "
         f"shows {len(shows.shows)} · threads {threading.active_count()} · peak mem {rss:.0f} MB{flag}",
         flush=True,
@@ -160,6 +167,8 @@ async def run(
     health: float = 0.0,
     remote: str | None = None,
     code: str | None = None,
+    source: str | None = None,
+    source_opts: dict | None = None,
 ):
     """`artnet_ip`: None = visualiser only, "rig" = the set's output, an IP = that network node.
     `health`: every that many seconds print one line: packets from VirtualDJ, deck positions, how well the
@@ -169,7 +178,8 @@ async def run(
     from decisive.rig import store
 
     show = show or store.current()
-    listener = open_listener(remote, code, cache)
+    listener = open_listener(remote, code, cache, source, source_opts)
+    dj = getattr(listener, "label", "VirtualDJ")
     follow_set = director is None  # no --director: the set's decision model, following changes to it
     director = director or rig.get("director", "rules")
     sender = open_output(rig, None if artnet_ip == "rig" else artnet_ip) if artnet_ip else None
@@ -186,6 +196,8 @@ async def run(
     httpd = serve_http(http_port, show)
     if remote:
         print(f"Live mode: VirtualDJ on {listener.name}, via Decisive Link.")
+    elif source and source != "vdj":
+        print(f"Live mode: following {listener.name}.")
     else:
         print(f"Live mode: waiting for VirtualDJ (DecisiveLink plugin as master effect, UDP {UDP_PORT}).")
     print(f"Visualiser: http://localhost:{http_port}   Director: {director}   (Ctrl+C to stop)")
@@ -207,21 +219,21 @@ async def run(
                     follower.poll(now)
                 alive = listener.alive()
                 if alive != was_alive:
-                    print("  VirtualDJ connected" if alive else "  VirtualDJ silent: lights dark")
+                    print(f"  {dj} connected" if alive else f"  {dj} silent: lights dark")
                     was_alive = alive
 
                 # every audible deck renders its own show at its own position
                 parts, decks = [], []
                 for deck in sorted(listener.decks.values(), key=lambda d: d.deck) if alive else []:
-                    show = shows.get(deck.file)
+                    show = shows.get(deck.file) if deck.file else None  # no file: a track not on this computer
                     decks.append(
                         {
                             "deck": deck.deck,
-                            "track": Path(deck.file).stem,
+                            "track": Path(deck.file).stem if deck.file else f"{deck.artist} – {deck.title}".strip(" –"),
                             "vol": round(deck.vol, 2),
                             "play": deck.play,
                             "ready": show is not None,
-                            "status": shows.progress(deck.file),
+                            "status": shows.progress(deck.file) if deck.file else {"missing": True},
                             "genre": show[0].genre if show else "",
                             "style": show[0].style if show else "",
                         }
