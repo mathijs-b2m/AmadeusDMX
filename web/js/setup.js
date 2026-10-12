@@ -30,7 +30,7 @@ async function load() {
   $("strobe").checked = !!rig.safety.allow_fast_strobe;
   render(); msg("");
   } catch (e) {
-    msg("Can't reach the show/setup server. Start it (decisive live or decisive setup) and reload this page.", "bad");
+    msg("Can't reach the show/setup server. Start it (amadeus live or amadeus setup) and reload this page.", "bad");
   }
 }
 
@@ -182,7 +182,7 @@ async function loadSets() {
   const fixed = r.fixed;
   for (const id of ["setSel", "setCopy", "setNew", "setDel", "gMake", "rigSel", "rigNew"]) $(id).disabled = !!fixed;
   $("setNote").textContent = fixed
-    ? `This server edits ${fixed} (started with --set/--rig, or a show is running with it). Start "decisive setup" without --set to manage sets here.`
+    ? `This server edits ${fixed} (started with --set/--rig, or a show is running with it). Start "amadeus setup" without --set to manage sets here.`
     : `${active?.description || active?.summary || ""} · ${active?.output || "Art-Net " + (active?.artnet || "?")} · play/live/setup start with this set on this rig unless given --set / --rig.`;
   $("gModel").innerHTML = library.filter(l => l.kind === "moving_head").concat(library.filter(l => l.kind !== "moving_head"))
     .map(l => `<option value="${l.key}" ${/encore/i.test(l.model) ? "selected" : ""}>${l.manufacturer} ${l.model}</option>`).join("");

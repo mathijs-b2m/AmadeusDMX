@@ -3,7 +3,7 @@
 Any fixture works, not only the ones in `fixtures/`. Search covers three libraries at once: ours (checked
 on real hardware), the QLC+ fixture library (~1,800, Apache-2.0) and the Open Fixture Library (~650, MIT).
 Adding a fixture copies its definition into `fixtures/<brand>/<model>.json`, where it is an ordinary library
-fixture that can be checked and calibrated (`decisive test`, `colors`, `gobos`, `motion`, `tools/twin.py`).
+fixture that can be checked and calibrated (`amadeus test`, `colors`, `gobos`, `motion`, `tools/twin.py`).
 
 ## The shadow catalogue
 
@@ -55,7 +55,7 @@ the downbeat of a big drop). The rules director keeps clear air in the intro, a 
 breakdowns, more for builds and drops, a burst as the main drop lands, and stops at the end. The AI
 director chooses freely, guided by the same descriptions. The song's arc keeps bursts for the main drops.
 
-`decisive/engine/fog.py` plays it. It keeps a model of how hazy the room is: each machine fills it by its
+`amadeus/engine/fog.py` plays it. It keeps a model of how hazy the room is: each machine fills it by its
 output against the room's volume, and the room clears by itself. It fires the machines on the beat and
 ahead of time (fog takes a while to spread), until the room gets there:
 

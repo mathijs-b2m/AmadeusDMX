@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from decisive.library import ofl, qlc, shadow  # noqa: E402
+from amadeus.library import ofl, qlc, shadow  # noqa: E402
 
 
 def build_qlc(refresh: bool) -> int:

@@ -3,7 +3,7 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; }
   header { display: flex; gap: 16px; align-items: baseline; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  header h1 { font-size: 16px; margin: 0; } header h1 span { color: var(--accent); }
+  header h1 { font-size: 16px; margin: 0; } header h1 img { width: 1.25em; height: 1.25em; vertical-align: -.3em; margin-right: .2em; }
   header a { color: var(--muted); font-size: 13px; }
   main { padding: 16px 20px; display: grid; gap: 16px; max-width: 1200px; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }

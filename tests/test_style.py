@@ -1,10 +1,10 @@
 """A house style per genre, and a live set's genre."""
 
-from decisive.director import direct
-from decisive.director.prompt import QUESTIONS, build_prompt, questions_for
-from decisive.director.rules import RuleDirector
-from decisive.director.style import STYLES, SetGenre, check, style_for
-from decisive.director.vocabulary import DEFAULT_PALETTES
+from amadeus.director import direct
+from amadeus.director.prompt import QUESTIONS, build_prompt, questions_for
+from amadeus.director.rules import RuleDirector
+from amadeus.director.style import STYLES, SetGenre, check, style_for
+from amadeus.director.vocabulary import DEFAULT_PALETTES
 from tests.synthetic import synthetic_analysis
 
 

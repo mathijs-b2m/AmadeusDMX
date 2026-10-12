@@ -5,10 +5,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from decisive.audio.phrases import vocal_pickups
-from decisive.director import RuleDirector, direct
-from decisive.engine import Engine
-from decisive.rig.loader import load_rig
+from amadeus.audio.phrases import vocal_pickups
+from amadeus.director import RuleDirector, direct
+from amadeus.engine import Engine
+from amadeus.rig.loader import load_rig
 from tests.synthetic import synthetic_analysis
 
 
@@ -82,7 +82,7 @@ def test_a_fill_is_played_by_the_lights():
 def test_a_long_section_before_a_drop_gets_its_build_as_its_own_section():
     from types import SimpleNamespace
 
-    from decisive.audio.phrases import _split_builds
+    from amadeus.audio.phrases import _split_builds
 
     n = 40
     bars = np.zeros((n, 5))

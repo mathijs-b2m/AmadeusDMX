@@ -37,11 +37,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from decisive.engine.motion import DEFAULT_MOTION, DMX_LEAD_S, MOTION_FPS, _slew  # noqa: E402
-from decisive.engine.state import State  # noqa: E402
-from decisive.library import fixtures as fxlib  # noqa: E402
-from decisive.rig import store  # noqa: E402
-from decisive.rig.loader import load_rig  # noqa: E402
+from amadeus.engine.motion import DEFAULT_MOTION, DMX_LEAD_S, MOTION_FPS, _slew  # noqa: E402
+from amadeus.engine.state import State  # noqa: E402
+from amadeus.library import fixtures as fxlib  # noqa: E402
+from amadeus.rig import store  # noqa: E402
+from amadeus.rig.loader import load_rig  # noqa: E402
 
 AXES = ("pan", "tilt")
 SUBSTEP = 0.001  # the twin's motors are simulated in 1 ms steps
@@ -218,7 +218,7 @@ def _attrs(fx: dict) -> list[str]:
 
 def wire_universe(rig: dict, u: int) -> int:
     """The Art-Net universe a set's universe goes out as (the output's offset or map)."""
-    from decisive.dmx.outputs import _specs
+    from amadeus.dmx.outputs import _specs
 
     for s in _specs(rig):
         if s.get("type", "artnet") == "artnet":
@@ -365,9 +365,9 @@ def fit_engine(goal: np.ndarray, twin: np.ndarray, vmax: float, accel: float) ->
 def render(rig: dict, head: Head, bpm: float = 128.0) -> tuple[np.ndarray, float]:
     """The synthetic track through the engine: per DMX frame t, the engine's pan/tilt (what the visualiser
     draws, 0..1), the DMX pan/tilt and the speed channel as decoded from the bytes."""
-    from decisive.director import RuleDirector, direct
-    from decisive.engine import Engine, motion
-    from decisive.rig.groups import head_groups, laser_list
+    from amadeus.director import RuleDirector, direct
+    from amadeus.engine import Engine, motion
+    from amadeus.rig.groups import head_groups, laser_list
     from tests.synthetic import synthetic_analysis
 
     a = synthetic_analysis(bpm=bpm)
@@ -574,7 +574,7 @@ class Live:
             el = time.monotonic() - start
             pan_deg, tilt_deg, dim = float(p["pan"]), float(p["tilt"]), 1.0
             ax = p["axis"]
-            if p["name"] == "swing":  # a jump on every beat, like `decisive motion`
+            if p["name"] == "swing":  # a jump on every beat, like `amadeus motion`
                 beat = int(el / (60 / float(p["bpm"])))
                 off = float(p["amp"]) / 2 * (1 if beat % 2 else -1)
             elif p["name"] == "marker":  # back and forth with a pause; lit only while the TWIN says it stands still
@@ -596,7 +596,7 @@ class Live:
             if got:
                 self._input(*got)
             if self.forward:
-                from decisive.dmx.artnet import ArtNetSender
+                from amadeus.dmx.artnet import ArtNetSender
 
                 self.out.sendto(ArtNetSender.packet(self.head.wire_universe, buf), self.forward)
             time.sleep(1 / 40)

@@ -2,9 +2,9 @@
 
 Three small protocols connect the pieces. All of them are JSON; none needs a library to speak.
 
-## 1. VirtualDJ → engine: the DecisiveLink plugin
+## 1. VirtualDJ → engine: the AmadeusLink plugin
 
-`vdj/DecisiveLink.cpp`, loaded in VirtualDJ as a **master effect** (it never touches the audio). About 25
+`vdj/AmadeusLink.cpp`, loaded in VirtualDJ as a **master effect** (it never touches the audio). About 25
 times a second it sends one UDP datagram to `127.0.0.1:9123`:
 
 ```json
@@ -22,13 +22,13 @@ times a second it sends one UDP datagram to `127.0.0.1:9123`:
 | `bpm`, `bpm0` | current and original tempo (their ratio is the playback speed) |
 | `vol` | fader × crossfader, 0..1 |
 
-The receiver (`decisive/show/vdj.py`) extrapolates each deck's position between packets, drops mirrored
+The receiver (`amadeus/show/vdj.py`) extrapolates each deck's position between packets, drops mirrored
 decks (VirtualDJ reports copies of real decks to master effects) and treats a deck whose position stops
 moving as stopped.
 
 ## 2. Engine → visualisers: the feed
 
-A WebSocket on `ws://127.0.0.1:8765` (`--ws-port`), served by `decisive/show/feed.py`. The web
+A WebSocket on `ws://127.0.0.1:8765` (`--ws-port`), served by `amadeus/show/feed.py`. The web
 visualiser and the Mac app both read it.
 
 **`hello`**, on connect and whenever the track (or the deck the heads follow) changes:
@@ -51,24 +51,24 @@ visualiser and the Mac app both read it.
 | `lz` | per element: the beams a laser draws, `[dx, dy, dz, r, g, b, brightness]` each |
 | `bands` | spectrum meters, 0..1 |
 | `decks` | live mode: each deck's track, volume, play state and preparation progress |
-| `link` | Decisive Link: the link's health (offset, jitter, lost packets) |
+| `link` | Amadeus Link: the link's health (offset, jitter, lost packets) |
 | `guard` | what the laser guard did this frame (laser id → note) |
 
 **Lite clients** connect to `ws://…/lite` and get a `frame` with `"lite": true` and only the small fields
 (`t`, `phrase`, `bp`, `decks`, `link`, `guard`), 5 times a second. The Mac app uses this in Perform mode.
 The full frames are only built while a full client is connected.
 
-## 3. DJ laptop → lighting computer: Decisive Link (v1)
+## 3. DJ laptop → lighting computer: Amadeus Link (v1)
 
-The Decisive Link app (`mac/Sources/DecisiveLink/`) on the DJ's laptop receives the plugin's packets
-(as the engine would), advertises itself with Bonjour (`_decisivelink._tcp`, TCP port 7123) and shows a
-4-digit code. The engine (`decisive live --remote dj:NAME --code 1234`, `decisive/show/link.py`) pairs
+The Amadeus Link app (`mac/Sources/AmadeusLink/`) on the DJ's laptop receives the plugin's packets
+(as the engine would), advertises itself with Bonjour (`_amadeuslink._tcp`, TCP port 7123) and shows a
+4-digit code. The engine (`amadeus live --remote dj:NAME --code 1234`, `amadeus/show/link.py`) pairs
 with it.
 
 **Pairing** (JSON lines over TCP):
 
 ```
-→ {"hello": "decisive", "v": 1, "nonce": c}           c, s: 16 random bytes, hex
+→ {"hello": "amadeus", "v": 1, "nonce": c}           c, s: 16 random bytes, hex
 ← {"v": 1, "name": "DJ laptop", "nonce": s}
 → {"proof": HMAC(code, "pair" s c), "udp": <port>}
 ← {"ok": true, "session": id}                          or {"ok": false, "error": …} and close
@@ -95,15 +95,15 @@ pairing.
 
 ## 4. Other DJ software: integrations
 
-`decisive/show/sources/` holds one integration per DJ software. Each one is a `Source`: it fills `decks`
+`amadeus/show/sources/` holds one integration per DJ software. Each one is a `Source`: it fills `decks`
 (track file, position at a moment, tempo, volume, plus title/artist when known) and derives the same events
 for all of them (`track_loaded`, `playback_started`, `playback_stopped`, `seek`, `loop`). Live mode follows
-one with `decisive live --source NAME [--opt key=value …]`.
+one with `amadeus live --source NAME [--opt key=value …]`.
 
-`decisive probe NAME` shows what an integration sees and how well it keeps time (readings per second, the
+`amadeus probe NAME` shows what an integration sees and how well it keeps time (readings per second, the
 longest gap, and the drift between what a reading says and where the previous one predicted the deck would
-be). `--emit 127.0.0.1:9123` passes it on as the DecisiveLink plugin's packets (section 1), so on a DJ
-laptop the Decisive Link app (section 3) carries any DJ software to the lighting computer unchanged.
+be). `--emit 127.0.0.1:9123` passes it on as the AmadeusLink plugin's packets (section 1), so on a DJ
+laptop the Amadeus Link app (section 3) carries any DJ software to the lighting computer unchanged.
 `--record FILE` keeps the readings for `--source replay --opt file=FILE`.
 
 A deck of DJ software synced to Ableton Link also carries `phase` (its beat phase, 0..1, also in the plugin
@@ -112,4 +112,4 @@ the DJ software's own position picks the beat, Link gives the exact moment, and 
 the two is learnt as it plays.
 
 A track that the DJ software only names (artist, title, length) or reports with a path from another
-computer is looked up in the music folders (`DECISIVE_MUSIC`, folders separated by `:`, default `~/Music`).
+computer is looked up in the music folders (`AMADEUS_MUSIC`, folders separated by `:`, default `~/Music`).

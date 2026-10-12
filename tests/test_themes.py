@@ -4,11 +4,11 @@ from dataclasses import replace
 
 import numpy as np
 
-from decisive.director import RuleDirector, direct
-from decisive.director.prompt import questions_for
-from decisive.director.themes import theme_of
-from decisive.engine import Engine
-from decisive.rig.loader import load_rig
+from amadeus.director import RuleDirector, direct
+from amadeus.director.prompt import questions_for
+from amadeus.director.themes import theme_of
+from amadeus.engine import Engine
+from amadeus.rig.loader import load_rig
 from tests.synthetic import synthetic_analysis
 
 

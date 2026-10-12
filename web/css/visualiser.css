@@ -8,7 +8,7 @@
          font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
   header { display: flex; align-items: baseline; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   header h1 { font-size: 16px; margin: 0; letter-spacing: .02em; }
-  header h1 span { color: var(--accent); }
+  header h1 img { width: 1.25em; height: 1.25em; vertical-align: -.3em; margin-right: .2em; }
   .meta { color: var(--muted); font-variant-numeric: tabular-nums; }
   .badge { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
   .badge.openai { color: #7fe0b5; border-color: #2f6b55; }

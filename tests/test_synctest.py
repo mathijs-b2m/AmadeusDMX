@@ -7,9 +7,9 @@ import json
 
 import numpy as np
 
-from decisive.audio import analysis, genre
-from decisive.director.prompt import drop_scores
-from decisive.show import synctest
+from amadeus.audio import analysis, genre
+from amadeus.director.prompt import drop_scores
+from amadeus.show import synctest
 
 
 def test_the_analysis_gets_the_sync_track_exactly(tmp_path, monkeypatch):

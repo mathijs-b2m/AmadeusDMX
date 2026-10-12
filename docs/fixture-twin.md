@@ -36,7 +36,7 @@ python tools/twin.py live fuze1
 ```
 
 ```bash
-decisive live --artnet 127.0.0.1
+amadeus live --artnet 127.0.0.1
 ```
 
 It listens on 127.0.0.1:6454 and relays every packet to the set's node (`--forward IP` for another one,

@@ -1,26 +1,26 @@
 # DJ software
 
 Live mode follows a DJ's decks: which track each deck plays, where in it, how fast, and how loud. VirtualDJ
-was first; other DJ software comes in through **integrations** (`decisive/show/sources/`), one per DJ
+was first; other DJ software comes in through **integrations** (`amadeus/show/sources/`), one per DJ
 software, all behind the same `Source` interface. The engine and the Mac app's Start menu read the same
-list (`decisive/show/sources/sources.json`).
+list (`amadeus/show/sources/sources.json`).
 
 ```bash
-decisive probe                         # the list, with what each integration has been tested on
-decisive probe mixxx                   # watch one: decks, events, how well it keeps time
-decisive live --source mixxx --dmx     # follow it (the Mac app: Start ▸ Start Live Show (Mixxx))
+amadeus probe                         # the list, with what each integration has been tested on
+amadeus probe mixxx                   # watch one: decks, events, how well it keeps time
+amadeus live --source mixxx --dmx     # follow it (the Mac app: Start ▸ Start Live Show (Mixxx))
 ```
 
 Accurate position matters most: every deck plays its own pre-analysed show at the position the DJ software
 reports, so the lights can only be as precise as that position. A track the DJ software names but whose file
-isn't on this computer is looked up in the music folders (`DECISIVE_MUSIC`, default `~/Music`).
+isn't on this computer is looked up in the music folders (`AMADEUS_MUSIC`, default `~/Music`).
 
 ## At a glance
 
 | DJ software | How | Position (measured) | Needs | Status |
 |---|---|---|---|---|
 | **VirtualDJ** | our plugin (`vdj/`), UDP | exact, from VirtualDJ | the plugin as master effect | verified, live on a real rig |
-| **Mixxx** | its official controller scripting, over a virtual MIDI port | p95 10 ms from Mixxx's playhead, 51 readings/s | the "Decisive Lightning" controller mapping (copied for you), `python-rtmidi` | verified, Mixxx 2.5.6 (macOS) |
+| **Mixxx** | its official controller scripting, over a virtual MIDI port | p95 10 ms from Mixxx's playhead, 51 readings/s | the "Amadeus DMX" controller mapping (copied for you), `python-rtmidi` | verified, Mixxx 2.5.6 (macOS) |
 | **djay Pro** | its window, read through macOS Accessibility, plus Ableton Link | on SYNC: within 6 ms (sd) of Link's beat; without SYNC: sd 12–17 ms, up to ~70 ms | the Accessibility permission, `pyobjc-framework-ApplicationServices`, `aalink` | verified, djay Pro 5.6.8 (macOS) |
 | **Serato DJ Pro** | the protocol of its Serato Remote app (OSC over TCP, Bonjour) | exact, from Serato (per its protocol notes) | nothing in Serato | branch `integrations/serato`, tested against a simulated Serato only |
 | **Engine DJ / Denon** | StageLinQ (community-documented) | exact, per the protocol | a Denon player on the network | not started: needs hardware |
@@ -33,10 +33,10 @@ See the README ("Live in VirtualDJ") and [protocols.md](protocols.md), sections 
 
 ## Mixxx
 
-Mixxx's controller scripts can't open a network socket, but they speak MIDI. `decisive live --source mixxx`
-creates a virtual MIDI device, **Decisive Lightning**, and copies a controller mapping of the same name into
-Mixxx's controllers folder (`mixxx/` in this repository). In Mixxx: Preferences → Controllers → Decisive
-Lightning → load the mapping "Decisive Lightning" → Enabled. Its script sends every deck's position,
+Mixxx's controller scripts can't open a network socket, but they speak MIDI. `amadeus live --source mixxx`
+creates a virtual MIDI device, **Amadeus DMX**, and copies a controller mapping of the same name into
+Mixxx's controllers folder (`mixxx/` in this repository). In Mixxx: Preferences → Controllers → Amadeus
+DMX → load the mapping "Amadeus DMX" → Enabled. Its script sends every deck's position,
 length, speed, tempo, volume, loop state and the crossfader 50 times a second as SysEx. A script can't read
 a track's title or file, so the track is found in Mixxx's own library (read only) by its exact length.
 
@@ -89,11 +89,11 @@ labels, about 200 times a second, through the macOS Accessibility API.
 
 The first time the live show follows djay, macOS asks:
 
-> "Decisive Lightning.app" would like to control this computer using accessibility features.
+> "Amadeus DMX.app" would like to control this computer using accessibility features.
 
 macOS uses the same wording for every app that asks for this permission, because the permission itself is
-broad: an app that has it *can* read what other apps show and *can* click and type in them. Decisive
-Lightning uses it to **read**, and only this:
+broad: an app that has it *can* read what other apps show and *can* click and type in them. Amadeus
+DMX uses it to **read**, and only this:
 
 - **Which app:** only djay Pro (an app whose bundle id starts with `com.algoriddim.djay`). No other app's
   window is opened.
@@ -102,20 +102,20 @@ Lightning uses it to **read**, and only this:
 - **Never:** it doesn't click, type, press buttons or change anything in djay or any other app. The code
   makes three kinds of Accessibility calls only: whether the permission is granted
   (`AXIsProcessTrustedWithOptions`), djay's window (`AXUIElementCreateApplication`) and an element's text or
-  label (`AXUIElementCopyAttributeValue`). All of it is in `decisive/show/sources/djay.py`.
+  label (`AXUIElementCopyAttributeValue`). All of it is in `amadeus/show/sources/djay.py`.
 - **When:** only while a live show follows djay. Following VirtualDJ, Mixxx or another DJ software doesn't
   touch it.
 - **Where it goes:** the deck state stays on this computer, as with VirtualDJ: into the light show and the
-  visualiser feed (on a DJ laptop, `decisive probe djay --emit` passes it to the Decisive Link app).
+  visualiser feed (on a DJ laptop, `amadeus probe djay --emit` passes it to the Amadeus Link app).
 
 Who gets the permission: macOS grants it to the app that started the engine. In the Mac app that is
-**Decisive Lightning**; from the command line it is your terminal app (Terminal, iTerm, …). Every engine
+**Amadeus DMX**; from the command line it is your terminal app (Terminal, iTerm, …). Every engine
 that app starts then has it, so only grant it to an app that runs an engine folder you trust.
 
 Switching it off (System Settings → Privacy & Security → Accessibility) only stops the djay integration: the
 next live show with djay says the permission is missing; everything else works as before.
 
-A Decisive Lightning you built yourself (`mac/build-app.sh`) is signed ad hoc, and macOS may see each new
+An Amadeus DMX you built yourself (`mac/build-app.sh`) is signed ad hoc, and macOS may see each new
 build as a new app: if djay stops being followed after a rebuild, switch the app off and on again in that
 list (or remove it with − and start the show again).
 
@@ -137,10 +137,10 @@ uses (as published by serato-connect), which is a reason to look at it before it
 
 ## Adding one
 
-1. A module in `decisive/show/sources/` with a `Source` subclass that calls `self.received([...Deck...])`
+1. A module in `amadeus/show/sources/` with a `Source` subclass that calls `self.received([...Deck...])`
    for every reading (`DeckBook` turns readings into decks and events: track loaded, started, stopped, seek,
    loop). Report `phase` on a deck when the DJ software is synced to Ableton Link.
 2. An entry in `sources.json`: its module and class, what it needs, how good its position is
    (`exact`, `beat`, `metadata`) and what it has been verified on.
-3. `decisive probe NAME` to see it work and measure it; `--record FILE` keeps a session for
+3. `amadeus probe NAME` to see it work and measure it; `--record FILE` keeps a session for
    `--source replay --opt file=FILE`.

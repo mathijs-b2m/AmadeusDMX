@@ -13,10 +13,10 @@ copies of `examples/sets` and `examples/rigs`. `config/` is not in git: it is yo
 
 The usual flow (the Mac app's set-up assistant does exactly this):
 
-1. **Make a set**: add your fixtures (the Set page, `decisive set NAME --new` + `decisive patch …`, or the setup page).
+1. **Make a set**: add your fixtures (the Set page, `amadeus set NAME --new` + `amadeus patch …`, or the setup page).
 2. **Make a rig**: from a template (an empty room, two stands, a truss over the booth, a club, a concert stage),
-   then move and add trusses in the rig editor (`decisive rig NAME --template club`).
-3. **Place the set on the rig**: auto-mount (`decisive rig --automount`, or *Auto-Mount* in the rig editor), or
+   then move and add trusses in the rig editor (`amadeus rig NAME --template club`).
+3. **Place the set on the rig**: auto-mount (`amadeus rig --automount`, or *Auto-Mount* in the rig editor), or
    drag fixtures onto the trusses: one by one, or a whole group at once.
 
 Mount the same set on another rig and the first rig keeps its placements: each rig remembers, per set, where
@@ -40,7 +40,7 @@ every fixture hangs.
 
 Per fixture: `id`, `fixture` (the library key, `fixtures/<brand>/<model>.json`), `mode`, `universe`, `address`,
 and calibration (`pan_invert`, `tilt_invert`, `pan_home_deg`, `tilt_home_deg`, …). `output` is optional (absent:
-Art-Net to `artnet.ip`); see `decisive/dmx/outputs.py`. `safety.max_fog` (0..1, default 0.7) caps how hazy smoke
+Art-Net to `artnet.ip`); see `amadeus/dmx/outputs.py`. `safety.max_fog` (0..1, default 0.7) caps how hazy smoke
 machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 
 ## The rig file
@@ -76,25 +76,25 @@ seen from above), `aim` (`[azimuth°, elevation°]`, fixtures without motors), a
 to that face), its base against the truss and its head pointing out; only on `top` of a tower does a fixture
 stand. Tower fixtures from before tower faces stood in front of it; they are moved onto the front face when the
 rig is loaded. `reverse`, `width` and `group` are
-placement fields too. Fixtures on a truss are positioned by `decisive/rig/trusses.py`; the Mac editor uses the
+placement fields too. Fixtures on a truss are positioned by `amadeus/rig/trusses.py`; the Mac editor uses the
 same rules.
 
 **DMX output.** A set says where its universes go with `"dmx"`: per universe a device from `config/devices.json`
 and which of its outputs (`{"1": {"device": "pocket", "output": 1}}`); the devices themselves (`type` artnet,
 sacn or enttec_pro, `ip`, `udp_port`, `first_universe`, `outputs`, `priority`, USB `port`/`serial`) are kept apart
-from the sets, see `decisive/dmx/devices.py`. Without `"dmx"` a set uses its own `"output"`/`"artnet"` blocks
-(`decisive/dmx/outputs.py`; an Art-Net output may have a `universe_offset`).
+from the sets, see `amadeus/dmx/devices.py`. Without `"dmx"` a set uses its own `"output"`/`"artnet"` blocks
+(`amadeus/dmx/outputs.py`; an Art-Net output may have a `universe_offset`).
 
 `"artnet": {"lead_ms": 50}`: how far ahead of the music the lights are rendered (default 50 ms), for the time
 your lights take to show what they are sent and the DJ software's audio buffer. The beat grid is where the music
 is heard; this is the only place the rig's own delay goes.
 
-Zones (`avoid`, `keep_in`, `laser_out`) are explained in `mac/README.md` and `decisive/engine/zones.py`.
+Zones (`avoid`, `keep_in`, `laser_out`) are explained in `mac/README.md` and `amadeus/engine/zones.py`.
 
 ## The combined view
 
 The engine reads one dict: the set's keys, the rig's `stage`, `trusses`, `zones` and `screen`, and each fixture
-with its placement fields merged in (`decisive/rig/store.py`, `compose`). This is also what `GET /api/rig`
+with its placement fields merged in (`amadeus/rig/store.py`, `compose`). This is also what `GET /api/rig`
 returns and `POST /api/rig` takes; saving splits it back into the two files (`split`), keeping the rig's
 placements for other sets.
 
@@ -109,7 +109,7 @@ of the same name the first time the engine or the Mac app runs.
 
 ## Auto-mount
 
-`decisive/rig/automount.py`, in this order:
+`amadeus/rig/automount.py`, in this order:
 
 1. **Lasers** on top of the back-most high truss, in the middle; else high on the towers (never below 2 m);
    else on stands at the back.

@@ -1,0 +1,8 @@
+# What the Mac app ships with its built-in Python (mac/bundle-engine.sh): the engine pinned as in CI, plus the
+# OpenAI director, USB DMX and the DJ software integrations. Not the instrument separation (requirements-ml.txt,
+# ~2 GB) and not streamed tracks (yt-dlp): those are opt-in.
+-r requirements.txt
+python-rtmidi==1.5.8
+pyobjc-core==12.2.2
+pyobjc-framework-ApplicationServices==12.2.2
+aalink==0.2.3

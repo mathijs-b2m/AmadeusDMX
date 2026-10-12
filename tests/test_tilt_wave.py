@@ -5,11 +5,11 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from decisive.director import RuleDirector, direct
-from decisive.director.arc import apply_arc
-from decisive.engine import Engine
-from decisive.engine import looks as L
-from decisive.rig.loader import load_rig
+from amadeus.director import RuleDirector, direct
+from amadeus.director.arc import apply_arc
+from amadeus.engine import Engine
+from amadeus.engine import looks as L
+from amadeus.rig.loader import load_rig
 from tests.synthetic import synthetic_analysis
 
 

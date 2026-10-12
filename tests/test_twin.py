@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from decisive.rig.loader import load_rig
+from amadeus.rig.loader import load_rig
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("twin", ROOT / "tools" / "twin.py")
@@ -92,7 +92,7 @@ def test_a_quicker_fixture_runs_ahead(show):
 
 
 def test_apply_writes_the_range_and_keeps_home_on_the_same_dmx_value(tmp_path, monkeypatch):
-    from decisive.rig.store import Selection
+    from amadeus.rig.store import Selection
 
     lib = tmp_path / "fixtures"
     (lib / "beamz").mkdir(parents=True)

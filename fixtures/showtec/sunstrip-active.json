@@ -2,7 +2,7 @@
   "manufacturer": "Showtec",
   "model": "Sunstrip Active",
   "kind": "par_bar",
-  "source": "QLC+ fixture library (Showtec/Showtec-Sunstrip-Active.qxf), converted automatically: check it once with `decisive test`",
+  "source": "QLC+ fixture library (Showtec/Showtec-Sunstrip-Active.qxf), converted automatically: check it once with `amadeus test`",
   "qlc": {
     "key": "Showtec/Showtec-Sunstrip-Active.qxf",
     "type": "LED Bar (Pixels)",

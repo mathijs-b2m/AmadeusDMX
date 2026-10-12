@@ -1,4 +1,4 @@
-from decisive.show import link
+from amadeus.show import link
 
 
 def test_pairing_proof_depends_on_the_code():

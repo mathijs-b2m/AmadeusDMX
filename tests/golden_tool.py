@@ -17,10 +17,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from decisive.director import RuleDirector, direct  # noqa: E402
-from decisive.engine import Engine, motion  # noqa: E402
-from decisive.rig.groups import head_groups, laser_list  # noqa: E402
-from decisive.rig.loader import load_rig  # noqa: E402
+from amadeus.director import RuleDirector, direct  # noqa: E402
+from amadeus.engine import Engine, motion  # noqa: E402
+from amadeus.rig.groups import head_groups, laser_list  # noqa: E402
+from amadeus.rig.loader import load_rig  # noqa: E402
 from tests.synthetic import synthetic_analysis  # noqa: E402
 
 GOLDEN = Path(__file__).parent / "golden.json"

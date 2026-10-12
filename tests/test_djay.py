@@ -2,7 +2,7 @@
 
 import random
 
-from decisive.show.sources.djay import LATE_S, Playhead, clock, percent
+from amadeus.show.sources.djay import LATE_S, Playhead, clock, percent
 
 
 def test_labels():

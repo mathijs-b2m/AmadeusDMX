@@ -8,8 +8,8 @@ import types
 
 import pytest
 
-from decisive.show.sources import streamed
-from decisive.show.sources.streamed import Fetcher, Stream, _fields, djay_streams, score
+from amadeus.show.sources import streamed
+from amadeus.show.sources.streamed import Fetcher, Stream, _fields, djay_streams, score
 
 
 def s8(text: str) -> bytes:
@@ -149,7 +149,7 @@ def test_a_track_no_longer_on_a_deck_is_skipped(fetcher):
 
 
 def test_saved_settings_and_the_command_line(tmp_path):
-    from decisive.show.sources import settings
+    from amadeus.show.sources import settings
 
     f = tmp_path / "integrations.json"
     assert settings("djay", f) == {}  # no file: everything at its default (streamed tracks off)
@@ -162,7 +162,7 @@ def test_saved_settings_and_the_command_line(tmp_path):
 def test_streamed_tracks_are_off_by_default():
     import inspect
 
-    from decisive.show.sources.djay import Djay
+    from amadeus.show.sources.djay import Djay
 
     assert inspect.signature(Djay).parameters["streamed"].default == 0
 

@@ -1,0 +1,43 @@
+[
+  {
+    "name": "vdj",
+    "app": "VirtualDJ",
+    "module": "amadeus.show.vdj",
+    "class": "Listener",
+    "about": "VirtualDJ on this computer: the AmadeusLink plugin (UDP 9123)",
+    "position": "exact",
+    "verified": "VirtualDJ 8.5 (macOS), live on a real rig",
+    "waiting": "Load a track in VirtualDJ with AmadeusLink as master effect."
+  },
+  {
+    "name": "mixxx",
+    "app": "Mixxx",
+    "module": "amadeus.show.sources.mixxx",
+    "class": "Mixxx",
+    "about": "Mixxx: its controller scripting, over a virtual MIDI device (needs python-rtmidi); opts port, library",
+    "position": "exact",
+    "verified": "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Amadeus Link p95 10 ms, max 13 ms",
+    "waiting": "Play a track in Mixxx with the Amadeus DMX controller enabled (start Mixxx after the show)."
+  },
+  {
+    "name": "djay",
+    "app": "djay Pro",
+    "module": "amadeus.show.sources.djay",
+    "class": "Djay",
+    "about": "djay Pro (macOS): its window read through Accessibility (needs pyobjc-framework-ApplicationServices and the Accessibility permission); opt streamed=1: Spotify tracks lit from a local copy (needs yt-dlp; off by default)",
+    "position": "exact",
+    "verified": "djay Pro 5.6.8 (macOS): on SYNC with Ableton Link, within 6 ms (sd) of Link's beat; without SYNC, the label alone: sd 12-17 ms, up to ~70 ms",
+    "waiting": "Load a track in djay Pro (Amadeus DMX reads its window: Accessibility permission)."
+  },
+  {
+    "name": "replay",
+    "app": "a recording",
+    "module": "amadeus.show.sources.replay",
+    "class": "Replay",
+    "about": "a recording of any source (amadeus probe NAME --record FILE): opt file=FILE",
+    "position": "exact",
+    "verified": "unit tests",
+    "menu": false,
+    "waiting": "Replaying a recording."
+  }
+]

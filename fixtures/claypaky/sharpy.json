@@ -2,7 +2,7 @@
   "manufacturer": "Clay Paky",
   "model": "Sharpy",
   "kind": "moving_head",
-  "source": "QLC+ fixture library (Clay_Paky/Clay-Paky-Sharpy.qxf), converted automatically: check it once with `decisive test`",
+  "source": "QLC+ fixture library (Clay_Paky/Clay-Paky-Sharpy.qxf), converted automatically: check it once with `amadeus test`",
   "qlc": {
     "key": "Clay_Paky/Clay-Paky-Sharpy.qxf",
     "type": "Moving Head",
@@ -384,6 +384,6 @@
     "pan_speed_dps": 200,
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
-    "_note": "Estimated; measure with `decisive motion`."
+    "_note": "Estimated; measure with `amadeus motion`."
   }
 }

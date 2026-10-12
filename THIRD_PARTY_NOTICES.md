@@ -1,6 +1,6 @@
 # Third-party notices
 
-Decisive Lightning is MIT licensed (see `LICENSE`). It includes or uses the following.
+Amadeus DMX is MIT licensed (see `LICENSE`). It includes or uses the following.
 
 ## Included in this repository
 
@@ -40,6 +40,6 @@ MilkDrop-style visuals in the web visualiser. License texts: `licenses/butterchu
   the original libraries, fetched into `.cache/qlcplus` and `.cache/ofl` only to rebuild the catalogue or to
   add a fixture newer than it.
 - **VirtualDJ SDK headers** (© Atomix Productions): downloaded by `vdj/build.sh` from virtualdj.com to build
-  the DecisiveLink plugin; not redistributable, so not included.
+  the AmadeusLink plugin; not redistributable, so not included.
 - **Python packages** (`pyproject.toml`): numpy, scipy (BSD), soundfile, sounddevice, websockets, pyserial
   (BSD / MIT); optional openai (Apache-2.0), demucs (MIT), beat-this (MIT), torch / torchaudio (BSD).

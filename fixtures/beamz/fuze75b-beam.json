@@ -13,18 +13,18 @@
     "light": "75 W white LED + colour wheel"
   },
   "motion": {
-    "_note": "Measured with `decisive motion` (per axis). Used to size per-beat moves and to predict where the head is; DMX gets the target slightly ahead and the fixture moves at its own speed.",
+    "_note": "Measured with `amadeus motion` (per axis). Used to size per-beat moves and to predict where the head is; DMX gets the target slightly ahead and the fixture moves at its own speed.",
     "estimated": false,
     "pan_speed_dps": 200,
     "tilt_speed_dps": 160,
     "accel_dps2": 374,
-    "_measured_tilt": "40\u00b0 full swing per beat at 145 BPM (decisive motion)",
-    "_measured_pan": "20\u00b0 full swing per beat at 145 BPM (decisive motion)",
+    "_measured_tilt": "40\u00b0 full swing per beat at 145 BPM (amadeus motion)",
+    "_measured_pan": "20\u00b0 full swing per beat at 145 BPM (amadeus motion)",
     "tilt_accel_dps2": 748,
     "pan_accel_dps2": 374
   },
   "color_wheel": {
-    "_note": "Slot colours as seen on the real fixture (decisive colors).",
+    "_note": "Slot colours as seen on the real fixture (amadeus colors).",
     "verified": true,
     "slots": [
       {

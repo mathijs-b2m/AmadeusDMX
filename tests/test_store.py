@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from decisive.library import fixtures as fxlib
-from decisive.rig import automount, manage, store, templates
-from decisive.rig.loader import load_rig_dict
+from amadeus.library import fixtures as fxlib
+from amadeus.rig import automount, manage, store, templates
+from amadeus.rig.loader import load_rig_dict
 
 SETS = Path(__file__).parent / "sets"
 
@@ -132,7 +132,7 @@ def test_automount_leaves_mounted_fixtures_and_their_room_alone(config):
     first = merged["fixtures"][0]
     truss = merged["trusses"][0]
     first.pop(store.UNPLACED)
-    from decisive.rig.trusses import place
+    from amadeus.rig.trusses import place
 
     place(first, truss, 0.0, merged["stage"]["width_m"], "under")
     show.save(merged)
@@ -145,8 +145,8 @@ def test_automount_leaves_mounted_fixtures_and_their_room_alone(config):
 
 
 def test_a_tower_has_four_faces_and_a_top():
-    from decisive.rig import geometry
-    from decisive.rig import trusses as T
+    from amadeus.rig import geometry
+    from amadeus.rig import trusses as T
 
     tower = {"id": "tw", "vertical": True, "x_m": 0.0, "y_m": -1.5, "z_m": 1.5, "length_m": 3.0}
     out = {"front": (0, 1, 0), "back": (0, -1, 0), "left": (-1, 0, 0), "right": (1, 0, 0)}
@@ -159,7 +159,7 @@ def test_a_tower_has_four_faces_and_a_top():
 
 
 def test_a_fixture_standing_on_a_tower_from_before_hangs_off_its_front():
-    from decisive.rig.store import compose
+    from amadeus.rig.store import compose
 
     rig = {"trusses": [{"id": "tw", "vertical": True, "x_m": 0.0, "y_m": -1.5, "z_m": 1.5, "length_m": 3.0}],
            "placements": {"s": {"h": {"truss": "tw", "truss_pos_m": 2.0, "mount": "stand", "x": 0.0, "y_m": -1.18,
@@ -170,7 +170,7 @@ def test_a_fixture_standing_on_a_tower_from_before_hangs_off_its_front():
 
 
 def test_auto_mount_reads_the_structure_of_a_rig_without_trusses():
-    from decisive.rig import automount as am
+    from amadeus.rig import automount as am
 
     merged = json.loads(Path("tests/sets/concert60.json").read_text())  # fixtures at fixed positions, no trusses
     merged.pop("trusses", None)
@@ -184,7 +184,7 @@ def test_auto_mount_reads_the_structure_of_a_rig_without_trusses():
 
 
 def test_auto_mount_in_an_empty_room_builds_a_structure_first():
-    from decisive.rig import automount as am
+    from amadeus.rig import automount as am
 
     merged = json.loads(Path("tests/sets/showcase.json").read_text())
     merged.pop("trusses", None)
@@ -201,7 +201,7 @@ def test_auto_mount_in_an_empty_room_builds_a_structure_first():
 def test_renaming_a_fixture_keeps_where_it_hangs(config):
     from types import SimpleNamespace
 
-    from decisive.web import rig as api
+    from amadeus.web import rig as api
 
     old_style(config, "showcase")
     store.sets.load("showcase")  # (split into set and rig)
@@ -216,7 +216,7 @@ def test_renaming_a_fixture_keeps_where_it_hangs(config):
 
 def test_mounting_new_fixtures_leaves_a_small_room_as_it_is():
     """Two new heads in a living room with two heads on stands: on stands beside them, no trusses invented."""
-    from decisive.rig import automount as am
+    from amadeus.rig import automount as am
 
     def fx(fid, x, y, z, mount, waiting=False):
         f = {"id": fid, "fixture": "beamz/fuze75b-beam", "x": x, "y_m": y, "z_m": z, "mount": mount}

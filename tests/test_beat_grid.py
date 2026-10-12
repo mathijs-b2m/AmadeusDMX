@@ -3,8 +3,8 @@
 import numpy as np
 import soundfile as sf
 
-from decisive.audio.analysis import analyze
-from decisive.audio.beats import attack_offset, constant_grid
+from amadeus.audio.analysis import analyze
+from amadeus.audio.beats import attack_offset, constant_grid
 
 SR = 44100
 BEAT = 31 / 64  # 123.87 BPM: not a round number of analysis frames

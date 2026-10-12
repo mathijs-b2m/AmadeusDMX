@@ -8,7 +8,7 @@ Thanks for helping. A few things make reviews quick.
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev,openai]"
 .venv/bin/pytest -q            # ~1 minute
-.venv/bin/ruff check decisive tests && .venv/bin/ruff format decisive tests
+.venv/bin/ruff check amadeus tests && .venv/bin/ruff format amadeus tests
 ```
 
 The Mac app: `cd mac && swift build` (Xcode 26, macOS 26). See `mac/README.md`.

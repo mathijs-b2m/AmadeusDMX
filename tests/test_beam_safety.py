@@ -5,10 +5,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from decisive.director import RuleDirector, direct
-from decisive.engine import Engine, motion
-from decisive.library import fixtures as fxlib
-from decisive.rig.loader import load_rig
+from amadeus.director import RuleDirector, direct
+from amadeus.engine import Engine, motion
+from amadeus.library import fixtures as fxlib
+from amadeus.rig.loader import load_rig
 from tests.synthetic import synthetic_analysis
 
 

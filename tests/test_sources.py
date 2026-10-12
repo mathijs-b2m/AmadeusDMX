@@ -5,11 +5,11 @@ import time
 import numpy as np
 import soundfile as sf
 
-from decisive.show import probe
-from decisive.show.sources import open_source, parse_opts
-from decisive.show.sources.base import FROZEN_S, Deck, DeckBook, Source
-from decisive.show.sources.resolve import Resolver
-from decisive.show.vdj import Listener
+from amadeus.show import probe
+from amadeus.show.sources import open_source, parse_opts
+from amadeus.show.sources.base import FROZEN_S, Deck, DeckBook, Source
+from amadeus.show.sources.resolve import Resolver
+from amadeus.show.vdj import Listener
 
 
 def deck(pos, t, play=True, file="a.mp3", n=1, vol=1.0, bpm=128.0):
@@ -76,7 +76,7 @@ def test_master_is_the_loudest_playing_deck():
 
 def test_probe_emits_what_the_vdj_listener_reads():
     """Any source, passed on with --emit, arrives as the plugin's packets (here: straight into live mode's
-    VirtualDJ listener; on a DJ laptop: into the Decisive Link app)."""
+    VirtualDJ listener; on a DJ laptop: into the Amadeus Link app)."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
@@ -154,7 +154,7 @@ def test_parse_opts():
 
 
 def test_snap_moves_to_the_nearest_point_at_that_phase():
-    from decisive.show.sources.base import snap
+    from amadeus.show.sources.base import snap
 
     beats = np.arange(0, 100) * 0.5  # 120 BPM
     assert abs(snap(10.1, beats, 0.0) - 10.0) < 1e-9
@@ -165,7 +165,7 @@ def test_snap_moves_to_the_nearest_point_at_that_phase():
 def test_phase_lock_learns_a_fixed_offset_near_half_a_beat():
     """The DJ software's position runs 0.2 s (0.4 beat) ahead of what Link says is heard, with ±50 ms noise:
     the lock still picks the right beat every time, and ends exactly on Link's phase."""
-    from decisive.show.sources.base import PhaseLock
+    from amadeus.show.sources.base import PhaseLock
 
     beats, rnd, lock = np.arange(0, 400) * 0.5, np.random.default_rng(3), PhaseLock()
     for k in range(200):

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from decisive.audio.model import Analysis, Phrase
+from amadeus.audio.model import Analysis, Phrase
 
 # (section shape, loudness %, low %, kick ratio, drop score) per 8-bar phrase
 SHAPE = [

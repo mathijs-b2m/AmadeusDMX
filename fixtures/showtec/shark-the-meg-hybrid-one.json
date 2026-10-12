@@ -2,7 +2,7 @@
   "manufacturer": "Showtec",
   "model": "Shark The Meg Hybrid One",
   "kind": "moving_head",
-  "source": "Open Fixture Library (showtec/shark-the-meg-hybrid-one), converted automatically: check it once with `decisive test`",
+  "source": "Open Fixture Library (showtec/shark-the-meg-hybrid-one), converted automatically: check it once with `amadeus test`",
   "ofl": {
     "key": "showtec/shark-the-meg-hybrid-one",
     "categories": [
@@ -298,6 +298,6 @@
     "pan_speed_dps": 200,
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
-    "_note": "Estimated; measure with `decisive motion`."
+    "_note": "Estimated; measure with `amadeus motion`."
   }
 }

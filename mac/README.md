@@ -1,7 +1,7 @@
-# Decisive Lightning for macOS
+# Amadeus DMX for macOS
 
 A native macOS app (SwiftUI + Metal) on top of the same Python engine the web UI uses. It sits side by side
-with the web UI: nothing in `decisive/` or `web/` depends on it, and both share the sets, rigs, fixtures and
+with the web UI: nothing in `amadeus/` or `web/` depends on it, and both share the sets, rigs, fixtures and
 cache.
 
 The pages: **Show** (the stage and the music), **Rig** (the venue and where your fixtures hang on it),
@@ -12,8 +12,8 @@ runs with ("showcase on club"); most people have one set and a rig per venue. Se
 ```
 mac/
   Package.swift
-  Sources/DecisiveKit/         shared library: protocol, live feed, engine supervisor, setup API, sets, palettes
-  Sources/DecisiveLightning/   the app, by feature
+  Sources/AmadeusKit/          shared library: protocol, live feed, engine supervisor, setup API, sets, palettes
+  Sources/AmadeusDMX/          the app, by feature
     App/                       the app, its state, the show mode, the keychain
     Main/                      the window: sidebar and toolbar
     Show/                      the show page: stage, now playing, decks, timeline, Perform board, director
@@ -23,34 +23,34 @@ mac/
     Wizard/                    the set-up assistant (set → rig → mount), one file per step
     Render/                    Metal stage (beams, lasers, LED wall, bloom), the LED wall's scenes
     Shared/                    small helpers used across views
-  Sources/DecisiveLink/        the DJ laptop's companion app (Decisive Link)
-  build-app.sh                 builds "Decisive Lightning.app" (and a .dmg)
-  tools/make-icon.swift        draws the app icon
+  Sources/AmadeusLink/         the DJ laptop's companion app (Amadeus Link)
+  build-app.sh                 builds "Amadeus DMX.app" (and a .dmg)
+  Resources/AppIcon.icns       the app icon (the Amadeus DMX logo; docs/logo/ has the artwork)
 ```
 
 ## Build and install
 
 ```bash
-./build-app.sh              # build/Decisive Lightning.app
+./build-app.sh              # build/Amadeus DMX.app
 ./build-app.sh --install    # … and copy it to ~/Applications
-./build-app.sh --dmg        # … and build/DecisiveLightning.dmg
+./build-app.sh --dmg        # … and build/AmadeusDMX.dmg
 ```
 
 Needs Xcode 26 (Swift 6.2+) and macOS 26. You can also open `Package.swift` in Xcode and run the
-`DecisiveLightning` scheme.
+`AmadeusDMX` scheme.
 
 ## How it works
 
-- **Engine:** the app runs `python -m decisive live …` (or `play`) from the engine folder's `.venv`. It reads
+- **Engine:** the app runs `python -m amadeus live …` (or `play`) from the engine folder's `.venv`. It reads
   the same WebSocket feed as the web visualiser (`ws://127.0.0.1:8765`). Quitting the app stops the engine
   cleanly, so the lights black out.
-- **Already running:** if `decisive live` is already running from a terminal, the app attaches to it
+- **Already running:** if `amadeus live` is already running from a terminal, the app attaches to it
   ("Watching") instead of starting a second engine.
-- **Setup service:** for the wizard, the app runs `decisive setup --port 8181` in the background and uses its
+- **Setup service:** for the wizard, the app runs `amadeus setup --port 8181` in the background and uses its
   `/api/*`, the same API the web setup page uses.
 - **OpenAI key:** stored in the Keychain and passed to the engine as `OPENAI_API_KEY`. A `.env` in the engine
   folder works too.
-- **Engine folder:** baked in at build time (`DLEngineRoot` in Info.plist). If it moves, choose it in
+- **Engine folder:** baked in at build time (`AmadeusEngineRoot` in Info.plist). If it moves, choose it in
   Settings › General.
 
 ## Set up: a set, a rig, the set on the rig
@@ -106,7 +106,7 @@ goes (the set), the **rig** (a new one from a template, or one you have), and ho
 - **Placement:** the inspector sets the truss side (under / front / top / back), mount, rotation and, for
   fixtures without motors, aim.
 - **Zones (Zone button):** translucent rectangles or boxes that limit beams. They belong to the rig and are
-  enforced by the engine (`decisive/engine/zones.py`):
+  enforced by the engine (`amadeus/engine/zones.py`):
   - **keep out** (blue): a physical stop for the head motors. A head never turns its beam into the zone
     (plus a margin): it slides along the edge or waits, and is never dimmed for it;
   - **keep in** (green): moving-head beams land only inside it;
@@ -158,24 +158,24 @@ Start ▸ **Start Live Show (…)** lists every DJ software the engine can follo
 the Start button and ⌘R then use the last one chosen. What each needs:
 [docs/dj-software.md](../docs/dj-software.md).
 
-- **Mixxx:** start the show first, then Mixxx; in Mixxx, enable the "Decisive Lightning" controller once.
-- **djay Pro:** macOS asks once to allow **Decisive Lightning** to "control this computer using
-  accessibility features". That is macOS's wording for any app with this permission. Decisive Lightning
+- **Mixxx:** start the show first, then Mixxx; in Mixxx, enable the "Amadeus DMX" controller once.
+- **djay Pro:** macOS asks once to allow **Amadeus DMX** to "control this computer using
+  accessibility features". That is macOS's wording for any app with this permission. Amadeus DMX
   uses it only to *read* djay's deck labels (track, elapsed time, play, tempo, volumes), only djay's, and
   only while a show follows djay: it never clicks or types anywhere. Allow it in System Settings → Privacy &
   Security → Accessibility, then start the show again; switching it off only stops following djay. The
   permission belongs to the app and covers the engine it starts. A self-built app may need it switched off
   and on again after a rebuild (ad-hoc signature). Details: [docs/dj-software.md](../docs/dj-software.md#the-accessibility-permission).
 
-## Decisive Link (VirtualDJ on another computer)
+## Amadeus Link (VirtualDJ on another computer)
 
 When the DJ and the lighting operator use different computers:
 
-1. **The DJ's laptop** runs VirtualDJ with the DecisiveLink plugin as usual, plus **Decisive Link.app**
-   (a small window and a menu bar icon, from `build/DecisiveLink.dmg`). Switched on, it advertises itself with Bonjour and shows a
+1. **The DJ's laptop** runs VirtualDJ with the AmadeusLink plugin as usual, plus **Amadeus Link.app**
+   (a small window and a menu bar icon, from `build/AmadeusLink.dmg`). Switched on, it advertises itself with Bonjour and shows a
    4-digit code.
 2. **The lighting computer**: Start ▸ **Start with a DJ Laptop…** lists the nearby DJs; pick one and type
-   the code. From the command line: `decisive live --remote auto --code 1234` (or `--remote HOST:7123`).
+   the code. From the command line: `amadeus live --remote auto --code 1234` (or `--remote HOST:7123`).
 
 What travels over the network (protocol in [docs/protocols.md](../docs/protocols.md)):
 - **Deck state:** 25 times a second, stamped with the DJ laptop's clock and signed with a key derived
@@ -190,11 +190,11 @@ packets, and macOS asks once to allow incoming connections on both computers.
 ## Developer launch arguments
 
 ```bash
-open "build/Decisive Lightning.app" --args -section rig            # open on a page: show, rig, set, engine
-open "build/Decisive Lightning.app" --args -wizard YES             # open the wizard
-open "build/Decisive Lightning.app" --args -play TRACK.mp3 -playFrom 120 -muted YES
-open "build/Decisive Lightning.app" --args -section rig -lastSet showcase -lastRig club   # a set on a rig
-open "build/Decisive Lightning.app" --args -engineRoot /path/to/a/copy    # another engine folder (a sandbox)
-open "build/Decisive Lightning.app" --args -editorSelfTest NAME   # the set NAME on the rig NAME (copies: it saves!)
+open "build/Amadeus DMX.app" --args -section rig            # open on a page: show, rig, set, engine
+open "build/Amadeus DMX.app" --args -wizard YES             # open the wizard
+open "build/Amadeus DMX.app" --args -play TRACK.mp3 -playFrom 120 -muted YES
+open "build/Amadeus DMX.app" --args -section rig -lastSet showcase -lastRig club   # a set on a rig
+open "build/Amadeus DMX.app" --args -engineRoot /path/to/a/copy    # another engine folder (a sandbox)
+open "build/Amadeus DMX.app" --args -editorSelfTest NAME   # the set NAME on the rig NAME (copies: it saves!)
                                                                    # report in $TMPDIR/editor-selftest.txt
 ```

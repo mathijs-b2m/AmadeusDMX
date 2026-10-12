@@ -7,8 +7,8 @@ import subprocess
 
 import pytest
 
-from decisive import paths
-from decisive.show.sources import mixxx
+from amadeus import paths
+from amadeus.show.sources import mixxx
 
 HARNESS = """
 const fs = require("fs");
@@ -20,15 +20,15 @@ global.engine = {
   beginTimer: () => 1, stopTimer: () => {},
 };
 global.midi = {sendSysexMsg: (m, n) => sent.push(m.slice(0, n))};
-eval(fs.readFileSync(%s, "utf8") + "; global.DecisiveLightning = DecisiveLightning;");
-DecisiveLightning.init();
-DecisiveLightning.tick();
+eval(fs.readFileSync(%s, "utf8") + "; global.AmadeusDMX = AmadeusDMX;");
+AmadeusDMX.init();
+AmadeusDMX.tick();
 console.log(JSON.stringify(sent));
 """
 
 
 def script_output(values: dict) -> list[list[int]]:
-    js = paths.ROOT / "mixxx" / "Decisive-Lightning-scripts.js"
+    js = paths.ROOT / "mixxx" / "Amadeus-DMX-scripts.js"
     out = subprocess.run(
         ["node", "-e", HARNESS % (json.dumps(values), json.dumps(str(js)))], capture_output=True, text=True, check=True
     )

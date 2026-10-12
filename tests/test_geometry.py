@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from decisive.library import fixtures as fxlib
-from decisive.rig import geometry
-from decisive.rig.loader import load_rig
+from amadeus.library import fixtures as fxlib
+from amadeus.rig import geometry
+from amadeus.rig.loader import load_rig
 
 
 @pytest.fixture(scope="module")
@@ -31,7 +31,7 @@ def test_ik_inverts_fk(head, rot, roll):
 def test_beams_stay_off_the_ceiling_and_never_shine_back_at_the_dj():
     import numpy as np
 
-    from decisive.rig import geometry as g
+    from amadeus.rig import geometry as g
 
     room = {**g.DEFAULT_STAGE, "ceiling_m": 2.6, "room_depth_m": 4.0}
     up, back, back_down, crowd = (

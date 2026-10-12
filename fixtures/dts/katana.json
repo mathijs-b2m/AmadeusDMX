@@ -2,7 +2,7 @@
   "manufacturer": "DTS",
   "model": "Katana",
   "kind": "moving_bar",
-  "source": "QLC+ fixture library (DTS/DTS-Katana.qxf), converted automatically: check it once with `decisive test`",
+  "source": "QLC+ fixture library (DTS/DTS-Katana.qxf), converted automatically: check it once with `amadeus test`",
   "qlc": {
     "key": "DTS/DTS-Katana.qxf",
     "type": "LED Bar (Beams)",
@@ -427,6 +427,6 @@
     "pan_speed_dps": 200,
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
-    "_note": "Estimated; measure with `decisive motion`."
+    "_note": "Estimated; measure with `amadeus motion`."
   }
 }

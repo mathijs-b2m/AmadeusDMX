@@ -1,23 +1,23 @@
 // swift-tools-version: 6.2
-// Decisive Lightning for macOS: a native app on top of the Python engine (side by side with the web UI).
+// Amadeus DMX for macOS: a native app on top of the Python engine (side by side with the web UI).
 //
-//  DecisiveKit         the shared library: protocol, live feed, engine supervisor, setup API, sets, palettes
-//  DecisiveLightning   the app: SwiftUI + Metal
+//  AmadeusKit   the shared library: protocol, live feed, engine supervisor, setup API, sets, palettes
+//  AmadeusDMX   the app: SwiftUI + Metal
 import PackageDescription
 
 let package = Package(
-    name: "DecisiveLightning",
+    name: "AmadeusDMX",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "DecisiveKit", targets: ["DecisiveKit"]),
-        .executable(name: "DecisiveLightning", targets: ["DecisiveLightning"]),
-        .executable(name: "DecisiveLink", targets: ["DecisiveLink"]),
+        .library(name: "AmadeusKit", targets: ["AmadeusKit"]),
+        .executable(name: "AmadeusDMX", targets: ["AmadeusDMX"]),
+        .executable(name: "AmadeusLink", targets: ["AmadeusLink"]),
     ],
     targets: [
-        .target(name: "DecisiveKit", swiftSettings: [.swiftLanguageMode(.v5)]),
-        .executableTarget(name: "DecisiveLightning", dependencies: ["DecisiveKit"],
+        .target(name: "AmadeusKit", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .executableTarget(name: "AmadeusDMX", dependencies: ["AmadeusKit"],
                           swiftSettings: [.swiftLanguageMode(.v5)]),
-        // the DJ laptop's companion: passes VirtualDJ's mix state to the lighting computer (decisive/link.py)
-        .executableTarget(name: "DecisiveLink", swiftSettings: [.swiftLanguageMode(.v5)]),
+        // the DJ laptop's companion: passes VirtualDJ's mix state to the lighting computer (amadeus/link.py)
+        .executableTarget(name: "AmadeusLink", swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

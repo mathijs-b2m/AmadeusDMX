@@ -2,7 +2,7 @@
 
 import pytest
 
-from decisive.dmx import devices, outputs
+from amadeus.dmx import devices, outputs
 
 DEVICES = [
     {"id": "pocket", "name": "Pocket", "type": "artnet", "ip": "127.0.0.1", "first_universe": 0, "outputs": 2},

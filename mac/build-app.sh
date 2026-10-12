@@ -1,98 +1,111 @@
 #!/bin/bash
-# Build "Decisive Lightning.app" (release, Apple Silicon) next to this script in build/.
-#   ./build-app.sh             build the app
+# Build "Amadeus DMX.app" (release, Apple Silicon) next to this script in build/.
+#   ./build-app.sh             build the app for this checkout (it runs the engine from here, with its .venv)
+#   ./build-app.sh --release   build the app people download: the engine and its Python inside (bundle-engine.sh)
 #   ./build-app.sh --install   … and copy it to ~/Applications
-#   ./build-app.sh --dmg       … and make a disk image (build/DecisiveLightning.dmg)
-# The engine folder (this repository) is baked in as the default; the app asks if it moves.
+#   ./build-app.sh --dmg       … and make disk images (build/AmadeusDMX.dmg, build/AmadeusLink.dmg)
+# Options combine (--release --dmg). VERSION=1.2.3 sets the version people see (default 0.1.<commits>); the build
+# number is always the commit count, so every later build is newer (what updaters compare).
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd .. && pwd)"
-APP="build/Decisive Lightning.app"
-VERSION="0.1.$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 0)"
+APP="build/Amadeus DMX.app"
+BUILD="$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 0)"
+VERSION="${VERSION:-0.1.$BUILD}"
+RELEASE=0 INSTALL=0 DMG=0
+for arg in "$@"; do
+  case "$arg" in
+    --release) RELEASE=1 ;;
+    --install) INSTALL=1 ;;
+    --dmg) DMG=1 ;;
+    *) echo "Unknown option $arg" >&2; exit 1 ;;
+  esac
+done
+# a development build runs the engine from this checkout; a release has its own inside
+ENGINE_ROOT=""
+[ "$RELEASE" = 1 ] || ENGINE_ROOT="  <key>AmadeusEngineRoot</key><string>${ROOT}</string>"
 
 swift build -c release --arch arm64
-BIN="$(swift build -c release --arch arm64 --show-bin-path)/DecisiveLightning"
+BIN="$(swift build -c release --arch arm64 --show-bin-path)/AmadeusDMX"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/DecisiveLightning"
+cp "$BIN" "$APP/Contents/MacOS/AmadeusDMX"
 
-if [ ! -f build/AppIcon.icns ]; then
-  swift tools/make-icon.swift build/AppIcon.iconset
-  iconutil -c icns build/AppIcon.iconset -o build/AppIcon.icns
-fi
-cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>io.github.decisivelightning.app</string>
-  <key>CFBundleName</key><string>Decisive Lightning</string>
-  <key>CFBundleDisplayName</key><string>Decisive Lightning</string>
-  <key>CFBundleExecutable</key><string>DecisiveLightning</string>
+  <key>CFBundleIdentifier</key><string>io.github.amadeusdmx.app</string>
+  <key>CFBundleName</key><string>Amadeus DMX</string>
+  <key>CFBundleDisplayName</key><string>Amadeus DMX</string>
+  <key>CFBundleExecutable</key><string>AmadeusDMX</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-  <key>CFBundleVersion</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>Decisive Lightning sends DMX to your lights over Art-Net and listens to VirtualDJ on this Mac.</string>
-  <key>DLEngineRoot</key><string>${ROOT}</string>
+  <string>Amadeus DMX sends DMX to your lights over Art-Net and listens to VirtualDJ on this Mac.</string>
+${ENGINE_ROOT}
 </dict>
 </plist>
 PLIST
 
+[ "$RELEASE" = 1 ] && ./bundle-engine.sh "$APP"
 codesign --force --sign - --timestamp=none "$APP"
-echo "Built $APP ($VERSION)"
+echo "Built $APP ($VERSION$([ "$RELEASE" = 1 ] && echo ", engine inside"))"
 
-# Decisive Link: the companion for the DJ's laptop (menu bar only)
-LINK="build/Decisive Link.app"
+# Amadeus Link: the companion for the DJ's laptop (menu bar only)
+LINK="build/Amadeus Link.app"
 rm -rf "$LINK"
 mkdir -p "$LINK/Contents/MacOS" "$LINK/Contents/Resources"
-cp "$(dirname "$BIN")/DecisiveLink" "$LINK/Contents/MacOS/DecisiveLink"
-cp build/AppIcon.icns "$LINK/Contents/Resources/AppIcon.icns"
+cp "$(dirname "$BIN")/AmadeusLink" "$LINK/Contents/MacOS/AmadeusLink"
+cp Resources/AppIcon.icns "$LINK/Contents/Resources/AppIcon.icns"
 cat > "$LINK/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>io.github.decisivelightning.link</string>
-  <key>CFBundleName</key><string>Decisive Link</string>
-  <key>CFBundleExecutable</key><string>DecisiveLink</string>
+  <key>CFBundleIdentifier</key><string>io.github.amadeusdmx.link</string>
+  <key>CFBundleName</key><string>Amadeus Link</string>
+  <key>CFBundleExecutable</key><string>AmadeusLink</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-  <key>CFBundleVersion</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>Decisive Link passes VirtualDJ's mix to the lighting computer on your network.</string>
-  <key>NSBonjourServices</key><array><string>_decisivelink._tcp</string></array>
+  <string>Amadeus Link passes VirtualDJ's mix to the lighting computer on your network.</string>
+  <key>NSBonjourServices</key><array><string>_amadeuslink._tcp</string></array>
 </dict>
 </plist>
 PLIST
 codesign --force --sign - --timestamp=none "$LINK"
 echo "Built $LINK"
 
-if [ "${1:-}" = "--install" ]; then
+if [ "$INSTALL" = 1 ]; then
   mkdir -p "$HOME/Applications"
-  rm -rf "$HOME/Applications/Decisive Lightning.app"
+  rm -rf "$HOME/Applications/Amadeus DMX.app"
   cp -R "$APP" "$HOME/Applications/"
   echo "Installed to ~/Applications"
-elif [ "${1:-}" = "--dmg" ]; then
-  rm -rf build/dmg build/DecisiveLightning.dmg
+fi
+if [ "$DMG" = 1 ]; then
+  rm -rf build/dmg build/AmadeusDMX.dmg
   mkdir -p build/dmg
   cp -R "$APP" build/dmg/
   ln -s /Applications build/dmg/Applications
-  hdiutil create -volname "Decisive Lightning" -srcfolder build/dmg -ov -format UDZO build/DecisiveLightning.dmg >/dev/null
+  hdiutil create -volname "Amadeus DMX" -srcfolder build/dmg -ov -format UDZO build/AmadeusDMX.dmg >/dev/null
   rm -rf build/dmg
-  echo "Disk image: build/DecisiveLightning.dmg"
+  echo "Disk image: build/AmadeusDMX.dmg"
   mkdir -p build/dmg && cp -R "$LINK" build/dmg/ && ln -s /Applications build/dmg/Applications
-  hdiutil create -volname "Decisive Link" -srcfolder build/dmg -ov -format UDZO build/DecisiveLink.dmg >/dev/null
+  hdiutil create -volname "Amadeus Link" -srcfolder build/dmg -ov -format UDZO build/AmadeusLink.dmg >/dev/null
   rm -rf build/dmg
-  echo "Disk image for the DJ: build/DecisiveLink.dmg"
+  echo "Disk image for the DJ: build/AmadeusLink.dmg"
 fi

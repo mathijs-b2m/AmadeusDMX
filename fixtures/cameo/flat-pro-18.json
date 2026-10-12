@@ -2,7 +2,7 @@
   "manufacturer": "Cameo",
   "model": "FLAT PRO 18",
   "kind": "par",
-  "source": "QLC+ fixture library (Cameo/Cameo-FLAT-PRO-18.qxf), converted automatically: check it once with `decisive test`",
+  "source": "QLC+ fixture library (Cameo/Cameo-FLAT-PRO-18.qxf), converted automatically: check it once with `amadeus test`",
   "qlc": {
     "key": "Cameo/Cameo-FLAT-PRO-18.qxf",
     "type": "Color Changer",

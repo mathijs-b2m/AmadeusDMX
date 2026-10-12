@@ -2,7 +2,7 @@
   "manufacturer": "Martin",
   "model": "Atomic 3000 LED",
   "kind": "strobe",
-  "source": "QLC+ fixture library (Martin/Martin-Atomic-3000-LED.qxf), converted automatically: check it once with `decisive test`",
+  "source": "QLC+ fixture library (Martin/Martin-Atomic-3000-LED.qxf), converted automatically: check it once with `amadeus test`",
   "qlc": {
     "key": "Martin/Martin-Atomic-3000-LED.qxf",
     "type": "Strobe",

@@ -5,11 +5,11 @@ import json
 import numpy as np
 import pytest
 
-from decisive.director import RuleDirector, direct
-from decisive.engine import Engine, fog, motion
-from decisive.library import fixtures as fxlib
-from decisive.rig.groups import has_smoke, head_groups, laser_list
-from decisive.rig.loader import load_rig_dict
+from amadeus.director import RuleDirector, direct
+from amadeus.engine import Engine, fog, motion
+from amadeus.library import fixtures as fxlib
+from amadeus.rig.groups import has_smoke, head_groups, laser_list
+from amadeus.rig.loader import load_rig_dict
 from tests.synthetic import SHAPE, synthetic_analysis
 
 BPM = 128

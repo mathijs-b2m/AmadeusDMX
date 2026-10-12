@@ -1,0 +1,53 @@
+name: Release
+
+# Push a tag (git tag v0.2.0 && git push origin v0.2.0): the checks run, the Mac apps are built with the engine
+# inside, and a draft release with the disk images is made on GitHub. You publish it there, after a look.
+# Run by hand (Actions › Release › Run workflow): the same build, the disk images as a workflow artifact only.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # the draft release
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  mac:
+    needs: checks
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the build number is the commit count
+      - uses: astral-sh/setup-uv@v6
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-dev.$(git rev-list --count HEAD)"; fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Build (engine inside)
+        working-directory: mac
+        run: ./build-app.sh --release --dmg
+      - name: Name the disk images
+        working-directory: mac/build
+        run: |
+          mv AmadeusDMX.dmg "AmadeusDMX-$VERSION.dmg"
+          mv AmadeusLink.dmg "AmadeusLink-$VERSION.dmg"
+          shasum -a 256 *.dmg > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amadeus-dmx-${{ env.VERSION }}
+          path: |
+            mac/build/*.dmg
+            mac/build/SHA256SUMS.txt
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Amadeus DMX $VERSION" \
+            $([[ "$VERSION" == *-* ]] && echo --prerelease) \
+            mac/build/*.dmg mac/build/SHA256SUMS.txt

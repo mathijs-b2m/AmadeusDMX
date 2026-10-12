@@ -6,7 +6,7 @@
   header { position: sticky; top: 0; z-index: 5; background: rgba(11,12,16,.92); backdrop-filter: blur(8px);
            padding: calc(10px + env(safe-area-inset-top)) 16px 10px; border-bottom: 1px solid var(--line);
            display: flex; align-items: baseline; gap: 10px; }
-  header h1 { font-size: 18px; margin: 0; } header h1 span { color: var(--accent); }
+  header h1 { font-size: 18px; margin: 0; } header h1 img { width: 1.25em; height: 1.25em; vertical-align: -.3em; margin-right: .2em; }
   header .note { margin-left: auto; }
   main { padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 8px; }

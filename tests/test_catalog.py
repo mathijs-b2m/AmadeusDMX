@@ -3,9 +3,9 @@ add and patch, and adding one works offline."""
 
 import pytest
 
-from decisive.engine.state import State
-from decisive.library import catalog, ofl, qlc, shadow
-from decisive.library import fixtures as fxlib
+from amadeus.engine.state import State
+from amadeus.library import catalog, ofl, qlc, shadow
+from amadeus.library import fixtures as fxlib
 
 KINDS = {"moving_head", "moving_bar", "par", "par_bar", "strobe", "blinder", "laser", "smoke"}
 

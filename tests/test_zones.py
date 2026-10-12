@@ -1,6 +1,6 @@
 import numpy as np
 
-from decisive.engine import zones
+from amadeus.engine import zones
 
 WALL = {
     "id": "w",

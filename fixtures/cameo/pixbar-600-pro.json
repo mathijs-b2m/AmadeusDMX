@@ -2,7 +2,7 @@
   "manufacturer": "Cameo",
   "model": "Pixbar 600 PRO",
   "kind": "par_bar",
-  "source": "QLC+ fixture library (Cameo/Cameo-Pixbar-600-PRO.qxf), converted automatically: check it once with `decisive test`",
+  "source": "QLC+ fixture library (Cameo/Cameo-Pixbar-600-PRO.qxf), converted automatically: check it once with `amadeus test`",
   "qlc": {
     "key": "Cameo/Cameo-Pixbar-600-PRO.qxf",
     "type": "LED Bar (Beams)",

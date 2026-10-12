@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MixxxControllerPreset mixxxVersion="2.4.0+" schemaVersion="1">
+    <info>
+        <name>Amadeus DMX</name>
+        <author>Amadeus DMX</author>
+        <description>Sends every deck's position, tempo, volume and the crossfader to Amadeus DMX (no controls: pick the "Amadeus DMX" MIDI device, which `amadeus live --source mixxx` creates).</description>
+    </info>
+    <controller id="AmadeusDMX">
+        <scriptfiles>
+            <file filename="Amadeus-DMX-scripts.js" functionprefix="AmadeusDMX"/>
+        </scriptfiles>
+        <controls/>
+        <outputs/>
+    </controller>
+</MixxxControllerPreset>

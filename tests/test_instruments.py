@@ -4,10 +4,10 @@ from dataclasses import replace
 
 import numpy as np
 
-from decisive.audio import instruments as I
-from decisive.director import RuleDirector, direct
-from decisive.engine import Engine
-from decisive.rig.loader import load_rig
+from amadeus.audio import instruments as I
+from amadeus.director import RuleDirector, direct
+from amadeus.engine import Engine
+from amadeus.rig.loader import load_rig
 from tests.synthetic import synthetic_analysis
 
 
@@ -46,7 +46,7 @@ def test_accent_lights_follow_one_instrument_per_phrase():
 
 
 def test_a_new_melody_inside_a_phrase_splits_it():
-    from decisive.audio.analysis import _split_on_melody
+    from amadeus.audio.analysis import _split_on_melody
 
     a = synthetic_analysis()
     bars = a.beats[a.downbeats]

@@ -6,13 +6,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from decisive.audio import genre
-from decisive.audio.hits import Hits
-from decisive.director import direct
-from decisive.director.cinematic import CinematicDirector
-from decisive.engine import Engine
-from decisive.engine import cinematic as C
-from decisive.rig.loader import load_rig, load_rig_dict
+from amadeus.audio import genre
+from amadeus.audio.hits import Hits
+from amadeus.director import direct
+from amadeus.director.cinematic import CinematicDirector
+from amadeus.engine import Engine
+from amadeus.engine import cinematic as C
+from amadeus.rig.loader import load_rig, load_rig_dict
 from tests.synthetic import synthetic_analysis
 
 
