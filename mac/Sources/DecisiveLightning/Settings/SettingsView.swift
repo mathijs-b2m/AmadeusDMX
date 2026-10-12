@@ -1,4 +1,4 @@
-// Settings (⌘,): the engine folder, the AI key, VirtualDJ, the look of the stage.
+// Settings (⌘,): the engine folder, the AI key, the DJ software integrations, the look of the stage.
 import DecisiveKit
 import SwiftUI
 
@@ -7,7 +7,7 @@ struct SettingsView: View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Director", systemImage: "wand.and.stars") { DirectorSettings() }
-            Tab("VirtualDJ", systemImage: "dot.radiowaves.left.and.right") { VirtualDJSettings() }
+            Tab("Integrations", systemImage: "dot.radiowaves.left.and.right") { IntegrationSettings() }
         }
         .frame(width: 560)
         .scenePadding()
@@ -86,7 +86,56 @@ struct DirectorSettings: View {
     }
 }
 
-struct VirtualDJSettings: View {
+/// What each DJ software integration needs or may do: one section per DJ software.
+struct IntegrationSettings: View {
+    var body: some View {
+        Form {
+            VirtualDJSection()
+            DjaySection()
+        }
+        .formStyle(.grouped)
+    }
+}
+
+struct DjaySection: View {
+    @Environment(AppModel.self) private var model
+    @State private var streamed = false
+    @State private var confirming = false
+
+    var body: some View {
+        SwiftUI.Section {
+            Toggle(isOn: Binding(get: { streamed }, set: { on in
+                if on { confirming = true } else { save(false) }
+            })) {
+                Text("Light streamed tracks")
+                Text("Spotify tracks have no file to analyse. When one is loaded on a deck, a copy of the same recording is downloaded from YouTube (yt-dlp, once per track) and analysed. The audience still hears djay's own stream.")
+            }
+            .disabled(model.workspace == nil)
+            if streamed, model.workspace?.hasPythonPackage("yt_dlp") == false {
+                Label("yt-dlp isn't installed in the engine's environment: pip install -e '.[streamed]'", systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(.orange)
+            }
+        } header: {
+            Text("djay Pro")
+        } footer: {
+            Text("Off by default. Downloading from YouTube goes against YouTube's terms of service and may not be allowed by copyright law where you are. Only switch this on for music you may copy; you are responsible for that choice. Copies stay on this Mac (the engine's .cache/streamed) and are used only to analyse the track. Takes effect at the next live show.")
+        }
+        .onAppear { streamed = model.workspace?.integrationSetting("djay", "streamed") ?? false }
+        .confirmationDialog("Download copies of streamed tracks?", isPresented: $confirming) {
+            Button("Switch On") { save(true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Each Spotify track you load in djay is downloaded from YouTube to analyse it. That goes against YouTube's terms of service and may not be allowed where you are. Only use it for music you may copy.")
+        }
+    }
+
+    private func save(_ on: Bool) {
+        model.workspace?.setIntegrationSetting("djay", "streamed", on)
+        streamed = on
+    }
+}
+
+struct VirtualDJSection: View {
     @Environment(AppModel.self) private var model
     @State private var status = ""
 
@@ -96,25 +145,22 @@ struct VirtualDJSettings: View {
     }
 
     var body: some View {
-        Form {
-            SwiftUI.Section {
-                LabeledContent("DecisiveLink plugin") {
-                    Text(FileManager.default.fileExists(atPath: dest.path) ? "Installed" : "Not installed")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Spacer()
-                    if !status.isEmpty { Text(status).foregroundStyle(.secondary) }
-                    Button("Install Plugin") { install() }
-                        .disabled(!(FileManager.default.fileExists(atPath: model.workspace?.pluginBundle.path ?? "")))
-                }
-            } header: {
-                Text("VirtualDJ")
-            } footer: {
-                Text("In VirtualDJ, add DecisiveLink as master effect. It sends every deck's position, tempo and volume to the engine (UDP 9123). Restart VirtualDJ after installing.")
+        SwiftUI.Section {
+            LabeledContent("DecisiveLink plugin") {
+                Text(FileManager.default.fileExists(atPath: dest.path) ? "Installed" : "Not installed")
+                    .foregroundStyle(.secondary)
             }
+            HStack {
+                Spacer()
+                if !status.isEmpty { Text(status).foregroundStyle(.secondary) }
+                Button("Install Plugin") { install() }
+                    .disabled(!(FileManager.default.fileExists(atPath: model.workspace?.pluginBundle.path ?? "")))
+            }
+        } header: {
+            Text("VirtualDJ")
+        } footer: {
+            Text("In VirtualDJ, add DecisiveLink as master effect. It sends every deck's position, tempo and volume to the engine (UDP 9123). Restart VirtualDJ after installing.")
         }
-        .formStyle(.grouped)
     }
 
     private func install() {

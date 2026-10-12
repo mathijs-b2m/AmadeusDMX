@@ -146,3 +146,22 @@ def test_a_track_no_longer_on_a_deck_is_skipped(fetcher):
     wait(fetcher, b)
     assert [c for c in calls if c[0] == "search"] == [("search", "6I9"), ("search", "b")]  # one by one, not "a"
     assert "a" not in fetcher.state  # asked for again later, it is queued again
+
+
+def test_saved_settings_and_the_command_line(tmp_path):
+    from decisive.show.sources import settings
+
+    f = tmp_path / "integrations.json"
+    assert settings("djay", f) == {}  # no file: everything at its default (streamed tracks off)
+    f.write_text('{"djay": {"streamed": true, "poll": 100}, "mixxx": {"port": "IAC"}}')
+    assert settings("djay", f) == {"streamed": 1, "poll": 100}
+    f.write_text("not json")
+    assert settings("djay", f) == {}
+
+
+def test_streamed_tracks_are_off_by_default():
+    import inspect
+
+    from decisive.show.sources.djay import Djay
+
+    assert inspect.signature(Djay).parameters["streamed"].default == 0

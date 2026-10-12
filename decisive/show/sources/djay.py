@@ -22,8 +22,11 @@ position to it (base.PhaseLock): the label picks the beat, Link gives the exact 
 A track djay streams (Spotify) has no file. djay's library says which recording it is (Spotify id, ISRC,
 length): we fetch a local copy of that same recording once (streamed.py, needs yt-dlp) and light it from that.
 
-Options: poll (readings per second, default 200), link (0: don't listen to Ableton Link), streamed (0: don't
-fetch copies of streamed tracks).
+This is off unless switched on (Settings ▸ Integrations ▸ djay Pro in the Mac app, or `--opt streamed=1`):
+it downloads from YouTube, which is the user's own call to make.
+
+Options: poll (readings per second, default 200), link (0: don't listen to Ableton Link), streamed (1: fetch
+copies of streamed tracks).
 """
 
 from __future__ import annotations
@@ -43,6 +46,8 @@ from decisive.show.sources.streamed import DjayStreams, Fetcher
 BUNDLE = "com.algoriddim.djay"
 LIBRARY = Path.home() / "Music/djay/djay Media Library.djayMediaLibrary/MediaLibrary.db"
 LATE_S = 0.15  # a label is at most this late (djay redraws ~10× a second, plus our polling)
+OFF = "dark (to light it: Settings ▸ Integrations ▸ djay Pro, or --opt streamed=1)"
+NO_YTDLP = "dark (yt-dlp isn't installed: pip install -e '.[streamed]')"
 KEEP = 8  # ticks to keep: the least late of them anchors the playhead
 SCAN_S = 2.0  # look for djay's controls again this often (tracks load, decks are added)
 
@@ -214,7 +219,7 @@ class Window:
 class Djay(Source):
     label = "djay Pro"
 
-    def __init__(self, poll: int = 200, link: int = 1, streamed: int = 1):
+    def __init__(self, poll: int = 200, link: int = 1, streamed: int = 0):
         super().__init__()
         self.link = None
         if link:
@@ -226,11 +231,12 @@ class Djay(Source):
                 print("  djay: no Ableton Link (pip install aalink): positions from djay's window only", flush=True)
         self.streams = DjayStreams(LIBRARY)
         self.fetcher = None
+        self.streamed = bool(streamed)
         if streamed:
             try:
                 self.fetcher = Fetcher()
             except ImportError:
-                print("  djay: streamed tracks (Spotify) stay dark: pip install yt-dlp to light them", flush=True)
+                print(f"  djay: streamed tracks (Spotify) stay {NO_YTDLP}", flush=True)
         self.window = Window()
         self.resolver = Resolver()
         self.library = Library(found=self.resolver.add)
@@ -286,7 +292,7 @@ class Djay(Source):
                 if stream and self.fetcher:
                     file = self.fetcher.file(stream)  # "" while the copy is being fetched
                 if stream and stream.id != getattr(info.get("stream"), "id", None):  # said once per track
-                    how = "fetching a copy to light it" if self.fetcher else "no copy (yt-dlp missing): dark"
+                    how = "fetching a copy to light it" if self.fetcher else NO_YTDLP if self.streamed else OFF
                     print(f"  deck {n}: {stream.name} streams from {stream.service.title()}: {how}", flush=True)
                 length = (stream.length if stream else 0.0) or ((length_of(file) or 0.0) if file else 0.0)
                 info.update(title=title, artist=artist, file=file, length=length, stream=stream)

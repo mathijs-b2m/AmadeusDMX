@@ -24,7 +24,7 @@
     "app": "djay Pro",
     "module": "decisive.show.sources.djay",
     "class": "Djay",
-    "about": "djay Pro (macOS): its window read through Accessibility (needs pyobjc-framework-ApplicationServices and the Accessibility permission); Spotify tracks lit from a local copy (needs yt-dlp; opt streamed=0 to switch off)",
+    "about": "djay Pro (macOS): its window read through Accessibility (needs pyobjc-framework-ApplicationServices and the Accessibility permission); opt streamed=1: Spotify tracks lit from a local copy (needs yt-dlp; off by default)",
     "position": "exact",
     "verified": "djay Pro 5.6.8 (macOS): on SYNC with Ableton Link, within 6 ms (sd) of Link's beat; without SYNC, the label alone: sd 12-17 ms, up to ~70 ms",
     "waiting": "Load a track in djay Pro (Decisive Lightning reads its window: Accessibility permission)."
