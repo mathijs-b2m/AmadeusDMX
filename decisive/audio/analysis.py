@@ -38,7 +38,7 @@ from decisive.audio.features import (
 from decisive.audio.model import Analysis, Phrase
 from decisive.audio.phrases import build_phrases
 
-ANALYSIS_VERSION = 37
+ANALYSIS_VERSION = 39
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -136,7 +136,7 @@ def analyze(
     accent_env = normalize(feats["flux_all"]) + normalize(
         np.maximum(0, np.diff(feats["bass"], prepend=feats["bass"][0]))
     )
-    downbeat_idx = downbeats(beat_frames, accent_env)
+    downbeat_idx = downbeats(beat_frames, accent_env, low)
     phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets)
     log(
         f"  {len(beat_times)} beats, {len(downbeat_idx)} bars, {len(phrases)} phrases, "

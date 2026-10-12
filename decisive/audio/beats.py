@@ -212,17 +212,43 @@ def attack_offset(audio: np.ndarray, sr: int, beat_times: np.ndarray, max_s: flo
     return off if abs(off) <= max_s else 0.0
 
 
-def downbeats(beat_frames: np.ndarray, accent_env: np.ndarray) -> np.ndarray:
-    """Pick the bar phase (0..3) per 64-beat window; assumes 4/4 like nearly all DJ music."""
+STRUCTURE_SHARE = 0.45  # the low end's changes pick the bar phase when this share of them falls on one phase
+
+
+def downbeats(beat_frames: np.ndarray, accent_env: np.ndarray, low: np.ndarray | None = None) -> np.ndarray:
+    """Pick the bar phase (0..3) per 64-beat window; assumes 4/4 like nearly all DJ music.
+
+    First by the music's structure: drops, breaks, the kick or bass coming in or out all start on the one, so
+    the beats where the low end changes most (its level over the next bar against the bar before) mark the bar
+    lines. With a steady four-on-the-floor kick the beats' own accents are nearly equal and pick a phase
+    almost by chance; they decide only where the structure says nothing clear (fewer than STRUCTURE_SHARE of
+    the change on one phase, looking a few windows around)."""
     strength = accent_env[beat_frames]
+    n = len(beat_frames)
+    nov = np.zeros(n)
+    if low is not None and n > 8:
+        edges = np.r_[beat_frames, min(len(low), beat_frames[-1] + int(np.median(np.diff(beat_frames))))]
+        lb = np.array([low[a:b].mean() if b > a else low[min(a, len(low) - 1)] for a, b in zip(edges, edges[1:])])
+        for i in range(4, n - 4):
+            nov[i] = abs(lb[i : i + 4].mean() - lb[i - 4 : i].mean())
+        peak = np.array([nov[i] > 0 and nov[i] >= nov[max(0, i - 2) : i + 3].max() for i in range(n)])
+        nov = np.where(peak, nov, 0.0)  # one beat per change: where it changes most
+        if (nov > 0).any():
+            nov = np.where(nov >= np.percentile(nov[nov > 0], 75), nov, 0.0)  # the big changes only
     phases = []
-    for s in range(0, len(beat_frames), 64):
+    for s in range(0, n, 64):
         seg = strength[s : s + 64]
+        lo, hi = max(0, s - 128), min(n, s + 192)
+        idx = np.arange(lo, hi)
+        struct = np.array([nov[idx[idx % 4 == p]].sum() for p in range(4)])
+        if struct.sum() > 0 and struct.max() / struct.sum() >= STRUCTURE_SHARE:
+            phases.append(int(np.argmax(struct)))
+            continue
         scores = [seg[((np.arange(len(seg)) + s) % 4) == p].mean() if len(seg) > 4 else 0 for p in range(4)]
         phases.append(int(np.argmax(scores)))
     if len(phases) >= 3:  # a phase flip needs agreement from neighbours
         phases = list(median_filter(np.array(phases), size=3, mode="nearest"))
-    idx = [i for i in range(len(beat_frames)) if i % 4 == phases[min(i // 64, len(phases) - 1)]]
+    idx = [i for i in range(n) if i % 4 == phases[min(i // 64, len(phases) - 1)]]
     return np.array(idx, dtype=int)
 
 

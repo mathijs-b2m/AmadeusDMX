@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 from decisive import paths
@@ -82,6 +83,15 @@ def add_commands(sub) -> dict:
 
     p = sub.add_parser("monitor", help="watch VirtualDJ + live mode: CPU, memory, threads, GPU, crashes")
     p.add_argument("--interval", type=float, default=1.0)
+
+    p = sub.add_parser("synctest", help="a test track with beeps, and a listener: how far the show is from the music")
+    p.add_argument("action", choices=["make", "listen"], help="make: write the track; listen: measure while it plays")
+    p.add_argument(
+        "--out", type=Path, default=Path.home() / "Music" / "Decisive Lightning", help="where make writes it"
+    )
+    p.add_argument("--seconds", type=float, default=200.0, help="listen this long (the track is three minutes)")
+    p.add_argument("--ws-port", type=int, default=8765, help="the running show's feed")
+    p.add_argument("--lead-ms", type=float, default=None, help="the show's light lead (default: the active rig's)")
     return {
         "genre": genre_command,
         "analyze": analyze,
@@ -90,7 +100,37 @@ def add_commands(sub) -> dict:
         "live": live,
         "monitor": monitor,
         "probe": probe,
+        "synctest": synctest,
     }
+
+
+def synctest(args):
+    from decisive.show import synctest as st
+
+    side = args.out / f"{st.NAME}.json"
+    if args.action == "make":
+        wav, side = st.make(args.out)
+        print(f"{wav}\n{side}\nAdd the track to the DJ software, start the live show, then: decisive synctest listen")
+        return
+    if not side.exists():
+        raise SystemExit(f"No test track in {args.out}: run `decisive synctest make` first")
+    if args.lead_ms is None:
+        from decisive.rig import store
+        from decisive.rig.loader import load_rig_dict
+        from decisive.show.clock import light_lead
+
+        lead = light_lead(load_rig_dict(store.current().load()))
+    else:
+        lead = args.lead_ms / 1000
+    result = st.listen(side, args.seconds, args.ws_port, lead)
+    print("Result:", json.dumps(result))
+    if "offset_ms" in result:
+        off = result["offset_ms"]
+        print(
+            f"The show is {abs(off):.0f} ms {'ahead of' if off > 0 else 'behind'} the music you hear "
+            f"(10-90% spread {result['spread_ms']:.0f} ms"
+            + (f", drift {result['drift_ms_per_min']:+.0f} ms per minute)" if "drift_ms_per_min" in result else ")")
+        )
 
 
 def analyze(args):

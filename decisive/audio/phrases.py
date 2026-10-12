@@ -96,8 +96,9 @@ def _drop_bar(feats, fps, db_times, kicks, k0: int) -> int:
     best, best_score = k0, -1.0
     for k in range(max(2, k0 - 6), min(len(db_times) - 1, k0 + 5)):
         k_after, k_before = count(db_times[k], db_times[k + 1]), count(db_times[k - 2], db_times[k]) / 2
-        if k_after < 3:
-            continue  # a drop has a running kick in its first bar
+        k_next = count(db_times[k + 1], db_times[k + 2]) if k + 2 < len(db_times) else 0
+        if k_after < 3 and not (k_after >= 2 and k_next >= 3):
+            continue  # a drop has a running kick in its first bar (the first kick can hide under the bass)
         score = max(0.0, low_mean(db_times[k], db_times[k + 1]) - low_mean(db_times[k - 2], db_times[k])) + 2.5 * max(
             0.0, k_after - k_before
         )

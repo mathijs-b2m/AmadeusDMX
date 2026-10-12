@@ -63,6 +63,7 @@ For VirtualDJ: see [Live in VirtualDJ](#live-in-virtualdj).
 | `decisive rig [NAME] [--template T] [--automount [--all]]` | The venue: list, switch or create rigs (templates: floor, stands, booth, club, stage); mount the set on it |
 | `decisive monitor` | Watch VirtualDJ and the engine: CPU, memory, threads, GPU, crashes |
 | `decisive probe [NAME] [--emit 127.0.0.1:9123]` | Other DJ software (Mixxx, djay Pro, …): list, watch and measure one, or pass it to the Decisive Link app |
+| `decisive synctest make` / `listen` | A test track with beeps, and a listener: how far the show is from the music you hear |
 
 (`decisive` = `.venv/bin/decisive`, or `python -m decisive`.) `--dmx` without an IP uses the node from the rig. Audio formats: WAV, MP3, FLAC, OGG, AIFF directly; M4A/AAC is decoded once with ffmpeg.
 
@@ -86,6 +87,20 @@ Restart VirtualDJ, then enable **DecisiveLink** as a **master** effect. Works wi
 - The plugin keeps its VirtualDJ queries low (~230/s: only real decks; file, length and original BPM twice per second).
 
 **Known VirtualDJ issue (not the plugin):** on macOS the VDJ interface can freeze after switching apps while audio keeps running. Workarounds from the VDJ forums: set the display to 60 Hz instead of ProMotion, avoid Stage Manager or toggle Full Screen/Windowed, try `experimentalUseMetal` or `skinFps` in VDJ's options.
+
+## Is the show in sync?
+
+`decisive synctest make` writes a test track (128 BPM, three minutes, with a build-up and two drops) to
+`~/Music/Decisive Lightning/`, with a short 3.15 kHz beep on the downbeat of every fourth bar. Load it in the DJ
+software, start the live show, play it, and run `decisive synctest listen`: the Mac's microphone hears each
+beep, the show's feed says where the show was at that moment, and since each beep's place in the track is known
+the difference is how far the show is from the music **as you hear it** (DJ software, its audio buffer,
+speakers and room included), with the light lead (`artnet.lead_ms`) taken out. It prints each beep and then the
+offset, its spread and any drift per minute. The analysis gets this track exactly (a test checks tempo, beats,
+bar lines and drops), so an offset here is the live timing, not the analysis.
+
+The live show also writes `.cache/live.log`: everything it prints with clock times, and at every phrase change
+the position the DJ software reported next to the position the show plays.
 
 ## Other DJ software
 
@@ -196,7 +211,7 @@ The analysis can overrule the model where the music is unambiguous; changed phra
 
 `decisive/audio/`, numpy/scipy only, cached per file:
 
-- **Beats and tempo:** onset envelope (frames centred on their own time) → windowed autocorrelation → dynamic-programming beat tracker (follows tempo drift). A tempo the whole track fits much better (a comb over 80–180 BPM on the low end) makes it track again from there. Each beat is refined between frames and steadied by its neighbours. A track made at one tempo (most club music, also a mix held at one tempo) gets **one straight grid**: tempo and phase from where the low end, sub included, rises most on evenly spaced lines over the whole track, so on the kick, also where the off-beats are as loud. Finally the grid moves to where the beat is **heard**: the attack of the average hit on the beat, at sample precision. Downbeats per 64-beat window, 4/4 assumed. Hip-hop is often detected at double tempo: use `--tempo half`.
+- **Beats and tempo:** onset envelope (frames centred on their own time) → windowed autocorrelation → dynamic-programming beat tracker (follows tempo drift). A tempo the whole track fits much better (a comb over 80–180 BPM on the low end) makes it track again from there. Each beat is refined between frames and steadied by its neighbours. A track made at one tempo (most club music, also a mix held at one tempo) gets **one straight grid**: tempo and phase from where the low end, sub included, rises most on evenly spaced lines over the whole track, so on the kick, also where the off-beats are as loud. Finally the grid moves to where the beat is **heard**: the attack of the average hit on the beat, at sample precision. Downbeats (the bar lines) per 64-beat window, 4/4 assumed: by the music's structure first (drops, breaks, the kick or bass coming in or out start on the one, so the beat where the low end changes most marks the bar line), by the beats' accents only where the structure says nothing clear; with a steady four-on-the-floor kick the accents pick a beat almost by chance. On 24 club tracks the bar lines now sit on the drops in 23 (before: 14); Greyhound's drops were a beat late. Hip-hop is often detected at double tempo: use `--tempo half`.
 - **Onsets:** kicks checked on every beat in the 100–200 Hz punch (lower bands are masked by offbeat bass), snares, hats, accents, melodic notes.
 - **Phrases:** 4–16-bar segments at novelty peaks.
 - **Drops:** first, wherever the phrase grid is, the bars where a drop lands: the kick starts **running** (on most beats of this bar and the next, after bars with at most half) and the low end jumps in with it. A phrase boundary within 6 bars moves onto that bar, or the phrase is split there. Songs don't keep a 4-bar grid from their first bar (a piano intro, a bar of silence before the drop), and a long phrase that only gets its beat halfway must not count as a drop from its beatless first bar. Then per phrase a `drop_score` (relative jump in loudness and low end, kick returning; the first drop of a track is often quieter than the last), and the boundary is fine-tuned to the **exact bar** where kick and low end come in.
