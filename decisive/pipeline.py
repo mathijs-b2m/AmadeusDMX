@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -25,6 +26,10 @@ from decisive.director.themes import theme_of
 from decisive.rig.groups import head_groups, laser_list, signature
 
 CACHE = paths.CACHE
+
+# Ollama answers one request at a time: two tracks directed at once would each take twice as long. One track at a
+# time, so the first one asked for (the one playing) is ready soonest.
+LOCAL_MODEL = threading.Lock()
 
 
 def pick_director(name: str, wav: Path | None = None, redo: bool = False, tempo: str | None = None) -> str:
@@ -134,7 +139,11 @@ def get_plan(
         d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style, theme=theme)
     else:
         d = RuleDirector(groups, lasers, screen, style, theme)
-    plan = direct(a, d, cancel=cancel, progress=progress)
+    if isinstance(d, OllamaDirector):
+        with LOCAL_MODEL:
+            plan = direct(a, d, cancel=cancel, progress=progress)
+    else:
+        plan = direct(a, d, cancel=cancel, progress=progress)
     save_plan(plan, path)
     print(f"Plan saved to {path}")
     return a, plan
