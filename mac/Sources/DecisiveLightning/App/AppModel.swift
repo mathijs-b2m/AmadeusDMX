@@ -307,6 +307,16 @@ final class AppModel {
         return false
     }
 
+    /// Start the setup service again (e.g. with a new OpenAI key), when it runs.
+    func restartSetupService() {
+        guard setup.isRunning else { return }
+        Task {
+            setup.stopAndWait(timeout: 2)
+            setupReady = false
+            _ = await ensureSetupService()
+        }
+    }
+
     func shutdown() {
         engine.stopAndWait()
         setup.stopAndWait(timeout: 2)

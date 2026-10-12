@@ -56,30 +56,14 @@ struct GeneralSettings: View {
 }
 
 struct DirectorSettings: View {
-    @Environment(AppModel.self) private var model
-    @State private var key = Keychain.openAIKey ?? ""
-    @State private var saved = false
-
     var body: some View {
         Form {
             SwiftUI.Section {
-                SecureField("OpenAI API key", text: $key, prompt: Text("sk-…"))
-                HStack {
-                    if model.workspace?.hasEnvKey == true {
-                        Label("The engine folder also has a key in .env", systemImage: "checkmark.circle")
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if saved { Text("Saved").foregroundStyle(.secondary) }
-                    Button("Save") {
-                        Keychain.openAIKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-                        saved = true
-                    }
-                }
+                OpenAIKeyView()
             } header: {
-                Text("AI Director")
+                Text("AI Director: OpenAI API key")
             } footer: {
-                Text("Stored in your Keychain and handed to the engine when it starts; never written to a file.")
+                Text("With a key, the AI director (OpenAI) decides the show; without one, the rule-based director does. Your key is kept in your Keychain and handed to the engine when it starts, never written to a file, and only sent to OpenAI. Which director runs is chosen on the setup page.")
             }
         }
         .formStyle(.grouped)

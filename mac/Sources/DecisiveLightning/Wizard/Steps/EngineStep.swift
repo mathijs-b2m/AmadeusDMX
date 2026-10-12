@@ -5,7 +5,6 @@ import SwiftUI
 struct EngineStep: View {
     @Environment(AppModel.self) private var model
     @State private var error: String?
-    @State private var key = Keychain.openAIKey ?? ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -17,8 +16,6 @@ struct EngineStep: View {
                           detail: model.workspace?.root.path ?? "Not found")
                     Check(ok: model.workspace?.isValid == true, text: "Python environment (.venv)",
                           detail: model.workspace.map { $0.python.path } ?? "–")
-                    Check(ok: !key.isEmpty || model.workspace?.hasEnvKey == true, optional: true, text: "OpenAI key for the AI director",
-                          detail: model.workspace?.hasEnvKey == true ? "found in .env" : key.isEmpty ? "optional: the rules director works without" : "in your Keychain")
                     HStack {
                         Button("Choose Engine Folder…") { choose() }
                         if let error { Text(error).foregroundStyle(.red).font(.callout) }
@@ -26,12 +23,8 @@ struct EngineStep: View {
                 }
                 .padding(6)
             }
-            GroupBox("OpenAI API Key (optional)") {
-                HStack {
-                    SecureField("sk-…", text: $key)
-                    Button("Save") { Keychain.openAIKey = key.trimmingCharacters(in: .whitespaces) }
-                }
-                .padding(6)
+            GroupBox("OpenAI API Key (optional: the rule-based director works without)") {
+                OpenAIKeyView().padding(6)
             }
         }
     }
