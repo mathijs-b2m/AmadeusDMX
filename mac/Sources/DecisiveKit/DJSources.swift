@@ -29,3 +29,37 @@ extension Workspace {
         return all.first { $0.name == name }
     }
 }
+
+// Settings per integration, shared with the engine: config/integrations.json ({"djay": {"streamed": true}}).
+// Live mode passes them to the integration (decisive/show/sources/__init__.py); `--opt` overrides them.
+extension Workspace {
+    public var integrationsFile: URL { root.appending(path: "config/integrations.json") }
+
+    private func integrations() -> [String: Any] {
+        guard let data = try? Data(contentsOf: integrationsFile),
+              let all = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return all
+    }
+
+    public func integrationSetting(_ source: String, _ key: String) -> Bool {
+        (integrations()[source] as? [String: Any])?[key] as? Bool ?? false
+    }
+
+    /// Saves one setting, keeping every other one in the file.
+    public func setIntegrationSetting(_ source: String, _ key: String, _ value: Bool) {
+        var all = integrations()
+        var one = all[source] as? [String: Any] ?? [:]
+        one[key] = value
+        all[source] = one
+        guard let data = try? JSONSerialization.data(withJSONObject: all, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: integrationsFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: integrationsFile, options: .atomic)
+    }
+
+    /// A Python package installed in the engine's environment (e.g. yt_dlp).
+    public func hasPythonPackage(_ name: String) -> Bool {
+        let lib = root.appending(path: ".venv/lib")
+        let versions = (try? FileManager.default.contentsOfDirectory(atPath: lib.path)) ?? []
+        return versions.contains { FileManager.default.fileExists(atPath: lib.appending(path: "\($0)/site-packages/\(name)").path) }
+    }
+}

@@ -6,7 +6,7 @@ import Observation
 import Security
 
 enum Section: String, CaseIterable, Identifiable, Hashable {
-    case show, set, rig, engine
+    case show, set, rig, engine, settings
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -14,6 +14,7 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
         case .rig: "Rigs"
         case .set: "Sets"
         case .engine: "Engine"
+        case .settings: "Settings"
         }
     }
     var symbol: String {
@@ -22,6 +23,7 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
         case .rig: "square.split.bottomrightquarter"
         case .set: "light.overhead.right"
         case .engine: "terminal"
+        case .settings: "gearshape"
         }
     }
     /// What the page is for, in a few words (the sidebar's tooltip).
@@ -31,6 +33,7 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
         case .rig: "Your rigs (the venues: trusses, stage, zones), and the sets placed on them"
         case .set: "Your sets of fixtures: their DMX patch and where the DMX goes"
         case .engine: "The engine's log"
+        case .settings: "The engine folder, the director and its AI key, the DJ software integrations (also ⌘,)"
         }
     }
 }

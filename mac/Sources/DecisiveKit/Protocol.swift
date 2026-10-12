@@ -252,9 +252,11 @@ public struct TrackStatus: Decodable, Sendable, Equatable {
     public var aiTotal: Int?
     public var lights: String?
     public var elapsed: Int?
+    public var stream: String?  // a streamed track ("spotify"): its local copy is fetched first
+    public var copy: String?
 
     enum CodingKeys: String, CodingKey {
-        case analysis, stems, ai, aiDone = "ai_done", aiTotal = "ai_total", lights, elapsed
+        case analysis, stems, ai, aiDone = "ai_done", aiTotal = "ai_total", lights, elapsed, stream, copy
     }
 }
 

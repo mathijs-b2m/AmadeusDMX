@@ -35,6 +35,8 @@ class Deck:
     track_id: str = ""  # the DJ software's own id for the track, when it has one
     rate: float = 0.0  # playback speed when the DJ software reports it (else from the tempo: bpm / bpm0)
     phase: float | None = None  # beat phase 0..1 at `received` from a shared clock (Ableton Link), when synced
+    stream: str = ""  # the service the DJ software streams this track from ("spotify"), "" for a local file
+    copy: str = ""  # a streamed track's local copy: "running" (being fetched), "done", "failed"
 
     def now(self, t: float) -> float:
         """Track position right now: last reported position + time since, at the current playback speed."""

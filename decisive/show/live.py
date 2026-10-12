@@ -262,11 +262,16 @@ async def run(
                     decks.append(
                         {
                             "deck": deck.deck,
-                            "track": Path(deck.file).stem if deck.file else f"{deck.artist} – {deck.title}".strip(" –"),
+                            "track": Path(deck.file).stem
+                            if deck.file and not deck.stream
+                            else f"{deck.artist} – {deck.title}".strip(" –"),
                             "vol": round(deck.vol, 2),
                             "play": deck.play,
                             "ready": show is not None,
-                            "status": shows.progress(deck.file) if deck.file else {"missing": True},
+                            "status": {
+                                **(shows.progress(deck.file) if deck.file else {"missing": True}),
+                                **({"stream": deck.stream, "copy": deck.copy} if deck.stream else {}),
+                            },
                             "genre": show[0].genre if show else "",
                             "style": show[0].style if show else "",
                         }

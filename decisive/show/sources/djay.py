@@ -19,7 +19,14 @@ djay's known tracks are in (and the music folders), so a track is analysed as so
 A deck on SYNC follows Ableton Link: then the deck also carries Link's beat phase, and live mode locks the
 position to it (base.PhaseLock): the label picks the beat, Link gives the exact moment (needs aalink).
 
-Options: poll (readings per second, default 200), link (0: don't listen to Ableton Link).
+A track djay streams (Spotify) has no file. djay's library says which recording it is (Spotify id, ISRC,
+length): we fetch a local copy of that same recording once (streamed.py, needs yt-dlp) and light it from that.
+
+This is off unless switched on (Settings ▸ Integrations ▸ djay Pro in the Mac app, or `--opt streamed=1`):
+it downloads from YouTube, which is the user's own call to make.
+
+Options: poll (readings per second, default 200), link (0: don't listen to Ableton Link), streamed (1: fetch
+copies of streamed tracks).
 """
 
 from __future__ import annotations
@@ -34,10 +41,13 @@ from urllib.parse import unquote, urlparse
 
 from decisive.show.sources.base import Deck, Source
 from decisive.show.sources.resolve import Resolver, length_of
+from decisive.show.sources.streamed import DjayStreams, Fetcher
 
 BUNDLE = "com.algoriddim.djay"
 LIBRARY = Path.home() / "Music/djay/djay Media Library.djayMediaLibrary/MediaLibrary.db"
 LATE_S = 0.15  # a label is at most this late (djay redraws ~10× a second, plus our polling)
+OFF = "dark (to light it: Settings ▸ Integrations ▸ djay Pro, or --opt streamed=1)"
+NO_YTDLP = "dark (yt-dlp isn't installed: pip install -e '.[streamed]')"
 KEEP = 8  # ticks to keep: the least late of them anchors the playhead
 SCAN_S = 2.0  # look for djay's controls again this often (tracks load, decks are added)
 
@@ -209,7 +219,7 @@ class Window:
 class Djay(Source):
     label = "djay Pro"
 
-    def __init__(self, poll: int = 200, link: int = 1):
+    def __init__(self, poll: int = 200, link: int = 1, streamed: int = 0):
         super().__init__()
         self.link = None
         if link:
@@ -219,6 +229,14 @@ class Djay(Source):
                 self.link = LinkClock()
             except ImportError:
                 print("  djay: no Ableton Link (pip install aalink): positions from djay's window only", flush=True)
+        self.streams = DjayStreams(LIBRARY)
+        self.fetcher = None
+        self.streamed = bool(streamed)
+        if streamed:
+            try:
+                self.fetcher = Fetcher()
+            except ImportError:
+                print(f"  djay: streamed tracks (Spotify) stay {NO_YTDLP}", flush=True)
         self.window = Window()
         self.resolver = Resolver()
         self.library = Library(found=self.resolver.add)
@@ -270,7 +288,16 @@ class Djay(Source):
             if (title, artist) != (info.get("title"), info.get("artist")) or (title and not info.get("file")):
                 file = self.library.find(title, artist) if title else ""
                 file = self.resolver.find(file, artist, title)
-                info.update(title=title, artist=artist, file=file, length=(length_of(file) or 0.0) if file else 0.0)
+                stream = self.streams.find(title, artist) if title and not file else None
+                if stream and self.fetcher:
+                    file = self.fetcher.file(stream)  # "" while the copy is being fetched
+                if stream and stream.id != getattr(info.get("stream"), "id", None):  # said once per track
+                    how = "fetching a copy to light it" if self.fetcher else NO_YTDLP if self.streamed else OFF
+                    print(f"  deck {n}: {stream.name} streams from {stream.service.title()}: {how}", flush=True)
+                length = (stream.length if stream else 0.0) or ((length_of(file) or 0.0) if file else 0.0)
+                info.update(title=title, artist=artist, file=file, length=length, stream=stream)
+            if (stream := info.get("stream")) and self.fetcher:
+                info["copy"] = self.fetcher.status(stream)
             info["vol"] = percent(w.value(f"Line volume, Deck {n}"))
             tempo = percent(w.value(f"Tempo, Deck {n}")) or 0.0
             info["bpm"] = w.bpm(n)
@@ -295,6 +322,7 @@ class Djay(Source):
                 Deck(
                     n, info["file"], head.at(now), info["length"], head.play, bpm, bpm / head.speed if bpm else 0.0,
                     vol, now, info["title"], info["artist"], rate=head.speed if head.play else 0.0, phase=phase,
+                    stream=info["stream"].service if info.get("stream") else "", copy=info.get("copy", ""),
                 )
             )  # fmt: skip
         self.received(readings, now=now)

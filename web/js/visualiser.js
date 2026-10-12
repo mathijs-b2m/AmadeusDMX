@@ -508,6 +508,7 @@ function deckLine(d) {
   const lights = s.lights ? (s.lights === "rules" ? "quick plan" : "AI plan") : "dark";
   return `<div class="deck"><b>Deck ${d.deck} ${d.play ? "▶" : "⏸"}</b> <span>${esc(d.track)}</span>
     <span>${Math.round(d.vol * 100)}%</span>
+    ${s.stream ? stepChip(`${s.stream[0].toUpperCase()}${s.stream.slice(1)} copy`, s.copy === "waiting" ? "running" : s.copy) : ""}
     ${stepChip("analysis", s.analysis === "running" ? "running" : (s.analysis || (d.ready ? "done" : "running")))}
     ${stepChip("instruments", s.stems, run(s.stems))}
     ${stepChip("AI plan", s.ai || (s.lights && s.lights !== "rules" ? "done" : undefined), ai + run(s.ai))}

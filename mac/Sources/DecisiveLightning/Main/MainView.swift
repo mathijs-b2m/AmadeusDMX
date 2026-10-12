@@ -22,6 +22,7 @@ struct MainView: View {
                     case .rig: RigView()
                     case .set: SetView()
                     case .engine: EngineView()
+                    case .settings: SettingsView(page: true)
                     }
                 }
             }
@@ -52,7 +53,7 @@ struct MainView: View {
         case .rig:
             let r = model.rigs.first { $0.name == model.editingRig }
             return r.map { $0.summary + (model.editingRigSet.isEmpty ? "" : " · \(model.editingRigSet) on it") } ?? ""
-        case .engine:
+        case .engine, .settings:
             return ""
         case .show:
             break
