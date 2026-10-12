@@ -39,7 +39,7 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
 enum ShowState: Equatable {
     case stopped
     case starting
-    case waitingForDJ        // running, VirtualDJ not sending (yet)
+    case waitingForDJ        // running, the DJ software not sending (yet)
     case live                // lights follow the mix
     case playing             // a track played by the engine itself
     case attached            // an engine started elsewhere (terminal) is sending: we only watch
@@ -49,7 +49,7 @@ enum ShowState: Equatable {
         switch self {
         case .stopped: "Stopped"
         case .starting: "Starting…"
-        case .waitingForDJ: "Waiting for VirtualDJ"
+        case .waitingForDJ: "Waiting for the DJ software"  // (AppModel.showTitle names it)
         case .live: "Live"
         case .playing: "Playing"
         case .attached: "Watching"

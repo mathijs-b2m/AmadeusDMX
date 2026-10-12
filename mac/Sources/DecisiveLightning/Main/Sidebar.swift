@@ -38,7 +38,7 @@ struct EngineFooter: View {
             HStack(spacing: 8) {
                 Image(systemName: state.symbol)   // no symbolEffect: a running animation redraws every frame
                     .foregroundStyle(color(state))
-                Text(state.title).font(.callout.weight(.semibold))
+                Text(model.showTitle).font(.callout.weight(.semibold))
                 Spacer()
                 if model.feed.state == .connected, state.isActive, !model.feed.lite {
                     Text("\(Int(model.feed.fps.rounded())) fps")
@@ -58,7 +58,7 @@ struct EngineFooter: View {
                       systemImage: link.up ? "laptopcomputer" : "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(link.up ? Color.secondary : Color.orange)
             } else if state == .waitingForDJ {
-                Text(model.remoteDJ.map { "Waiting for \($0)…" } ?? "Load a track in VirtualDJ with DecisiveLink as master effect.")
+                Text(model.djWaiting)
                     .font(.caption).foregroundStyle(.secondary)
             } else if state == .attached {
                 Text("An engine started outside the app is running; the app shows its lights.")

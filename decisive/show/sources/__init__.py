@@ -31,6 +31,7 @@ class Entry:
     position: str  # exact | beat | metadata
     verified: str  # what has been tested for real, and on what
     menu: bool = True  # offered in the Mac app's Start menu
+    waiting: str = ""  # what to do while the show waits for it (the Mac app shows it)
 
 
 # sources.json: the one list of integrations, read by the engine and the Mac app alike

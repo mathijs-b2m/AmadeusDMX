@@ -6,7 +6,8 @@
     "class": "Listener",
     "about": "VirtualDJ on this computer: the DecisiveLink plugin (UDP 9123)",
     "position": "exact",
-    "verified": "VirtualDJ 8.5 (macOS), live on a real rig"
+    "verified": "VirtualDJ 8.5 (macOS), live on a real rig",
+    "waiting": "Load a track in VirtualDJ with DecisiveLink as master effect."
   },
   {
     "name": "mixxx",
@@ -15,7 +16,8 @@
     "class": "Mixxx",
     "about": "Mixxx: its controller scripting, over a virtual MIDI device (needs python-rtmidi); opts port, library",
     "position": "exact",
-    "verified": "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Decisive Link p95 10 ms, max 13 ms"
+    "verified": "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Decisive Link p95 10 ms, max 13 ms",
+    "waiting": "Play a track in Mixxx with the Decisive Lightning controller enabled (start Mixxx after the show)."
   },
   {
     "name": "djay",
@@ -24,7 +26,8 @@
     "class": "Djay",
     "about": "djay Pro (macOS): its window read through Accessibility (needs pyobjc-framework-ApplicationServices and the Accessibility permission)",
     "position": "exact",
-    "verified": "djay Pro 5.6.8 (macOS): on SYNC with Ableton Link, within 6 ms (sd) of Link's beat; without SYNC, the label alone: sd 12-17 ms, up to ~70 ms"
+    "verified": "djay Pro 5.6.8 (macOS): on SYNC with Ableton Link, within 6 ms (sd) of Link's beat; without SYNC, the label alone: sd 12-17 ms, up to ~70 ms",
+    "waiting": "Load a track in djay Pro (Decisive Lightning reads its window: Accessibility permission)."
   },
   {
     "name": "replay",
@@ -34,6 +37,7 @@
     "about": "a recording of any source (decisive probe NAME --record FILE): opt file=FILE",
     "position": "exact",
     "verified": "unit tests",
-    "menu": false
+    "menu": false,
+    "waiting": "Replaying a recording."
   }
 ]

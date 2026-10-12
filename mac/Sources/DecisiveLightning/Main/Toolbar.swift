@@ -56,7 +56,7 @@ struct StatusPill: View {
                 }
                 Text(timeString(model.feed.time)).monospacedDigit().foregroundStyle(.secondary)
             } else {
-                Text(state.title).foregroundStyle(.secondary)
+                Text(model.showTitle).foregroundStyle(.secondary)
             }
         }
         .font(.callout)
@@ -177,7 +177,7 @@ struct EngineButton: View {
             .disabled(model.workspace == nil || model.selectedSet.isEmpty || model.showState == .attached)
             .sheet(isPresented: $showDJ) { DJLinkSheet().environment(model) }
             .help(model.showState == .attached ? "An engine is already running outside the app"
-                  : "Start the live show: the lights follow VirtualDJ ⌘R")
+                  : "Start the live show: the lights follow \(model.nextSourceName) ⌘R")
         }
     }
 }

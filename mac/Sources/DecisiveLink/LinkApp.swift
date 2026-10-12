@@ -40,12 +40,13 @@ struct LinkMenu: View {
             }
 
             TimelineView(.periodic(from: .now, by: 1)) { _ in
-                Label(link.vdjConnected ? "VirtualDJ connected" : "Waiting for VirtualDJ (DecisiveLink plugin as master effect)",
-                      systemImage: link.vdjConnected ? "checkmark.circle.fill" : "hourglass")
-                    .foregroundStyle(link.vdjConnected ? .green : .secondary)
+                Label(link.djConnected ? "\(link.djApp) connected"
+                      : "Waiting for the DJ software (VirtualDJ: DecisiveLink plugin as master effect)",
+                      systemImage: link.djConnected ? "checkmark.circle.fill" : "hourglass")
+                    .foregroundStyle(link.djConnected ? .green : .secondary)
                     .font(.callout)
             }
-            if link.vdjConnected && !link.deckSummary.isEmpty {
+            if link.djConnected && !link.deckSummary.isEmpty {
                 Text(link.deckSummary).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(4)
             }
 

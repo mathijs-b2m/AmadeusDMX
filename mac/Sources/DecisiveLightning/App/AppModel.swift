@@ -211,6 +211,25 @@ final class AppModel {
     let djs = LinkBrowser()
     /// The DJ laptop the show follows (Decisive Link), when it isn't this Mac.
     private(set) var remoteDJ: String?
+    /// The DJ software a live show on this Mac follows (from the engine's list; VirtualDJ unless chosen).
+    private(set) var liveSource: DJSource?
+
+    /// Who the show waits for or follows, for people: the DJ laptop, else the DJ software.
+    var djName: String { remoteDJ ?? liveSource?.app ?? "VirtualDJ" }
+
+    /// What to do while the show waits for the DJ software.
+    var djWaiting: String {
+        if let remoteDJ { return "Waiting for \(remoteDJ)…" }
+        return liveSource?.waiting ?? "Load a track in VirtualDJ with DecisiveLink as master effect."
+    }
+
+    /// The show's state for people: "Waiting for djay Pro" rather than a fixed name.
+    var showTitle: String { showState == .waitingForDJ ? "Waiting for \(djName)" : showState.title }
+
+    /// The DJ software Start (⌘R) follows: the last one chosen in the Start menu.
+    var nextSourceName: String {
+        workspace?.djSource(UserDefaults.standard.string(forKey: "djSource") ?? "vdj")?.app ?? "VirtualDJ"
+    }
 
     /// Start live mode: the lights follow the DJ software on this Mac (VirtualDJ, Mixxx, …) or on a DJ laptop.
     func startLive(dj: String? = nil, code: String? = nil, source: String? = nil) {
@@ -219,6 +238,7 @@ final class AppModel {
         remoteDJ = dj
         remoteCode = code
         if let source { UserDefaults.standard.set(source, forKey: "djSource") }
+        liveSource = dj == nil ? ws.djSource(source ?? UserDefaults.standard.string(forKey: "djSource") ?? "vdj") : nil
         runningWithDMX = sendArtNet
         var args = ["live", "--set", selectedSet, "--rig", selectedRig, "--health", "30"]
         if let dj, let code { args += ["--remote", "dj:" + dj, "--code", code] }

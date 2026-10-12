@@ -59,7 +59,7 @@ struct NowPlayingCard: View {
         switch s {
         case .stopped: "Rig preview. Press Start (⌘R) for a live show, or play a track (⌘O)."
         case .starting: "The engine is starting…"
-        case .waitingForDJ: "Waiting for VirtualDJ: load a track with DecisiveLink as master effect."
+        case .waitingForDJ: "\(model.showTitle). \(model.djWaiting)"
         case .failed(let why): why
         default: ""
         }

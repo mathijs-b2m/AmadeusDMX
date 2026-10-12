@@ -25,6 +25,8 @@ final class LinkServer {
     private(set) var peers: [Peer] = []
     private(set) var lastPluginPacket: Date = .distantPast
     private(set) var deckSummary = ""
+    /// The DJ software sending the decks: the VirtualDJ plugin, or `decisive probe NAME --emit` (which names it).
+    private(set) var djApp = "VirtualDJ"
     private(set) var error: String?
     private(set) var tracksServed = 0
 
@@ -33,7 +35,7 @@ final class LinkServer {
 
     init() {
         if let fixed = UserDefaults.standard.string(forKey: "code"), fixed.count == 4 { code = fixed }  // -code 1234 (tests)
-        net.onPlugin = { [weak self] summary in Task { @MainActor in self?.plugin(summary) } }
+        net.onPlugin = { [weak self] summary, app in Task { @MainActor in self?.plugin(summary, app: app) } }
         net.onPeers = { [weak self] peers in Task { @MainActor in self?.peers = peers } }
         net.onError = { [weak self] e in Task { @MainActor in self?.error = e } }
         net.onServed = { [weak self] in Task { @MainActor in self?.tracksServed += 1 } }
@@ -43,7 +45,7 @@ final class LinkServer {
         if UserDefaults.standard.object(forKey: "linkOn") as? Bool ?? true { setOn(true) }
     }
 
-    var vdjConnected: Bool { Date().timeIntervalSince(lastPluginPacket) < 1.5 }
+    var djConnected: Bool { Date().timeIntervalSince(lastPluginPacket) < 1.5 }
 
     func setOn(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: "linkOn")
@@ -59,9 +61,10 @@ final class LinkServer {
 
     func disconnect(_ id: String) { net.drop(id) }
 
-    private func plugin(_ summary: String) {
+    private func plugin(_ summary: String, app: String) {
         lastPluginPacket = Date()
         deckSummary = summary
+        djApp = app
     }
 
     static func newCode() -> String { String(format: "%04d", Int.random(in: 0...9999)) }
@@ -70,7 +73,7 @@ final class LinkServer {
 /// The networking, on its own queue (never the main thread: the forwarding must stay on time).
 final class LinkNet: @unchecked Sendable {
     var code = "0000"
-    var onPlugin: ((String) -> Void)?
+    var onPlugin: ((String, String) -> Void)?
     var onPeers: (([LinkServer.Peer]) -> Void)?
     var onError: ((String) -> Void)?
     var onServed: (() -> Void)?
@@ -106,13 +109,13 @@ final class LinkNet: @unchecked Sendable {
             }
             l.stateUpdateHandler = { [weak self] st in
                 if case .failed(let e) = st {
-                    self?.onError?("Can’t listen for VirtualDJ on port \(port): \(e.localizedDescription). Is a lighting engine running on this laptop?")
+                    self?.onError?("Can’t listen for the DJ software on port \(port): \(e.localizedDescription). Is a lighting engine running on this laptop?")
                 }
             }
             l.start(queue: q)
             pluginListener = l
         } catch {
-            onError?("Can’t listen for VirtualDJ: \(error.localizedDescription)")
+            onError?("Can’t listen for the DJ software: \(error.localizedDescription)")
         }
     }
 
@@ -135,7 +138,7 @@ final class LinkNet: @unchecked Sendable {
                     let name = ((d["file"] as? String) ?? "").split(separator: "/").last.map(String.init) ?? "–"
                     return "\(d["deck"] ?? "?"): \((d["play"] as? Int) == 1 ? "▶" : "■") \(name)"
                 }.joined(separator: "\n")
-                onPlugin?(s)
+                onPlugin?(s, (obj["app"] as? String) ?? "VirtualDJ")
             }
         }
         guard !sessions.isEmpty else { return }
@@ -270,7 +273,7 @@ final class LinkNet: @unchecked Sendable {
         }
         guard allowed.contains(path), let data = FileManager.default.contents(atPath: path),
               let attrs = try? FileManager.default.attributesOfItem(atPath: path) else {
-            send(c, ["ok": false, "error": "not a track VirtualDJ has loaded"]) { c.cancel() }
+            send(c, ["ok": false, "error": "not a track the DJ software has loaded"]) { c.cancel() }
             return
         }
         let mtime = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0

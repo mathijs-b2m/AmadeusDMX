@@ -59,8 +59,8 @@ struct MainView: View {
         }
         switch model.showState {
         case .live, .playing, .attached:
-            if let h = model.feed.hello { return "\(Int(h.bpm.rounded())) BPM · \(model.showState.title)" }
-            return model.showState.title
+            if let h = model.feed.hello { return "\(Int(h.bpm.rounded())) BPM · \(model.showTitle)" }
+            return model.showTitle
         default:
             let m = model.mounted
             guard m.total > 0 else { return model.currentRig?.summary ?? "" }

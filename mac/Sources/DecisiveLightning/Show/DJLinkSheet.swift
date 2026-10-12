@@ -14,7 +14,7 @@ struct DJLinkSheet: View {
                 Image(systemName: "laptopcomputer.and.arrow.down").font(.largeTitle).foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Start with a DJ Laptop").font(.title2.weight(.semibold))
-                    Text("VirtualDJ runs on the DJ’s laptop with Decisive Link switched on. The show here follows that mix.")
+                    Text("The DJ software runs on the DJ’s laptop with Decisive Link switched on. The show here follows that mix.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }

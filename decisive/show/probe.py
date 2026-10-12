@@ -31,6 +31,7 @@ def plugin_packet(src: Source, now: float, t0: float) -> dict:
     """The decks as the DecisiveLink plugin would send them (positions extrapolated to `now`)."""
     return {
         "t": int((now - t0) * 1000),
+        "app": src.label,  # which DJ software (the VirtualDJ plugin sends none: the Link app assumes VirtualDJ)
         "master": src.master,
         "decks": [
             {
