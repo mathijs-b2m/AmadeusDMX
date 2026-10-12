@@ -89,6 +89,10 @@ struct LinkMenu: View {
                 Text("Off: this laptop is invisible on the network.").font(.callout).foregroundStyle(.secondary)
             }
 
+            if let e = link.pluginError {
+                Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let e = link.error {
                 Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)

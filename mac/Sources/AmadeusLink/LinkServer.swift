@@ -29,6 +29,9 @@ final class LinkServer {
     /// The DJ software sending the decks: the VirtualDJ plugin, or `amadeus probe NAME --emit` (which names it).
     private(set) var djApp = "VirtualDJ"
     private(set) var error: String?
+    /// Why the DJ software can't reach this app (its port is taken), nil while it can. Kept apart from `error`:
+    /// switching Link on or off doesn't clear it, only listening again does.
+    private(set) var pluginError: String?
     private(set) var tracksServed = 0
 
     @ObservationIgnored private let net = LinkNet()
@@ -47,6 +50,7 @@ final class LinkServer {
             }
         }
         net.onError = { [weak self] e in Task { @MainActor in self?.error = e } }
+        net.onPluginError = { [weak self] e in Task { @MainActor in self?.pluginError = e } }
         net.onServed = { [weak self] in Task { @MainActor in self?.tracksServed += 1 } }
         net.code = code
         let pluginPort = UInt16(UserDefaults.standard.integer(forKey: "pluginPort"))   // -pluginPort 9124 (tests)
@@ -85,6 +89,8 @@ final class LinkNet: @unchecked Sendable {
     var onPlugin: ((String, String) -> Void)?
     var onPeers: (([LinkServer.Peer]) -> Void)?
     var onError: ((String) -> Void)?
+    /// The plugin's port: a message while it can't be opened, nil once it is.
+    var onPluginError: ((String?) -> Void)?
     var onServed: (() -> Void)?
 
     private let q = DispatchQueue(label: "amadeus.link", qos: .userInteractive)
@@ -106,25 +112,35 @@ final class LinkNet: @unchecked Sendable {
 
     // MARK: VirtualDJ's plugin (local)
 
+    /// Listens for the plugin on 127.0.0.1. Another program may hold the port (a lighting engine started on this
+    /// laptop before Link): then it tries again every two seconds, until it's free.
     func startPlugin(port: UInt16) {
         let params = NWParameters.udp
         params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!)
         params.allowLocalEndpointReuse = true
+        let busy = "Port \(port) is taken: the DJ software can't reach Link. Quit a lighting engine running on this laptop (Amadeus DMX's own live show); Link tries again by itself."
         do {
             let l = try NWListener(using: params)
             l.newConnectionHandler = { [weak self] c in
                 c.start(queue: self?.q ?? .main)
                 self?.receivePlugin(c)
             }
-            l.stateUpdateHandler = { [weak self] st in
-                if case .failed(let e) = st {
-                    self?.onError?("Can’t listen for the DJ software on port \(port): \(e.localizedDescription). Is a lighting engine running on this laptop?")
+            l.stateUpdateHandler = { [weak self, weak l] st in
+                switch st {
+                case .ready:
+                    self?.onPluginError?(nil)
+                case .failed, .waiting:
+                    l?.cancel()
+                    self?.onPluginError?(busy)
+                    self?.q.asyncAfter(deadline: .now() + 2) { self?.startPlugin(port: port) }
+                default: break
                 }
             }
             l.start(queue: q)
             pluginListener = l
         } catch {
-            onError?("Can’t listen for the DJ software: \(error.localizedDescription)")
+            onPluginError?(busy)
+            q.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startPlugin(port: port) }
         }
     }
 
