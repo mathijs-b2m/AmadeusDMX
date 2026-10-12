@@ -231,9 +231,12 @@ the Start button and ⌘R then use the last one chosen. What each needs:
 
 When the DJ and the lighting operator use different computers:
 
-1. **The DJ's laptop** runs VirtualDJ with the AmadeusLink plugin as usual, plus **Amadeus Link.app**
-   (a small window and a menu bar icon, from `build/AmadeusLink.dmg`). Switched on, it advertises itself with Bonjour and shows a
-   4-digit code.
+1. **The DJ's laptop** runs VirtualDJ plus **Amadeus Link.app** (a small window and a menu bar icon, from
+   `build/AmadeusLink.dmg`). Link carries the AmadeusLink plugin for VirtualDJ: *Install* in its menu puts it
+   in VirtualDJ's plugin folder (and *Update* replaces an older one); restart VirtualDJ and switch it on as
+   master effect. Switched on, Link advertises itself with Bonjour and shows a 4-digit code.
+   Don't run a live show of Amadeus DMX on the DJ laptop as well: it takes the plugin's port (UDP 9123), and
+   Link says so until it's free again.
 2. **The lighting computer**: Start ▸ **Start with a DJ Laptop…** lists the nearby DJs; pick one and type
    the code. From the command line: `amadeus live --remote auto --code 1234` (or `--remote HOST:7123`).
 

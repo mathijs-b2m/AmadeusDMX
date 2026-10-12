@@ -250,41 +250,45 @@ struct DjaySection: View {
 
 struct VirtualDJSection: View {
     @Environment(AppModel.self) private var model
-    @State private var status = ""
-
-    private var dest: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Application Support/VirtualDJ/PluginsMacArm/SoundEffect/AmadeusLink.bundle")
-    }
+    @State private var message = ""
+    @State private var installed = VirtualDJPlugin.Status.notInstalled
 
     var body: some View {
+        let bundled = model.workspace?.pluginBundle
         SwiftUI.Section {
             LabeledContent("AmadeusLink plugin") {
-                Text(FileManager.default.fileExists(atPath: dest.path) ? "Installed" : "Not installed")
-                    .foregroundStyle(.secondary)
+                Text(installedText).foregroundStyle(installed == .outdated ? .orange : .secondary)
             }
             HStack {
                 Spacer()
-                if !status.isEmpty { Text(status).foregroundStyle(.secondary) }
-                Button("Install Plugin") { install() }
-                    .disabled(!(FileManager.default.fileExists(atPath: model.workspace?.pluginBundle.path ?? "")))
+                if !message.isEmpty { Text(message).foregroundStyle(.secondary) }
+                Button(installed == .outdated ? "Update Plugin" : "Install Plugin") { install(bundled) }
+                    .disabled(!(FileManager.default.fileExists(atPath: bundled?.path ?? "")) || installed == .upToDate)
             }
         } header: {
             Text("VirtualDJ")
         } footer: {
-            Text("In VirtualDJ, add AmadeusLink as master effect. It sends every deck's position, tempo and volume to the engine (UDP 9123). Restart VirtualDJ after installing.")
+            Text("In VirtualDJ, add AmadeusLink as master effect. It sends every deck's position, tempo and volume to the engine (UDP 9123). Restart VirtualDJ after installing. On a separate DJ laptop, Amadeus Link installs it.")
+        }
+        .onAppear { installed = VirtualDJPlugin.status(comparedTo: bundled) }
+    }
+
+    private var installedText: String {
+        switch installed {
+        case .notInstalled: "Not installed"
+        case .upToDate: "Installed"
+        case .outdated: "An update is ready"
         }
     }
 
-    private func install() {
-        guard let src = model.workspace?.pluginBundle else { return }
+    private func install(_ bundled: URL?) {
+        guard let bundled else { return }
         do {
-            try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? FileManager.default.removeItem(at: dest)
-            try FileManager.default.copyItem(at: src, to: dest)
-            status = "Installed. Restart VirtualDJ."
+            try VirtualDJPlugin.install(from: bundled)
+            message = "Installed. Restart VirtualDJ."
         } catch {
-            status = error.localizedDescription
+            message = error.localizedDescription
         }
+        installed = VirtualDJPlugin.status(comparedTo: bundled)
     }
 }

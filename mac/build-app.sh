@@ -116,6 +116,9 @@ rm -rf "$LINK"
 mkdir -p "$LINK/Contents/MacOS" "$LINK/Contents/Resources"
 cp "$(dirname "$BIN")/AmadeusLink" "$LINK/Contents/MacOS/AmadeusLink"
 embed_sparkle "$LINK" AmadeusLink
+# the VirtualDJ plugin, for Link to install on the DJ laptop (signed ad hoc by vdj/build.sh, as Amadeus DMX's copy)
+[ -d "$ROOT/vdj/build/AmadeusLink.bundle" ] || "$ROOT/vdj/build.sh" >/dev/null
+cp -R "$ROOT/vdj/build/AmadeusLink.bundle" "$LINK/Contents/Resources/"
 cp Resources/AppIcon.icns "$LINK/Contents/Resources/AppIcon.icns"
 cat > "$LINK/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

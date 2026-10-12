@@ -48,6 +48,7 @@ struct LinkMenu: View {
                     .foregroundStyle(link.djConnected ? .green : .secondary)
                     .font(.callout)
             }
+            if !link.djConnected { PluginRow() }
             if link.djConnected && !link.deckSummary.isEmpty {
                 Text(link.deckSummary).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(4)
             }
@@ -115,5 +116,50 @@ struct LinkMenu: View {
         }
         .padding(16)
         .frame(width: 300)
+    }
+}
+
+/// The AmadeusLink plugin for VirtualDJ: Link carries it (Contents/Resources), so a DJ laptop needs nothing else.
+struct PluginRow: View {
+    @State private var status = VirtualDJPlugin.Status.notInstalled
+    @State private var message = ""
+    private let bundled = Bundle.main.url(forResource: "AmadeusLink", withExtension: "bundle")
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label(title, systemImage: status == .upToDate ? "puzzlepiece.extension.fill" : "puzzlepiece.extension")
+                .font(.callout)
+                .foregroundStyle(status == .upToDate ? Color.secondary : Color.orange)
+                Spacer()
+                if status != .upToDate, bundled != nil {
+                    Button(status == .outdated ? "Update" : "Install") { install() }.font(.callout)
+                }
+            }
+            Text(message.isEmpty
+                 ? "In VirtualDJ: Master effect › AmadeusLink. Restart VirtualDJ after installing."
+                 : message)
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear { status = VirtualDJPlugin.status(comparedTo: bundled) }
+    }
+
+    private var title: String {
+        switch status {
+        case .notInstalled: "VirtualDJ plugin not installed"
+        case .upToDate: "VirtualDJ plugin installed"
+        case .outdated: "VirtualDJ plugin: an update is ready"
+        }
+    }
+
+    private func install() {
+        guard let bundled else { return }
+        do {
+            try VirtualDJPlugin.install(from: bundled)
+            message = "Installed. Restart VirtualDJ, then switch on AmadeusLink as master effect."
+        } catch {
+            message = error.localizedDescription
+        }
+        status = VirtualDJPlugin.status(comparedTo: bundled)
     }
 }
