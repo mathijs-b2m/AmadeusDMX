@@ -52,6 +52,9 @@ struct DeckRow: View {
             ProgressView(value: min(1, deck.vol)).progressViewStyle(.linear).tint(deck.play ? .green : .gray)
             if let s = deck.status {
                 HStack(spacing: 6) {
+                    if let stream = s.stream {
+                        StepChip(title: "\(stream.capitalized) copy", state: s.copy == "waiting" ? "running" : s.copy)
+                    }
                     StepChip(title: "Analysis", state: s.analysis)
                     StepChip(title: "Instruments", state: s.stems,
                              extra: s.stems == "running" ? s.elapsed.map { timeString(Double($0)) } : nil)

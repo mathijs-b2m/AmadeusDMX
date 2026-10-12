@@ -65,7 +65,16 @@ labels, about 200 times a second, through the macOS Accessibility API.
   djay only records a newly added file there once it *plays*, so a track loaded for the first time is looked
   up by its title in the folders of the tracks djay already knows (and the music folders): its show is
   prepared while it is still cued, as with VirtualDJ.
-  Streamed tracks (Spotify and the like) have no file to analyse, so they aren't lit.
+- **Streamed tracks (Spotify):** these have no file to analyse, but djay's library says exactly which recording
+  each one is: its Spotify id, its ISRC (the recording's own code, the same on every service) and its length.
+  When a Spotify track is loaded on a deck, live mode fetches a local copy of that same recording from YouTube
+  (yt-dlp: `pip install -e '.[streamed]'`), found by its ISRC, usually the label's own "Artist - Topic"
+  upload. The copy is taken only if its length matches Spotify's within a second (most match within 30 ms; an
+  edit or a video with an intro is seconds off), then analysed and lit like a local file, at djay's playhead.
+  Nothing is played from the copy: the audience hears djay's stream. Copies are kept in `.cache/streamed/`, at
+  ~70 kbps (enough to analyse). YouTube is asked gently: only for tracks on a deck, one search or download at
+  a time, 3 s apart; a track unloaded before its turn is skipped. A first fetch takes ~2–5 s, then the
+  quick plan lights it within seconds. `--opt streamed=0` switches it off. Only fetch audio you may copy.
 
 ### The Accessibility permission
 
