@@ -16,6 +16,12 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 ![Art-Net · sACN · USB DMX](https://img.shields.io/badge/Art--Net_·_sACN_·_USB_DMX-555?style=flat-square)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange?style=flat-square)
 
+<br><br>
+
+<img src="docs/screenshots/show-drop.png" alt="Amadeus DMX on the drop: lasers, an LED wall and 60 moving heads on a concert stage, with the AI director's choices for this phrase on the right" width="100%">
+
+<sub>The drop, live in the app: 60 moving heads, 10 lasers and an LED wall. On the right, what the AI director chose for this phrase.</sub>
+
 </div>
 
 ---
@@ -74,6 +80,19 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 **See it before you rig it:** a live 3D stage on your Mac shows every beam, so you can plan and try a show
 without a single light connected. When you're ready, the same show goes out over Art-Net, sACN or a USB
 DMX interface.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/show-buildup.png" alt="The build-up before the drop: warm beams and a wave across the moving heads">
+<p align="center"><sub>The build-up, one second before the drop</sub></p>
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/rig-editor.png" alt="The rig editor: a concert stage with three trusses and two towers, 70 fixtures mounted">
+<p align="center"><sub>The rig editor: your venue, with every fixture where it hangs</sub></p>
+</td>
+</tr>
+</table>
 
 ## Get started
 

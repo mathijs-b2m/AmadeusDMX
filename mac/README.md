@@ -254,6 +254,7 @@ open "build/Amadeus DMX.app" --args -section rig            # open on a page: sh
 open "build/Amadeus DMX.app" --args -wizard YES             # open the wizard
 open "build/Amadeus DMX.app" --args -play TRACK.mp3 -playFrom 120 -muted YES
 open "build/Amadeus DMX.app" --args -section rig -lastSet showcase -lastRig club   # a set on a rig
+open "build/Amadeus DMX.app" --args -section rig -lastRig concert -editSet concert60  # the rig editor with that set
 open "build/Amadeus DMX.app" --args -engineRoot /path/to/a/copy    # another engine folder (a sandbox)
 open "build/Amadeus DMX.app" --args -editorSelfTest NAME   # the set NAME on the rig NAME (copies: it saves!)
                                                                    # report in $TMPDIR/editor-selftest.txt

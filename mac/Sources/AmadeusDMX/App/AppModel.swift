@@ -130,6 +130,9 @@ final class AppModel {
         if let s = UserDefaults.standard.string(forKey: "section").flatMap(Section.init(rawValue:)) { section = s }  // -section rig
         if UserDefaults.standard.string(forKey: "section") == "sets" { section = .set }
         DispatchQueue.main.async { EditorSelfTest.runIfRequested(self) }  // -editorSelfTest SET (development)
+        if let set = UserDefaults.standard.string(forKey: "editSet"), setsOn(editingRig).contains(set) {
+            editingRigSet = set  // -editSet SET: the rig editor shows where that set hangs (screenshots)
+        }
         if UserDefaults.standard.bool(forKey: "startLive") {  // -startLive YES: start the live show at launch
             DispatchQueue.main.async { self.startLive() }
         } else if let dj = UserDefaults.standard.string(forKey: "startDJ"),  // -startDJ NAME -djCode 1234
