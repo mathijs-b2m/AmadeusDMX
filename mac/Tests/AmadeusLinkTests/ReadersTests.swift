@@ -65,3 +65,85 @@ private func near(_ a: Double, _ b: Double, _ eps: Double = 1e-9) -> Bool { abs(
     #expect(o["app"] as? String == "djay Pro" && o["t"] as? Int == 500 && list.count == 1)
     #expect(list[0]["pos"] as? Double == 10.5 && list[0]["sync"] as? Int == 1)
 }
+
+// djay's library records, built as tests/test_streamed.py builds them
+private func s8(_ text: String) -> [UInt8] { [0x08] + Array(text.utf8) + [0x00] }
+
+private func f32(_ data: [UInt8], _ value: Float) -> [UInt8] {
+    var d = data + [0x13]
+    d += [UInt8](repeating: 0, count: (4 - d.count % 4) % 4)
+    return d + withUnsafeBytes(of: value.bitPattern.littleEndian) { Array($0) }
+}
+
+private func location(_ title: String, _ artist: String, _ uri: String, _ isrc: String, _ length: Float) -> Data {
+    var d: [UInt8] = Array("TSAF".utf8) + [3, 0, 3, 0] + s8("ADCMediaItemLocation") + s8("ab12") + s8("uuid") + [5, 2]
+    d += s8(title) + s8("title") + s8(artist) + s8("artist")
+    d = f32(d, length) + s8("duration")
+    return Data(d + s8(isrc) + s8("isrc") + s8(uri) + s8("sourceURIs"))
+}
+
+@Test func djayStreamedRecord() throws {
+    let s = try #require(DjayStreams.stream(location("Toxic", "Britney Spears", "spotify:track:6I9VzX", "USJI10301102", 198.8)))
+    #expect(s.service == "spotify" && s.id == "6I9VzX" && s.isrc == "USJI10301102")
+    #expect(s.title == "Toxic" && s.artist == "Britney Spears" && abs(s.length - 198.8) < 1e-3)
+    #expect(DjayStreams.stream(Data(s8("file:///x.mp3") + s8("Local") + s8("title"))) == nil)  // a file: not streamed
+}
+
+@Test func djayMissingArtistIsNotAKey() {
+    let f = DjayStreams.fields(Data(s8("Zebra") + s8("title") + s8("artist") + s8("spotify:track:x") + s8("sourceURIs")))
+    #expect(f.text["title"] == "Zebra" && f.text["artist"] == nil && f.uris == ["spotify:track:x"])
+}
+
+@Test func packetCarriesAStreamedDeck() throws {
+    let st = StreamedTrack(service: "spotify", id: "6I9", title: "Toxic", artist: "Britney Spears", isrc: "US1", length: 198.8)
+    let d = DeckReading(deck: 2, file: "", pos: 30, length: 198.8, play: true, bpm: 143, bpm0: 143, vol: 1, received: 1,
+                        title: "Toxic", artist: "Britney Spears", stream: st)
+    let data = try #require(Packet.make(app: "djay Pro", decks: [d], now: 1, start: 0))
+    let o = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let deck = try #require((o["decks"] as? [[String: Any]])?.first)
+    #expect(deck["file"] as? String == "" && deck["title"] as? String == "Toxic")
+    #expect((deck["stream"] as? [String: String]) == ["service": "spotify", "id": "6I9", "isrc": "US1"])
+}
+
+private let vdjDatabase = """
+<?xml version="1.0" encoding="UTF-8"?>
+<VirtualDJ_Database Version="2025">
+ <Song FilePath="netsearch://sp1fI4E7jeOiyfa3LmwNnD0o" Flag="256">
+  <Tags Author="Paul Kalkbrenner" Title="DIE TROMPETEN VON BERLIN" Album="THE ESSENCE" Year="2025" />
+  <Infos SongLength="330.022109" Bitrate="320" />
+ </Song>
+ <Song FilePath="netsearch://sp4eE4vEaakr3ZnSt1UNfOhz" Flag="256">
+  <Tags Author="Emrod" Title="Tango" />
+  <Infos SongLength="240.0" />
+ </Song>
+ <Song FilePath="/Music/local.mp3"><Tags Author="A" Title="Local" /><Infos SongLength="200.5" /></Song>
+</VirtualDJ_Database>
+"""
+
+@Test func virtualDJDatabase() throws {
+    let found = VirtualDJStreams.parse(Data(vdjDatabase.utf8))
+    #expect(found.count == 2)
+    let s = try #require(found["netsearch://sp1fI4E7jeOiyfa3LmwNnD0o"])
+    #expect(s.service == "spotify" && s.id == "1fI4E7jeOiyfa3LmwNnD0o" && s.artist == "Paul Kalkbrenner")
+    #expect(s.title == "DIE TROMPETEN VON BERLIN" && abs(s.length - 330.022109) < 1e-6)
+    #expect(found["netsearch://sp4eE4vEaakr3ZnSt1UNfOhz"]?.length == 0)  // 240.0: VirtualDJ's guess, unknown
+    #expect(VirtualDJStreams.netsearch("/Music/local.mp3") == nil)
+}
+
+@Test func virtualDJPacketNamesItsStreams() throws {
+    let url = FileManager.default.temporaryDirectory.appending(path: "vdj-\(UUID().uuidString).xml")
+    try Data(vdjDatabase.utf8).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let packet = Data("""
+    {"t":1,"master":2,"decks":[{"deck":1,"pos":0,"len":240,"play":0,"bpm":125,"bpm0":124,"vol":1,"file":"/Music/local.mp3"},\
+    {"deck":2,"pos":34.4,"len":330,"play":1,"bpm":125.4,"bpm0":137.4,"vol":1,"file":"netsearch://sp1fI4E7jeOiyfa3LmwNnD0o"}]}
+    """.utf8)
+    let o = try #require(try JSONSerialization.jsonObject(with: VirtualDJStreams(path: url).enrich(packet)) as? [String: Any])
+    let decks = try #require(o["decks"] as? [[String: Any]])
+    #expect(decks[0]["file"] as? String == "/Music/local.mp3" && decks[0]["stream"] == nil)  // a file: as it was
+    #expect(decks[1]["file"] as? String == "" && decks[1]["title"] as? String == "DIE TROMPETEN VON BERLIN")
+    #expect(decks[1]["artist"] as? String == "Paul Kalkbrenner" && abs((decks[1]["len"] as? Double ?? 0) - 330.022109) < 1e-6)
+    #expect((decks[1]["stream"] as? [String: String]) == ["service": "spotify", "id": "1fI4E7jeOiyfa3LmwNnD0o", "isrc": ""])
+    let plain = Data(#"{"decks":[{"deck":1,"file":"/x.mp3"}]}"#.utf8)
+    #expect(VirtualDJStreams(path: url).enrich(plain) == plain)  // nothing streams: untouched
+}

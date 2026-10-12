@@ -199,6 +199,9 @@ final class LinkNet: @unchecked Sendable {
         }
     }
 
+    /// VirtualDJ's streamed tracks (Spotify): named from its database before they're passed on.
+    private let vdjStreams = VirtualDJStreams()
+
     /// Whether VirtualDJ's plugin is the DJ software passed on (another one is read by Amadeus Link itself).
     var pluginOn = true
 
@@ -210,7 +213,7 @@ final class LinkNet: @unchecked Sendable {
     private func receivePlugin(_ c: NWConnection) {
         c.receiveMessage { [weak self] data, _, _, err in
             guard let self else { return }
-            if let data, !data.isEmpty, self.pluginOn { self.forward(data) }
+            if let data, !data.isEmpty, self.pluginOn { self.forward(self.vdjStreams.enrich(data)) }
             if err == nil { self.receivePlugin(c) }
         }
     }
@@ -223,7 +226,10 @@ final class LinkNet: @unchecked Sendable {
             if Date().timeIntervalSince(lastSummary) > 0.5 {
                 lastSummary = Date()
                 let s = decks.map { d in
-                    let name = ((d["file"] as? String) ?? "").split(separator: "/").last.map(String.init) ?? "–"
+                    let file = (d["file"] as? String) ?? ""
+                    let name = d["stream"] != nil
+                        ? "\((d["artist"] as? String) ?? "") – \((d["title"] as? String) ?? "")  (\(((d["stream"] as? [String: Any])?["service"] as? String ?? "stream").capitalized): the lighting computer fetches a copy)"
+                        : file.isEmpty ? "streamed, not named yet: dark" : (file.split(separator: "/").last.map(String.init) ?? "–")
                     return "\(d["deck"] ?? "?"): \((d["play"] as? Int) == 1 ? "▶" : "■") \(name)"
                 }.joined(separator: "\n")
                 onPlugin?(s, (obj["app"] as? String) ?? "VirtualDJ")

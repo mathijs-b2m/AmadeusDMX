@@ -19,10 +19,21 @@ struct DeckReading {
     var id = ""
     var rate: Double = 0  // playback speed when the DJ software reports it
     var sync = false  // synced to Ableton Link: the lighting computer reads the beat from Link itself
+    var stream: StreamedTrack?  // streamed (Spotify): no file here; the lighting computer fetches a copy of the recording
 
     var speed: Double { rate > 0 ? rate : (bpm0 > 1 && bpm > 1 ? bpm / bpm0 : 1) }
 
     func now(_ t: Double) -> Double { play ? pos + (t - received) * speed : pos }
+}
+
+/// A track the DJ software streams, as its library knows it (the recording: the service's id and the ISRC).
+struct StreamedTrack: Equatable {
+    var service: String  // "spotify"
+    var id: String
+    var title: String
+    var artist: String
+    var isrc = ""
+    var length = 0.0
 }
 
 /// A DJ software Amadeus Link reads itself.
@@ -42,15 +53,18 @@ extension DeckReading {
     /// "2: ▶ Artist – Title", and why it isn't passed on when it has no file here.
     var line: String {
         let what = title.isEmpty ? (file as NSString).lastPathComponent : (artist.isEmpty ? title : "\(artist) – \(title)")
-        return "\(deck): \(play ? "▶" : "■") \(what.isEmpty ? "no track" : what)\(file.isEmpty && !title.isEmpty ? "  (no file on this laptop: not sent)" : "")"
+        let why = stream.map { "  (\($0.service.capitalized): the lighting computer fetches a copy)" }
+            ?? (file.isEmpty && !title.isEmpty ? "  (no file on this laptop: not sent)" : "")
+        return "\(deck): \(play ? "▶" : "■") \(what.isEmpty ? "no track" : what)\(why)"
     }
 }
 
 enum Packet {
-    /// The decks as the AmadeusLink plugin sends them, positions brought to `now`. Decks without a file stay out:
-    /// the lighting computer can only light a track it can fetch.
+    /// The decks as the AmadeusLink plugin sends them, positions brought to `now`. Decks with neither a file nor a
+    /// stream stay out: the lighting computer can only light a track it can get. A streamed deck has no file
+    /// ("file": "") and says which recording it is ("stream"); the lighting computer fetches a copy (streamed.py).
     static func make(app: String, decks: [DeckReading], now: Double, start: Double) -> Data? {
-        let list: [[String: Any]] = decks.filter { !$0.file.isEmpty }.sorted { $0.deck < $1.deck }.map { d in
+        let list: [[String: Any]] = decks.filter { !$0.file.isEmpty || $0.stream != nil }.sorted { $0.deck < $1.deck }.map { d in
             var o: [String: Any] = [
                 "deck": d.deck, "file": d.file, "pos": round4(d.now(now)), "len": d.length, "play": d.play ? 1 : 0,
                 "bpm": d.bpm, "bpm0": d.bpm0, "vol": round4(d.vol),
@@ -59,6 +73,7 @@ enum Packet {
             if !d.artist.isEmpty { o["artist"] = d.artist }
             if !d.id.isEmpty { o["id"] = d.id }
             if d.sync { o["sync"] = 1 }
+            if let st = d.stream, d.file.isEmpty { o["stream"] = ["service": st.service, "id": st.id, "isrc": st.isrc] }
             return o
         }
         let obj: [String: Any] = ["t": Int((now - start) * 1000), "app": app, "master": 0, "decks": list]

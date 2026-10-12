@@ -204,47 +204,53 @@ struct IntegrationSettings: View {
     var body: some View {
         Form {
             VirtualDJSection()
-            DjaySection()
+            StreamedSection()
         }
         .formStyle(.grouped)
     }
 }
 
-struct DjaySection: View {
+/// Streamed tracks (Spotify in djay Pro and VirtualDJ, here or on a DJ laptop through Amadeus Link): a copy of the
+/// same recording, downloaded to analyse it (amadeus/show/sources/streamed.py). One switch for all, off by default.
+struct StreamedSection: View {
     @Environment(AppModel.self) private var model
-    @State private var streamed = false
+    @State private var on = false
     @State private var confirming = false
 
     var body: some View {
         SwiftUI.Section {
-            Toggle(isOn: Binding(get: { streamed }, set: { on in
-                if on { confirming = true } else { save(false) }
+            Toggle(isOn: Binding(get: { on }, set: { new in
+                if new { confirming = true } else { save(false) }
             })) {
                 Text("Light streamed tracks")
-                Text("Spotify tracks have no file to analyse. When one is loaded on a deck, a copy of the same recording is downloaded from YouTube (yt-dlp, once per track) and analysed. The audience still hears djay's own stream. Needs an internet connection during the show.")
+                Text("Spotify tracks in djay Pro and VirtualDJ have no file to analyse. When one is loaded on a deck (on this Mac, or on a DJ laptop through Amadeus Link), a copy of the same recording is downloaded from YouTube (yt-dlp, once per track) and analysed. The audience still hears the DJ software's own stream. Needs an internet connection during the show.")
             }
             .disabled(model.workspace == nil)
-            if streamed, model.workspace?.hasPythonPackage("yt_dlp") == false {
+            if on, model.workspace?.hasPythonPackage("yt_dlp") == false {
                 Label("yt-dlp isn't installed: install Streamed tracks under General › Optional packs", systemImage: "exclamationmark.triangle")
                     .font(.callout).foregroundStyle(.orange)
             }
         } header: {
-            Text("djay Pro")
+            Text("Streamed tracks")
         } footer: {
             Text("Off by default. Downloading from YouTube goes against YouTube's terms of service and may not be allowed by copyright law where you are. Only switch this on for music you may copy; you are responsible for that choice. Needs an internet connection: a track is fetched when it is loaded on a deck (a few seconds); offline, streamed tracks stay dark, while tracks fetched before still light. Copies stay on this Mac (the engine's .cache/streamed) and are used only to analyse the track. Takes effect at the next live show.")
         }
-        .onAppear { streamed = model.workspace?.integrationSetting("djay", "streamed") ?? false }
+        .onAppear {
+            on = (model.workspace?.integrationSetting("streamed", "on") ?? false)
+                || (model.workspace?.integrationSetting("djay", "streamed") ?? false)  // the switch as djay's own, from before
+        }
         .confirmationDialog("Download copies of streamed tracks?", isPresented: $confirming) {
             Button("Switch On") { save(true) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Each Spotify track you load in djay is downloaded from YouTube to analyse it. That goes against YouTube's terms of service and may not be allowed where you are. Only use it for music you may copy.")
+            Text("Each Spotify track you load in djay Pro or VirtualDJ is downloaded from YouTube to analyse it. That goes against YouTube's terms of service and may not be allowed where you are. Only use it for music you may copy.")
         }
     }
 
-    private func save(_ on: Bool) {
-        model.workspace?.setIntegrationSetting("djay", "streamed", on)
-        streamed = on
+    private func save(_ value: Bool) {
+        model.workspace?.setIntegrationSetting("streamed", "on", value)
+        if !value { model.workspace?.setIntegrationSetting("djay", "streamed", false) }  // off means off, also the old one
+        on = value
     }
 }
 

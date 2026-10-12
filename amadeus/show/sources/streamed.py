@@ -1,4 +1,5 @@
-"""Streamed tracks (Spotify in djay Pro): a local copy of the same recording, so it can be analysed and lit.
+"""Streamed tracks (Spotify in djay Pro and VirtualDJ): a local copy of the same recording, so it can be
+analysed and lit.
 
 A streamed track has no file to analyse. But the DJ software knows exactly which recording it plays: djay's
 library keeps, for every Spotify track it has seen, the Spotify id, the ISRC (the recording's own code, the
@@ -12,7 +13,8 @@ length matches the streamed track's within LENGTH_MATCH_S (an edit, a radio vers
 are seconds off), preferably within EXACT_S. A search by ISRC first; else by artist and title, the label's own
 upload preferred. Only tracks loaded on a deck are fetched, one request at a time, GAP_S apart.
 
-Needs yt-dlp (`pip install -e '.[streamed]'`) and ffmpeg. Only fetch audio you are allowed to copy; the copy is
+Needs yt-dlp (`pip install -e '.[streamed]'`); copies are M4A, which macOS decodes itself (ffmpeg only for
+the WebM a few videos come in). Only fetch audio you are allowed to copy; the copy is
 for analysis on this computer, the music the audience hears is the DJ software's own stream.
 """
 
@@ -39,7 +41,8 @@ DOWNLOADS = 2  # at most this many candidates downloaded per track
 GAP_S = 3.0  # at least this long between two requests to YouTube (search or download)
 OFFLINE_RETRY_S = 30.0  # a fetch that failed for want of a connection: tried again this much later
 WANTED_S = 10.0  # a queued track no deck has asked for in this long is skipped
-QUALITY = "bestaudio[abr<=80]/worstaudio[abr>=40]/bestaudio"  # ~70 kbps Opus: plenty to analyse
+# M4A (AAC, ~128 kbps) first: macOS reads it without ffmpeg (afconvert); WebM/Opus needs ffmpeg to be analysed
+QUALITY = "bestaudio[ext=m4a]/bestaudio[abr<=80]/worstaudio[abr>=40]/bestaudio"
 SEARCH = 8  # results to consider per search
 SHUNNED = {"live", "cover", "karaoke", "instrumental", "acapella", "slowed", "sped", "nightcore", "reverb",
            "8d", "loop", "hour", "1hour", "mashup", "reaction", "tutorial", "lyrics", "lyric"}  # fmt: skip
@@ -60,6 +63,24 @@ class Stream:
     @property
     def name(self) -> str:
         return f"{self.artist} - {self.title}".strip(" -")
+
+
+def enabled() -> bool:
+    """Whether copies of streamed tracks may be fetched: the user's own call, off unless switched on (Settings ▸
+    Integrations ▸ Streamed tracks: {"streamed": {"on": true}}; before, djay's own {"djay": {"streamed": true}})."""
+    from amadeus.show.sources import settings
+
+    return bool(settings("streamed").get("on") or settings("djay").get("streamed"))
+
+
+def from_packet(d: dict) -> Stream | None:
+    """A deck in the plugin's packet format that streams ({"stream": {"service", "id", "isrc"}, "title", "artist",
+    "len"}): Amadeus Link sends these for tracks that have no file on the DJ laptop."""
+    s = d.get("stream")
+    if not isinstance(s, dict) or not s.get("id"):
+        return None
+    return Stream(str(s.get("service") or "spotify"), str(s["id"]), str(d.get("title") or ""),
+                  str(d.get("artist") or ""), str(s.get("isrc") or ""), float(d.get("len") or 0.0))  # fmt: skip
 
 
 # --- djay's library -----------------------------------------------------------------------------------------
@@ -127,6 +148,66 @@ class DjayStreams:
         return self.known.get((title, artist)) or next(
             (s for (t, _), s in self.known.items() if t == title and title), None
         )
+
+
+# --- VirtualDJ's database -----------------------------------------------------------------------------------
+# VirtualDJ names a streamed track "netsearch://" + a two-letter service + the service's own id
+# ("netsearch://sp1fI4E7jeOiyfa3LmwNnD0o": Spotify). Its database.xml keeps, per track it has seen, the artist,
+# the title and the length (<Tags Author= Title=>, <Infos SongLength=>); no ISRC.
+
+NETSEARCH = re.compile(r"netsearch://([a-z]{2})([A-Za-z0-9]+)")
+SERVICES = {"sp": "spotify", "td": "tidal", "dz": "deezer", "sc": "soundcloud", "bp": "beatport", "bs": "beatsource"}
+VDJ_DATABASE = Path.home() / "Library/Application Support/VirtualDJ/database.xml"
+
+
+def vdj_length(text: str) -> float:
+    """A track's length from VirtualDJ's database. A whole number of seconds is VirtualDJ's guess before it has
+    the stream itself (240.0): unknown, so it can't turn the right copy down (the search still checks the title)."""
+    try:
+        length = float(text)
+    except ValueError:
+        return 0.0
+    return 0.0 if length == int(length) else length
+
+
+def vdj_streams(db: Path) -> dict[str, Stream]:
+    """Every streamed track VirtualDJ's database knows, by the path its decks report ("netsearch://sp…")."""
+    import xml.etree.ElementTree as ET
+
+    found: dict[str, Stream] = {}
+    for _, song in ET.iterparse(db, events=("end",)):
+        if song.tag != "Song":
+            continue
+        m = NETSEARCH.fullmatch(song.get("FilePath") or "")
+        tags, infos = song.find("Tags"), song.find("Infos")
+        if m and tags is not None and tags.get("Title"):
+            found[m.group(0)] = Stream(
+                SERVICES.get(m.group(1), m.group(1)), m.group(2), tags.get("Title", ""), tags.get("Author", ""),
+                length=vdj_length(infos.get("SongLength", "") if infos is not None else ""),
+            )  # fmt: skip
+        song.clear()
+    return found
+
+
+class VdjStreams:
+    """VirtualDJ's streamed tracks, read again when a deck reports one we don't know and the database changed."""
+
+    def __init__(self, db: Path = VDJ_DATABASE):
+        self.db = db
+        self.known: dict[str, Stream] = {}
+        self.mtime = 0.0
+
+    def find(self, file: str) -> Stream | None:
+        if not NETSEARCH.fullmatch(file or ""):
+            return None
+        if file not in self.known or not self.known[file].length:  # VirtualDJ writes the real length later
+            try:
+                mtime = self.db.stat().st_mtime
+                if mtime != self.mtime:
+                    self.mtime, self.known = mtime, vdj_streams(self.db)
+            except (OSError, ValueError, SyntaxError) as e:  # SyntaxError: ElementTree's ParseError
+                print(f"  ⚠ VirtualDJ database: {e}", flush=True)
+        return self.known.get(file)
 
 
 # --- finding and fetching a copy ----------------------------------------------------------------------------
@@ -307,14 +388,22 @@ def offline(e: Exception) -> bool:
 
 
 def _probe_length(f: Path) -> float | None:
-    """Length by ffprobe (soundfile can't read WebM/M4A)."""
+    """Length of a file soundfile can't read (WebM, M4A): ffprobe (next to ffmpeg), else macOS's afinfo."""
     import subprocess
 
+    from amadeus.audio.analysis import ffmpeg
+
+    tool = ffmpeg()
     try:
-        out = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(f)],
-            capture_output=True, text=True, timeout=20,
-        )  # fmt: skip
-        return float(out.stdout.strip())
+        if tool:
+            out = subprocess.run(
+                [str(Path(tool).with_name("ffprobe")), "-v", "error", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", str(f)],
+                capture_output=True, text=True, timeout=20,
+            )  # fmt: skip
+            return float(out.stdout.strip())
+        out = subprocess.run(["/usr/bin/afinfo", str(f)], capture_output=True, text=True, timeout=20)
+        m = re.search(r"estimated duration: ([\d.]+)", out.stdout)
+        return float(m.group(1)) if m else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None

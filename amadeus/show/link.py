@@ -43,6 +43,7 @@ from collections import deque
 from pathlib import Path
 
 from amadeus import paths
+from amadeus.show.sources import streamed
 from amadeus.show.vdj import Deck
 
 SERVICE = "_amadeuslink._tcp"
@@ -156,6 +157,8 @@ class RemoteListener:
         self.connected = False
         self.error = ""
         self.ableton = None  # Ableton Link on this computer, for decks synced to it (None: not joined yet)
+        self.fetcher = None  # copies of streamed tracks (None: not needed yet, False: not allowed or no yt-dlp)
+        self.dark: set[str] = set()  # streamed tracks said to stay dark (once each)
         # both IPv4 and IPv6: a DJ laptop found by its Bonjour name is often reached over IPv6
         self.udp = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         self.udp.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -271,7 +274,8 @@ class RemoteListener:
                 if sig_ in seen:
                     continue
                 seen.add(sig_)
-                local = self._track(d["file"])
+                stream = streamed.from_packet(d) if not d.get("file") else None
+                local = self._stream_copy(stream) if stream else self._track(d["file"])
                 if local is None:  # still on its way: this deck joins when its track is here
                     continue
                 last_pos, changed = self.moved.get(d["deck"], (None, now))
@@ -291,9 +295,29 @@ class RemoteListener:
                     at,
                     title=d.get("title", ""),
                     artist=d.get("artist", ""),
+                    stream=stream.service if stream else "",
+                    copy=self.fetcher.status(stream) if stream and self.fetcher else "",
                     phase=d["phase"] if d.get("phase") is not None else self._link_phase(d, now, at),
                 )
             self.decks = decks
+
+    def _stream_copy(self, s: streamed.Stream) -> str | None:
+        """A track the DJ laptop streams (no file there, e.g. Spotify): a copy of the same recording, fetched here,
+        as for djay on this computer (streamed.py), when switched on here (Settings ▸ Integrations)."""
+        if self.fetcher is None:
+            self.fetcher = False
+            if streamed.enabled():
+                try:
+                    self.fetcher = streamed.Fetcher()
+                except ImportError:
+                    print("  streamed tracks stay dark: yt-dlp isn't installed (Settings ▸ General ▸ Optional packs)")
+        if not self.fetcher:
+            if s.id not in self.dark:
+                self.dark.add(s.id)
+                why = "switched off (Settings ▸ Integrations ▸ Streamed tracks)" if self.fetcher is False else ""
+                print(f"  {s.name} streams from {s.service.title()}: dark{', ' + why if why else ''}", flush=True)
+            return None
+        return self.fetcher.file(s) or None
 
     def _link_phase(self, d: dict, now: float, at: float) -> float | None:
         """A deck the DJ laptop says is synced to Ableton Link ("sync"), without a phase of its own: Link is a

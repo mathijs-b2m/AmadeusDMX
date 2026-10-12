@@ -50,10 +50,22 @@ def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
     return Path(f"{base}.analysis.npz"), Path(f"{base}.analysis.json")
 
 
-def readable_audio(path: str | Path, cache_dir: str | Path = paths.CACHE) -> Path:
-    """The file itself if soundfile can read it (WAV, MP3, FLAC, OGG, AIFF); otherwise (e.g. M4A/AAC)
-    a WAV copy decoded once with ffmpeg into the cache."""
+FFMPEG_PLACES = ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg")  # Homebrew (Apple Silicon, Intel)
+AFCONVERT = "/usr/bin/afconvert"  # macOS's own: MP4/AAC, ALAC, CAF, … (not WebM/Opus)
+
+
+def ffmpeg() -> str | None:
+    """ffmpeg, also where Homebrew puts it: an engine the Mac app starts doesn't have Homebrew on its PATH."""
+    import os
     import shutil
+
+    return shutil.which("ffmpeg") or next((p for p in FFMPEG_PLACES if os.access(p, os.X_OK)), None)
+
+
+def readable_audio(path: str | Path, cache_dir: str | Path = paths.CACHE) -> Path:
+    """The file itself if soundfile can read it (WAV, MP3, FLAC, OGG, AIFF); otherwise (e.g. M4A/AAC, WebM) a WAV
+    copy decoded once into the cache: with ffmpeg, else with macOS's afconvert (no ffmpeg needed for M4A)."""
+    import os
     import subprocess
 
     path = Path(path)
@@ -62,16 +74,23 @@ def readable_audio(path: str | Path, cache_dir: str | Path = paths.CACHE) -> Pat
         return path
     except Exception:
         pass
-    if not shutil.which("ffmpeg"):
-        raise SystemExit(f"Can't read {path.name} directly and ffmpeg isn't installed (brew install ffmpeg).")
     st = path.stat()
     key = hashlib.sha1(f"{path.resolve()}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:8]
     out = Path(cache_dir) / f"{path.stem}.{key}.decoded.wav"
-    if not out.exists():
+    if out.exists():
+        return out
+    Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    tool = ffmpeg()
+    if tool:
         print(f"Decoding {path.name} with ffmpeg …")
-        Path(cache_dir).mkdir(exist_ok=True)
-        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(path), str(out)], check=True)
-    return out
+        subprocess.run([tool, "-loglevel", "error", "-y", "-i", str(path), str(out)], check=True)
+        return out
+    if os.access(AFCONVERT, os.X_OK):
+        r = subprocess.run([AFCONVERT, "-f", "WAVE", "-d", "LEI16", str(path), str(out)], capture_output=True)
+        if r.returncode == 0:
+            return out
+        out.unlink(missing_ok=True)
+    raise SystemExit(f"Can't read {path.name}: it needs ffmpeg (brew install ffmpeg).")
 
 
 def analyze(

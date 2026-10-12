@@ -19,13 +19,14 @@ final class Djay: DJReader, @unchecked Sendable {
     private var running = true
     private var controls = Controls()
     private var heads: [Int: Playhead] = [:]
-    private var info: [Int: (title: String, artist: String, file: String, length: Double, vol: Double?, bpm: Double, sync: Bool)] = [:]
+    private var info: [Int: (title: String, artist: String, file: String, length: Double, vol: Double?, bpm: Double, sync: Bool, stream: StreamedTrack?)] = [:]
     private var xfader = 0.5
     private var trusted = false
     private var found = false
     private var streamed: Set<Int> = []
     private let resolver = Resolver()
     private let tracks: DjayLibrary
+    private let streamsKnown = DjayStreams(path: Djay.library)
 
     init() {
         tracks = DjayLibrary(path: Self.library)
@@ -42,7 +43,7 @@ final class Djay: DJReader, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         if !trusted { return "Amadeus Link may not read djay's window yet: System Settings › Privacy & Security › Accessibility, switch on Amadeus Link." }
         if !found { return "Waiting for djay Pro." }
-        if !streamed.isEmpty { return "Streamed tracks (Spotify) stay dark over Amadeus Link: play files from your library." }
+        if !streamed.isEmpty { return "A track on a deck is neither a file here nor a stream djay's library knows: it stays dark." }
         return ""
     }
 
@@ -129,7 +130,7 @@ final class Djay: DJReader, @unchecked Sendable {
         for n in c.decks {
             let title = value(c, "Title, Deck \(n)") ?? "", artist = value(c, "Artist, Deck \(n)") ?? ""
             lock.lock()
-            var i = info[n] ?? (title: "", artist: "", file: "", length: 0, vol: nil, bpm: 0, sync: false)
+            var i = info[n] ?? (title: "", artist: "", file: "", length: 0, vol: nil, bpm: 0, sync: false, stream: nil)
             lock.unlock()
             if (title, artist) != (i.title, i.artist) || (!title.isEmpty && i.file.isEmpty) {
                 let known = title.isEmpty ? "" : tracks.find(title: title, artist: artist)
@@ -138,8 +139,10 @@ final class Djay: DJReader, @unchecked Sendable {
                 i.artist = artist
                 i.file = file
                 i.length = file.isEmpty ? 0 : (Resolver.length(of: URL(filePath: file)) ?? 0)
+                i.stream = file.isEmpty && !title.isEmpty ? streamsKnown.find(title: title, artist: artist) : nil
+                if let st = i.stream { i.length = st.length }
             }
-            if !title.isEmpty && i.file.isEmpty { streams.insert(n) }
+            if !title.isEmpty && i.file.isEmpty && i.stream == nil { streams.insert(n) }
             i.vol = Self.percent(value(c, "Line volume, Deck \(n)"))
             i.bpm = c.bpm[n] ?? 0
             i.sync = value(c, "Sync, Deck \(n)") == "Active"
@@ -165,7 +168,8 @@ final class Djay: DJReader, @unchecked Sendable {
             let gain = min(1, 2 * (1 - x))
             return DeckReading(deck: n, file: i.file, pos: head.at(now), length: i.length, play: head.play, bpm: i.bpm,
                                bpm0: i.bpm > 0 ? i.bpm / head.speed : 0, vol: (i.vol ?? 1) * gain, received: now,
-                               title: i.title, artist: i.artist, rate: head.play ? head.speed : 0, sync: i.sync && head.play)
+                               title: i.title, artist: i.artist, rate: head.play ? head.speed : 0, sync: i.sync && head.play,
+                               stream: i.stream)
         }
     }
 
@@ -338,5 +342,102 @@ final class DjayLibrary: @unchecked Sendable {
             }
         }
         return out
+    }
+}
+
+/// The tracks djay streams (Spotify), from its library (MediaLibrary.db, read only): which recording each is (the
+/// service's id, the ISRC, the length), by title and artist as its decks show them. A port of streamed.py's
+/// djay_streams: djay's records are a key/value archive ("TSAF"), each value followed by its key; strings as
+/// 0x08 + text + 0x00, 32-bit floats as 0x13, zero padding to a 4-byte boundary, then 4 bytes (little endian).
+final class DjayStreams: @unchecked Sendable {
+    static let text: Set<String> = ["title", "artist", "isrc"]
+    static let keys = text.union(["duration", "uuid", "titleIDs", "titleID", "sourceURIs", "type", "bpm"])  // never a value
+
+    let path: URL
+    private let lock = NSLock()
+    private var known: [String: StreamedTrack] = [:]  // "title\u{0}artist"
+    private var readAt = -10.0
+
+    init(path: URL) { self.path = path }
+
+    /// Read again (at most every 2 s) when a deck shows a track we don't know yet.
+    func find(title: String, artist: String) -> StreamedTrack? {
+        let key = "\(title)\u{0}\(artist)"
+        lock.lock()
+        let stale = known[key] == nil && monotonic() - readAt > 2
+        lock.unlock()
+        if stale { read() }
+        lock.lock(); defer { lock.unlock() }
+        return known[key] ?? known.first { $0.key.hasPrefix("\(title)\u{0}") && !title.isEmpty }?.value
+    }
+
+    func read() {
+        var found: [String: StreamedTrack] = [:]
+        var db: OpaquePointer?
+        defer { sqlite3_close(db) }
+        if sqlite3_open_v2(path.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK {
+            var st: OpaquePointer?
+            defer { sqlite3_finalize(st) }
+            if sqlite3_prepare_v2(db, "SELECT data FROM database2 WHERE collection = 'globalMediaItemLocations'", -1, &st, nil) == SQLITE_OK {
+                while sqlite3_step(st) == SQLITE_ROW {
+                    guard let p = sqlite3_column_blob(st, 0) else { continue }
+                    if let s = Self.stream(Data(bytes: p, count: Int(sqlite3_column_bytes(st, 0)))) {
+                        found["\(s.title)\u{0}\(s.artist)"] = s
+                    }
+                }
+            }
+        }
+        lock.lock()
+        known = found
+        readAt = monotonic()
+        lock.unlock()
+    }
+
+    /// One record → its stream, nil when it isn't a streamed track.
+    static func stream(_ data: Data) -> StreamedTrack? {
+        let f = fields(data)
+        guard let uri = f.uris.first(where: { $0.hasPrefix("spotify:track:") }), let title = f.text["title"] else { return nil }
+        return StreamedTrack(service: "spotify", id: String(uri.split(separator: ":").last!), title: title, artist: f.text["artist"] ?? "",
+                      isrc: f.text["isrc"] ?? "", length: Double(f.floats["duration"] ?? 0))
+    }
+
+    /// The strings and floats of one record, by key (the first of each key: the record's own, not a nested one).
+    static func fields(_ data: Data) -> (text: [String: String], floats: [String: Float], uris: [String]) {
+        let b = [UInt8](data)
+        var strings: [(start: Int, end: Int, text: String)] = []  // as re.finditer(rb"\x08([^\x00]{0,1000})\x00")
+        var i = 0
+        while i < b.count {
+            if b[i] == 0x08, let end = b[(i + 1)..<min(b.count, i + 1002)].firstIndex(of: 0), end - i - 1 <= 1000 {
+                strings.append((i, end + 1, String(decoding: b[(i + 1)..<end], as: UTF8.self)))
+                i = end + 1
+            } else {
+                i += 1
+            }
+        }
+        var text: [String: String] = [:]
+        for (v, k) in zip(strings, strings.dropFirst()) where v.end == k.start && Self.text.contains(k.text) && !keys.contains(v.text) {
+            if text[k.text] == nil { text[k.text] = v.text }  // a value directly followed by its key
+        }
+        var floats: [String: Float] = [:]
+        for key in ["duration", "bpm"] {
+            let needle: [UInt8] = [0x08] + Array(key.utf8) + [0x00]
+            guard let at = firstIndex(of: needle, in: b), at >= 8 else { continue }
+            let pad = b[(at - 8)..<(at - 4)]  // the float ends where its key starts
+            if let last = pad.lastIndex(where: { $0 != 0 }), b[last] == 0x13 {
+                floats[key] = b[(at - 4)..<at].withUnsafeBytes { Float(bitPattern: UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self))) }
+            }
+        }
+        let uris = strings.map(\.text).filter { u in
+            let parts = u.split(separator: ":", omittingEmptySubsequences: false)
+            return parts.count == 3 && parts[1] == "track" && !parts[0].isEmpty && parts[0].allSatisfy { $0.isASCII && $0.isLowercase }
+                && !parts[2].isEmpty && parts[2].allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        }
+        return (text, floats, uris)
+    }
+
+    private static func firstIndex(of needle: [UInt8], in b: [UInt8]) -> Int? {
+        guard needle.count <= b.count else { return nil }
+        for i in 0...(b.count - needle.count) where b[i] == needle[0] && Array(b[i..<(i + needle.count)]) == needle { return i }
+        return nil
     }
 }

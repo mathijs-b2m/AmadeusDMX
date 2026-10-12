@@ -31,3 +31,20 @@ def test_synced_deck_takes_its_phase_from_ableton_link_here():
     assert rl._link_phase({**deck, "bpm": 128.0}, 10.0, 10.0) is None  # another tempo: not this session
     rl.ableton = False  # no aalink here
     assert rl._link_phase(deck, 10.0, 10.0) is None
+
+
+def test_streamed_deck_stays_dark_unless_switched_on(monkeypatch):
+    from amadeus.show.sources import streamed
+
+    rl = link.RemoteListener.__new__(link.RemoteListener)
+    rl.fetcher, rl.dark = None, set()
+    s = streamed.Stream("spotify", "abc", "T", "A", "", 200.0)
+    monkeypatch.setattr(streamed, "enabled", lambda: False)
+    assert rl._stream_copy(s) is None and rl.fetcher is False and "abc" in rl.dark
+
+    class FakeFetcher:
+        def file(self, s):
+            return "/cache/streamed/A - T [spotify-abc].opus"
+
+    rl.fetcher = FakeFetcher()
+    assert rl._stream_copy(s).endswith("[spotify-abc].opus")

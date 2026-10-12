@@ -10,6 +10,8 @@ from pathlib import Path
 from amadeus.director.style import SetGenre
 from amadeus.engine import Engine
 
+RETRY_S = 30.0  # a track that couldn't be prepared is tried again this much later (not for every packet)
+
 
 class TrackShows:
     """Analysis + plan + engine per track, built in the background the first time a track appears."""
@@ -19,6 +21,7 @@ class TrackShows:
         self.real_output = real_output
         self.shows: dict[str, tuple] = {}  # file → (analysis, plan, engine, director used)
         self.pending: set[str] = set()
+        self.failed: dict[str, float] = {}  # file → when preparing it last failed
         self.status: dict[str, dict] = {}  # file → progress per step, for the visualiser
         self.pool = ThreadPoolExecutor(max_workers=2)
         self.lock = threading.Lock()
@@ -43,7 +46,8 @@ class TrackShows:
     def get(self, file: str):
         with self.lock:
             show = self.shows.get(file)
-            if show is None and file not in self.pending:
+            failed_recently = time.monotonic() - self.failed.get(file, -RETRY_S) < RETRY_S
+            if show is None and file not in self.pending and not failed_recently:
                 self.pending.add(file)
                 self.pool.submit(self._build, file)
         return show
@@ -104,7 +108,8 @@ class TrackShows:
                         self._step(file, ai="done", ai_done=len(plan), ai_total=len(plan))
                 done = director
         except BaseException as e:  # noqa: BLE001 - a bad track must never stop the show
-            print(f"  ⚠ could not prepare {Path(file).name}: {e}")
+            self.failed[file] = time.monotonic()  # not again for every packet: in RETRY_S, if it's still on a deck
+            print(f"  ⚠ could not prepare {Path(file).name}: {e} (trying again in {RETRY_S:.0f} s)")
         finally:
             with self.lock:
                 self.pending.discard(file)

@@ -182,3 +182,76 @@ def test_offline_is_tried_again_later(fetcher, monkeypatch):
     fetcher.file(TOXIC)
     wait(fetcher, TOXIC)
     assert fetcher.file(TOXIC).endswith("[spotify-6I9].webm")
+
+
+def test_stream_from_a_link_packet():
+    d = {"file": "", "title": "Greyhound", "artist": "Swedish House Mafia", "len": 411.1,
+         "stream": {"service": "spotify", "id": "4ZWTmS", "isrc": "GBUM71203217"}}  # fmt: skip
+    s = streamed.from_packet(d)
+    assert (s.service, s.id, s.isrc, s.title, s.artist, s.length) == (
+        "spotify", "4ZWTmS", "GBUM71203217", "Greyhound", "Swedish House Mafia", 411.1)  # fmt: skip
+    assert streamed.from_packet({"file": "/x.mp3"}) is None and streamed.from_packet({"stream": {}}) is None
+
+
+def test_one_switch_for_streamed_tracks(tmp_path, monkeypatch):
+    from amadeus.show import sources
+
+    f = tmp_path / "integrations.json"
+    monkeypatch.setattr(sources, "SETTINGS", f)
+    assert not streamed.enabled()  # off unless switched on
+    f.write_text('{"streamed": {"on": true}}')
+    assert streamed.enabled()
+    f.write_text('{"djay": {"streamed": true}}')  # the switch as djay's own, from before
+    assert streamed.enabled()
+
+
+VDJ_DB = """<?xml version="1.0" encoding="UTF-8"?>
+<VirtualDJ_Database Version="2025">
+ <Song FilePath="netsearch://sp1fI4E7jeOiyfa3LmwNnD0o" Flag="256">
+  <Tags Author="Paul Kalkbrenner" Title="DIE TROMPETEN VON BERLIN" Album="THE ESSENCE" Year="2025" />
+  <Infos SongLength="330.022109" Bitrate="320" />
+ </Song>
+ <Song FilePath="netsearch://sp4eE4vEaakr3ZnSt1UNfOhz" Flag="256">
+  <Tags Author="Emrod" Title="Tango" />
+  <Infos SongLength="240.0" />
+ </Song>
+ <Song FilePath="/Music/local.mp3"><Tags Author="A" Title="Local" /><Infos SongLength="200.5" /></Song>
+</VirtualDJ_Database>
+"""
+
+
+def test_virtualdj_database(tmp_path):
+    db = tmp_path / "database.xml"
+    db.write_text(VDJ_DB)
+    v = streamed.VdjStreams(db)
+    s = v.find("netsearch://sp1fI4E7jeOiyfa3LmwNnD0o")
+    assert (s.service, s.id, s.artist, s.title, round(s.length, 3)) == (
+        "spotify", "1fI4E7jeOiyfa3LmwNnD0o", "Paul Kalkbrenner", "DIE TROMPETEN VON BERLIN", 330.022)  # fmt: skip
+    assert v.find("netsearch://sp4eE4vEaakr3ZnSt1UNfOhz").length == 0.0  # 240.0: VirtualDJ's guess, unknown
+    assert v.find("/Music/local.mp3") is None and v.find("netsearch://spUnknown") is None
+
+
+def test_virtualdj_streamed_deck(tmp_path, monkeypatch):
+    from amadeus.show import vdj
+    from amadeus.show.sources.base import Deck
+
+    db = tmp_path / "database.xml"
+    db.write_text(VDJ_DB)
+    lst = vdj.Listener.__new__(vdj.Listener)  # no socket: only the stream handling
+    lst.streams, lst.fetcher, lst.said, lst.copies = streamed.VdjStreams(db), None, set(), {}
+    monkeypatch.setattr(vdj, "enabled", lambda: False)
+    d = Deck(2, "netsearch://sp1fI4E7jeOiyfa3LmwNnD0o", 34.4, 330.0, True, 125.4, 137.4, 1.0, 0.0)
+    lst._streamed(d)
+    assert d.file == "" and d.title == "DIE TROMPETEN VON BERLIN" and d.stream == "spotify"  # switched off: dark
+
+    class FakeFetcher:
+        def file(self, s):
+            return f"/cache/streamed/{s.name} [spotify-{s.id}].opus"
+
+        def status(self, s):
+            return "done"
+
+    lst.fetcher = FakeFetcher()
+    d = Deck(2, "netsearch://sp1fI4E7jeOiyfa3LmwNnD0o", 34.4, 330.0, True, 125.4, 137.4, 1.0, 0.0)
+    lst._streamed(d)
+    assert d.file.endswith("[spotify-1fI4E7jeOiyfa3LmwNnD0o].opus") and d.copy == "done"

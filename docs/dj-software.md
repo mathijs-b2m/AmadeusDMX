@@ -81,9 +81,20 @@ labels, about 200 times a second, through the macOS Accessibility API.
   is tried again 30 s later). Preparing a playlist's tracks before the gig (preloading) is for a later version.
 
   It downloads from YouTube, which YouTube's terms don't allow and which copyright law may not allow where you
-  are: it is off until you switch it on, in the Mac app (Settings ▸ Integrations ▸ djay Pro: "Light streamed
-  tracks") or with `--opt streamed=1`. The app saves the choice in `config/integrations.json`
-  (`{"djay": {"streamed": true}}`), which live mode reads for every integration; `--opt` overrides it.
+  are: it is off until you switch it on, in the Mac app (Settings ▸ Integrations ▸ Streamed tracks: "Light
+  streamed tracks") or with `--opt streamed=1`. One switch for every DJ software: the app saves it in
+  `config/integrations.json` (`{"streamed": {"on": true}}`; djay's own `{"djay": {"streamed": true}}` from
+  before still counts).
+
+- **VirtualDJ** reports a streamed track as `netsearch://` + a service + its id (`netsearch://sp…`: Spotify).
+  Its database (`~/Library/Application Support/VirtualDJ/database.xml`) names it: artist, title and length,
+  but no ISRC, so the copy is found by artist and title, its length checked (a length VirtualDJ only guessed,
+  a whole number of seconds before it has played the stream, isn't used). `amadeus/show/vdj.py`.
+- **Through Amadeus Link** (djay Pro or VirtualDJ on a DJ laptop): Link reads which recording a deck streams
+  (djay's library, VirtualDJ's database) and sends it along (`"stream"` in the packet, `"file": ""`); the
+  lighting computer fetches the copy itself, when its own switch is on. Nothing is downloaded on the DJ laptop.
+- Copies are M4A (AAC): macOS decodes them itself (`afconvert`); ffmpeg is used when it's there (also
+  Homebrew's, which an app's PATH doesn't include), and only needed for the few videos that only come as WebM.
 
 ### The Accessibility permission
 

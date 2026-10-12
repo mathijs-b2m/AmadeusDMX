@@ -238,12 +238,15 @@ When the DJ and the lighting operator use different computers:
    - **djay Pro:** Link reads djay's window itself, like the engine does (`Sources/AmadeusLink/DJ/Djay.swift`):
      it needs the **Accessibility** permission for Amadeus Link (its menu opens the setting). A deck on SYNC
      is marked so, and the lighting computer reads the exact beat from **Ableton Link** on the network itself
-     (it needs aalink there; both computers on the same network). Tracks djay streams (Spotify) stay dark over
-     Link: they have no file to send.
+     (it needs aalink there; both computers on the same network).
    - **Mixxx:** Link creates the MIDI device "Amadeus DMX" and puts the "Amadeus DMX" mapping in Mixxx's
      controllers folder (`Sources/AmadeusLink/DJ/Mixxx.swift`). In Mixxx: Preferences › Controllers ›
      Amadeus DMX, mapping "Amadeus DMX", enabled. **Start Mixxx after Amadeus Link**: Mixxx looks for MIDI
      devices only when it starts.
+
+   **Spotify** tracks in djay Pro and VirtualDJ have no file to send: Link says which recording a deck streams
+   (from djay's library, VirtualDJ's database), and the lighting computer fetches a copy itself when its
+   Settings › Integrations › Streamed tracks is on ([docs/dj-software.md](../docs/dj-software.md)).
 
    Switched on, Link advertises itself with Bonjour and shows a 4-digit code. Don't run a live show of
    Amadeus DMX on the DJ laptop as well: it takes VirtualDJ's port (UDP 9123), and Link says so until it's free.
