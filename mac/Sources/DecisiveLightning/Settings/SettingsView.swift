@@ -58,12 +58,13 @@ struct GeneralSettings: View {
 struct DirectorSettings: View {
     var body: some View {
         Form {
+            DirectorChoiceSection()
             SwiftUI.Section {
                 OpenAIKeyView()
             } header: {
                 Text("AI Director: OpenAI API key")
             } footer: {
-                Text("With a key, the AI director (OpenAI) decides the show; without one, the rule-based director does. Your key is kept in your Keychain and handed to the engine when it starts, never written to a file, and only sent to OpenAI. Which director runs is chosen on the setup page.")
+                Text("With a key, the AI director (OpenAI) decides the show; without one, the rule-based director does. Your key is kept in your Keychain and handed to the engine when it starts, never written to a file, and only sent to OpenAI.")
             }
         }
         .formStyle(.grouped)

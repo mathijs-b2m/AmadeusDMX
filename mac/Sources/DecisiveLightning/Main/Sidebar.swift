@@ -115,11 +115,12 @@ struct PowerLine: View {
               + "stage takes. Measured every \(Int(PowerMeter.interval)) s.")
     }
 
+    // one line each, however narrow the sidebar: a taller footer would push the show's timeline out of the window
     private func row(_ name: String, _ cpu: Double, _ watts: Double, gpu: Double?) -> some View {
         HStack(spacing: 6) {
             Text(name).frame(width: 58, alignment: .leading)
-            Text(String(format: "%3.0f%% CPU · %.1f W", cpu * 100, watts))
-            if let gpu { Text(String(format: "· GPU %.0f%%", gpu * 100)) }
+            Text(String(format: "%.0f%% CPU · %.1f W", cpu * 100, watts) + (gpu.map { String(format: " · GPU %.0f%%", $0 * 100) } ?? ""))
+                .lineLimit(1).minimumScaleFactor(0.75)
         }
     }
 }
@@ -129,21 +130,31 @@ struct PowerWarning: View {
     let power: PowerMeter
     let performOnly: () -> Void
 
+    // short, on one line with its button (the whole story in the tooltip): the footer must stay low
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(reason, systemImage: "exclamationmark.triangle.fill")
+        HStack(spacing: 6) {
+            Label(short, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption).foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            Spacer(minLength: 4)
             Button("Perform Only", action: performOnly)
-                .controlSize(.small)
-                .help("The lights only, no 3D stage: the computer's power goes to the show.")
+                .controlSize(.mini)
         }
+        .help(reason + " Perform Only: the lights only, no 3D stage, so the computer's power goes to the show.")
+    }
+
+    private var why: String? {
+        power.hot ? "The Mac is getting hot" : power.lowPower ? "Low Power Mode is on" : power.onBattery ? "On battery" : nil
+    }
+
+    private var ratio: Double { (power.stage.cpu + power.gpu) / max(power.engine.cpu, 0.05) }
+
+    private var short: String {
+        let cost = ratio >= 1.5 ? "3D \(Int(ratio.rounded()))× the lights" : "3D stage is heavy"
+        return power.hot ? "Hot · \(cost)" : power.lowPower ? "Low Power · \(cost)" : power.onBattery ? "Battery · \(cost)" : cost
     }
 
     private var reason: String {
-        let why = power.hot ? "The Mac is getting hot" : power.lowPower ? "Low Power Mode is on"
-            : power.onBattery ? "On battery" : nil
-        let ratio = (power.stage.cpu + power.gpu) / max(power.engine.cpu, 0.05)
         let cost = ratio >= 1.5 ? "the 3D stage takes \(Int(ratio.rounded()))× what the lights do" : "the 3D stage adds to the load"
         return (why.map { "\($0): " } ?? "") + cost + ". During a gig, Perform Only keeps the lights on time."
     }

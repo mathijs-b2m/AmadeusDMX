@@ -218,14 +218,16 @@ class OllamaDirector(OpenAIDirector):
         self,
         cache_file: Path,
         model: str = "nimble",
-        host: str = "http://localhost:11434",
+        host: str | None = None,
         groups: list[dict] | None = None,
         lasers: list[dict] | None = None,
         screen: bool = False,
         style: Style | None = None,
         theme: str | None = None,
     ):
-        self.model, self.host = model, host
+        from decisive import paths
+
+        self.model, self.host = model, host or paths.ollama_host()
         self.name = f"ollama-{model.replace(':', '-').replace('/', '-')}"
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}

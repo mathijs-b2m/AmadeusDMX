@@ -85,7 +85,7 @@ struct OpenAIKeyView: View {
     private func changed(_ text: String) {
         source = .current(model.workspace)
         check = nil
-        model.restartSetupService()  // the setup page shows which directors can run: let it see the new key
+        Task { await model.restartSetupService() }  // the setup page shows which directors can run: the new key
         note = text + (model.engineRunning ? " The running show keeps the old key until it is started again." : "")
     }
 

@@ -18,6 +18,16 @@ WEB = ROOT / "web"
 ENV_FILE = ROOT / ".env"
 
 
+def ollama_host() -> str:
+    """Where Ollama runs: OLLAMA_HOST (Ollama's own setting: "host", "host:port" or a URL), else this computer."""
+    h = os.environ.get("OLLAMA_HOST", "").strip().rstrip("/")
+    if not h:
+        return "http://localhost:11434"
+    if "://" in h:
+        return h  # a URL: as given (a proxy may serve it on its own port)
+    return "http://" + h + ("" if ":" in h else ":11434")
+
+
 def load_dotenv(path: Path = ENV_FILE) -> None:
     """KEY=value lines from .env (if present) for variables not already set in the shell."""
     if not path.exists():

@@ -13,8 +13,6 @@ from decisive.director import MODEL
 from decisive.library import fixtures as fxlib
 from decisive.web.events import event
 
-OLLAMA_TAGS = "http://localhost:11434/api/tags"
-
 
 def get_rig(req):
     return req.show.load()
@@ -60,26 +58,29 @@ def directors(req=None) -> list[dict]:
             "note": "~1.3 s per phrase, needs OPENAI_API_KEY" if has_key else "no OPENAI_API_KEY / .env found",
         }
     )
+    host = paths.ollama_host()
     try:
-        with urllib.request.urlopen(OLLAMA_TAGS, timeout=2) as r:
+        with urllib.request.urlopen(f"{host}/api/tags", timeout=2) as r:
             models = json.loads(r.read()).get("models", [])
-        for m in models:
-            if "decision" in m.get("capabilities", []):
-                name = m["name"].removesuffix(":latest")
-                note = "free, offline; ~7 s per phrase on a laptop" if name == "nimble" else "free, offline"
-                out.append(
-                    {"value": f"ollama:{name}", "label": f"Local: {name} (Ollama)", "available": True, "note": note}
-                )
-    except OSError:
-        out.append(
-            {
-                "value": "ollama:nimble",
-                "label": "Local: nimble (Ollama)",
-                "available": False,
-                "note": "Ollama is not running",
-            }
-        )
-    return out
+    except (OSError, ValueError):
+        where = "" if host == "http://localhost:11434" else f" at {host}"
+        note = f"Ollama isn't running{where}: start it, then refresh"
+        return out + [{"value": "ollama:nimble", "label": "Local: nimble (Ollama)", "available": False, "note": note}]
+    local = []
+    for m in models:
+        name = m["name"].removesuffix(":latest")
+        size = (m.get("details") or {}).get("parameter_size", "")
+        if "decision" in m.get("capabilities", []):
+            note = "free, offline; ~7 s per phrase on a laptop" if name == "nimble" else "free, offline"
+            local.append({"value": f"ollama:{name}", "label": f"Local: {name} (Ollama)", "available": True,
+                          "note": note + (f"; {size}" if size else "")})  # fmt: skip
+        else:  # installed, but can't answer the director's questions with probabilities
+            local.append({"value": f"ollama:{name}", "label": f"Local: {name} (Ollama)", "available": False,
+                          "note": "no decision support: the director needs a decision model, e.g. nimble"})  # fmt: skip
+    if not any(d["available"] for d in local):
+        local.append({"value": "ollama:nimble", "label": "Local: nimble (Ollama)", "available": False,
+                      "note": "not installed: ollama pull nimble"})  # fmt: skip
+    return out + sorted(local, key=lambda d: not d["available"])
 
 
 def set_director(req):

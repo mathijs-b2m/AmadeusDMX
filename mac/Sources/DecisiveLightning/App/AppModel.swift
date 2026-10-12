@@ -289,6 +289,7 @@ final class AppModel {
         var env: [String: String] = [:]
         if let root = workspace?.root.path { env["DECISIVE_ROOT"] = root }  // the engine works in this folder
         if let key = Keychain.openAIKey, !key.isEmpty { env["OPENAI_API_KEY"] = key }
+        if let host = UserDefaults.standard.string(forKey: "ollamaHost"), !host.isEmpty { env["OLLAMA_HOST"] = host }
         return env
     }
 
@@ -307,14 +308,12 @@ final class AppModel {
         return false
     }
 
-    /// Start the setup service again (e.g. with a new OpenAI key), when it runs.
-    func restartSetupService() {
+    /// Start the setup service again (e.g. with a new OpenAI key or Ollama address), when it runs.
+    func restartSetupService() async {
         guard setup.isRunning else { return }
-        Task {
-            setup.stopAndWait(timeout: 2)
-            setupReady = false
-            _ = await ensureSetupService()
-        }
+        setup.stopAndWait(timeout: 2)
+        setupReady = false
+        _ = await ensureSetupService()
     }
 
     func shutdown() {

@@ -19,11 +19,12 @@ import re
 import urllib.request
 from collections import defaultdict
 
+from decisive import paths
 from decisive.library import catalog
 from decisive.library.catalog import _typed
 from decisive.library.ofl import _tokens
 
-OLLAMA = "http://localhost:11434"
+OLLAMA = paths.ollama_host()
 NONE = "__none__"
 
 
