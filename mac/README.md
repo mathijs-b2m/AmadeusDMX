@@ -65,20 +65,22 @@ macOS stops the first launch of a downloaded copy: open it once, then System Set
 
 ## Updates
 
-The app updates itself with [Sparkle](https://sparkle-project.org) (`Sources/AmadeusDMX/App/Updates.swift`):
+Both apps update themselves with [Sparkle](https://sparkle-project.org) (`Sources/AmadeusKit/Updates.swift`):
 
-- **Opt-in.** On the second launch Sparkle asks whether to check automatically; Settings › General › Updates
-  changes it, adds "download and install by themselves", and *Check Now* (also in the app menu).
-- **Never during a show.** No background check while the lights run; an update you install then waits until the
-  show stops. One downloaded by itself is installed when you quit.
+- **Opt-in.** On the second launch Sparkle asks whether to check automatically. Amadeus DMX: Settings › General ›
+  Updates changes it, adds "download and install by themselves", and *Check Now* (also in the app menu).
+  Amadeus Link: *Check for updates* and *Check Now* at the bottom of its menu.
+- **Never during a show.** No background check while the lights run (Amadeus Link: while a lighting computer is
+  connected); an update you install then waits until that's over. One downloaded by itself is installed when
+  you quit.
 - **Only ours.** The app installs an update only if it is signed with the release key (its public half is
   `Resources/sparkle-public-key.txt`) and carries the same code signature as the app itself.
-- **The feed** is `appcast.xml` on the newest published GitHub release
-  (`releases/latest/download/appcast.xml`); release.yml makes it. Publishing the draft release is what makes an
+- **The feeds** are `appcast.xml` (Amadeus DMX) and `appcast-link.xml` (Amadeus Link) on the newest published
+  GitHub release (`releases/latest/download/…`); release.yml makes them. Publishing the draft release is what makes an
   update reach people. Prereleases (`v0.3.0-beta.1`) don't reach them.
 - Your data (sets, rigs, settings, packs) is outside the app, so an update never touches it.
 
-Development builds have no feed and don't update. Amadeus Link doesn't update by itself yet.
+Development builds have no feed and don't update.
 
 ### The release keys
 

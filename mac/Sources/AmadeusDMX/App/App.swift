@@ -13,7 +13,7 @@ struct AmadeusDMXApp: App {
             MainView()
                 .environment(model)
                 .onAppear { delegate.model = model }
-                .onChange(of: model.engineRunning) { _, running in if !running { model.updates.showStopped() } }
+                .onChange(of: model.engineRunning) { _, running in if !running { model.updates.becameIdle() } }
                 .frame(minWidth: 980, minHeight: 620)
         }
         .defaultSize(width: 1440, height: 900)

@@ -101,7 +101,7 @@ struct UpdatesSection: View {
                 LabeledContent("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")") {
                     Button("Check Now") { updates.checkForUpdates() }.disabled(!updates.canCheck)
                 }
-                if updates.waitingForShow {
+                if updates.waitingForIdle {
                     Label("An update installs when the show stops", systemImage: "clock").foregroundStyle(.secondary)
                 }
             } else {

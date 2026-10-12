@@ -120,7 +120,7 @@ final class AppModel {
 
     init() {
         Self.adoptOldSettings()
-        updates.showRunning = { [weak self] in self?.engineRunning ?? false }
+        updates.isBusy = { [weak self] in self?.engineRunning ?? false }
         EngineProcess.stopLeftover(name: "show")
         EngineProcess.stopLeftover(name: "setup")
         workspace = Workspace.locate(saved: UserDefaults.standard.string(forKey: "engineRoot"))

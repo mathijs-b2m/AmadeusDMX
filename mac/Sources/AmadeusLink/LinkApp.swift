@@ -1,4 +1,5 @@
 // Amadeus Link: a menu bar app for the DJ's laptop. Switch it on, read the code to the lighting operator.
+import AmadeusKit
 import SwiftUI
 
 @main
@@ -27,6 +28,7 @@ struct AmadeusLinkApp: App {
 
 struct LinkMenu: View {
     @Environment(LinkServer.self) private var link
+    private var updates: Updates { link.updates }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -92,6 +94,18 @@ struct LinkMenu: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Divider()
+            if updates.isAvailable {
+                HStack {
+                    Toggle("Check for updates", isOn: Binding(get: { updates.checksAutomatically },
+                                                              set: { updates.checksAutomatically = $0 }))
+                        .toggleStyle(.checkbox).font(.callout)
+                    Spacer()
+                    Button("Check Now") { updates.checkForUpdates() }.disabled(!updates.canCheck).font(.callout)
+                }
+                if updates.waitingForIdle {
+                    Text("An update installs when the lighting computer disconnects.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Button("Quit Amadeus Link") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }

@@ -5,6 +5,7 @@
 // lighting computer through a 4-digit code, and forwards every packet with this laptop's clock and a
 // signature. It serves the lighting computer the tracks VirtualDJ has loaded (and only those).
 // Protocol: docs/protocols.md (and amadeus/show/link.py, the receiving end).
+import AmadeusKit
 import CryptoKit
 import Foundation
 import Network
@@ -31,12 +32,20 @@ final class LinkServer {
     private(set) var tracksServed = 0
 
     @ObservationIgnored private let net = LinkNet()
+    /// Updates (Sparkle; a release build only): never while a lighting computer is connected.
+    let updates = Updates()
     static let servicePort: UInt16 = 7123
 
     init() {
+        updates.isBusy = { [weak self] in !(self?.peers.isEmpty ?? true) }
         if let fixed = UserDefaults.standard.string(forKey: "code"), fixed.count == 4 { code = fixed }  // -code 1234 (tests)
         net.onPlugin = { [weak self] summary, app in Task { @MainActor in self?.plugin(summary, app: app) } }
-        net.onPeers = { [weak self] peers in Task { @MainActor in self?.peers = peers } }
+        net.onPeers = { [weak self] peers in
+            Task { @MainActor in
+                self?.peers = peers
+                if peers.isEmpty { self?.updates.becameIdle() }  // an update that waited for the lighting computer
+            }
+        }
         net.onError = { [weak self] e in Task { @MainActor in self?.error = e } }
         net.onServed = { [weak self] in Task { @MainActor in self?.tracksServed += 1 } }
         net.code = code

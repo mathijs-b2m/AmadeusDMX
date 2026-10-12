@@ -7,7 +7,8 @@
 # Options combine (--release --dmg). VERSION=1.2.3 sets the version people see (default 0.1.<commits>); the build
 # number is always the commit count, so every later build is newer (what Sparkle compares).
 # A release is signed with the release certificate (release-keys.sh; SIGN_P12 and SIGN_PASSWORD_FILE, default
-# ~/.amadeus-release), else ad hoc. FEED_URL=… turns on updates (Sparkle): the appcast the app checks.
+# ~/.amadeus-release), else ad hoc. FEED_URL=… turns on updates (Sparkle): the appcast Amadeus DMX checks;
+# Amadeus Link checks appcast-link.xml next to it.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd .. && pwd)"
@@ -29,13 +30,19 @@ done
 ENGINE_ROOT=""
 [ "$RELEASE" = 1 ] || ENGINE_ROOT="  <key>AmadeusEngineRoot</key><string>${ROOT}</string>"
 
-# updates: only a release with a feed and the public update key (Sparkle stays off otherwise)
-UPDATES=""
-if [ "$RELEASE" = 1 ] && [ -n "${FEED_URL:-}" ] && [ -s Resources/sparkle-public-key.txt ]; then
-  UPDATES="  <key>SUFeedURL</key><string>${FEED_URL}</string>
+# updates: only a release with a feed and the public update key (Sparkle stays off otherwise). Each app has its
+# feed: FEED_URL for Amadeus DMX, appcast-link.xml next to it for Amadeus Link (LINK_FEED_URL=… elsewhere).
+updates_plist() {
+  if [ "$RELEASE" = 1 ] && [ -n "$1" ] && [ -s Resources/sparkle-public-key.txt ]; then
+    echo "  <key>SUFeedURL</key><string>$1</string>
   <key>SUPublicEDKey</key><string>$(tr -d '\n' < Resources/sparkle-public-key.txt)</string>
   <key>SUVerifyUpdateBeforeExtraction</key><true/>"
-fi
+  fi
+}
+FEED_URL="${FEED_URL:-}"
+LINK_FEED_URL="${LINK_FEED_URL:-${FEED_URL:+${FEED_URL%/*}/appcast-link.xml}}"
+UPDATES="$(updates_plist "$FEED_URL")"
+LINK_UPDATES="$(updates_plist "$LINK_FEED_URL")"
 
 # signing: the release certificate in a keychain of its own (removed again at the end), else ad hoc
 SIGN="-"
@@ -49,15 +56,28 @@ if [ "$RELEASE" = 1 ] && [ -s "$P12" ]; then
 fi
 sign() { codesign --force --sign "$SIGN" --timestamp=none "$@"; }
 
+# Sparkle, the updater: in the app's Frameworks, where its executable looks for it
+embed_sparkle() {
+  mkdir -p "$1/Contents/Frameworks"
+  cp -R "$(dirname "$BIN")/Sparkle.framework" "$1/Contents/Frameworks/"
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$1/Contents/MacOS/$2"
+}
+
+# inside out: Sparkle's helpers, Sparkle, the app
+sign_app() {
+  local spk="$1/Contents/Frameworks/Sparkle.framework/Versions/B"
+  for helper in "$spk"/XPCServices/*.xpc "$spk/Updater.app" "$spk/Autoupdate"; do sign "$helper"; done
+  sign "$1/Contents/Frameworks/Sparkle.framework"
+  sign "$1"
+}
+
 swift build -c release --arch arm64
 BIN="$(swift build -c release --arch arm64 --show-bin-path)/AmadeusDMX"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/AmadeusDMX"
-# Sparkle, the updater: in Frameworks, where the app looks for it
-cp -R "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/"
-install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/AmadeusDMX"
+embed_sparkle "$APP" AmadeusDMX
 
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
@@ -87,11 +107,7 @@ ${UPDATES}
 PLIST
 
 [ "$RELEASE" = 1 ] && ./bundle-engine.sh "$APP"
-# inside out: Sparkle's helpers, Sparkle, the app
-SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
-for helper in "$SPK"/XPCServices/*.xpc "$SPK/Updater.app" "$SPK/Autoupdate"; do sign "$helper"; done
-sign "$APP/Contents/Frameworks/Sparkle.framework"
-sign "$APP"
+sign_app "$APP"
 echo "Built $APP ($VERSION$([ "$RELEASE" = 1 ] && echo ", engine inside")$([ "$SIGN" != - ] && echo ", signed as $SIGN")$([ -n "$UPDATES" ] && echo ", updates from $FEED_URL"))"
 
 # Amadeus Link: the companion for the DJ's laptop (menu bar only)
@@ -99,6 +115,7 @@ LINK="$OUT/Amadeus Link.app"
 rm -rf "$LINK"
 mkdir -p "$LINK/Contents/MacOS" "$LINK/Contents/Resources"
 cp "$(dirname "$BIN")/AmadeusLink" "$LINK/Contents/MacOS/AmadeusLink"
+embed_sparkle "$LINK" AmadeusLink
 cp Resources/AppIcon.icns "$LINK/Contents/Resources/AppIcon.icns"
 cat > "$LINK/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -116,11 +133,12 @@ cat > "$LINK/Contents/Info.plist" <<PLIST
   <key>NSLocalNetworkUsageDescription</key>
   <string>Amadeus Link passes VirtualDJ's mix to the lighting computer on your network.</string>
   <key>NSBonjourServices</key><array><string>_amadeuslink._tcp</string></array>
+${LINK_UPDATES}
 </dict>
 </plist>
 PLIST
-sign "$LINK"
-echo "Built $LINK"
+sign_app "$LINK"
+echo "Built $LINK$([ -n "$LINK_UPDATES" ] && echo ", updates from $LINK_FEED_URL")"
 
 if [ "$INSTALL" = 1 ]; then
   mkdir -p "$HOME/Applications"

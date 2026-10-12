@@ -1,9 +1,9 @@
 name: Release
 
 # Push a tag (git tag v0.2.0 && git push origin v0.2.0): the checks run, the Mac apps are built with the engine
-# inside, and a draft release with the disk images and the update feed (appcast.xml) is made on GitHub. You
-# publish it there, after a look: from then on the apps out there find it (Sparkle reads
-# releases/latest/download/appcast.xml, the newest published release that isn't a prerelease).
+# inside, and a draft release with the disk images and the update feeds (appcast.xml for Amadeus DMX,
+# appcast-link.xml for Amadeus Link) is made on GitHub. You publish it there, after a look: from then on the apps
+# out there find it (Sparkle reads releases/latest/download/…, the newest published release, not a prerelease).
 # Run by hand (Actions › Release › Run workflow): the same build, the disk images as a workflow artifact only.
 #
 # Secrets (mac/release-keys.sh makes them): SIGNING_P12_BASE64 + SIGNING_P12_PASSWORD (the signing certificate)
@@ -63,15 +63,20 @@ jobs:
           mv AmadeusDMX.dmg "AmadeusDMX-$VERSION.dmg"
           mv AmadeusLink.dmg "AmadeusLink-$VERSION.dmg"
           shasum -a 256 *.dmg > SHA256SUMS.txt
-      - name: Update feed
+      - name: Update feeds
         if: startsWith(github.ref, 'refs/tags/v') && env.SPARKLE_KEY_FILE != ''
         run: |
-          mkdir -p "$RUNNER_TEMP/feed"
-          cp "mac/build/AmadeusDMX-$VERSION.dmg" "$RUNNER_TEMP/feed/"
-          mac/.build/artifacts/sparkle/Sparkle/bin/generate_appcast --ed-key-file "$SPARKLE_KEY_FILE" \
-            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/" \
-            --full-release-notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" \
-            -o mac/build/appcast.xml "$RUNNER_TEMP/feed"
+          # one feed per app: appcast.xml (Amadeus DMX), appcast-link.xml (Amadeus Link)
+          feed() {
+            mkdir -p "$RUNNER_TEMP/feed-$1"
+            cp "mac/build/$1-$VERSION.dmg" "$RUNNER_TEMP/feed-$1/"
+            mac/.build/artifacts/sparkle/Sparkle/bin/generate_appcast --ed-key-file "$SPARKLE_KEY_FILE" \
+              --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/" \
+              --full-release-notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" \
+              -o "mac/build/$2" "$RUNNER_TEMP/feed-$1"
+          }
+          feed AmadeusDMX appcast.xml
+          feed AmadeusLink appcast-link.xml
       - uses: actions/upload-artifact@v4
         with:
           name: amadeus-dmx-${{ env.VERSION }}
@@ -85,4 +90,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Amadeus DMX $VERSION" \
             $([[ "$VERSION" == *-* ]] && echo --prerelease) \
-            mac/build/*.dmg mac/build/SHA256SUMS.txt $([ -f mac/build/appcast.xml ] && echo mac/build/appcast.xml)
+            mac/build/*.dmg mac/build/SHA256SUMS.txt $(ls mac/build/appcast*.xml 2>/dev/null)
