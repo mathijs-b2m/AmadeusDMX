@@ -64,4 +64,7 @@ which blacks out the lights. See `docs/protocols.md` for what goes over the wire
 `tests/test_golden.py` hashes all the DMX every example rig sends for a synthetic track
 (`tests/synthetic.py`): refactors must leave it unchanged. Unit tests cover geometry, zones, the laser
 guard, Decisive Link's signatures, and sets and rigs (migration, saving, auto-mount on every rig template).
-See `CONTRIBUTING.md`. The Mac app's rig editor has its own self-test (`-editorSelfTest`, see `mac/README.md`).
+See `CONTRIBUTING.md`.
+`tools/twin.py` checks the head motion the visualiser shows against a twin of one fixture driven only by
+its DMX, and calibrates it against the real fixture ([fixture-twin.md](fixture-twin.md)).
+The Mac app's rig editor has its own self-test (`-editorSelfTest`, see `mac/README.md`).

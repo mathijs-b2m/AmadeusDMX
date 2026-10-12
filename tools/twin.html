@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture Twin</title>
+<style>
+  :root { --bg: #0b0c10; --panel: #14161d; --line: #262a35; --text: #e7e9ee; --muted: #8b91a1; --accent: #ffcc33;
+          --bad: #ff6b6b; --good: #63d39b; --dmx: #8b91a1; --engine: #5aa9ff; --twin: #ffa040; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  header { display: flex; gap: 16px; align-items: baseline; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; } header h1 span { color: var(--accent); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .chip { border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; }
+  .chip.on { color: var(--good); border-color: #2d5a43; } .chip.off { color: var(--bad); border-color: #5a2d2d; }
+  main { padding: 16px 20px; display: grid; gap: 16px; max-width: 1200px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  input, select, button { font: inherit; color: var(--text); background: #0e1015; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  input[type=number] { width: 90px; } input[type=range] { width: 160px; padding: 0; }
+  button { cursor: pointer; background: #1c1f29; }
+  button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+  button.active { border-color: var(--accent); color: var(--accent); }
+  button:hover { filter: brightness(1.15); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.eng { color: var(--muted); font-variant-numeric: tabular-nums; }
+  canvas { width: 100%; display: block; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+  .verdict { font-size: 13px; margin-top: 6px; min-height: 1.4em; }
+  .verdict.bad { color: var(--bad); } .verdict.good { color: var(--good); }
+  .metrics { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 1.4em; color: var(--good); }
+  ol { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; } ol b { color: var(--text); font-weight: 600; }
+  @media (max-width: 760px) { main { padding: 12px 16px; } .two { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fixture twin · <span id="name">…</span></h1>
+  <div class="chips">
+    <span class="chip" id="c-dmx">DMX —</span>
+    <span class="chip" id="c-feed">engine —</span>
+    <span class="chip" id="c-fwd">relay —</span>
+    <span class="chip" id="c-cal">—</span>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Where the head points: degrees from home</h2>
+    <div class="legend">
+      <span><i style="background:var(--dmx)"></i>DMX target</span>
+      <span><i style="background:var(--engine)"></i>visualiser (engine prediction)</span>
+      <span><i style="background:var(--twin)"></i>twin (driven by DMX only)</span>
+    </div>
+    <div class="two">
+      <div><canvas id="dial-pan" height="200"></canvas><div class="verdict" id="v-pan"></div><div class="metrics" id="m-pan"></div></div>
+      <div><canvas id="dial-tilt" height="200"></canvas><div class="verdict" id="v-tilt"></div><div class="metrics" id="m-tilt"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The last 8 seconds</h2>
+    <canvas id="chart-pan" height="150"></canvas>
+    <canvas id="chart-tilt" height="150" style="margin-top:10px"></canvas>
+  </section>
+
+  <div class="two">
+    <section>
+      <h2>The twin: how the real fixture moves</h2>
+      <table>
+        <thead><tr><th></th><th>pan</th><th>tilt</th><th>engine now</th></tr></thead>
+        <tbody id="params"></tbody>
+      </table>
+      <div class="row" style="margin-top:10px">
+        <button id="save">Save twin</button>
+        <button class="primary" id="apply">Apply to engine</button>
+      </div>
+      <div class="msg" id="msg"></div>
+      <p class="note">“Apply” writes the twin's range and speed into the fixture's library file (the engine's model of it)
+        and keeps your set's home pointing at the same DMX value. Restart the show afterwards.</p>
+    </section>
+
+    <section>
+      <h2>Calibrate against the real fixture</h2>
+      <div class="row">
+        <label>pan from home <input type="range" id="p-pan" min="-270" max="270" step="5"><span id="o-pan"></span></label>
+        <label>tilt from home <input type="range" id="p-tilt" min="-135" max="135" step="5"><span id="o-tilt"></span></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>axis <select id="p-axis"><option>tilt</option><option>pan</option></select></label>
+        <label>size ° <input type="number" id="p-amp" min="5" max="360" step="5"></label>
+        <label>BPM <input type="number" id="p-bpm" min="60" max="200"></label>
+        <label>pause s <input type="number" id="p-dwell" min="0.3" max="5" step="0.1"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button data-pattern="hold">Hold</button>
+        <button data-pattern="swing">Swing on beat</button>
+        <button data-pattern="marker">Marker</button>
+        <button data-pattern="off">Stop (engine drives)</button>
+      </div>
+      <ol>
+        <li><b>Range.</b> Hold, then set tilt to 90 (or pan to 180). Change the twin's <i>range</i> until the real
+          head points exactly level (or exactly backwards). The DMX follows the range, so the head moves as you edit.</li>
+        <li><b>Speed.</b> Marker: the head goes back and forth, lit only when the <i>twin</i> says it has stopped.
+          A light streak while moving: the twin is too fast. Dark after stopping: too slow. Tune top speed with big
+          sizes (180°), acceleration and braking with small ones (20–40°), the delay last.</li>
+        <li><b>Check.</b> Swing on beat at your usual tempo: does the real head turn back early, like the twin?</li>
+      </ol>
+    </section>
+  </div>
+</main>
+<script>
+const PARAMS = [
+  ["range_deg", "range °", "range"],
+  ["vmax_dps", "top speed °/s", "speed"],
+  ["accel_dps2", "acceleration °/s²", "accel"],
+  ["decel_dps2", "braking °/s²", "accel"],
+  ["latency_ms", "delay ms", "lead"],
+  ["smooth_ms", "smoothing ms", null],
+  ["slowest", "speed ch. 255 ×", null],
+];
+const WINDOW = 8;
+let info = null;
+const buf = { pan: [], tilt: [] };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = id => document.getElementById(id);
+
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", body: JSON.stringify(body || {}) });
+  return r.json();
+}
+
+function engineValue(axis, kind) {
+  const e = info.engine, m = e.motion;
+  if (kind === "range") return e.range[axis] + "°";
+  if (kind === "speed") return m[axis + "_speed_dps"] + "°/s";
+  if (kind === "accel") return (m[axis + "_accel_dps2"] ?? m.accel_dps2) + "°/s²";
+  if (kind === "lead") return "sends " + e.lead_ms + " ms early";
+  return "";
+}
+
+function renderParams() {
+  const tb = $("params");
+  tb.innerHTML = "";
+  for (const [key, label, kind] of PARAMS) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${label}</td>`;
+    for (const axis of ["pan", "tilt"]) {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.step = key === "slowest" ? "0.01" : "1";
+      inp.value = +(+info.profile[axis][key]).toFixed(2);
+      inp.addEventListener("change", async () => {
+        info = await post("/params", { [axis]: { [key]: +inp.value } });
+      });
+      td.append(inp);
+      tr.append(td);
+    }
+    const eng = document.createElement("td");
+    eng.className = "eng";
+    eng.textContent = kind ? ["pan", "tilt"].map(a => engineValue(a, kind)).filter((v, i, x) => kind !== "lead" || i === 0).join(" / ") : "";
+    tr.append(eng);
+    tb.append(tr);
+  }
+}
+
+function renderPattern() {
+  const p = info.pattern;
+  $("p-pan").value = p.pan; $("o-pan").textContent = p.pan + "°";
+  $("p-tilt").value = p.tilt; $("o-tilt").textContent = p.tilt + "°";
+  $("p-axis").value = p.axis; $("p-amp").value = p.amp; $("p-bpm").value = p.bpm; $("p-dwell").value = p.dwell;
+  document.querySelectorAll("[data-pattern]").forEach(b => b.classList.toggle("active", b.dataset.pattern === p.name));
+}
+
+async function load() {
+  info = await (await fetch("/info")).json();
+  $("name").textContent = `${info.fixture} (${info.model})`;
+  $("c-fwd").textContent = info.forward ? "relay → " + info.forward : "no relay: twin only";
+  $("c-fwd").className = "chip " + (info.forward ? "on" : "");
+  $("c-cal").textContent = info.calibrated ? "twin calibrated" : "twin not calibrated yet (= engine's numbers)";
+  renderParams();
+  renderPattern();
+}
+
+for (const id of ["p-pan", "p-tilt"]) {
+  $(id).addEventListener("input", async e => {
+    const k = id.slice(2);
+    $("o-" + k).textContent = e.target.value + "°";
+    info = await post("/pattern", { [k]: +e.target.value });
+  });
+}
+for (const id of ["p-axis", "p-amp", "p-bpm", "p-dwell"]) {
+  $(id).addEventListener("change", async e => {
+    const v = id === "p-axis" ? e.target.value : +e.target.value;
+    info = await post("/pattern", { [id.slice(2)]: v });
+  });
+}
+document.querySelectorAll("[data-pattern]").forEach(b => b.addEventListener("click", async () => {
+  info = await post("/pattern", { name: b.dataset.pattern });
+  renderPattern();
+}));
+$("save").onclick = async () => { const r = await post("/save"); info = r; $("msg").textContent = r.message; load(); };
+$("apply").onclick = async () => {
+  if (!confirm("Write the twin's range and speed into the fixture's library file (and rescale your set's home)?")) return;
+  const r = await post("/apply"); $("msg").textContent = r.message; load();
+};
+
+// ---------------------------------------------------------------- drawing
+
+function fit(c) {
+  const dpr = devicePixelRatio || 1, w = c.clientWidth, h = +(c.dataset.h ||= c.getAttribute("height"));
+  if (c.width !== w * dpr || c.height !== h * dpr) { c.width = w * dpr; c.height = h * dpr; c.style.height = h + "px"; }
+  const g = c.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  return [g, w, h];
+}
+
+function dial(axis) {
+  const [g, w, h] = fit($("dial-" + axis));
+  const last = buf[axis][buf[axis].length - 1];
+  const cx = w / 2, cy = axis === "tilt" ? h - 22 : h / 2, r = Math.min(w / 2, axis === "tilt" ? h - 34 : h / 2) - 12;
+  g.strokeStyle = css("--line"); g.lineWidth = 1;
+  g.beginPath(); axis === "tilt" ? g.arc(cx, cy, r, Math.PI, 0) : g.arc(cx, cy, r, 0, 2 * Math.PI); g.stroke();
+  g.fillStyle = css("--muted"); g.font = "11px ui-sans-serif, system-ui"; g.textAlign = "center";
+  // home is up on both dials; tilt: ±90 = level, pan: seen from above
+  const marks = axis === "tilt" ? [-135, -90, -45, 0, 45, 90, 135] : [-180, -90, 0, 90];
+  for (const m of marks) {
+    const a = (m - 90) * Math.PI / 180;
+    g.fillText(m + "°", cx + Math.cos(a) * (r + 12), cy + Math.sin(a) * (r + 12) + 4);
+  }
+  g.textAlign = "left";
+  g.fillText(axis === "tilt" ? "TILT (side view)" : "PAN (from above)", 0, 12);
+  if (!last) return;
+  const needle = (deg, color, width, dash) => {
+    if (deg === null) return;
+    const a = (deg - 90) * Math.PI / 180;
+    g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash || []);
+    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); g.stroke();
+    g.setLineDash([]);
+  };
+  needle(last[1], css("--dmx"), 1.5, [4, 4]);
+  needle(last[2], css("--engine"), 6);
+  needle(last[3], css("--twin"), 2.5);
+}
+
+function chart(axis) {
+  const [g, w, h] = fit($("chart-" + axis));
+  const rows = buf[axis];
+  if (!rows.length) return;
+  const t1 = rows[rows.length - 1][0], t0 = t1 - WINDOW;
+  let lo = Infinity, hi = -Infinity;
+  for (const r of rows) for (const v of r.slice(1)) if (v !== null) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  if (hi - lo < 20) { const m = (hi + lo) / 2; lo = m - 10; hi = m + 10; }
+  const pad = 26, X = t => pad + (t - t0) / WINDOW * (w - pad - 4), Y = v => 8 + (hi - v) / (hi - lo) * (h - 22);
+  g.strokeStyle = css("--line"); g.fillStyle = css("--muted"); g.font = "11px ui-sans-serif, system-ui"; g.lineWidth = 1;
+  for (const v of [lo, (lo + hi) / 2, hi]) {
+    g.beginPath(); g.moveTo(pad, Y(v)); g.lineTo(w - 4, Y(v)); g.stroke();
+    g.textAlign = "right"; g.fillText(Math.round(v) + "°", pad - 4, Y(v) + 4);
+  }
+  g.textAlign = "left"; g.fillText(axis, pad + 4, h - 2);
+  const line = (k, color, width, dash) => {
+    g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash || []); g.beginPath();
+    let on = false;
+    for (const r of rows) {
+      if (r[k] === null) { on = false; continue; }
+      on ? g.lineTo(X(r[0]), Y(r[k])) : g.moveTo(X(r[0]), Y(r[k]));
+      on = true;
+    }
+    g.stroke(); g.setLineDash([]);
+  };
+  line(1, css("--dmx"), 1.2, [4, 4]);
+  line(2, css("--engine"), 3.5);
+  line(3, css("--twin"), 1.8);
+}
+
+function draw() {
+  for (const a of ["pan", "tilt"]) { dial(a); chart(a); }
+  requestAnimationFrame(draw);
+}
+
+function metrics(axis, d) {
+  const v = $("v-" + axis);
+  v.textContent = d.verdict;
+  v.className = "verdict " + (d.verdict.includes("matches") ? "good" : /×| ms /.test(d.verdict) ? "bad" : "");
+  const m = d.metrics;
+  $("m-" + axis).textContent = m
+    ? `gap ${m.rms}° rms · range ×${m.range ?? "–"} · swings: visualiser ${m.engine_swing}°, twin ${m.twin_swing}° · twin ${m.lag_ms >= 0 ? "+" : ""}${m.lag_ms} ms (last 15 s)`
+    : "";
+}
+
+function listen() {
+  const es = new EventSource("/events");
+  es.onmessage = e => {
+    const f = JSON.parse(e.data);
+    for (const a of ["pan", "tilt"]) {
+      const d = f.axes[a];
+      buf[a].push(...d.samples);
+      const t1 = buf[a].length ? buf[a][buf[a].length - 1][0] : 0;
+      while (buf[a].length && buf[a][0][0] < t1 - WINDOW) buf[a].shift();
+      metrics(a, d);
+    }
+    const s = f.status;
+    $("c-dmx").textContent = s.pattern !== "off" ? `test pattern: ${s.pattern} · beam ${s.lit ? "on" : "off"}` : `DMX in ${s.dmx_hz} Hz`;
+    $("c-dmx").className = "chip " + (s.dmx_hz > 1 || s.pattern !== "off" ? "on" : "off");
+    $("c-feed").textContent = "engine: " + s.feed + (s.track ? " · " + s.track : "");
+    $("c-feed").className = "chip " + (s.feed.startsWith("connected") ? "on" : "off");
+  };
+}
+
+load().then(() => { listen(); draw(); });
+</script>
+</body>
+</html>
