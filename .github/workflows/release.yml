@@ -1,8 +1,13 @@
 name: Release
 
 # Push a tag (git tag v0.2.0 && git push origin v0.2.0): the checks run, the Mac apps are built with the engine
-# inside, and a draft release with the disk images is made on GitHub. You publish it there, after a look.
+# inside, and a draft release with the disk images and the update feed (appcast.xml) is made on GitHub. You
+# publish it there, after a look: from then on the apps out there find it (Sparkle reads
+# releases/latest/download/appcast.xml, the newest published release that isn't a prerelease).
 # Run by hand (Actions › Release › Run workflow): the same build, the disk images as a workflow artifact only.
+#
+# Secrets (mac/release-keys.sh makes them): SIGNING_P12_BASE64 + SIGNING_P12_PASSWORD (the signing certificate)
+# and SPARKLE_PRIVATE_KEY (signs the updates). Without them the apps are signed ad hoc and don't update.
 
 on:
   push:
@@ -28,6 +33,27 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-dev.$(git rev-list --count HEAD)"; fi
           echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Release keys
+        env:
+          P12: ${{ secrets.SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          keys="$RUNNER_TEMP/keys"; mkdir -p "$keys"; chmod 700 "$keys"
+          # updates need both: the same signature on every release, and updates signed with the key
+          if [ -z "$P12" ] || [ -z "$SPARKLE_KEY" ]; then
+            echo "::warning::No release keys in the secrets: signed ad hoc, without updates"
+            exit 0
+          fi
+          echo "$P12" | base64 --decode > "$keys/signing.p12"
+          printf %s "$P12_PASSWORD" > "$keys/signing-password.txt"
+          printf %s "$SPARKLE_KEY" > "$keys/sparkle-private-key.txt"
+          {
+            echo "SIGN_P12=$keys/signing.p12"
+            echo "SIGN_PASSWORD_FILE=$keys/signing-password.txt"
+            echo "SPARKLE_KEY_FILE=$keys/sparkle-private-key.txt"
+            echo "FEED_URL=https://github.com/$GITHUB_REPOSITORY/releases/latest/download/appcast.xml"
+          } >> "$GITHUB_ENV"
       - name: Build (engine inside)
         working-directory: mac
         run: ./build-app.sh --release --dmg
@@ -37,6 +63,15 @@ jobs:
           mv AmadeusDMX.dmg "AmadeusDMX-$VERSION.dmg"
           mv AmadeusLink.dmg "AmadeusLink-$VERSION.dmg"
           shasum -a 256 *.dmg > SHA256SUMS.txt
+      - name: Update feed
+        if: startsWith(github.ref, 'refs/tags/v') && env.SPARKLE_KEY_FILE != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/feed"
+          cp "mac/build/AmadeusDMX-$VERSION.dmg" "$RUNNER_TEMP/feed/"
+          mac/.build/artifacts/sparkle/Sparkle/bin/generate_appcast --ed-key-file "$SPARKLE_KEY_FILE" \
+            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/" \
+            --full-release-notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" \
+            -o mac/build/appcast.xml "$RUNNER_TEMP/feed"
       - uses: actions/upload-artifact@v4
         with:
           name: amadeus-dmx-${{ env.VERSION }}
@@ -50,4 +85,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Amadeus DMX $VERSION" \
             $([[ "$VERSION" == *-* ]] && echo --prerelease) \
-            mac/build/*.dmg mac/build/SHA256SUMS.txt
+            mac/build/*.dmg mac/build/SHA256SUMS.txt $([ -f mac/build/appcast.xml ] && echo mac/build/appcast.xml)

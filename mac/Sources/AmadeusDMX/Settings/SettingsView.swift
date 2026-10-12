@@ -57,6 +57,7 @@ struct GeneralSettings: View {
                     Text("The Amadeus DMX folder with its Python environment (.venv). The web UI uses the same folder, sets and fixtures.")
                 }
             }
+            UpdatesSection()
             PacksSection()
             SwiftUI.Section {
                 Picker("Mode", selection: Binding(get: { model.mode }, set: { model.setMode($0) })) {
@@ -76,6 +77,46 @@ struct GeneralSettings: View {
         p.message = "Choose the Amadeus DMX engine folder"
         if p.runModal() == .OK, let url = p.url {
             error = model.useWorkspace(url) ? nil : "That folder has no engine (amadeus/ and .venv/bin/python)."
+        }
+    }
+}
+
+/// Updates (Sparkle, App/Updates.swift): whether to check and install by itself, and checking now.
+struct UpdatesSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var checks = false
+    @State private var installs = false
+
+    var body: some View {
+        let updates = model.updates
+        SwiftUI.Section {
+            if updates.isAvailable {
+                Toggle("Check for updates automatically", isOn: Binding(get: { checks }, set: {
+                    updates.checksAutomatically = $0; checks = $0
+                }))
+                Toggle("Download and install updates by themselves", isOn: Binding(get: { installs }, set: {
+                    updates.installsAutomatically = $0; installs = $0
+                }))
+                .disabled(!checks)
+                LabeledContent("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")") {
+                    Button("Check Now") { updates.checkForUpdates() }.disabled(!updates.canCheck)
+                }
+                if updates.waitingForShow {
+                    Label("An update installs when the show stops", systemImage: "clock").foregroundStyle(.secondary)
+                }
+            } else {
+                Text("A development build: it updates with the code, not by itself.").foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            if updates.isAvailable {
+                Text("Never during a show: no check while the lights run, and an update you install then waits until the show stops. One downloaded by itself is installed when you quit. Your sets, rigs and packs stay as they are.")
+            }
+        }
+        .onAppear {
+            checks = updates.checksAutomatically
+            installs = updates.installsAutomatically
         }
     }
 }

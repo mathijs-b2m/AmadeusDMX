@@ -15,6 +15,8 @@ final class AppModel {
     let setup = EngineProcess(name: "setup")
     /// Installs an optional pack (Settings › General).
     let packInstall = EngineProcess(name: "packs")
+    /// Updates (Sparkle; a release build only).
+    let updates = Updates()
     let feed = LiveFeed()
     let api = SetupAPI(port: 8181)
 
@@ -118,6 +120,7 @@ final class AppModel {
 
     init() {
         Self.adoptOldSettings()
+        updates.showRunning = { [weak self] in self?.engineRunning ?? false }
         EngineProcess.stopLeftover(name: "show")
         EngineProcess.stopLeftover(name: "setup")
         workspace = Workspace.locate(saved: UserDefaults.standard.string(forKey: "engineRoot"))

@@ -5,11 +5,15 @@
 #   ./build-app.sh --install   … and copy it to ~/Applications
 #   ./build-app.sh --dmg       … and make disk images (build/AmadeusDMX.dmg, build/AmadeusLink.dmg)
 # Options combine (--release --dmg). VERSION=1.2.3 sets the version people see (default 0.1.<commits>); the build
-# number is always the commit count, so every later build is newer (what updaters compare).
+# number is always the commit count, so every later build is newer (what Sparkle compares).
+# A release is signed with the release certificate (release-keys.sh; SIGN_P12 and SIGN_PASSWORD_FILE, default
+# ~/.amadeus-release), else ad hoc. FEED_URL=… turns on updates (Sparkle): the appcast the app checks.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd .. && pwd)"
-APP="build/Amadeus DMX.app"
+OUT="${OUT:-build}"  # OUT=… builds elsewhere (e.g. while an app built here is running)
+mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
+APP="$OUT/Amadeus DMX.app"
 BUILD="$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 0)"
 VERSION="${VERSION:-0.1.$BUILD}"
 RELEASE=0 INSTALL=0 DMG=0
@@ -25,12 +29,35 @@ done
 ENGINE_ROOT=""
 [ "$RELEASE" = 1 ] || ENGINE_ROOT="  <key>AmadeusEngineRoot</key><string>${ROOT}</string>"
 
+# updates: only a release with a feed and the public update key (Sparkle stays off otherwise)
+UPDATES=""
+if [ "$RELEASE" = 1 ] && [ -n "${FEED_URL:-}" ] && [ -s Resources/sparkle-public-key.txt ]; then
+  UPDATES="  <key>SUFeedURL</key><string>${FEED_URL}</string>
+  <key>SUPublicEDKey</key><string>$(tr -d '\n' < Resources/sparkle-public-key.txt)</string>
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>"
+fi
+
+# signing: the release certificate in a keychain of its own (removed again at the end), else ad hoc
+SIGN="-"
+P12="${SIGN_P12:-$HOME/.amadeus-release/signing.p12}"
+PASSFILE="${SIGN_PASSWORD_FILE:-$HOME/.amadeus-release/signing-password.txt}"
+if [ "$RELEASE" = 1 ] && [ -s "$P12" ]; then
+  KC="$OUT/signing.keychain-db"
+  ./signing-keychain.sh "$P12" "$PASSFILE" "$KC" >/dev/null
+  trap 'security delete-keychain "$KC" 2>/dev/null || true' EXIT
+  SIGN="Amadeus DMX"
+fi
+sign() { codesign --force --sign "$SIGN" --timestamp=none "$@"; }
+
 swift build -c release --arch arm64
 BIN="$(swift build -c release --arch arm64 --show-bin-path)/AmadeusDMX"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/AmadeusDMX"
+# Sparkle, the updater: in Frameworks, where the app looks for it
+cp -R "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/AmadeusDMX"
 
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
@@ -54,16 +81,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSLocalNetworkUsageDescription</key>
   <string>Amadeus DMX sends DMX to your lights over Art-Net and listens to VirtualDJ on this Mac.</string>
 ${ENGINE_ROOT}
+${UPDATES}
 </dict>
 </plist>
 PLIST
 
 [ "$RELEASE" = 1 ] && ./bundle-engine.sh "$APP"
-codesign --force --sign - --timestamp=none "$APP"
-echo "Built $APP ($VERSION$([ "$RELEASE" = 1 ] && echo ", engine inside"))"
+# inside out: Sparkle's helpers, Sparkle, the app
+SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for helper in "$SPK"/XPCServices/*.xpc "$SPK/Updater.app" "$SPK/Autoupdate"; do sign "$helper"; done
+sign "$APP/Contents/Frameworks/Sparkle.framework"
+sign "$APP"
+echo "Built $APP ($VERSION$([ "$RELEASE" = 1 ] && echo ", engine inside")$([ "$SIGN" != - ] && echo ", signed as $SIGN")$([ -n "$UPDATES" ] && echo ", updates from $FEED_URL"))"
 
 # Amadeus Link: the companion for the DJ's laptop (menu bar only)
-LINK="build/Amadeus Link.app"
+LINK="$OUT/Amadeus Link.app"
 rm -rf "$LINK"
 mkdir -p "$LINK/Contents/MacOS" "$LINK/Contents/Resources"
 cp "$(dirname "$BIN")/AmadeusLink" "$LINK/Contents/MacOS/AmadeusLink"
@@ -87,7 +119,7 @@ cat > "$LINK/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-codesign --force --sign - --timestamp=none "$LINK"
+sign "$LINK"
 echo "Built $LINK"
 
 if [ "$INSTALL" = 1 ]; then
@@ -97,15 +129,15 @@ if [ "$INSTALL" = 1 ]; then
   echo "Installed to ~/Applications"
 fi
 if [ "$DMG" = 1 ]; then
-  rm -rf build/dmg build/AmadeusDMX.dmg
-  mkdir -p build/dmg
-  cp -R "$APP" build/dmg/
-  ln -s /Applications build/dmg/Applications
-  hdiutil create -volname "Amadeus DMX" -srcfolder build/dmg -ov -format UDZO build/AmadeusDMX.dmg >/dev/null
-  rm -rf build/dmg
-  echo "Disk image: build/AmadeusDMX.dmg"
-  mkdir -p build/dmg && cp -R "$LINK" build/dmg/ && ln -s /Applications build/dmg/Applications
-  hdiutil create -volname "Amadeus Link" -srcfolder build/dmg -ov -format UDZO build/AmadeusLink.dmg >/dev/null
-  rm -rf build/dmg
-  echo "Disk image for the DJ: build/AmadeusLink.dmg"
+  rm -rf "$OUT/dmg" "$OUT/AmadeusDMX.dmg"
+  mkdir -p "$OUT/dmg"
+  cp -R "$APP" "$OUT/dmg/"
+  ln -s /Applications "$OUT/dmg/Applications"
+  hdiutil create -volname "Amadeus DMX" -srcfolder "$OUT/dmg" -ov -format UDZO "$OUT/AmadeusDMX.dmg" >/dev/null
+  rm -rf "$OUT/dmg"
+  echo "Disk image: $OUT/AmadeusDMX.dmg"
+  mkdir -p "$OUT/dmg" && cp -R "$LINK" "$OUT/dmg/" && ln -s /Applications "$OUT/dmg/Applications"
+  hdiutil create -volname "Amadeus Link" -srcfolder "$OUT/dmg" -ov -format UDZO "$OUT/AmadeusLink.dmg" >/dev/null
+  rm -rf "$OUT/dmg"
+  echo "Disk image for the DJ: $OUT/AmadeusLink.dmg"
 fi

@@ -58,8 +58,43 @@ through `AMADEUS_ROOT` and `AMADEUS_DATA` (`amadeus/paths.py`).
 the checks, builds both apps and makes a **draft** release with the disk images and their SHA-256 sums; you
 publish it on GitHub. Actions › Release › *Run workflow* makes the same build as a workflow artifact only.
 
-The apps are signed ad hoc, not with an Apple Developer ID, so macOS stops the first launch of a
-downloaded copy: open it once, then System Settings › Privacy & Security › *Open Anyway*.
+The apps are signed with a certificate of our own (`release-keys.sh` makes it), not an Apple Developer ID, so
+macOS stops the first launch of a downloaded copy: open it once, then System Settings › Privacy & Security ›
+*Open Anyway*. Because every release carries the same signature, macOS keeps the permissions you gave it
+(Accessibility for djay, the local network) across updates.
+
+## Updates
+
+The app updates itself with [Sparkle](https://sparkle-project.org) (`Sources/AmadeusDMX/App/Updates.swift`):
+
+- **Opt-in.** On the second launch Sparkle asks whether to check automatically; Settings › General › Updates
+  changes it, adds "download and install by themselves", and *Check Now* (also in the app menu).
+- **Never during a show.** No background check while the lights run; an update you install then waits until the
+  show stops. One downloaded by itself is installed when you quit.
+- **Only ours.** The app installs an update only if it is signed with the release key (its public half is
+  `Resources/sparkle-public-key.txt`) and carries the same code signature as the app itself.
+- **The feed** is `appcast.xml` on the newest published GitHub release
+  (`releases/latest/download/appcast.xml`); release.yml makes it. Publishing the draft release is what makes an
+  update reach people. Prereleases (`v0.3.0-beta.1`) don't reach them.
+- Your data (sets, rigs, settings, packs) is outside the app, so an update never touches it.
+
+Development builds have no feed and don't update. Amadeus Link doesn't update by itself yet.
+
+### The release keys
+
+`./release-keys.sh` makes them once, in `~/.amadeus-release`: the signing certificate (`signing.p12`, its
+password) and the update key (`sparkle-private-key.txt`). **They must stay the same for every release**: keep a
+copy in a password manager. Lost, the apps out there can't update to anything signed with new ones (people
+download the next version by hand, once). For GitHub, put them in Settings › Secrets › Actions:
+
+| Secret | Value |
+|---|---|
+| `SIGNING_P12_BASE64` | `base64 < ~/.amadeus-release/signing.p12` |
+| `SIGNING_P12_PASSWORD` | `~/.amadeus-release/signing-password.txt` |
+| `SPARKLE_PRIVATE_KEY` | `~/.amadeus-release/sparkle-private-key.txt` |
+
+Without them a release is signed ad hoc and has no feed. A local `./build-app.sh --release` signs with the
+certificate in `~/.amadeus-release` when it's there; `FEED_URL=…` gives it a feed (for testing updates).
 
 ## How it works
 

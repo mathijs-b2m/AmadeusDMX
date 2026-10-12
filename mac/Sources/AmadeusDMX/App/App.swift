@@ -13,6 +13,7 @@ struct AmadeusDMXApp: App {
             MainView()
                 .environment(model)
                 .onAppear { delegate.model = model }
+                .onChange(of: model.engineRunning) { _, running in if !running { model.updates.showStopped() } }
                 .frame(minWidth: 980, minHeight: 620)
         }
         .defaultSize(width: 1440, height: 900)
@@ -73,6 +74,12 @@ struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            if model.updates.isAvailable {
+                Button("Check for Updates…") { model.updates.checkForUpdates() }
+                    .disabled(!model.updates.canCheck)
+            }
+        }
         CommandGroup(after: .newItem) {
             Button("New Set…") { openWindow(id: "wizard") }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
