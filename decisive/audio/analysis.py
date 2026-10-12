@@ -38,7 +38,7 @@ from decisive.audio.features import (
 from decisive.audio.model import Analysis, Phrase
 from decisive.audio.phrases import build_phrases
 
-ANALYSIS_VERSION = 39
+ANALYSIS_VERSION = 40
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -198,7 +198,85 @@ def _with_notes(a: Analysis, path: Path) -> Analysis:
     notes = stemlib.load_notes(path)
     if notes is not None:
         a.synth_notes = notes
+        a.instruments = stemlib.load_instruments(path)
+        if a.instruments is not None:
+            _split_on_melody(a)
+            t, probs, names = a.instruments["t"], a.instruments["probs"], a.instruments["names"]
+            for ph in a.phrases:
+                m = (t >= ph.start) & (t < ph.end)
+                if m.any():
+                    mean = probs[m].mean(0)
+                    ph.instruments = ", ".join(
+                        f"{names[j]} {mean[j]:.2f}" for j in np.argsort(-mean)[:3] if mean[j] >= 0.15
+                    )
     return a
+
+
+MELODY_SPLIT = 2.5  # a melodic change this clear (see _melody_changes) splits a phrase
+MELODY_MIN_BARS = 4  # …into parts of at least this many bars, on 4-bar lines from the phrase's start
+
+
+def _melody_changes(a: Analysis) -> tuple[np.ndarray, np.ndarray]:
+    """Per bar line: how much the melodic part changes there, the four bars after against the four before. Its
+    sound (the instrument model's description, cosine distance, relative to the track's usual change) plus three
+    times the jump in register (the median pitch of its notes, 0..1). A new melody, a new instrument, a lead
+    that moves an octave up: what a DJ hears as "here comes the next part" though the drums stay the same."""
+    ins = a.instruments
+    jt = np.asarray(ins["t"], float)
+    snd = np.asarray(ins["sound"], np.float32)
+    snd = snd / (np.linalg.norm(snd, axis=1, keepdims=True) + 1e-9)
+    nt, _, pitch = (np.asarray(x, float) for x in a.synth_notes)
+    bars = a.beats[a.downbeats] if len(a.downbeats) else a.beats[::4]
+    w = 4 * float(np.median(np.diff(bars))) if len(bars) > 1 else 8.0
+    sound, reg = np.zeros(len(bars)), np.zeros(len(bars))
+    for k, d in enumerate(bars):
+        b, f = snd[(jt >= d - w) & (jt < d)], snd[(jt >= d) & (jt < d + w)]
+        if len(b) >= 2 and len(f) >= 2:
+            mb, mf = b.mean(0), f.mean(0)
+            sound[k] = 1 - float(mb @ mf / (np.linalg.norm(mb) * np.linalg.norm(mf) + 1e-9))
+        pb, pf = pitch[(nt >= d - w) & (nt < d)], pitch[(nt >= d) & (nt < d + w)]
+        if len(pb) > 2 and len(pf) > 2:
+            reg[k] = abs(float(np.median(pf)) - float(np.median(pb)))
+    usual = float(np.median(sound[sound > 0])) if (sound > 0).any() else 1.0
+    return bars, sound / max(usual, 1e-6) + 3 * reg
+
+
+def _split_on_melody(a: Analysis) -> None:
+    """Split phrases where a new melody comes in on a 4-bar line inside them: the drums and energy (what the phrase
+    grid listens to) can stay the same while the music clearly moves on. The new phrase is marked for the
+    director; it keeps the old phrase's measurements (drops and pickups belong to the first part)."""
+    from dataclasses import replace
+
+    if a.synth_notes is None or not len(a.phrases):
+        return
+    bars, score = _melody_changes(a)
+    if not len(bars):
+        return
+    bar = float(np.median(np.diff(bars))) if len(bars) > 1 else 2.0
+    out = []
+    todo = list(a.phrases)
+    while todo:
+        ph = todo.pop(0)
+        best, best_score = None, MELODY_SPLIT
+        for k, d in enumerate(bars):
+            n = (d - ph.start) / bar
+            if (
+                MELODY_MIN_BARS - 0.1 <= n <= (ph.end - ph.start) / bar - MELODY_MIN_BARS + 0.1
+                and abs(n - round(n / 4) * 4) < 0.1
+            ) and score[k] > best_score:
+                best, best_score = float(d), float(score[k])
+        if best is None:
+            out.append(ph)
+            continue
+        nb = int(round((best - ph.start) / bar))
+        first = replace(ph, end=best, bars=nb)
+        second = replace(ph, start=best, bars=max(1, ph.bars - nb), drop_score=0.0, pickup_beats=0, pickup_kind="",
+                         pickup_start=best, melody_change=True)  # fmt: skip
+        out.append(first)
+        todo.insert(0, second)  # (it may split again)
+    for i, ph in enumerate(out):
+        ph.index = i
+    a.phrases = out
 
 
 def _save(a: Analysis, npz_path: Path, json_path: Path):

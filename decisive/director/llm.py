@@ -28,7 +28,7 @@ MODEL = "gpt-6-luna"
 HOLD_CONFIDENCE = 0.35  # mean look confidence below this, in an unchanged section → keep the previous look
 
 
-PROMPT_VERSION = 23
+PROMPT_VERSION = 25
 
 
 class OpenAIDirector:

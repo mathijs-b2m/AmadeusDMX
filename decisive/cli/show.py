@@ -84,6 +84,10 @@ def add_commands(sub) -> dict:
     p = sub.add_parser("monitor", help="watch VirtualDJ + live mode: CPU, memory, threads, GPU, crashes")
     p.add_argument("--interval", type=float, default=1.0)
 
+    p = sub.add_parser("instruments", help="which instruments play in a track (MTG-Jamendo models, non-commercial)")
+    p.add_argument("wav", type=Path, nargs="?", metavar="TRACK", help="show its instruments over time")
+    p.add_argument("--download", action="store_true", help="fetch the two models (~21 MB, CC BY-NC-SA 4.0)")
+
     p = sub.add_parser("synctest", help="a test track with beeps, and a listener: how far the show is from the music")
     p.add_argument("action", choices=["make", "listen"], help="make: write the track; listen: measure while it plays")
     p.add_argument(
@@ -101,7 +105,31 @@ def add_commands(sub) -> dict:
         "monitor": monitor,
         "probe": probe,
         "synctest": synctest,
+        "instruments": instruments_command,
     }
+
+
+def instruments_command(args):
+    from decisive.audio import instruments, stems
+
+    if args.download:
+        print("The MTG-Jamendo instrument models (Music Technology Group, UPF) are licensed CC BY-NC-SA 4.0:")
+        print("non-commercial use only; a proprietary license is available from the MTG.")
+        instruments.download()
+        print(f"Downloaded to {instruments.MODELS}")
+    if not instruments.available():
+        raise SystemExit("Not installed: `pip install onnxruntime` and `decisive instruments --download`")
+    if not args.wav:
+        return
+    ins = stems.load_instruments(args.wav)
+    if ins is None:
+        raise SystemExit("Separate the track first (it happens in a live show or `decisive play`)")
+    for t0 in range(0, int(ins["t"][-1]) + 1, 15):
+        m = (ins["t"] >= t0) & (ins["t"] < t0 + 15)
+        if m.any():
+            mean = ins["probs"][m].mean(0)
+            top = ", ".join(f"{ins['names'][j]} {mean[j]:.2f}" for j in mean.argsort()[::-1][:3] if mean[j] >= 0.15)
+            print(f"{t0 // 60}:{t0 % 60:02d}  {top}")
 
 
 def synctest(args):

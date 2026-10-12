@@ -46,7 +46,8 @@ def test_random_heads_pulse_on_their_own_kicks(show):
     _, plan, k, e = show
     d = plan[k]
     ts = np.arange(d.start + 0.5, d.end - 0.5, 0.02)
-    heads = [h["id"] for h in e.heads if h["id"] not in e._accent_players(d)][:8]  # (the rhythm lights)
+    accents = set().union(*(e._accent_players(d, t) for t in np.arange(d.start, d.end, 1.0)))
+    heads = [h["id"] for h in e.heads if h["id"] not in accents][:8]  # (the rhythm lights all along)
     lit = np.array([[e.render(float(t))[1][h].dimmer > 0.05 for h in heads] for t in ts])
     share = lit.mean()
     assert 0.1 < share < 0.5  # on part of the time

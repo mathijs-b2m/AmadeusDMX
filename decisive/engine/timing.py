@@ -142,6 +142,34 @@ class TimingMixin:
         lo, hi = minimum_filter1d(x, w), maximum_filter1d(x, w)
         return np.clip((x - lo) / np.maximum(hi - lo, 3.0), 0, 1).astype(np.float32)
 
+    def _stabs_per_instrument(self, analysis) -> None:
+        """When the instruments are known (decisive/audio/instruments.py), the accent lights follow ONE of them
+        per phrase: its stabs only (picked among its own notes), not whichever instrument is loudest. The
+        phrase's leading instrument: the most present one with the most stabs (presence × √stabs)."""
+        ins = analysis.instruments
+        if not ins or len(ins.get("note_family", [])) != len(self.syn_t) or not len(self.syn_t):
+            return
+        fam, names, t, probs = ins["note_family"], ins["names"], ins["t"], ins["probs"]
+        per = {f: pick_stabs(self.syn_t[fam == f], self.syn_s[fam == f]) for f in set(fam.tolist()) if f >= 0}
+        out_t, out_s = [], []
+        for i, d in enumerate(self.plan):
+            m = (t >= d.start) & (t < d.end)
+            best, score = None, 0.0
+            for f, (st, _) in per.items():
+                n = int(((st >= d.start) & (st < d.end)).sum())
+                presence = float(probs[m, f].mean()) if m.any() else 0.0
+                if n >= 3 and presence * n**0.5 > score:
+                    best, score = f, presence * n**0.5
+            if best is None:
+                continue
+            st, ss = per[best]
+            k = (st >= d.start) & (st < d.end)
+            out_t.append(st[k])
+            out_s.append(ss[k])
+            self.accent_family[i] = names[best]
+        if out_t:
+            self.stab_t, self.stab_s = np.concatenate(out_t), np.concatenate(out_s)
+
     def _kick_breaks(self) -> list[tuple[float, float, bool]]:
         """Where the kick drops out inside the music: (start, end, kick_returns) on bar lines. After a running
         kick (two bars with 3+ kicks), a stretch of bars with at most two kicks that dips to one or none: the

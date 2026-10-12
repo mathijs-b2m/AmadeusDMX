@@ -29,6 +29,7 @@ DROP_PATTERNS = ("all", "all", "sides", "rotate")
 
 ACCENT_SHARE = 3  # one light in this many plays the accents (the synth's stabs); the others keep the rhythm
 ACCENT_SECTIONS = ("groove", "drop", "buildup")
+BLOCK_BARS = 4  # in energetic parts the group's kick pattern and the accent roles change this often
 MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 
 
@@ -248,7 +249,7 @@ class LooksMixin:
     def _accents(self, d: Decision, t: float, out: dict, accent) -> None:
         """Accent lights flash on the synth's stabs, exactly on the note, in the accent colour (white in the
         big drops); dark in between. A single light layers the stabs over its rhythm."""
-        players = self._accent_players(d)
+        players = self._accent_players(d, t)
         lights = self.__dict__.get("_lights_by_x", [])
         solo = len(lights) == 1 and d.section in ACCENT_SECTIONS and d.intensity >= 1
         if not players and not solo:
@@ -299,7 +300,15 @@ class LooksMixin:
                     s.white = max(s.white, flash)
                 return
 
-    def _accent_players(self, d: Decision) -> set[str]:
+    def _block(self, d: Decision, t: float | None) -> int:
+        """Which 4-bar block of its phrase t is in, where the music moves fast (grooves, build-ups and drops with
+        some energy: the group changes how it plays every 4 bars there); 0 elsewhere (once per phrase)."""
+        if t is None or d.section not in ACCENT_SECTIONS or d.intensity < 1:
+            return 0
+        _, _, period = self.beat_info(t)
+        return max(0, int((t - d.start) / (BLOCK_BARS * 4 * period)))
+
+    def _accent_players(self, d: Decision, t: float | None = None) -> set[str]:
         """The lights that play the accents in this phrase: one in ACCENT_SHARE (heads and pars together, left
         to right, so they're spread over the rig; of two lights one), shifting per phrase. None in calm parts or
         where the synth has no stabs; a single light plays both (_scene layers the stabs over its rhythm)."""
@@ -324,13 +333,14 @@ class LooksMixin:
         if len(lights) < 2:
             return set()
         share = 2 if len(lights) < 4 else ACCENT_SHARE
-        shift = d.phrase % share
+        shift = (d.phrase + self._block(d, t)) % share  # the roles move on every 4 bars in energetic parts
         return {eid for k, eid in enumerate(lights) if (k + shift) % share == share // 2}
 
-    def _kick_pattern(self, d: Decision) -> str:
-        """How the group plays the kicks in this phrase: varied per phrase, mostly tutti in drops."""
+    def _kick_pattern(self, d: Decision, t: float | None = None) -> str:
+        """How the group plays the kicks: varied per phrase, and every 4 bars where the music moves fast; mostly
+        tutti in the big drops."""
         options = DROP_PATTERNS if d.section == "drop" and d.intensity >= 3 else KICK_PATTERNS
-        return options[int(_hash(d.phrase, 0, 5) * len(options))]
+        return options[int(_hash(d.phrase, self._block(d, t), 5) * len(options))]
 
     def _x_rank(self, elements: list[dict]) -> dict[str, int]:
         """Elements ranked left to right (cached per list)."""
@@ -354,7 +364,7 @@ class LooksMixin:
             base, accent = accent, base
         env, hit = self._note(d.trigger, t)
         hits = hit + 1  # hits so far: steps chases, alternation, sparkles
-        pattern = self._kick_pattern(d)
+        pattern = self._kick_pattern(d, t)
         flash = _decay(self.flash_t, self.flash_s, t, 0.07)
         rise = d.dynamics == "rise"
         out: dict[str, State] = {}

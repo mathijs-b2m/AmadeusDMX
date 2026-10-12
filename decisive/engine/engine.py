@@ -104,6 +104,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
             lp = analysis.lead_pitch if analysis.lead_pitch is not None else np.zeros(1)
             self.syn_p = np.array([float(lp[min(int(x * analysis.fps), len(lp) - 1)]) for x in lt])
         self.stab_t, self.stab_s = pick_stabs(self.syn_t, self.syn_s)  # the synth's key hits, for accent lights
+        self.accent_family: list[str] = [""] * len(plan)  # per phrase: the instrument the accent lights follow
+        self._stabs_per_instrument(analysis)
         self.gobo_groups = [
             {k: v for k, v in defn.get("gobo_groups", {}).items() if not k.startswith("_")} for _, defn in self.head_fx
         ]

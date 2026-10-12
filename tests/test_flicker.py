@@ -74,7 +74,8 @@ def test_a_kick_break_holds_and_builds_then_the_return_hits(track):
     plan = [replace(d, trigger="kick", par_accent="pulse", head_light="pulse") if d is groove else d for d in plan]
     e = Engine(a, plan, rig)
     assert any(abs(s - start) < 0.01 and abs(t - end) < 0.01 and r for s, t, r in e.kick_breaks)
-    head = next(h["id"] for h in e.heads if h["id"] not in e._accent_players(groove))  # a rhythm light
+    accents = set().union(*(e._accent_players(groove, t) for t in np.arange(groove.start, groove.end, 1.0)))
+    head = next(h["id"] for h in e.heads if h["id"] not in accents)  # a rhythm light all along
     period = 60 / 128
     ts = np.arange(start + 0.05, end - period, 0.05)
     level = np.array([e.render(float(t))[1][head].dimmer for t in ts])

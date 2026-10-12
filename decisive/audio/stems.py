@@ -162,6 +162,35 @@ def load_notes(path: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray] | 
     return z["t"], z["s"], z["p"]
 
 
+INSTRUMENTS_VERSION = 2
+
+
+def load_instruments(path: str | Path) -> dict | None:
+    """Which instrument family plays, over time and per synth note (decisive/audio/instruments.py), if the track
+    has been separated and the instrument models are installed; computed once (~1 s), cached next to the parts.
+    {"t": judgement times, "probs": (n, families), "names": family names, "note_family": per note (-1: unknown),
+    "sound": (n, 1280) the melodic part's sound description per judgement}"""
+    from decisive.audio import instruments
+
+    d = _dir(Path(path))
+    f = d / "instruments.npz"
+    if f.exists():
+        z = np.load(f, allow_pickle=False)
+        if int(z["version"]) == INSTRUMENTS_VERSION:
+            return {k: (list(z[k]) if k == "names" else z[k]) for k in ("t", "probs", "names", "note_family", "sound")}
+    notes = load_notes(path)
+    if notes is None or not instruments.available():
+        return None
+    other = cached_part(path, "other")
+    judged = instruments.judge(other, STEM_SR)
+    fam = instruments.note_families(other, STEM_SR, notes[0], judged)
+    out = {"t": judged["t"].astype(np.float32), "probs": instruments.family_probs(judged).astype(np.float32),
+           "names": list(instruments.FAMILIES), "note_family": fam.astype(np.int8),
+           "sound": judged["embeddings"].astype(np.float16)}  # fmt: skip
+    np.savez_compressed(f, version=INSTRUMENTS_VERSION, **{k: np.asarray(v) for k, v in out.items()})
+    return out
+
+
 def separate_and_save(path: str | Path, verbose: bool = True) -> tuple | None:
     """Separate (or load the cached parts), find the synth notes and store them next to the parts."""
     path = Path(path)

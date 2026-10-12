@@ -63,6 +63,8 @@ def describe(p: Phrase, prev: Phrase | None = None, riff: float = 0.0) -> str:
         f"Synth stutters/gates (rhythmic chopping of the sound): "
         f"{'strong' if p.stutter > 0.5 else 'some' if p.stutter > 0.25 else 'none'} ({p.stutter:.2f}).",
     ]
+    if p.instruments:
+        lines.append(f"Melodic instruments (from the separated melodic part): {p.instruments}.")
     if prev is not None:
         lines.append(
             f"Change vs previous phrase: loudness {p.loudness_pct - prev.loudness_pct:+.0f} pct-points, "
@@ -219,6 +221,12 @@ def build_prompt(
         hints.append(
             "Analysis: the NEXT phrase starts with a drop, so this phrase is most likely the BUILDUP "
             "towards it (use the rise energy curve; the 'roll' trigger accelerates with the build)."
+        )
+    if getattr(p, "melody_change", False):
+        hints.append(
+            "Analysis: a NEW MELODY comes in at the start of this phrase (the melodic part clearly changes sound or "
+            "register while the beat goes on). Answer it with a clear change of look: other colours, movement or "
+            "light pattern than the phrase before."
         )
     if p.kick_ratio < 0.5:
         hints.append(
