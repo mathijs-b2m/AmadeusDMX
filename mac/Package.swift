@@ -23,5 +23,7 @@ let package = Package(
                           swiftSettings: [.swiftLanguageMode(.v5)]),
         // the DJ laptop's companion: passes VirtualDJ's mix state to the lighting computer (amadeus/link.py)
         .executableTarget(name: "AmadeusLink", dependencies: ["AmadeusKit"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        // what Amadeus Link reads from djay Pro and Mixxx, checked against the engine's own readers (swift test)
+        .testTarget(name: "AmadeusLinkTests", dependencies: ["AmadeusLink"], swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

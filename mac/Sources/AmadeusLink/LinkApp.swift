@@ -30,6 +30,14 @@ struct LinkMenu: View {
     @Environment(LinkServer.self) private var link
     private var updates: Updates { link.updates }
 
+    private var waiting: String {
+        switch link.software {
+        case .virtualDJ: "Waiting for VirtualDJ (the AmadeusLink plugin as master effect)"
+        case .djay: "Waiting for djay Pro to play a track"
+        case .mixxx: "Waiting for Mixxx to play a track"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -41,14 +49,28 @@ struct LinkMenu: View {
                     .labelsHidden()
             }
 
+            Picker("DJ software", selection: Binding(get: { link.software }, set: { link.setSoftware($0) })) {
+                ForEach(LinkServer.Software.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
             TimelineView(.periodic(from: .now, by: 1)) { _ in
-                Label(link.djConnected ? "\(link.djApp) connected"
-                      : "Waiting for the DJ software (VirtualDJ: AmadeusLink plugin as master effect)",
+                Label(link.djConnected ? "\(link.djApp) connected" : waiting,
                       systemImage: link.djConnected ? "checkmark.circle.fill" : "hourglass")
                     .foregroundStyle(link.djConnected ? .green : .secondary)
                     .font(.callout)
             }
-            if !link.djConnected { PluginRow() }
+            if !link.djConnected && link.software == .virtualDJ { PluginRow() }
+            if !link.readerNote.isEmpty {
+                Text(link.readerNote).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                if link.software == .djay && link.readerNote.contains("Accessibility") {
+                    Button("Open Accessibility Settings") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                    }
+                    .font(.callout)
+                }
+            }
             if link.djConnected && !link.deckSummary.isEmpty {
                 Text(link.deckSummary).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(4)
             }

@@ -227,18 +227,31 @@ the Start button and ⌘R then use the last one chosen. What each needs:
   permission belongs to the app and covers the engine it starts. A self-built app may need it switched off
   and on again after a rebuild (ad-hoc signature). Details: [docs/dj-software.md](../docs/dj-software.md#the-accessibility-permission).
 
-## Amadeus Link (VirtualDJ on another computer)
+## Amadeus Link (the DJ's laptop)
 
 When the DJ and the lighting operator use different computers:
 
-1. **The DJ's laptop** runs VirtualDJ plus **Amadeus Link.app** (a small window and a menu bar icon, from
-   `build/AmadeusLink.dmg`). Link carries the AmadeusLink plugin for VirtualDJ: *Install* in its menu puts it
-   in VirtualDJ's plugin folder (and *Update* replaces an older one); restart VirtualDJ and switch it on as
-   master effect. Switched on, Link advertises itself with Bonjour and shows a 4-digit code.
-   Don't run a live show of Amadeus DMX on the DJ laptop as well: it takes the plugin's port (UDP 9123), and
-   Link says so until it's free again.
+1. **The DJ's laptop** runs the DJ software plus **Amadeus Link.app** (a small window and a menu bar icon, from
+   `build/AmadeusLink.dmg`). In its menu, pick the DJ software:
+   - **VirtualDJ:** Link carries the AmadeusLink plugin: *Install* puts it in VirtualDJ's plugin folder (and
+     *Update* replaces an older one); restart VirtualDJ and switch it on as master effect.
+   - **djay Pro:** Link reads djay's window itself, like the engine does (`Sources/AmadeusLink/DJ/Djay.swift`):
+     it needs the **Accessibility** permission for Amadeus Link (its menu opens the setting). A deck on SYNC
+     is marked so, and the lighting computer reads the exact beat from **Ableton Link** on the network itself
+     (it needs aalink there; both computers on the same network). Tracks djay streams (Spotify) stay dark over
+     Link: they have no file to send.
+   - **Mixxx:** Link creates the MIDI device "Amadeus DMX" and puts the "Amadeus DMX" mapping in Mixxx's
+     controllers folder (`Sources/AmadeusLink/DJ/Mixxx.swift`). In Mixxx: Preferences › Controllers ›
+     Amadeus DMX, mapping "Amadeus DMX", enabled. **Start Mixxx after Amadeus Link**: Mixxx looks for MIDI
+     devices only when it starts.
+
+   Switched on, Link advertises itself with Bonjour and shows a 4-digit code. Don't run a live show of
+   Amadeus DMX on the DJ laptop as well: it takes VirtualDJ's port (UDP 9123), and Link says so until it's free.
 2. **The lighting computer**: Start ▸ **Start with a DJ Laptop…** lists the nearby DJs; pick one and type
    the code. From the command line: `amadeus live --remote auto --code 1234` (or `--remote HOST:7123`).
+
+Link's djay Pro and Mixxx readers are ports of the engine's (`amadeus/show/sources/djay.py`, `mixxx.py`);
+`swift test` checks them against the values the engine's own code gives.
 
 What travels over the network (protocol in [docs/protocols.md](../docs/protocols.md)):
 - **Deck state:** 25 times a second, stamped with the DJ laptop's clock and signed with a key derived

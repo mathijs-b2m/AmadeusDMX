@@ -6,8 +6,8 @@
 #   ./build-app.sh --dmg       … and make disk images (build/AmadeusDMX.dmg, build/AmadeusLink.dmg)
 # Options combine (--release --dmg). VERSION=1.2.3 sets the version people see (default 0.1.<commits>); the build
 # number is always the commit count, so every later build is newer (what Sparkle compares).
-# A release is signed with the release certificate (release-keys.sh; SIGN_P12 and SIGN_PASSWORD_FILE, default
-# ~/.amadeus-release), else ad hoc. FEED_URL=… turns on updates (Sparkle): the appcast Amadeus DMX checks;
+# Every build is signed with the release certificate when it's on this Mac (release-keys.sh; SIGN_P12 and
+# SIGN_PASSWORD_FILE, default ~/.amadeus-release), else ad hoc. FEED_URL=… turns on updates (Sparkle): the appcast Amadeus DMX checks;
 # Amadeus Link checks appcast-link.xml next to it.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -48,7 +48,9 @@ LINK_UPDATES="$(updates_plist "$LINK_FEED_URL")"
 SIGN="-"
 P12="${SIGN_P12:-$HOME/.amadeus-release/signing.p12}"
 PASSFILE="${SIGN_PASSWORD_FILE:-$HOME/.amadeus-release/signing-password.txt}"
-if [ "$RELEASE" = 1 ] && [ -s "$P12" ]; then
+# every build, a development one too: then macOS keeps the permissions you gave (Accessibility for djay) across
+# rebuilds, instead of asking again for each new ad-hoc signature
+if [ -s "$P12" ]; then
   KC="$OUT/signing.keychain-db"
   ./signing-keychain.sh "$P12" "$PASSFILE" "$KC" >/dev/null
   trap 'security delete-keychain "$KC" 2>/dev/null || true' EXIT
@@ -119,6 +121,9 @@ embed_sparkle "$LINK" AmadeusLink
 # the VirtualDJ plugin, for Link to install on the DJ laptop (signed ad hoc by vdj/build.sh, as Amadeus DMX's copy)
 [ -d "$ROOT/vdj/build/AmadeusLink.bundle" ] || "$ROOT/vdj/build.sh" >/dev/null
 cp -R "$ROOT/vdj/build/AmadeusLink.bundle" "$LINK/Contents/Resources/"
+# the Mixxx mapping, for Link to put in Mixxx's controllers folder
+mkdir -p "$LINK/Contents/Resources/mixxx"
+cp "$ROOT"/mixxx/*.xml "$ROOT"/mixxx/*.js "$LINK/Contents/Resources/mixxx/"
 cp Resources/AppIcon.icns "$LINK/Contents/Resources/AppIcon.icns"
 cat > "$LINK/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

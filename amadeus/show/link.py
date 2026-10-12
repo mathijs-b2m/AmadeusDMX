@@ -155,6 +155,7 @@ class RemoteListener:
         self.seq = -1
         self.connected = False
         self.error = ""
+        self.ableton = None  # Ableton Link on this computer, for decks synced to it (None: not joined yet)
         # both IPv4 and IPv6: a DJ laptop found by its Bonjour name is often reached over IPv6
         self.udp = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         self.udp.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -288,9 +289,39 @@ class RemoteListener:
                     d["bpm0"],
                     d["vol"],
                     at,
-                    phase=d.get("phase"),
+                    title=d.get("title", ""),
+                    artist=d.get("artist", ""),
+                    phase=d["phase"] if d.get("phase") is not None else self._link_phase(d, now, at),
                 )
             self.decks = decks
+
+    def _link_phase(self, d: dict, now: float, at: float) -> float | None:
+        """A deck the DJ laptop says is synced to Ableton Link ("sync"), without a phase of its own: Link is a
+        session on the network, so this computer joins it and reads the beat itself (Amadeus Link carries no
+        Link code). The phase at `at`, the moment of the packet; None until joined, or when the tempos differ
+        (another session, or not synced after all)."""
+        if not d.get("sync") or not d.get("play") or self.ableton is False:
+            return None
+        if self.ableton is None:  # joining takes a moment: not in the way of the packets
+            self.ableton = "joining"
+            threading.Thread(target=self._join_ableton, daemon=True).start()
+            return None
+        if self.ableton == "joining":
+            return None
+        c, bpm = self.ableton, d["bpm"]
+        if not c.peers or abs(c.tempo - bpm) >= 0.1:
+            return None
+        return (c.phase() - (now - at) * bpm / 60.0) % 1.0
+
+    def _join_ableton(self):
+        try:
+            from amadeus.show.sources.ableton import LinkClock
+
+            self.ableton = LinkClock()
+            print("  ⇄ joined Ableton Link: synced decks follow its beat", flush=True)
+        except ImportError:
+            self.ableton = False
+            print("  a deck on SYNC: no Ableton Link here (pip install aalink): positions without it", flush=True)
 
     def alive(self) -> bool:
         return self.connected and time.monotonic() - self.last < STALE_S

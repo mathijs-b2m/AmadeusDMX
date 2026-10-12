@@ -34,6 +34,25 @@ final class LinkServer {
     private(set) var pluginError: String?
     private(set) var tracksServed = 0
 
+    /// The DJ software on this laptop: VirtualDJ sends through its plugin; djay Pro and Mixxx Amadeus Link reads itself.
+    enum Software: String, CaseIterable, Identifiable {
+        case virtualDJ = "virtualdj", djay, mixxx
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .virtualDJ: "VirtualDJ"
+            case .djay: "djay Pro"
+            case .mixxx: "Mixxx"
+            }
+        }
+    }
+
+    private(set) var software: Software = .virtualDJ
+    /// What the DJ should know or do for the chosen DJ software ("" when all is well).
+    private(set) var readerNote = ""
+    @ObservationIgnored private var reader: DJReader?
+    @ObservationIgnored private var pump: DispatchSourceTimer?
+
     @ObservationIgnored private let net = LinkNet()
     /// Updates (Sparkle; a release build only): never while a lighting computer is connected.
     let updates = Updates()
@@ -49,13 +68,49 @@ final class LinkServer {
                 if peers.isEmpty { self?.updates.becameIdle() }  // an update that waited for the lighting computer
             }
         }
-        net.onError = { [weak self] e in Task { @MainActor in self?.error = e } }
+        net.onError = { [weak self] e in Task { @MainActor in self?.error = e.isEmpty ? nil : e } }
         net.onPluginError = { [weak self] e in Task { @MainActor in self?.pluginError = e } }
         net.onServed = { [weak self] in Task { @MainActor in self?.tracksServed += 1 } }
         net.code = code
         let pluginPort = UInt16(UserDefaults.standard.integer(forKey: "pluginPort"))   // -pluginPort 9124 (tests)
         net.startPlugin(port: pluginPort > 0 ? pluginPort : 9123)
         if UserDefaults.standard.object(forKey: "linkOn") as? Bool ?? true { setOn(true) }
+        setSoftware(UserDefaults.standard.string(forKey: "djSoftware").flatMap(Software.init(rawValue:)) ?? .virtualDJ)
+    }
+
+    /// Which DJ software to pass on. djay Pro and Mixxx are read here, 50 times a second, into the plugin's packets.
+    func setSoftware(_ s: Software) {
+        UserDefaults.standard.set(s.rawValue, forKey: "djSoftware")
+        software = s
+        pump?.cancel()
+        pump = nil
+        reader?.stop()
+        reader = nil
+        readerNote = ""
+        net.setPluginOn(s == .virtualDJ)
+        guard s != .virtualDJ else { return }
+        let r: DJReader = s == .djay ? Djay() : Mixxx()
+        reader = r
+        let start = monotonic()
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "amadeus.link.reader", qos: .userInteractive))
+        var noted = 0.0
+        timer.schedule(deadline: .now(), repeating: .milliseconds(20), leeway: .milliseconds(1))
+        timer.setEventHandler { [weak self, net] in
+            let now = monotonic()
+            let decks = r.decks(at: now)
+            if !decks.isEmpty, let packet = Packet.make(app: r.app, decks: decks, now: now, start: start) { net.send(packet) }
+            if now - noted > 0.5 {
+                noted = now
+                let note = r.note, summary = r.summary(at: now)
+                Task { @MainActor in
+                    guard self?.reader === r else { return }
+                    self?.readerNote = note
+                    self?.deckSummary = summary  // every deck, also those not passed on
+                }
+            }
+        }
+        timer.resume()
+        pump = timer
     }
 
     var djConnected: Bool { Date().timeIntervalSince(lastPluginPacket) < 1.5 }
@@ -76,7 +131,7 @@ final class LinkServer {
 
     private func plugin(_ summary: String, app: String) {
         lastPluginPacket = Date()
-        deckSummary = summary
+        if software == .virtualDJ { deckSummary = summary }  // a reader of our own writes its own (every deck)
         djApp = app
     }
 
@@ -144,10 +199,18 @@ final class LinkNet: @unchecked Sendable {
         }
     }
 
+    /// Whether VirtualDJ's plugin is the DJ software passed on (another one is read by Amadeus Link itself).
+    var pluginOn = true
+
+    func setPluginOn(_ on: Bool) { q.async { [weak self] in self?.pluginOn = on } }
+
+    /// A packet Amadeus Link made itself (djay Pro, Mixxx), passed on like the plugin's.
+    func send(_ packet: Data) { q.async { [weak self] in self?.forward(packet) } }
+
     private func receivePlugin(_ c: NWConnection) {
         c.receiveMessage { [weak self] data, _, _, err in
             guard let self else { return }
-            if let data, !data.isEmpty { self.forward(data) }
+            if let data, !data.isEmpty, self.pluginOn { self.forward(data) }
             if err == nil { self.receivePlugin(c) }
         }
     }
@@ -183,8 +246,26 @@ final class LinkNet: @unchecked Sendable {
 
     // MARK: the service (Bonjour, pairing, tracks)
 
+    /// Advertises Link and accepts lighting computers. All on Link's own queue: a stop queued before a start once
+    /// cancelled the new listener (Link then wasn't reachable). A port that isn't free yet (Link just restarted)
+    /// is tried again every two seconds, as long as Link is on.
     func startService(port: UInt16, name: String) {
-        stopService()
+        q.async { [self] in
+            serviceWanted = (port, name)
+            stopNow()
+            listen(port: port, name: name)
+        }
+    }
+
+    private var serviceWanted: (port: UInt16, name: String)?
+
+    private func listen(port: UInt16, name: String) {
+        let retry = { [weak self] in
+            self?.q.asyncAfter(deadline: .now() + 2) {
+                guard let self, let w = self.serviceWanted, w.port == port, self.service == nil else { return }
+                self.listen(port: port, name: name)
+            }
+        }
         do {
             let params = NWParameters.tcp
             params.allowLocalEndpointReuse = true
@@ -194,23 +275,38 @@ final class LinkNet: @unchecked Sendable {
                 c.start(queue: self?.q ?? .main)
                 self?.readLines(c, buffer: Data()) { msg, rest in self?.handshake(c, msg, rest) }
             }
-            l.stateUpdateHandler = { [weak self] st in
-                if case .failed(let e) = st { self?.onError?("Can’t advertise: \(e.localizedDescription)") }
+            l.stateUpdateHandler = { [weak self, weak l] st in
+                switch st {
+                case .ready:
+                    self?.onError?("")
+                case .failed(let e), .waiting(let e):
+                    l?.cancel()
+                    if self?.service === l { self?.service = nil }
+                    self?.onError?("Can’t advertise yet: \(e.localizedDescription). Trying again …")
+                    retry()
+                default: break
+                }
             }
             l.start(queue: q)
             service = l
         } catch {
-            onError?("Can’t advertise: \(error.localizedDescription)")
+            onError?("Can’t advertise yet: \(error.localizedDescription). Trying again …")
+            retry()
         }
     }
 
     func stopService() {
         q.async { [self] in
-            service?.cancel(); service = nil
-            for s in sessions.values { s.udp.cancel(); s.control.cancel() }
-            sessions = [:]
-            publish()
+            serviceWanted = nil
+            stopNow()
         }
+    }
+
+    private func stopNow() {
+        service?.cancel(); service = nil
+        for s in sessions.values { s.udp.cancel(); s.control.cancel() }
+        sessions = [:]
+        publish()
     }
 
     func drop(_ id: String) {

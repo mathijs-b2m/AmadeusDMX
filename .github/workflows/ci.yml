@@ -35,3 +35,6 @@ jobs:
       - name: Build
         working-directory: mac
         run: swift build -c release
+      - name: Test
+        working-directory: mac
+        run: swift test

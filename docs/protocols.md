@@ -21,6 +21,10 @@ times a second it sends one UDP datagram to `127.0.0.1:9123`:
 | `play` | 1 while playing |
 | `bpm`, `bpm0` | current and original tempo (their ratio is the playback speed) |
 | `vol` | fader × crossfader, 0..1 |
+| `app` | the DJ software, when it isn't VirtualDJ (Amadeus Link's own djay Pro and Mixxx readers, `amadeus probe --emit`) |
+| `title`, `artist`, `id` | what the DJ software knows about the track, when it knows it (not VirtualDJ's plugin) |
+| `phase` | beat phase 0..1 from Ableton Link, for a deck synced to it (`amadeus probe --emit`) |
+| `sync` | 1: the deck is synced to Ableton Link but carries no phase (Amadeus Link has no Link code): the lighting computer joins the Link session on the network and reads the beat itself (`amadeus/show/link.py`) |
 
 The receiver (`amadeus/show/vdj.py`) extrapolates each deck's position between packets, drops mirrored
 decks (VirtualDJ reports copies of real decks to master effects) and treats a deck whose position stops

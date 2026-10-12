@@ -106,7 +106,9 @@ DMX uses it to **read**, and only this:
 - **When:** only while a live show follows djay. Following VirtualDJ, Mixxx or another DJ software doesn't
   touch it.
 - **Where it goes:** the deck state stays on this computer, as with VirtualDJ: into the light show and the
-  visualiser feed (on a DJ laptop, `amadeus probe djay --emit` passes it to the Amadeus Link app).
+  visualiser feed. On a separate DJ laptop, the Amadeus Link app reads djay the same way (its own reader,
+  `mac/Sources/AmadeusLink/DJ/Djay.swift`, with the same three kinds of calls) and passes the decks on; then
+  Amadeus Link is the app that needs the permission.
 
 Who gets the permission: macOS grants it to the app that started the engine. In the Mac app that is
 **Amadeus DMX**; from the command line it is your terminal app (Terminal, iTerm, …). Every engine
