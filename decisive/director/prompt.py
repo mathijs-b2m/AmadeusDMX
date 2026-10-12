@@ -14,6 +14,7 @@ from decisive.director.style import Style
 from decisive.director.vocabulary import (
     BASE_GLOWS,
     DEFAULT_PALETTES,
+    FOG_LEVELS,
     FORMATIONS,
     GROUPINGS,
     INTENSITY_LEVELS,
@@ -116,6 +117,7 @@ def _look_text(d: Decision) -> str:
         + ("" if d.layer_split == "none" else f"; layers: {d.layer_split} with a {d.base_glow} base glow")
         + ("" if d.laser_look == "off" else f"; lasers {d.laser_look} {d.laser_move} in {d.laser_color}")
         + ("" if d.screen == "off" else f"; LED wall {d.screen}")
+        + ("" if d.fog == "none" else f"; smoke {d.fog}")
     )
 
 
@@ -128,6 +130,7 @@ def build_prompt(
     screen: bool = False,
     style: Style | None = None,
     theme: str | None = None,
+    fog: bool = False,
 ) -> str:
     phrases = a.phrases
     p = phrases[i]
@@ -184,6 +187,14 @@ def build_prompt(
             "something: ambient colour in calm parts, playful outlined characters (a runner, a dancer, a "
             "jumping crowd, pong) or big words in grooves and builds, and full psychedelic visuals only for "
             "the biggest moments. Keep it fun to watch, not only abstract; vary it."
+        )
+    if fog:
+        parts.append(
+            "There is a SMOKE MACHINE: haze makes the beams visible (the 'fog' question: how hazy the room "
+            "should be in the CURRENT phrase; the program fires the machine, ahead of time and on the beat, sized "
+            "to the machine and the room). Smoke lingers for minutes: plan in long arcs, not phrase by phrase. "
+            "Clear air in the intro, a light haze for grooves, more for builds and drops, a burst only on the "
+            "downbeat of a big drop, and let it clear towards the end."
         )
     if theme == "stars":
         parts.append(
@@ -299,6 +310,7 @@ def questions_for(
     screen: bool = False,
     style: Style | None = None,
     theme: str | None = None,
+    fog: bool = False,
 ) -> list[dict]:
     """The questions for this rig: group/layer questions only with several groups of heads, laser questions
     only with lasers. With a genre's style its palettes are the colours offered (the rest of a style is a lean,
@@ -309,6 +321,8 @@ def questions_for(
     if theme:
         options = [(v, d) for v, d in SPECIALS if v in ("off", theme)]
         qs = qs + [_choice("special", options, f"Switch on the {theme} look for the CURRENT phrase?")]
+    if fog:
+        qs = qs + [_choice("fog", FOG_LEVELS, "How hazy should the room be in the CURRENT phrase (smoke machine)?")]
     return qs
 
 

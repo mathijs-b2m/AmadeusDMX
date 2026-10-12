@@ -150,7 +150,7 @@ class TrackShows:
         return True
 
     def _install(self, file, a, plan, director):
-        engine = Engine(a, plan, self.rig, real_output=self.real_output)
+        engine = Engine(a, plan, self.rig, real_output=self.real_output, fog_carry=True)
         with self.lock:
             self.shows[file] = (a, plan, engine, director)
         print(f"  ✓ {Path(file).name}: {len(plan)} phrases, {a.bpm:.1f} BPM ({director})")

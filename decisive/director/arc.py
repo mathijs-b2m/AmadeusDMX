@@ -131,6 +131,10 @@ def apply_arc(d: Decision, arc: dict, lasers, groups, next_best=None) -> bool:
         d.screen, changed = "figure", True  # the full-on visuals are for the biggest moments
     elif role == "main_drop" and d.source == "rules" and d.screen != "off":
         d.screen = "psychedelic"
+    if d.fog == "burst" and role != "main_drop":
+        d.fog, changed = "medium" if role in ("gentle_drop", "early") else "heavy", True  # blasts: big drops only
+    if d.fog == "heavy" and role in ("gentle_drop", "early"):
+        d.fog, changed = "medium", True
     if role in ("gentle_drop", "early"):
         if d.intensity > 2:
             d.intensity, changed = 2, True

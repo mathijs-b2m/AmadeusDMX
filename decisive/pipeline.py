@@ -23,7 +23,7 @@ from decisive.director.cinematic import NAME as CINEMATIC
 from decisive.director.cinematic import CinematicDirector
 from decisive.director.style import style_for
 from decisive.director.themes import theme_of
-from decisive.rig.groups import head_groups, laser_list, signature
+from decisive.rig.groups import has_smoke, head_groups, laser_list, signature
 
 CACHE = paths.CACHE
 
@@ -104,12 +104,14 @@ def get_plan(
     groups = head_groups(rig) if rig else []
     lasers = laser_list(rig) if rig else []
     screen = bool(rig and rig.get("screen"))
+    fog = has_smoke(rig) if rig else False
     layout = "-".join(
         x
         for x in (
             signature(groups),
             f"l{len(lasers)}" if lasers else None,
             "scr" if screen else None,
+            "fog" if fog else None,
             f"s{style.genre}" if style else None,
             f"t{theme}" if theme else None,
             _sections_key(a),
@@ -132,13 +134,14 @@ def get_plan(
             screen=screen,
             style=style,
             theme=theme,
+            fog=fog,
         )
     elif director.startswith("ollama"):
         model = director.split(":", 1)[1] if ":" in director else "nimble"
         cache = CACHE / f"{base}.{_file_tag(director)}.decisions-cache.json"
-        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style, theme=theme)
+        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style, theme=theme, fog=fog)
     else:
-        d = RuleDirector(groups, lasers, screen, style, theme)
+        d = RuleDirector(groups, lasers, screen, style, theme, fog)
     if isinstance(d, OllamaDirector):
         with LOCAL_MODEL:
             plan = direct(a, d, cancel=cancel, progress=progress)

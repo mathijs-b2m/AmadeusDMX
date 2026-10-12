@@ -23,6 +23,9 @@ def load_rig_dict(rig: dict) -> dict:
     rig.setdefault("artnet", {"ip": "127.0.0.1", "port": 6454, "fps": 40})
     for f in rig["fixtures"]:
         f.setdefault("mode", fxlib.default_mode(fxlib.get(f["fixture"])))
+    for f in rig["fixtures"]:
+        if fxlib.get(f["fixture"]).get("warning"):
+            print(f"⚠ {f['id']}: {fxlib.get(f['fixture'])['warning']}")
     for problem in fxlib.validate(rig):
         print(f"⚠ patch problem: {problem}")
     w = geometry.stage(rig)["width_m"]

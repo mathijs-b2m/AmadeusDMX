@@ -23,16 +23,22 @@ These fixture files were converted from the QLC+ fixture library into this proje
   - `fixtures/martin/mac-encore-performance.json`
   - `fixtures/martin/mac-aura.json`
 
+**The fixture catalogue** (`fixtures/catalog/`): every fixture of the QLC+ fixture library
+(`qlcplus.json.gz`, Apache License 2.0, © the QLC+ authors, license text in `licenses/Apache-2.0.txt`) and of
+the Open Fixture Library (`ofl.json.gz`, MIT, © 2017 Florian & Felix Edelmann and the Open Fixture Library contributors, license text in
+`licenses/open-fixture-library-MIT.txt`), converted into this project's format and modified (channel roles
+mapped, safe defaults added, lasers kept dark, smoke machines' output channels mapped). Each file records the
+upstream version it was built from (`"upstream"`); `tools/build_catalog.py` rebuilds it.
+
 **Butterchurn** and **Butterchurn presets** (MIT, © 2013-2018 Jordan Berg), `web/vendor/`: the LED wall's
 MilkDrop-style visuals in the web visualiser. License texts: `licenses/butterchurn-MIT.txt`,
 `licenses/butterchurn-presets-MIT.txt`.
 
 ## Downloaded when used (not in this repository)
 
-- **QLC+ fixture library** (Apache-2.0): fetched as a sparse git checkout into `.cache/qlcplus` when you
-  search it (`decisive library …`, the setup pages).
-- **Open Fixture Library** (MIT, https://open-fixture-library.org): fetched into `.cache/ofl` when you
-  search it.
+- **QLC+ fixture library** (Apache-2.0) and **Open Fixture Library** (MIT, https://open-fixture-library.org):
+  the original libraries, fetched into `.cache/qlcplus` and `.cache/ofl` only to rebuild the catalogue or to
+  add a fixture newer than it.
 - **VirtualDJ SDK headers** (© Atomix Productions): downloaded by `vdj/build.sh` from virtualdj.com to build
   the DecisiveLink plugin; not redistributable, so not included.
 - **Python packages** (`pyproject.toml`): numpy, scipy (BSD), soundfile, sounddevice, websockets, pyserial

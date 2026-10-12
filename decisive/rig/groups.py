@@ -114,12 +114,17 @@ def _friendly(g: dict, groups: list[dict]) -> str:
     return f"{g['cls']} {i + 1}"
 
 
+def has_smoke(rig: dict) -> bool:
+    """Is there a smoke machine or hazer the show can fire (engine/fog.py)?"""
+    return any(e["kind"] == "smoke" for e in rig.get("elements", []))
+
+
 def laser_list(rig: dict) -> list[dict]:
     """The rig's lasers and roughly where they are (for the director's prompt)."""
     out = []
     w = geometry.stage(rig)["width_m"]
     for f in rig["fixtures"]:
-        if fxlib.get(f["fixture"])["kind"] != "laser":
+        if fxlib.get(f["fixture"])["kind"] != "laser" or fxlib.inert(fxlib.get(f["fixture"])):
             continue
         for e in fxlib.expand(f):
             x, y, z = geometry.position(rig, e, f)

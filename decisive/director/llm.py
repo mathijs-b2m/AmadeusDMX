@@ -11,6 +11,7 @@ from pathlib import Path
 from decisive.audio.model import DROP_THRESHOLD, Analysis
 from decisive.director.arc import apply_arc, laser_star, song_arc
 from decisive.director.decision import (
+    FOG_NAMES,
     GROUP_NAMES,
     LASER_NAMES,
     LAYER_NAMES,
@@ -45,6 +46,7 @@ class OpenAIDirector:
         screen: bool = False,
         style: Style | None = None,
         theme: str | None = None,
+        fog: bool = False,
     ):
         from openai import OpenAI  # imported lazily so the rules mode works without a key
 
@@ -53,8 +55,9 @@ class OpenAIDirector:
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
         self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
-        self.questions = questions_for(groups, lasers, screen, style, theme)
-        self.fallback = RuleDirector(groups, lasers, screen, style, theme)
+        self.fog = fog
+        self.questions = questions_for(groups, lasers, screen, style, theme, fog)
+        self.fallback = RuleDirector(groups, lasers, screen, style, theme, fog)
         self.timings = []
 
     timings: list[float]
@@ -70,7 +73,7 @@ class OpenAIDirector:
         return self.cache[key]
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
-        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen, self.style, self.theme)
+        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen, self.style, self.theme, self.fog)
         d = self.fallback.decide(a, i, history)  # supplies any refused or failed answer
         d.prompt = prompt
         try:
@@ -80,7 +83,8 @@ class OpenAIDirector:
             return d
 
         d.source = self.name
-        for name in ["section", "palette", *LAYER_NAMES, *GROUP_NAMES, *LASER_NAMES, *SCREEN_NAMES, *SPECIAL_NAMES]:
+        names = [*LAYER_NAMES, *GROUP_NAMES, *LASER_NAMES, *SCREEN_NAMES, *SPECIAL_NAMES, *FOG_NAMES]
+        for name in ["section", "palette", *names]:
             ans = answers.get(name)
             if ans and ans.get("type") == "choice":
                 setattr(d, name, ans["choice"])
@@ -224,6 +228,7 @@ class OllamaDirector(OpenAIDirector):
         screen: bool = False,
         style: Style | None = None,
         theme: str | None = None,
+        fog: bool = False,
     ):
         from decisive import paths
 
@@ -232,8 +237,9 @@ class OllamaDirector(OpenAIDirector):
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
         self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
-        self.questions = questions_for(groups, lasers, screen, style, theme)
-        self.fallback = RuleDirector(groups, lasers, screen, style, theme)
+        self.fog = fog
+        self.questions = questions_for(groups, lasers, screen, style, theme, fog)
+        self.fallback = RuleDirector(groups, lasers, screen, style, theme, fog)
         self.timings = []
 
     def _questions(self) -> dict:

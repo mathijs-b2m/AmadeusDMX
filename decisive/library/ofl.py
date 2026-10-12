@@ -1,8 +1,8 @@
 """Open Fixture Library (https://open-fixture-library.org, MIT): search and convert to our fixture format.
 
-The OFL fixtures are downloaded once into .cache/ofl (not stored in this repository). A fixture
-the user adds is converted and saved into fixtures/<manufacturer>/<model>.json, after which it is a
-normal library fixture.
+Every OFL fixture ships already converted in fixtures/catalog/ofl.json.gz (library/shadow.py); the OFL
+itself is downloaded into .cache/ofl only to rebuild that or for a fixture newer than it. A fixture the user
+adds is saved into fixtures/<manufacturer>/<model>.json, after which it is a normal library fixture.
 
 Conversion rules (safety first): channels the engine drives get an attribute (dimmer, red/green/
 blue/white, pan/tilt + fine, color_wheel, gobo, prism, frost); every other channel gets a default
@@ -25,7 +25,7 @@ from decisive.library import fixtures as fxlib
 OFL_DIR = paths.CACHE / "ofl"
 OFL_TARBALL = "https://codeload.github.com/OpenLightingProject/open-fixture-library/tar.gz/refs/heads/master"
 INDEX = OFL_DIR / "index.json"
-CONVERTER_VERSION = 1
+CONVERTER_VERSION = 4
 
 COLOR_ATTR = {
     "Red": "red",
@@ -55,10 +55,21 @@ def ensure_downloaded() -> Path:
 # ---------------------------------------------------------------- helpers
 
 
+def _shift(ch: dict) -> int:
+    """Bits to drop to get a channel's values in bytes: a 16-bit channel (it has a fine channel) gives its
+    ranges and default in 16-bit values unless it says otherwise."""
+    res = ch.get("dmxValueResolution")
+    fine = len(ch.get("fineChannelAliases", []))
+    bits = {"8bit": 8, "16bit": 16, "24bit": 24}.get(res, 8 + 8 * fine)
+    return bits - 8
+
+
 def _caps(ch: dict) -> list[dict]:
     if "capability" in ch:
         return [{**ch["capability"], "dmxRange": [0, 255]}]
-    return ch.get("capabilities", [])
+    n = _shift(ch)
+    caps = ch.get("capabilities", [])
+    return [{**c, "dmxRange": [v >> n for v in c["dmxRange"]]} for c in caps] if n else caps
 
 
 def _mid(cap: dict) -> int:
@@ -81,8 +92,20 @@ def _quiet_default(ch: dict) -> int:
         if cap["type"] in QUIET_TYPES:
             return cap["dmxRange"][0]
     if "defaultValue" in ch and isinstance(ch["defaultValue"], int):
-        return ch["defaultValue"]
+        return ch["defaultValue"] >> _shift(ch)
     return 0
+
+
+def _cap_text(cap: dict) -> str:
+    """What a capability does, in words (to find the range that keeps a laser or smoke machine off)."""
+    t = cap.get("type", "")
+    words = [cap.get("comment", ""), cap.get("effectName", ""), cap.get("shutterEffect", "")]
+    if t == "NoFunction":
+        words.append("no function")
+    for k in ("brightness", "brightnessStart", "fogOutput", "fogOutputStart"):
+        if str(cap.get(k, "")).lower() in ("off", "0%", "0"):
+            words.append("off")
+    return " ".join(w for w in words if w) or t
 
 
 def _resolve_channel(d: dict, key: str) -> tuple[str, dict | None, str | None]:
@@ -229,15 +252,27 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
     """OFL fixture → our fixture definition (not yet saved)."""
     base = ensure_downloaded()
     d = json.loads((base / manufacturer_key / f"{fixture_key}.json").read_text())
+    if "redirectTo" in d:  # an alias (renamed, or sold under another brand): the fixture it points to
+        target = convert(*d["redirectTo"].split("/", 1))
+        return {**target, "model": d.get("name", target["model"])}
     mans = json.loads((base / "manufacturers.json").read_text())
     cats = d.get("categories", [])
     kind = (
-        "moving_head"
+        "laser"
+        if "Laser" in cats
+        else "smoke"
+        if {"Smoke", "Hazer"} & set(cats)
+        else "moving_head"
         if {"Moving Head", "Scanner"} & set(cats)
         else "par_bar"
         if "matrix" in d or "Pixel Bar" in cats
+        else "strobe"
+        if "Strobe" in cats and "Color Changer" not in cats
+        else "blinder"
+        if "Blinder" in cats
         else "par"
     )
+    dark, unsafe = kind in ("laser", "smoke"), []
     focus = d.get("physical", {}).get("focus", {})
     lens = d.get("physical", {}).get("lens", {})
     out = {
@@ -264,6 +299,16 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
                 continue
             _, ch, fine_of = _resolve_channel(d, key)
             spec = _classify(d, key, ch, fine_of)
+            if dark and ch is not None:
+                spec = {"attr": spec["attr"]}  # held at its off value
+                spec["default"], safe = fxlib.off_value(key, [(c["dmxRange"][0], _cap_text(c)) for c in _caps(ch)])
+                if not safe:
+                    unsafe.append(key)
+                if kind == "smoke":  # the output and the fan are played (engine/fog.py)
+                    have = any(c["attr"] == "fog" for c in chans)
+                    full = [(c["dmxRange"][0], c["dmxRange"][1], _cap_text(c)) for c in _caps(ch)]
+                    output = any(c.get("type") == "FogOutput" for c in _caps(ch))
+                    spec = fxlib.smoke_channel("output" if output else key, full, have) or spec
             if "_slots" in spec:
                 wheel_slots = wheel_slots or spec.pop("_slots")
                 spec.pop("_slots", None)
@@ -288,6 +333,16 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
             chans.append(spec)
         name = mode.get("shortName") or mode.get("name") or f"{len(chans)}ch"
         out["modes"][name] = chans
+    if dark:
+        if kind == "smoke" and any(c["attr"] == "fog" for m in out["modes"].values() for c in m):
+            watts = d.get("physical", {}).get("power")
+            if watts:
+                out["physical"]["watts"] = watts
+            fxlib.mark_smoke(out, haze="Hazer" in cats)
+        else:
+            fxlib.mark_inert(out, unsafe)
+        return out
+    _refine(out, d)
     if wheel_slots:
         out["color_wheel"] = {
             "verified": True,
@@ -296,7 +351,7 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
         }
     if len(beam_fx) > 1:
         out["beam_fx"] = beam_fx
-    if kind == "moving_head":
+    if out["kind"] in fxlib.MOVING:
         out["motion"] = {
             "estimated": True,
             "pan_speed_dps": 200,
@@ -305,6 +360,29 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
             "_note": "Estimated; measure with `decisive motion`.",
         }
     return out
+
+
+def _refine(out: dict, d: dict):
+    """What the channels say it is (the categories are loose), and its brightness."""
+    attrs = {c["attr"] for m in out["modes"].values() for c in m}
+    phys = out["physical"]
+    if {"pan", "tilt"} <= attrs:
+        out["kind"] = "moving_head"
+    elif "tilt" in attrs:
+        out["kind"] = "moving_bar"  # cells on one tilting bar
+        phys["pan_deg"] = 0
+    elif out["kind"] == "moving_head":  # a "moving head" without pan and tilt (e.g. an effect light)
+        out["kind"] = "par"
+    if out["kind"] not in fxlib.MOVING:
+        phys.pop("pan_deg", None)
+        phys.pop("tilt_deg", None)
+    lumens = d.get("physical", {}).get("bulb", {}).get("lumens") or 0
+    watts = d.get("physical", {}).get("power") or 0
+    if lumens >= 100:
+        phys["lumens"] = int(lumens)
+    elif watts:  # LED fixtures make roughly 20 lm per watt
+        phys["lumens"] = int(watts * 20)
+        phys["_lumens_note"] = "estimated from the power (20 lm/W)"
 
 
 # ---------------------------------------------------------------- search
@@ -385,6 +463,8 @@ def add_to_library(ofl_key: str) -> str:
     path = fxlib.LIB_DIR / f"{key}.json"
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(convert(mk, fk), indent=2))
+        from decisive.library import shadow
+
+        path.write_text(json.dumps(shadow.get(f"ofl:{key}") or convert(mk, fk), indent=2))
         fxlib.library.cache_clear()
     return key

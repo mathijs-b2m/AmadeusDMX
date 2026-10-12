@@ -161,7 +161,13 @@ def library(args):
     from decisive.library import fixtures as fxlib
 
     if args.add:
-        print(f"Added as '{catalog.add(args.add)}'. Check it once with `decisive test`.")
+        key = catalog.add(args.add)
+        d = fxlib.get(key)
+        print(f"Added as '{key}'. Check it once with `decisive test`.")
+        if fxlib.inert(d):
+            print(f"  Not driven by the show: {fxlib.inert(d)}.")
+        if d.get("warning"):
+            print(f"  ⚠ {d['warning']}.")
     elif args.query:
         for c in catalog.search(" ".join(args.query)):
             print(f"  {c['manufacturer']} {c['model']:<30} {catalog.SOURCES[c['source']]:<22} {c['key']}")
@@ -169,7 +175,8 @@ def library(args):
         for key, d in fxlib.library().items():
             modes = ", ".join(f"{m} ({len(ch)})" for m, ch in d["modes"].items())
             wheel = "" if "color_wheel" not in d or d["color_wheel"].get("verified") else "  ⚠ wheel colours unverified"
-            print(f"  {key:<22} {d['manufacturer']} {d['model']:<14} {d['kind']:<11} modes: {modes}{wheel}")
+            dark = "  (not driven: inert)" if fxlib.inert(d) else ""
+            print(f"  {key:<22} {d['manufacturer']} {d['model']:<14} {d['kind']:<11} modes: {modes}{wheel}{dark}")
 
 
 def patch(args):

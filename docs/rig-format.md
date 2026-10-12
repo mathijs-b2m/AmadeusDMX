@@ -40,14 +40,16 @@ every fixture hangs.
 
 Per fixture: `id`, `fixture` (the library key, `fixtures/<brand>/<model>.json`), `mode`, `universe`, `address`,
 and calibration (`pan_invert`, `tilt_invert`, `pan_home_deg`, `tilt_home_deg`, …). `output` is optional (absent:
-Art-Net to `artnet.ip`); see `decisive/dmx/outputs.py`.
+Art-Net to `artnet.ip`); see `decisive/dmx/outputs.py`. `safety.max_fog` (0..1, default 0.7) caps how hazy smoke
+machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 
 ## The rig file
 
 ```json
 {
   "description": "Club Rotterdam",
-  "stage": {"width_m": 10, "ceiling_m": 7, "room_depth_m": 15, "eye_safety": false},
+  "stage": {"width_m": 10, "ceiling_m": 7, "room_depth_m": 15, "eye_safety": false,
+            "room_volume_m3": 1800, "fog_clear_s": 300},
   "trusses": [
     {"id": "front", "type": "quatro", "length_m": 8.5, "x_m": 5, "y_m": -1.0, "z_m": 4.5},
     {"id": "towerL", "type": "quatro", "length_m": 4, "x_m": 0.3, "y_m": -1.0, "z_m": 2, "vertical": true}

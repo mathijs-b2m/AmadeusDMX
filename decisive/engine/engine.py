@@ -18,6 +18,7 @@ from decisive.audio.model import DROP_THRESHOLD, Analysis
 from decisive.director import Decision
 from decisive.engine import zones
 from decisive.engine.cinematic import CinematicMixin
+from decisive.engine.fog import FogMixin
 from decisive.engine.lasers import LasersMixin
 from decisive.engine.looks import XFADE, LooksMixin
 from decisive.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
@@ -29,11 +30,15 @@ from decisive.rig import geometry
 PICKUP_LEAD = 0.65  # a section that leads in early: how far its look has come in by the downbeat (which lands it)
 
 
-class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
-    def __init__(self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False):
-        """`real_output`: the DMX goes to real lights, so the laser guard insists on laser zones."""
+class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, FogMixin):
+    def __init__(
+        self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False, fog_carry: bool = False
+    ):
+        """`real_output`: the DMX goes to real lights, so the laser guard insists on laser zones. `fog_carry`: a
+        track in a live set: the room is already hazy from the one before (engine/fog.py)."""
         self.a = analysis
         self.real_output = real_output
+        self.fog_carry = fog_carry
         self.plan = plan
         self.rig = rig
         self.starts = [d.start for d in plan]
@@ -95,6 +100,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
         self._init_high_risk(rig, fixtures)
         self._init_groups(rig)
         self._init_lasers(rig, fixtures)
+        self._init_fog(rig, fixtures)
         # synth/melody notes for the lasers to play: from the separated synth instrument when available
         if analysis.synth_notes is not None and len(analysis.synth_notes[0]):
             self.syn_t, self.syn_s, self.syn_p = (np.asarray(x, float) for x in analysis.synth_notes)
@@ -240,7 +246,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin):
 
     def _finish(self, states: dict[str, State], t: float) -> dict[str, State]:
         """What every look gets last: the heads' real and target positions, dark while crossing the eye band,
-        colours the wheels can make, and the laser guard."""
+        colours the wheels can make, the smoke machines, and the laser guard."""
+        self._fog(states, t)
         f = t * MOTION_FPS
         i0 = int(min(max(f, 0), self.traj_n - 2))
         k = min(max(f - i0, 0.0), 1.0)

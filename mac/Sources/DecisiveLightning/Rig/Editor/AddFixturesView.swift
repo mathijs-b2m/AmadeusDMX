@@ -15,6 +15,8 @@ struct AddFixturesView: View {
     @State private var count = 4
     @State private var busy = false
     @State private var error: String?
+    @State private var note: String?
+    @State private var warns = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -41,6 +43,7 @@ struct AddFixturesView: View {
                 Picker("Mode", selection: $mode) { ForEach(modes, id: \.self) { Text($0).tag($0) } }
                 Stepper("Count: \(count)", value: $count, in: 1...48)
             }
+            if let note { Text(note).font(.caption).foregroundStyle(warns ? Color.red : Color.secondary) }
             if let error { Text(error).font(.caption).foregroundStyle(.red) }
             HStack {
                 if busy { ProgressView().controlSize(.small) }
@@ -68,6 +71,8 @@ struct AddFixturesView: View {
             let k = e.isLocal ? e.key : try await model.api.addToLibrary(e.key)  // QLC+/OFL → our library
             key = k
             guard let def = editor.definition(k) else { error = "Couldn’t read \(k)"; return }
+            note = def.addingNote
+            warns = def.warning != nil
             modes = def.modes.keys.sorted { def.channels($0) > def.channels($1) }
             mode = def.defaultMode
             error = nil

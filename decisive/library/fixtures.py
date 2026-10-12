@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from functools import cache
 
 from decisive import paths
@@ -19,8 +20,83 @@ LIB_DIR = paths.FIXTURES
 PAN_TILT = {"pan", "pan_fine", "tilt", "tilt_fine"}
 # definition kind → element kind. A moving bar (DTS Katana, COLORband PiX-M) is a row of cells that share
 # one tilt motor: every cell is a "head" element; the engine moves them together.
-ELEMENT_KIND = {"moving_head": "head", "moving_bar": "head", "laser": "laser", "blinder": "blinder", "strobe": "strobe"}
+ELEMENT_KIND = {
+    "moving_head": "head",
+    "moving_bar": "head",
+    "laser": "laser",
+    "blinder": "blinder",
+    "strobe": "strobe",
+    "smoke": "smoke",  # a smoke machine or hazer: engine/fog.py decides when and how much
+}
 MOVING = ("moving_head", "moving_bar")
+
+# Lasers from the QLC+ / Open Fixture Library come without the hand-made mapping the show needs to drive them
+# safely: they are "inert", every channel held at its off value (the visualisers draw them dark). So is a smoke
+# machine whose output channel the converter couldn't find.
+OFF_WORDS = re.compile(r"\b(off|blackout|no output|closed?|stop|disabled?|no function|nothing)\b", re.I)
+AUTO_WORDS = re.compile(r"\b(auto(matic)?|sound|music|programs?|show|demo|random)\b", re.I)
+MODE_CHANNEL = re.compile(r"^(?!.*speed).*\b(modes?|control|operation|function)\b", re.I)  # what switches it on
+
+
+def inert(defn: dict) -> str:
+    """Why the show never drives this fixture ('' if it does): it holds every channel at its default."""
+    if defn.get("inert"):
+        return defn["inert"]
+    if defn.get("kind") == "smoke" and not any(c["attr"] == "fog" for m in defn.get("modes", {}).values() for c in m):
+        return "a smoke machine whose output channel isn't known: the show never fires it"
+    if defn.get("kind") == "laser" and "laser" not in defn:
+        return "a laser whose channels aren't mapped by hand yet: it stays dark"
+    return ""
+
+
+def off_value(channel: str, caps: list[tuple[int, str]]) -> tuple[int, bool]:
+    """The DMX value that keeps a channel of a laser or smoke machine off: the first range called off,
+    blackout, no function…, else 0. False when 0 starts the fixture by itself (a mode channel whose 0 is
+    sound or auto) and nothing on the channel says off: DMX can't keep it dark."""
+    for lo, name in sorted(caps):
+        if OFF_WORDS.search(name) and not re.search(r"\bon\b", name, re.I):
+            return lo, True
+    first = min(caps)[1] if caps else ""
+    return 0, not (AUTO_WORDS.search(first) and MODE_CHANNEL.search(channel))
+
+
+FOG_OUTPUT = re.compile(r"^(fog|smoke|haze|pump)\b|output|volume|density", re.I)
+FOG_NOT = re.compile(r"duration|interval|time|program|colou?r|random|auto|speed|fan|strob|dimmer|macro", re.I)
+
+
+def smoke_channel(name: str, caps: list[tuple[int, str]], have_output: bool) -> dict | None:
+    """A smoke machine's channel the show drives: its output ("fog", from the first value that makes smoke)
+    or its fan; None for the rest (timers, colours, programs: held off)."""
+    if not have_output and FOG_OUTPUT.search(name) and not FOG_NOT.search(name):
+        off = [hi for lo, hi, n in caps if OFF_WORDS.search(n) and not re.search(r"\bon\b", n, re.I) and lo == 0]
+        return {"attr": "fog", "on_from": min(max(off, default=0) + 1, 255)}
+    if re.search(r"\bfan\b", name, re.I):
+        return {"attr": "fog_fan", "default": off_value(name, [(lo, n) for lo, _, n in caps])[0]}
+    return None
+
+
+def mark_smoke(defn: dict, haze: bool):
+    """A converted smoke machine with an output channel: what kind, how much (estimated from its power)."""
+    for k in ("pan_deg", "tilt_deg", "lumens", "_lumens_note"):
+        defn["physical"].pop(k, None)
+    defn["physical"]["fog"] = {
+        "type": "haze" if haze else "fog",
+        "estimated": True,
+        "_note": "Output estimated from the power; set m3_min (m³ per minute), max_burst_s and rest_s from "
+        "the manual for better timing (engine/fog.py).",
+    }
+
+
+def mark_inert(defn: dict, unsafe: list[str]):
+    """A converted laser or smoke machine: inert, and a warning when DMX can't keep it off."""
+    defn["inert"] = inert(defn)
+    for k in ("pan_deg", "tilt_deg", "lumens", "_lumens_note"):
+        defn["physical"].pop(k, None)
+    if unsafe:
+        defn["warning"] = (
+            f"DMX can't keep it off ({', '.join(sorted(set(unsafe)))} at 0 is a sound or auto mode): "
+            "power it from a switch you control"
+        )
 
 
 def is_moving(defn: dict) -> bool:
@@ -97,7 +173,7 @@ def expand(fx: dict, stage_w: float | None = None) -> list[dict]:
     axis, which `rot_deg` turns); `x` is the element's stage position as a fraction of the stage width
     (exact when `stage_w` is given, for ordering otherwise)."""
     defn = get(fx["fixture"])
-    kind = ELEMENT_KIND.get(defn["kind"], "par")
+    kind = "inert" if inert(defn) else ELEMENT_KIND.get(defn["kind"], "par")
     hs = heads(defn, fx["mode"])
     n = len(hs)
     length = bar_length_m(fx, defn)
@@ -138,7 +214,7 @@ def _chroma(rgb):
 def nearest_slot(defn: dict, rgb, white: float = 0.0) -> dict:
     """Pick the colour-wheel slot closest to the wanted colour (white flash → open)."""
     slots = defn["color_wheel"]["slots"]
-    if white > 0.5 or max(rgb) - min(rgb) < 0.2:  # unsaturated → open/white
+    if white > 0.5 or max(rgb) - min(rgb) < 0.2 or len(slots) < 2:  # unsaturated (or only open) → open/white
         return slots[0]
     want = _chroma(rgb)
     return min(slots[1:], key=lambda s: sum((a - b) ** 2 for a, b in zip(_chroma(s["rgb"]), want)))
@@ -158,6 +234,11 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
     """
     defn = get(fx["fixture"])
     chans = channels(defn, fx["mode"])
+    if inert(defn):  # never driven: every channel at its off value
+        for off, c in enumerate(chans):
+            if 0 <= fx["address"] - 1 + off < 512:
+                buf[fx["address"] - 1 + off] = int(c.get("default", 0))
+        return
     els = {e["head"]: states[e["id"]] for e in expand(fx)}
     first = next(iter(els.values()))
     per_head_colour = len(els) > 1
@@ -197,6 +278,11 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
         scale = s.dimmer if ((per_head_colour and not head_dimmers) or not has_dimmer) else 1.0
         if a in overrides:
             v = overrides[a]
+        elif a == "fog":  # smoke output: the element's level (engine/fog.py), above the value where smoke starts
+            on = c.get("on_from", 1)
+            v = 0 if s.dimmer <= 0 else on + round(min(s.dimmer, 1.0) * (255 - on))
+        elif a == "fog_fan":  # a hazer's fan: spreads what it makes; resting when it makes nothing
+            v = round((0.4 + 0.6 * min(s.dimmer, 1.0)) * 255) if s.dimmer > 0 else c.get("default", 0)
         elif "default" in c:
             v = c["default"]
         elif a == "pan":
@@ -232,7 +318,7 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
             v = _laser_value(a, defn["laser"], s)
         else:
             v = 0
-        buf[addr] = int(v)
+        buf[addr] = min(max(int(v), 0), 255)  # a bad value in a definition must never stop the show
 
 
 def _laser_value(a: str, laser: dict, s) -> int:

@@ -61,6 +61,9 @@ struct AddToSetSheet: View {
                 .scrollDisabled(true)
                 .frame(height: 110)
             }
+            if let note = definition?.addingNote {
+                Text(note).font(.callout).foregroundStyle(definition?.warning == nil ? Color.secondary : Color.red)
+            }
             if let error { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout) }
             HStack {
                 Spacer()

@@ -128,6 +128,24 @@ RULE_SCREEN = {  # rotated per section; a real wall is often dark
 }
 
 
+RULE_FOG = {  # smoke lingers: long arcs. Clear air at the edges, a burst only as a drop lands
+    "intro": "none",
+    "groove": "light",
+    "buildup": "medium",
+    "drop": "heavy",
+    "breakdown": "light",
+    "outro": "none",
+}
+
+
+def apply_fog(d: Decision, fog: bool, last: Decision | None, final: bool):
+    """`final`: the track's last phrase: stop firing (the haze lingers into whatever comes next)."""
+    if fog:
+        d.fog = "none" if final else RULE_FOG.get(d.section, "light")
+        if d.section == "drop" and not (last and last.section == "drop"):
+            d.fog = "burst"  # the moment it lands (the arc keeps bursts for the big drops)
+
+
 def apply_screen(d: Decision, screen: bool, n_before: int):
     if screen:
         options = RULE_SCREEN.get(d.section, ["off"])
@@ -172,8 +190,10 @@ class RuleDirector:
         screen: bool = False,
         style: Style | None = None,
         theme: str | None = None,
+        fog: bool = False,
     ):
         self.groups = groups
+        self.fog = fog  # the rig has a smoke machine
         self.lasers = lasers
         self.screen = screen
         self.style = style  # the genre's house style, if any
@@ -243,6 +263,7 @@ class RuleDirector:
         apply_groups(d, self.groups, n_before)
         apply_lasers(d, self.lasers, n_before)
         apply_screen(d, self.screen, n_before)
+        apply_fog(d, self.fog, last, i == len(a.phrases) - 1)
         arc = song_arc(a)[i]
         laser_star(d, arc, self.lasers)
         apply_arc(d, arc, self.lasers, self.groups)

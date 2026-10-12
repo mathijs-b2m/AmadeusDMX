@@ -198,6 +198,8 @@ function renderSheet() {
     <div class="brand">${esc(d.manufacturer)}</div>
     <h3>${esc(d.model)}</h3>
     <div class="note">${esc(extras)}</div>
+    ${d.inert ? `<p class="note">Not driven by the show: ${esc(d.inert)}.</p>` : ""}
+    ${d.warning ? `<p class="msg bad">⚠ ${esc(d.warning)}.</p>` : ""}
 
     <div class="section"><h2>DMX mode</h2>
       <div class="chips">${Object.entries(d.modes).map(([m, c]) =>

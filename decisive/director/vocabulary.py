@@ -298,6 +298,22 @@ LASER_COLORS = [
     ),
 ]
 
+FOG_LEVELS = [  # smoke machines / hazers (only asked when the rig has one): beams need haze to be seen
+    ("none", "No smoke: let the room clear. Intros, outros, and a deliberately clean, crisp moment."),
+    ("light", "A thin haze: beams just visible. The default for grooves and calm parts."),
+    ("medium", "Clearly hazy: beams stand in the air. Builds and busy parts."),
+    (
+        "heavy",
+        "Thick haze: big beam looks, drops and peaks. Not for long stretches: the crowd still wants to see the DJ.",
+    ),
+    (
+        "burst",
+        "A blast of smoke exactly on the downbeat of this phrase, then heavy: the moment a big drop "
+        "lands. Rare: a few times per track at most.",
+    ),
+]
+
+
 SCREEN_MODES = [  # the LED wall behind the DJ (only asked when the rig has one); a real wall is often dark
     ("off", "Wall dark: the lights carry the show (often the best choice: the wall keeps its impact)."),
     ("ambient", "Dim, slow, soft colour movement in the palette: atmosphere without stealing the show."),

@@ -109,6 +109,8 @@ class Feed:
         self.lite: set = set()
         self.hello: str | None = None
         self.ids = [e["id"] for e in rig["elements"]]
+        self.smokes = [e["id"] for e in rig["elements"] if e["kind"] == "smoke"]
+        self.dark = {e["id"] for e in rig["elements"] if e["kind"] in ("smoke", "inert")}  # no light of their own
         by_id = {f["id"]: f for f in rig["fixtures"]}
         self.head_fk = {
             e["id"]: (by_id[e["fixture"]], fxlib.get(by_id[e["fixture"]]["fixture"]))
@@ -159,6 +161,8 @@ class Feed:
         for e in self.ids:
             s = states[e]
             dim, r, g, b, w = shown.get(e, (s.dimmer, s.r, s.g, s.b, s.white))
+            if e in self.dark:
+                dim = w = 0.0
             fx.append([round(v, 3) for v in (dim, r, g, b, w, s.pan, s.tilt)])
         out = {
             "fx": fx,
@@ -172,6 +176,8 @@ class Feed:
         }
         if lasers:
             out["lz"] = [lasers.get(e) for e in self.ids]
+        if self.smokes:  # each smoke machine's output now, 0..1
+            out["fog"] = {e: round(states[e].dimmer, 2) for e in self.smokes}
         return out
 
 

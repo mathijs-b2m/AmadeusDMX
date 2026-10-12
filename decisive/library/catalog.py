@@ -11,7 +11,7 @@ import re
 from functools import cache
 
 from decisive.library import fixtures as fxlib
-from decisive.library import ofl, qlc
+from decisive.library import ofl, qlc, shadow
 from decisive.library.ofl import _tokens
 
 SOURCES = {"local": "your library", "qlc": "QLC+ library", "ofl": "Open Fixture Library"}
@@ -41,6 +41,7 @@ LOCAL_TYPES = {
     "strobe": "strobe",
     "blinder": "blinder",
     "laser": "laser",
+    "smoke": "smoke",
 }
 
 
@@ -89,10 +90,7 @@ def _candidates_uncached() -> list[dict]:
         if d["kind"] == "moving_head" and "gobo_names" in d and "beam" not in d["model"].lower():
             out[-1]["look"] = "spot"
     for source, index in (("qlc", qlc.index), ("ofl", ofl.index)):
-        try:
-            out += [_typed(dict(c, source=source)) for c in index()]
-        except OSError:  # offline and not cached yet: search what we have
-            pass
+        out += [_typed(dict(c, source=source)) for c in _source_index(source, index)]
     seen, unique = set(), []
     for c in out:
         _typed(c)
@@ -100,6 +98,33 @@ def _candidates_uncached() -> list[dict]:
             seen.add(_ident(c))
             unique.append(c)
     return unique
+
+
+def _source_index(source: str, live) -> list[dict]:
+    """The shipped catalogue's entries, plus any newer ones of a library already downloaded here; without a
+    catalogue, the library itself (downloaded on first use)."""
+    shipped = shadow.index(source)
+    downloaded = qlc.FIXTURES_DIR.exists() if source == "qlc" else (ofl.OFL_DIR / "fixtures").exists()
+    if shipped is not None and not downloaded:
+        return shipped
+    try:
+        fresh = live()
+    except OSError:  # offline and not cached yet: search what we have
+        return shipped or []
+    if shipped is None:
+        return fresh
+    known = {c["key"] for c in shipped}
+    return shipped + [c for c in fresh if c["key"] not in known]
+
+
+def definition(key: str) -> dict:
+    """A QLC+ / OFL entry converted: from the shipped catalogue, else converted now (downloads if needed)."""
+    d = shadow.get(key)
+    if d is not None:
+        return d
+    if key.startswith("qlc:"):
+        return qlc.convert(key[4:])
+    return ofl.convert(*key[4:].split("/", 1))
 
 
 def search(query: str, limit: int = 15) -> list[dict]:
@@ -122,12 +147,7 @@ def search(query: str, limit: int = 15) -> list[dict]:
 
 def details(key: str) -> dict:
     """Modes and channel layout of any catalogue entry (downloads the definition if needed)."""
-    if key.startswith("qlc:"):
-        d = qlc.convert(key[4:])
-    elif key.startswith("ofl:"):
-        d = ofl.convert(*key[4:].split("/", 1))
-    else:
-        d = fxlib.get(key)
+    d = definition(key) if key.startswith(("qlc:", "ofl:")) else fxlib.get(key)
     return {
         "key": key,
         "manufacturer": d["manufacturer"],
@@ -137,6 +157,8 @@ def details(key: str) -> dict:
         "default_mode": fxlib.default_mode(d),
         "color_wheel": "color_wheel" in d,
         "gobos": len(d.get("gobo_names", [])),
+        "inert": fxlib.inert(d),  # not driven by the show (a converted laser, smoke): why
+        "warning": d.get("warning", ""),
     }
 
 

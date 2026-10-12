@@ -2,7 +2,8 @@
 
 QLC+ ships ~1,800 fixture definitions (.qxf XML) — more than the Open Fixture Library for many DJ
 brands (e.g. beamZ, Ayra, Showtec). The fixture folder is fetched once with a sparse git checkout
-(~18 MB, a few seconds) into .cache/qlcplus; `git pull` there updates it. Conversion follows the same safety rules as
+(~18 MB, a few seconds) into .cache/qlcplus, only to rebuild fixtures/catalog/ (tools/build_catalog.py) or
+for a fixture newer than it. Conversion follows the same safety rules as
 the OFL converter: driven channels get an attribute, everything else a quiet default (shutter open,
 programs and macros off).
 """
@@ -26,7 +27,7 @@ FIXTURES_DIR = REPO_DIR / "resources" / "fixtures"
 REPO_URL = "https://github.com/mcallegari/qlcplus.git"
 RAW_URL = "https://raw.githubusercontent.com/mcallegari/qlcplus/master/resources/fixtures/{path}"
 NS = {"q": "http://www.qlcplus.org/FixtureDefinition"}
-CONVERTER_VERSION = 4
+CONVERTER_VERSION = 6
 
 PRESET_ATTR = {
     "IntensityMasterDimmer": "dimmer",
@@ -288,7 +289,11 @@ def convert(rel: str) -> dict:
     root = _load(rel)
     channels = {ch.get("Name"): ch for ch in root.findall("q:Channel", NS)}
     ftype = _text(root, "Type")
-    kind = "moving_head" if ftype in ("Moving Head", "Scanner") else "par"
+    kind = {"Moving Head": "moving_head", "Scanner": "moving_head", "Laser": "laser", "Smoke": "smoke"}.get(
+        "Smoke" if ftype == "Hazer" else ftype, "par"
+    )
+    dark = kind in ("laser", "smoke")  # never driven: every channel off (fixtures.inert)
+    unsafe: list[str] = []
     out = {
         "manufacturer": _text(root, "Manufacturer"),
         "model": _text(root, "Model"),
@@ -335,6 +340,16 @@ def convert(rel: str) -> dict:
         for n in range(len(order)):
             ch = channels.get(order.get(n))
             spec = _classify(ch) if ch is not None else {"attr": "unused", "default": 0}
+            if dark and ch is not None:
+                caps = [(c["min"], c["name"]) for c in _caps(ch)]
+                spec = {"attr": spec["attr"]}  # held at its off value
+                spec["default"], safe = fxlib.off_value(ch.get("Name", ""), caps)
+                if not safe:
+                    unsafe.append(ch.get("Name", ""))
+                if kind == "smoke":  # the output and the fan are played (engine/fog.py)
+                    have = any(c["attr"] == "fog" for c in chans)
+                    full = [(c["min"], c["max"], c["name"]) for c in _caps(ch)]
+                    spec = fxlib.smoke_channel(ch.get("Name", ""), full, have) or spec
             if spec.get("_slots"):
                 wheel_slots = wheel_slots or spec["_slots"]
             if spec["attr"] == "gobo":
@@ -366,6 +381,14 @@ def convert(rel: str) -> dict:
         out["beam_fx"] = beam_fx
     if gobo_names:
         out["gobo_names"] = gobo_names
+    if dark:
+        for k in ("beam_fx", "color_wheel", "gobo_names"):
+            out.pop(k, None)
+        if kind == "smoke" and any(c["attr"] == "fog" for m in out["modes"].values() for c in m):
+            fxlib.mark_smoke(out, haze=ftype == "Hazer" or "haz" in out["model"].lower())
+        else:
+            fxlib.mark_inert(out, unsafe)
+        return out
     _refine(out, ftype)
     if out["kind"] in ("moving_head", "moving_bar"):
         out["motion"] = {
@@ -426,8 +449,10 @@ def details(rel: str) -> dict:
 
 
 def add_to_library(qlc_key: str) -> str:
+    from decisive.library import shadow
+
     rel = qlc_key.removeprefix("qlc:")
-    d = convert(rel)
+    d = shadow.get(f"qlc:{rel}") or convert(rel)
     brand = re.sub(r"[^a-z0-9]+", "", d["manufacturer"].lower()) or "other"
     model = re.sub(r"[^a-z0-9]+", "-", d["model"].lower()).strip("-")
     key = f"{brand}/{model}"

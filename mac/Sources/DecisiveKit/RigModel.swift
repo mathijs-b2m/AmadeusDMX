@@ -78,8 +78,12 @@ public struct FixtureDefinition: Decodable, Sendable {
     public var kind: String
     public var physical: Physical?
     public var modes: [String: [[String: JSONValue]]]
+    /// Why the show never drives it ("" if it does): see fixtures.inert in the engine.
+    public var inert: String
+    /// Something the user must do for it to be safe (a laser DMX can't keep off).
+    public var warning: String?
 
-    enum CodingKeys: String, CodingKey { case manufacturer, model, kind, physical, modes }
+    enum CodingKeys: String, CodingKey { case manufacturer, model, kind, physical, modes, inert, warning, laser }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -88,6 +92,19 @@ public struct FixtureDefinition: Decodable, Sendable {
         kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? "par"
         physical = try c.decodeIfPresent(Physical.self, forKey: .physical)
         modes = (try? c.decodeIfPresent([String: [[String: JSONValue]]].self, forKey: .modes)) ?? [:]
+        warning = try c.decodeIfPresent(String.self, forKey: .warning)
+        let reason = try c.decodeIfPresent(String.self, forKey: .inert) ?? ""
+        inert = !reason.isEmpty ? reason
+            : kind == "smoke" && !modes.values.joined().contains(where: { $0["attr"]?.string == "fog" })
+                ? "a smoke machine whose output channel isn’t known: the show never fires it"
+            : kind == "laser" && !c.contains(.laser) ? "a laser whose channels aren’t mapped by hand yet: it stays dark"
+            : ""
+    }
+
+    /// What to tell someone adding it (nil: nothing special).
+    public var addingNote: String? {
+        let parts = [inert.isEmpty ? nil : "Not driven by the show: \(inert).", warning.map { "⚠ \($0)." }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
     public var name: String { "\(manufacturer) \(model)" }
