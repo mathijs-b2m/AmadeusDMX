@@ -76,6 +76,10 @@ labels, about 200 times a second, through the macOS Accessibility API.
   a time, 3 s apart; a track unloaded before its turn is skipped. A first fetch takes ~2–5 s, then the
   quick plan lights it within seconds.
 
+  It needs an internet connection during the show: a track is fetched when it is loaded on a deck. Offline,
+  streamed tracks stay dark (a copy fetched before still lights; a fetch that failed for want of a connection
+  is tried again 30 s later). Preparing a playlist's tracks before the gig (preloading) is for a later version.
+
   It downloads from YouTube, which YouTube's terms don't allow and which copyright law may not allow where you
   are: it is off until you switch it on, in the Mac app (Settings ▸ Integrations ▸ djay Pro: "Light streamed
   tracks") or with `--opt streamed=1`. The app saves the choice in `config/integrations.json`

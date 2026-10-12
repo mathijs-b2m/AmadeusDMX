@@ -108,7 +108,7 @@ struct DjaySection: View {
                 if on { confirming = true } else { save(false) }
             })) {
                 Text("Light streamed tracks")
-                Text("Spotify tracks have no file to analyse. When one is loaded on a deck, a copy of the same recording is downloaded from YouTube (yt-dlp, once per track) and analysed. The audience still hears djay's own stream.")
+                Text("Spotify tracks have no file to analyse. When one is loaded on a deck, a copy of the same recording is downloaded from YouTube (yt-dlp, once per track) and analysed. The audience still hears djay's own stream. Needs an internet connection during the show.")
             }
             .disabled(model.workspace == nil)
             if streamed, model.workspace?.hasPythonPackage("yt_dlp") == false {
@@ -118,7 +118,7 @@ struct DjaySection: View {
         } header: {
             Text("djay Pro")
         } footer: {
-            Text("Off by default. Downloading from YouTube goes against YouTube's terms of service and may not be allowed by copyright law where you are. Only switch this on for music you may copy; you are responsible for that choice. Copies stay on this Mac (the engine's .cache/streamed) and are used only to analyse the track. Takes effect at the next live show.")
+            Text("Off by default. Downloading from YouTube goes against YouTube's terms of service and may not be allowed by copyright law where you are. Only switch this on for music you may copy; you are responsible for that choice. Needs an internet connection: a track is fetched when it is loaded on a deck (a few seconds); offline, streamed tracks stay dark, while tracks fetched before still light. Copies stay on this Mac (the engine's .cache/streamed) and are used only to analyse the track. Takes effect at the next live show.")
         }
         .onAppear { streamed = model.workspace?.integrationSetting("djay", "streamed") ?? false }
         .confirmationDialog("Download copies of streamed tracks?", isPresented: $confirming) {

@@ -165,3 +165,20 @@ def test_streamed_tracks_are_off_by_default():
     from decisive.show.sources.djay import Djay
 
     assert inspect.signature(Djay).parameters["streamed"].default == 0
+
+
+def test_offline_is_tried_again_later(fetcher, monkeypatch):
+    def search(s):
+        raise OSError("<urlopen error [Errno 8] nodename nor servname provided, or not known>")
+
+    fetcher._search = search
+    fetcher.file(TOXIC)
+    wait(fetcher, TOXIC)
+    assert fetcher.state[TOXIC.id] == "failed" and TOXIC.id in fetcher.offline_at
+    fetcher.file(TOXIC)
+    assert fetcher.state[TOXIC.id] == "failed"  # not at once
+    fetcher.offline_at[TOXIC.id] -= streamed.OFFLINE_RETRY_S + 1
+    fake(fetcher, {"same": 198.8}, [])  # back online
+    fetcher.file(TOXIC)
+    wait(fetcher, TOXIC)
+    assert fetcher.file(TOXIC).endswith("[spotify-6I9].webm")

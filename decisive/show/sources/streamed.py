@@ -37,6 +37,7 @@ LENGTH_MATCH_S = 1.0  # the copy's length vs the stream's: further off is anothe
 EXACT_S = 0.1  # this close: the same master (most are within 30 ms); between the two, try one more candidate
 DOWNLOADS = 2  # at most this many candidates downloaded per track
 GAP_S = 3.0  # at least this long between two requests to YouTube (search or download)
+OFFLINE_RETRY_S = 30.0  # a fetch that failed for want of a connection: tried again this much later
 WANTED_S = 10.0  # a queued track no deck has asked for in this long is skipped
 QUALITY = "bestaudio[abr<=80]/worstaudio[abr>=40]/bestaudio"  # ~70 kbps Opus: plenty to analyse
 SEARCH = 8  # results to consider per search
@@ -162,6 +163,7 @@ class Fetcher:
         self.queue: queue.Queue[Stream] = queue.Queue()
         self.state: dict[str, str] = {}  # stream id → "waiting" | "running" | "done" | "failed"
         self.why: dict[str, str] = {}
+        self.offline_at: dict[str, float] = {}  # stream id → when its fetch failed for want of a connection
         self.asked: dict[str, float] = {}  # stream id → when a deck last asked for it
         self.last = 0.0  # when we last asked YouTube anything
         self.lock = threading.Lock()
@@ -185,6 +187,8 @@ class Fetcher:
             self.state[s.id] = "done"
             return f
         with self.lock:
+            if s.id in self.offline_at and time.monotonic() - self.offline_at[s.id] > OFFLINE_RETRY_S:
+                del self.offline_at[s.id], self.state[s.id]  # perhaps back online: once more
             if s.id not in self.state:
                 self.state[s.id] = "waiting"
                 self.queue.put(s)
@@ -242,7 +246,11 @@ class Fetcher:
             self.state[s.id] = "done"
         except Exception as e:  # a failed fetch leaves the deck dark, as before; say why once
             self.state[s.id], self.why[s.id] = "failed", str(e)
-            print(f"  ⚠ {s.name}: no copy to light it with ({e})", flush=True)
+            if offline(e):
+                self.offline_at[s.id] = time.monotonic()
+                print(f"  ⚠ {s.name}: no copy: no internet connection? (trying again in 30 s)", flush=True)
+            else:
+                print(f"  ⚠ {s.name}: no copy to light it with ({e})", flush=True)
 
     def _search(self, s: Stream) -> list[dict]:
         import yt_dlp
@@ -278,6 +286,8 @@ class Fetcher:
                     f = Path(y.prepare_filename(info))
                 return f, length_of(f) or _probe_length(f) or float(info.get("duration") or 0)
             except Exception as e:
+                if offline(e):
+                    raise  # no connection: the next candidate won't come either
                 if wait is None:
                     print(f"  ⚠ {s.name}: YouTube {hit['id']}: {e}", flush=True)
                     return None
@@ -286,6 +296,14 @@ class Fetcher:
 
     def status(self, s: Stream) -> str:
         return self.state.get(s.id, "")
+
+
+def offline(e: Exception) -> bool:
+    """The error of a request that couldn't reach YouTube at all (no connection, no name lookup)."""
+    text = str(e).lower()
+    return any(w in text for w in ("nodename nor servname", "name or service not known", "getaddrinfo",
+                                   "network is unreachable", "no route to host", "timed out", "connection refused",
+                                   "temporary failure in name resolution", "internet connection"))  # fmt: skip
 
 
 def _probe_length(f: Path) -> float | None:
