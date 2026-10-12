@@ -32,7 +32,7 @@ mac/
 
 ```bash
 ./build-app.sh              # build/Amadeus DMX.app, running the engine from this checkout (its .venv)
-./build-app.sh --install    # … and copy it to ~/Applications
+./build-app.sh --install    # … and copy it to ~/Applications, as "Amadeus DMX (dev)"
 ./build-app.sh --dmg        # … and build/AmadeusDMX.dmg and build/AmadeusLink.dmg
 ./build-app.sh --release --dmg   # the app people download: the engine and its own Python inside
 ```

@@ -2,7 +2,7 @@
 # Build "Amadeus DMX.app" (release, Apple Silicon) next to this script in build/.
 #   ./build-app.sh             build the app for this checkout (it runs the engine from here, with its .venv)
 #   ./build-app.sh --release   build the app people download: the engine and its Python inside (bundle-engine.sh)
-#   ./build-app.sh --install   … and copy it to ~/Applications
+#   ./build-app.sh --install   … and copy it to ~/Applications (a development build as "Amadeus DMX (dev)")
 #   ./build-app.sh --dmg       … and make disk images (build/AmadeusDMX.dmg, build/AmadeusLink.dmg)
 # Options combine (--release --dmg). VERSION=1.2.3 sets the version people see (default 0.1.<commits>); the build
 # number is always the commit count, so every later build is newer (what Sparkle compares).
@@ -144,10 +144,12 @@ sign_app "$LINK"
 echo "Built $LINK$([ -n "$LINK_UPDATES" ] && echo ", updates from $LINK_FEED_URL")"
 
 if [ "$INSTALL" = 1 ]; then
+  # a development build as "Amadeus DMX (dev)", so it isn't mistaken for a release in /Applications
+  NAME="Amadeus DMX$([ "$RELEASE" = 1 ] || echo " (dev)").app"
   mkdir -p "$HOME/Applications"
-  rm -rf "$HOME/Applications/Amadeus DMX.app"
-  cp -R "$APP" "$HOME/Applications/"
-  echo "Installed to ~/Applications"
+  rm -rf "$HOME/Applications/$NAME"
+  cp -R "$APP" "$HOME/Applications/$NAME"
+  echo "Installed to ~/Applications/$NAME"
 fi
 if [ "$DMG" = 1 ]; then
   rm -rf "$OUT/dmg" "$OUT/AmadeusDMX.dmg"
