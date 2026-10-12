@@ -1,8 +1,99 @@
-<img src="docs/logo/amadeus-dmx-256.png" alt="" width="96">
+<div align="center">
+
+<img src="docs/logo/amadeus-dmx-256.png" alt="Amadeus DMX" width="128">
 
 # Amadeus DMX
 
-AI-directed sound-to-light for DJs. Tracks are analysed (beats, bars, phrases, drops, build-ups, synth stutters and riffs), a **decision model** designs a layered light show per musical phrase, and a real-time engine drives moving heads, pars, strobes and lasers over **Art-Net, sACN or a USB DMX interface**, beat-locked. It works on recorded tracks and **live in VirtualDJ**, following the mix as you play, on the DJ's computer or on a separate lighting computer.
+### Your AI lighting director, the whole night long.
+
+Amadeus DMX listens to the music you play and runs your lights like a lighting designer would:
+from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
+
+[![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_Silicon-7c5cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/mathijs-b2m/DecisiveLightning/releases/latest)
+
+![macOS 26](https://img.shields.io/badge/macOS-26%2B-555?style=flat-square)
+![Free and open source](https://img.shields.io/badge/free_and_open_source-MIT-2ea44f?style=flat-square)
+![Art-Net · sACN · USB DMX](https://img.shields.io/badge/Art--Net_·_sACN_·_USB_DMX-555?style=flat-square)
+![Status: alpha](https://img.shields.io/badge/status-alpha-orange?style=flat-square)
+
+</div>
+
+---
+
+> **A note from the maker**
+>
+> I created Amadeus DMX because it's the software I always missed in my career as a mobile DJ. There is
+> nothing like it on the (free) market: a fully AI-powered lighting director that assists you the entire
+> evening of a gig. From the easy build-up to the final party bangers, the show evolves with the night and
+> the music.
+>
+> Setting up your rigs and fixtures has never been this easy. And afterwards? Press play!
+>
+> Oh, and: integrations for **djay Pro**, **VirtualDJ** and **Mixxx**, and even **Spotify** as a music source.
+> For the power users: run Amadeus DMX on a separate lighting laptop.
+>
+> — Mathijs
+
+---
+
+## Why DJs love it
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<h3>🧠 An AI director for the whole night</h3>
+<p>It decides the look for every musical phrase: which lights play, the colours, how the moving heads move. The show builds with the evening, in the house style of the genre you play. Use OpenAI, a free local model, or the rule-based director that works fully offline.</p>
+</td>
+<td width="50%" valign="top">
+<h3>⚡ Exact to the beat</h3>
+<p>Every track is analysed ahead of time: beats, bars, phrases, build-ups and drops. Kick pumps, the drop hit and the moving heads' moves land on the beat, because they come from the music itself, not from a guess.</p>
+</td>
+</tr>
+<tr>
+<td valign="top">
+<h3>🛠️ Set up in minutes</h3>
+<p>A set-up assistant walks you through your fixtures, the venue and where everything hangs. Drag fixtures onto trusses in the 3D rig editor, or let it place them for you. About <b>2,400 fixtures from 200+ brands</b> are built in, offline.</p>
+</td>
+<td valign="top">
+<h3>🎧 Plays along with your DJ software</h3>
+<p>Follows your mix live in <b>VirtualDJ</b>, <b>djay Pro</b> and <b>Mixxx</b>: which deck plays, the crossfades, the drops. Even <b>Spotify</b> tracks in djay Pro can light up (opt-in).</p>
+</td>
+</tr>
+<tr>
+<td valign="top">
+<h3>💻 A lighting laptop, if you want one</h3>
+<p>Keep your DJ laptop for the music. <b>Amadeus Link</b> on the DJ laptop pairs with the lighting computer through a 4-digit code, and the show follows your mix over the network.</p>
+</td>
+<td valign="top">
+<h3>🛡️ Safe by default</h3>
+<p>Flashes are capped at 3 Hz, nothing strobes along with the music, and laser zones, keep-out zones and eye-safety rules keep beams where they belong.</p>
+</td>
+</tr>
+</table>
+
+**See it before you rig it:** a live 3D stage on your Mac shows every beam, so you can plan and try a show
+without a single light connected. When you're ready, the same show goes out over Art-Net, sACN or a USB
+DMX interface.
+
+## Get started
+
+1. **[Download Amadeus DMX](https://github.com/mathijs-b2m/DecisiveLightning/releases/latest)** (Mac with
+   Apple Silicon, macOS 26 or later). Open the disk image and drag the app to Applications.
+2. **First launch:** open the app once, then go to System Settings › Privacy & Security and click
+   *Open Anyway* (it's free software, not sold through Apple). You only do this once; updates install
+   themselves.
+3. **Follow the set-up assistant:** your fixtures, your venue, done. No lights yet? Start with one of the
+   example rigs.
+4. **Press play.** Play a track, or start a live show and DJ as usual.
+
+Using a separate lighting laptop? Put **Amadeus Link** (on the same download page) on the DJ laptop.
+
+Optional, from Settings: instrument analysis (the accents follow the synth, the piano or the guitar) and
+updates that install by themselves.
+
+## How it works
+
+Tracks are analysed (beats, bars, phrases, drops, build-ups, synth stutters and riffs), a **decision model** designs a layered light show per musical phrase, and a real-time engine drives moving heads, pars, strobes and lasers over **Art-Net, sACN or a USB DMX interface**, beat-locked. It works on recorded tracks and **live in VirtualDJ**, following the mix as you play, on the DJ's computer or on a separate lighting computer.
 
 There is a 3D visualiser in the browser and a native **Mac app** (`mac/`) with a Metal stage, a rig editor and a set-up assistant.
 
@@ -23,7 +114,7 @@ Your lighting is described in two parts: a **set** (your fixtures: what you own 
 
 **The AI chooses the look; it never triggers individual hits.** Choices are made once per phrase (4–16 bars). Everything time-critical (kick pumps, flashes, beat-locked head moves, the drop hit, synth stutters) comes from the analysis, so it's exact to the beat.
 
-## Quick start
+## Build from source
 
 ```bash
 python3 -m venv .venv
@@ -37,7 +128,7 @@ echo 'OPENAI_API_KEY=sk-...' > .env          # optional: only for the OpenAI dec
 The first run starts with the examples (`examples/`): a showcase set of popular fixtures on a club rig, and
 60 moving heads with lasers on a concert stage. Your own sets and rigs live in `config/` (not in git).
 
-**Mac app:** `cd mac && ./build-app.sh --install` (see `mac/README.md`).
+**Mac app:** `cd mac && ./build-app.sh --install` (see `mac/README.md`, which also covers release builds and updates).
 
 Open **http://localhost:8080** for the 3D visualiser (stage, the decision per phrase with confidences and the exact prompt, energy curve with ⚡ drops) and **/setup.html** for the setup page.
 
