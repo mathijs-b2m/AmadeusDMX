@@ -28,7 +28,7 @@ rm -f "$LIB/EXTERNALLY-MANAGED"
 uv pip install --quiet --python "$RES/runtime/bin/python3" -r "$ROOT/requirements-app.txt"
 find "$RES/runtime" -name "__pycache__" -type d -prune -exec rm -rf {} +
 find "$LIB/site-packages" -type d -name tests -prune -exec rm -rf {} +  # numpy's and scipy's own test suites
-rm -rf "$LIB"/site-packages/{pip,setuptools,PyObjCTest}* "$LIB"/config-* "$RES"/runtime/lib/lib{tcl,tk}*
+rm -rf "$LIB"/site-packages/{setuptools,PyObjCTest}*  # pip stays: it installs the optional packs "$LIB"/config-* "$RES"/runtime/lib/lib{tcl,tk}*
 
 # the engine: what a checkout ships, without the caches, tests and your own data
 rm -rf "$RES/engine"

@@ -57,6 +57,7 @@ struct GeneralSettings: View {
                     Text("The Amadeus DMX folder with its Python environment (.venv). The web UI uses the same folder, sets and fixtures.")
                 }
             }
+            PacksSection()
             SwiftUI.Section {
                 Picker("Mode", selection: Binding(get: { model.mode }, set: { model.setMode($0) })) {
                     ForEach(ShowMode.allCases) { m in Text(m.title).tag(m) }
@@ -75,6 +76,68 @@ struct GeneralSettings: View {
         p.message = "Choose the Amadeus DMX engine folder"
         if p.runModal() == .OK, let url = p.url {
             error = model.useWorkspace(url) ? nil : "That folder has no engine (amadeus/ and .venv/bin/python)."
+        }
+    }
+}
+
+/// The optional packs (amadeus/cli/packs.py): what each adds, and installing it.
+struct PacksSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var packs: [PackInfo] = []
+    @State private var installing: String?
+    @State private var confirm: PackInfo?
+    @State private var failed: String?
+
+    var body: some View {
+        SwiftUI.Section {
+            ForEach(packs) { pack in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(pack.title)
+                        Spacer()
+                        if pack.installed {
+                            Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                        } else if installing == pack.name {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Button("Install (\(pack.size))") { confirm = pack }.disabled(installing != nil)
+                        }
+                    }
+                    Text(pack.about).font(.callout).foregroundStyle(.secondary)
+                    if installing == pack.name {
+                        Text(model.packInstall.lastLine).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    if failed == pack.name {
+                        Text("Not installed: \(model.packInstall.log.last(where: \.isError)?.text ?? model.packInstall.lastLine)")
+                            .font(.callout).foregroundStyle(.red)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        } header: {
+            Text("Optional packs")
+        } footer: {
+            Text("Downloaded from the internet when you install them, then they work offline. They take effect at the next show.")
+        }
+        .task(id: model.workspace) { packs = await model.workspace?.packs() ?? [] }
+        .confirmationDialog("Install \(confirm?.title ?? "")?", isPresented: Binding(get: { confirm != nil }, set: { if !$0 { confirm = nil } }),
+                            presenting: confirm) { pack in
+            Button("Install (\(pack.size))") { install(pack.name) }
+            Button("Cancel", role: .cancel) {}
+        } message: { pack in
+            Text(pack.note.isEmpty ? pack.about : pack.note)
+        }
+    }
+
+    private func install(_ name: String) {
+        installing = name
+        failed = nil
+        Task {
+            let ok = await model.installPack(name)
+            packs = await model.workspace?.packs() ?? []
+            installing = nil
+            if !ok { failed = name }
         }
     }
 }
@@ -121,7 +184,7 @@ struct DjaySection: View {
             }
             .disabled(model.workspace == nil)
             if streamed, model.workspace?.hasPythonPackage("yt_dlp") == false {
-                Label("yt-dlp isn't installed in the engine's environment: pip install -e '.[streamed]'", systemImage: "exclamationmark.triangle")
+                Label("yt-dlp isn't installed: install Streamed tracks under General › Optional packs", systemImage: "exclamationmark.triangle")
                     .font(.callout).foregroundStyle(.orange)
             }
         } header: {

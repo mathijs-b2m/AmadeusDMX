@@ -65,6 +65,8 @@ def stems(path: str | Path, verbose: bool = True) -> dict[str, np.ndarray] | Non
     if verbose:
         print(f"  separating instruments of {path.name} …", flush=True)
     wav, sr = sf.read(str(path), dtype="float32", always_2d=True)
+    if wav.shape[1] == 1:  # Demucs separates stereo: a mono track as both channels
+        wav = np.repeat(wav, 2, axis=1)
     if sr != _separator.samplerate:
         wav = resample_poly(wav, _separator.samplerate, sr, axis=0).astype(np.float32)
     _, parts = _separator.separate_tensor(torch.from_numpy(wav.T.copy()), _separator.samplerate)

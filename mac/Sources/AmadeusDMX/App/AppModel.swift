@@ -13,6 +13,8 @@ final class AppModel {
     /// What the show costs the computer: the light engine against the 3D stage.
     let power = PowerMeter()
     let setup = EngineProcess(name: "setup")
+    /// Installs an optional pack (Settings › General).
+    let packInstall = EngineProcess(name: "packs")
     let feed = LiveFeed()
     let api = SetupAPI(port: 8181)
 
@@ -147,6 +149,17 @@ final class AppModel {
         UserDefaults.standard.set(url.path, forKey: "engineRoot")
         reloadSets()
         return true
+    }
+
+    /// Installs an optional pack; afterwards the engine runs with it (a release: the packs' environment).
+    func installPack(_ name: String) async -> Bool {
+        guard let ws = workspace, !packInstall.isRunning else { return false }
+        packInstall.clearLog()
+        packInstall.start(ws, ["packs", "install", name], environment: engineEnvironment)
+        while packInstall.isRunning { try? await Task.sleep(for: .milliseconds(250)) }
+        if ws.isBuiltIn, let fresh = Workspace.builtIn { workspace = fresh }
+        if setup.isRunning { setup.stop(); setupReady = false }  // started again when needed, with the new packages
+        return packInstall.state == .stopped
     }
 
     /// Back to the engine inside the app (after a development folder was chosen).

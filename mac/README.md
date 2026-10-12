@@ -31,17 +31,39 @@ mac/
 ## Build and install
 
 ```bash
-./build-app.sh              # build/Amadeus DMX.app
+./build-app.sh              # build/Amadeus DMX.app, running the engine from this checkout (its .venv)
 ./build-app.sh --install    # … and copy it to ~/Applications
-./build-app.sh --dmg        # … and build/AmadeusDMX.dmg
+./build-app.sh --dmg        # … and build/AmadeusDMX.dmg and build/AmadeusLink.dmg
+./build-app.sh --release --dmg   # the app people download: the engine and its own Python inside
 ```
 
-Needs Xcode 26 (Swift 6.2+) and macOS 26. You can also open `Package.swift` in Xcode and run the
-`AmadeusDMX` scheme.
+Needs Xcode 26 (Swift 6.2+) and macOS 26; `--release` also needs uv (`brew install uv`). You can also open
+`Package.swift` in Xcode and run the `AmadeusDMX` scheme.
+
+## Releases
+
+A release app needs nothing installed: `bundle-engine.sh` puts a standalone Python (python-build-standalone,
+via uv) with `requirements-app.txt` in `Contents/Resources/runtime`, and the engine (package, web UI, fixtures,
+examples, Mixxx mapping, VirtualDJ plugin) in `Contents/Resources/engine`, compiled and signed. About 220 MB
+in the app, about 110 MB as a disk image. Not inside, as optional packs (Settings › General, or
+`amadeus packs install NAME`): instrument analysis (torch, Demucs and the instrument models, ~1 GB) and streamed
+tracks (yt-dlp). The app's Python is never written to: packs go into an environment of their own on top of it
+(`python/` in your data folder), which the app then runs the engine with.
+
+Your data stays out of the app, in `~/Library/Application Support/Amadeus DMX` (sets, rigs, settings, `.env`,
+fixtures you added or calibrated, the cache), so replacing the app never touches it. The engine finds both
+through `AMADEUS_ROOT` and `AMADEUS_DATA` (`amadeus/paths.py`).
+
+**On GitHub:** push a tag (`git tag v0.2.0 && git push origin v0.2.0`). `.github/workflows/release.yml` runs
+the checks, builds both apps and makes a **draft** release with the disk images and their SHA-256 sums; you
+publish it on GitHub. Actions › Release › *Run workflow* makes the same build as a workflow artifact only.
+
+The apps are signed ad hoc, not with an Apple Developer ID, so macOS stops the first launch of a
+downloaded copy: open it once, then System Settings › Privacy & Security › *Open Anyway*.
 
 ## How it works
 
-- **Engine:** the app runs `python -m amadeus live …` (or `play`) from the engine folder's `.venv`. It reads
+- **Engine:** the app runs `python -m amadeus live …` (or `play`) with the engine's Python (the app's own, or a checkout's `.venv`). It reads
   the same WebSocket feed as the web visualiser (`ws://127.0.0.1:8765`). Quitting the app stops the engine
   cleanly, so the lights black out.
 - **Already running:** if `amadeus live` is already running from a terminal, the app attaches to it
@@ -50,8 +72,9 @@ Needs Xcode 26 (Swift 6.2+) and macOS 26. You can also open `Package.swift` in X
   `/api/*`, the same API the web setup page uses.
 - **OpenAI key:** stored in the Keychain and passed to the engine as `OPENAI_API_KEY`. A `.env` in the engine
   folder works too.
-- **Engine folder:** baked in at build time (`AmadeusEngineRoot` in Info.plist). If it moves, choose it in
-  Settings › General.
+- **Engine folder:** a release has the engine inside (see [Releases](#releases)). A development build has the
+  checkout baked in (`AmadeusEngineRoot` in Info.plist); if it moves, choose it in Settings › General, which
+  also switches a release to a checkout and back.
 
 ## Set up: a set, a rig, the set on the rig
 

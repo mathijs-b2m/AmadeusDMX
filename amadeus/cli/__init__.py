@@ -17,6 +17,7 @@ the active ones (`amadeus set NAME`, `amadeus rig NAME`).
 amadeus discover / simnode / test / gobos / colors / motion   hardware: find, simulate, calibrate
 amadeus monitor                                               watch VirtualDJ and the engine run
 amadeus probe [NAME] [--emit 127.0.0.1:9123] [--record F]     watch another DJ software's integration, pass it on
+amadeus packs [install NAME]                                  optional packs: instrument analysis, streamed tracks
 """
 
 from __future__ import annotations
@@ -24,9 +25,9 @@ from __future__ import annotations
 import argparse
 
 from amadeus import paths
-from amadeus.cli import hardware, rig, show
+from amadeus.cli import hardware, packs, rig, show
 
-GROUPS = (show, rig, hardware)
+GROUPS = (show, rig, hardware, packs)
 ANNOUNCE_SET = {"play", "live", "setup", "test", "discover", "patch"}
 
 
@@ -38,7 +39,7 @@ def main(argv: list[str] | None = None):
     for group in GROUPS:
         handlers.update(group.add_commands(sub))
     args = ap.parse_args(argv)
-    paths.CACHE.mkdir(exist_ok=True)
+    paths.CACHE.mkdir(parents=True, exist_ok=True)
     if hasattr(args, "set_name"):  # commands that work on a show's rig and set
         _resolve_show(args)
     handlers[args.cmd](args)

@@ -32,11 +32,47 @@ public struct Workspace: Sendable, Equatable {
         guard let res = Bundle.main.resourceURL,
               let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         else { return nil }
-        let ws = Workspace(root: res.appending(path: "engine"), data: support.appending(path: "Amadeus DMX"),
-                           python: res.appending(path: "runtime/bin/python3"))
+        let runtime = res.appending(path: "runtime/bin/python3")
+        var ws = Workspace(root: res.appending(path: "engine"), data: support.appending(path: "Amadeus DMX"), python: runtime)
         guard ws.isValid else { return nil }
         try? FileManager.default.createDirectory(at: ws.data, withIntermediateDirectories: true)
+        // optional packs (amadeus/cli/packs.py) live in an environment on top of the app's Python: use it once there
+        let packs = ws.data.appending(path: "python")
+        if FileManager.default.fileExists(atPath: packs.appending(path: "pyvenv.cfg").path) {
+            repairPacks(packs, runtime: runtime)
+            let py = packs.appending(path: "bin/python3")
+            if FileManager.default.isExecutableFile(atPath: py.path) { ws.python = py }
+        }
         return ws
+    }
+
+    /// The packs' environment points at the app's Python by path: after the app moved, point it there again.
+    private static func repairPacks(_ env: URL, runtime: URL) {
+        let cfg = (try? String(contentsOf: env.appending(path: "pyvenv.cfg"), encoding: .utf8)) ?? ""
+        guard !cfg.contains("home = \(runtime.deletingLastPathComponent().path)\n") else { return }
+        let p = Process()
+        p.executableURL = runtime
+        p.arguments = ["-m", "venv", "--upgrade", "--system-site-packages", "--without-pip", env.path]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
+        p.waitUntilExit()
+    }
+
+    /// The optional packs and whether they're installed (`amadeus packs --json`).
+    public func packs() async -> [PackInfo] {
+        let p = Process()
+        p.executableURL = python
+        p.arguments = ["-m", "amadeus", "packs", "--json"]
+        p.currentDirectoryURL = root
+        p.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return [] }
+        let data = await Task.detached { out.fileHandleForReading.readDataToEndOfFile() }.value
+        p.waitUntilExit()
+        return (try? JSONDecoder().decode([PackInfo].self, from: data)) ?? []
     }
 
     public var isBuiltIn: Bool { data != root }
@@ -185,6 +221,17 @@ public struct Workspace: Sendable, Equatable {
         for _ in 0..<5 { dir = dir.deletingLastPathComponent(); candidates.append(dir) }
         return candidates.map(Workspace.init(root:)).first { $0.isValid }
     }
+}
+
+/// An optional pack (amadeus/cli/packs.py).
+public struct PackInfo: Codable, Sendable, Identifiable {
+    public var name: String
+    public var title: String
+    public var about: String
+    public var size: String
+    public var note: String
+    public var installed: Bool
+    public var id: String { name }
 }
 
 /// A set file (config/sets/NAME.json), the parts the app shows.

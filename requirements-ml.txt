@@ -1,6 +1,8 @@
 # Optional: trained instrument separation (Demucs) for synth/melody notes; ~2 GB, runs locally.
 # Without these the analysis works as before. Install with: pip install -r requirements-ml.txt
+# The Mac app installs the same pins as a pack (amadeus/cli/packs.py): keep the two the same.
 beat-this==1.1.0
 demucs==4.1.0
 torch==2.14.1
 torchaudio==2.11.0
+onnxruntime==1.31.0
