@@ -2,15 +2,24 @@
 import DecisiveKit
 import SwiftUI
 
+/// The same settings in the Settings window (⌘,) and on the main window's Settings page.
 struct SettingsView: View {
+    var page = false
+
     var body: some View {
+        if page {
+            tabs.frame(maxWidth: 680).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding()
+        } else {
+            tabs.frame(width: 560).scenePadding()
+        }
+    }
+
+    private var tabs: some View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Director", systemImage: "wand.and.stars") { DirectorSettings() }
             Tab("Integrations", systemImage: "dot.radiowaves.left.and.right") { IntegrationSettings() }
         }
-        .frame(width: 560)
-        .scenePadding()
     }
 }
 
