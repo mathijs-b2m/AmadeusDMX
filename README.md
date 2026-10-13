@@ -9,7 +9,7 @@
 Amadeus DMX listens to the music you play and runs your lights like a lighting designer would:
 from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 
-[![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_Silicon-7c5cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/mathijs-b2m/DecisiveLightning/releases/latest)
+[![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_Silicon-7c5cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/mathijs-b2m/AmadeusDMX/releases/latest)
 
 ![macOS 26](https://img.shields.io/badge/macOS-26%2B-555?style=flat-square)
 ![Free and open source](https://img.shields.io/badge/free_and_open_source-MIT-2ea44f?style=flat-square)
@@ -96,7 +96,7 @@ DMX interface.
 
 ## Get started
 
-1. **[Download Amadeus DMX](https://github.com/mathijs-b2m/DecisiveLightning/releases/latest)** (Mac with
+1. **[Download Amadeus DMX](https://github.com/mathijs-b2m/AmadeusDMX/releases/latest)** (Mac with
    Apple Silicon, macOS 26 or later). Open the disk image and drag the app to Applications.
 2. **First launch:** open the app once, then go to System Settings › Privacy & Security and click
    *Open Anyway* (it's free software, not sold through Apple). You only do this once; updates install
