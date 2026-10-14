@@ -27,7 +27,7 @@ import struct
 import time
 import uuid
 
-from amadeus.dmx.artnet import ArtNetSender, held
+from amadeus.dmx.artnet import ArtNetSender, Reachability, held
 
 TYPES = ("artnet", "sacn", "enttec_pro")
 
@@ -88,7 +88,7 @@ class ArtNetOutput(Output):
         return f"Art-Net → {self.ip}:{self.port}"
 
 
-class SacnOutput(Output):
+class SacnOutput(Output, Reachability):
     """E1.31 (ANSI E1.31-2018) data packets: multicast to 239.255.<hi>.<lo> per universe, or unicast."""
 
     PORT = 5568
@@ -138,8 +138,7 @@ class SacnOutput(Output):
     def _send(self, universes, terminated=False):
         for uni, data in universes.items():
             u = self.map.get(uni, uni + self.offset)
-            if 1 <= u <= 63999:
-                self.sock.sendto(self.packet(u, data, terminated), self._addr(u))
+            if 1 <= u <= 63999 and self._sendto(self.sock, self.packet(u, data, terminated), self._addr(u)):
                 self.sent.add(uni)
 
     def close(self):
