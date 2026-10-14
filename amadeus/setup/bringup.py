@@ -106,6 +106,31 @@ def run(show, level: float, ip: str | None):
             els = [e for e in elements if e["fixture"] == fx["id"]]
             n = fxlib.footprint(fx)
             where = f"universe {fx['universe']}, address {fx['address']}, mode {fx['mode']} ({n} ch)"
+            if len(els) == 1 and els[0]["kind"] == "smoke":
+                # a smoke machine makes no light: one short burst instead, once it's warm
+                a = _ask(
+                    f"   {fx['id']}: {defn['manufacturer']} {defn['model']} @ {where}\n"
+                    f"   Smoke machine: is it switched on and warmed up (most need 3-8 minutes, a 'ready' light)?\n"
+                    f"   [Enter = fire a 2-second burst, s = skip]",
+                    "s",
+                )
+                if a == "s":
+                    continue
+                while True:
+                    out.set({**look(), els[0]["id"]: State(dimmer=0.6)})
+                    time.sleep(2.0)
+                    out.set(look())
+                    a = _ask("   Did smoke come out? [Enter = yes, n = no, r = fire again]", "nr")
+                    if a != "r":
+                        break
+                if a == "n":
+                    print(
+                        f"   Check: (1) the machine is warm (its ready light) and has fluid; (2) on its display: DMX "
+                        f"mode {fx['mode']}, start address {fx['address']}; (3) a wired remote or timer plugged in can "
+                        f"lock out DMX on some machines; (4) the DMX cable chain from the node's port for universe "
+                        f"{fx['universe']}."
+                    )
+                continue
             if len(els) == 1:
                 out.set(look({els[0]["id"]: (1.0, 1.0, 1.0)}))
                 a = _ask(

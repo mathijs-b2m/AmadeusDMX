@@ -128,7 +128,8 @@ def plan(
                 out[j, k] = v if v >= 0.05 else 0.0
                 continue
             if t < on_until[j]:
-                if not blast[j] and h >= min(want, max_fog):  # there: stop early
+                # there: stop early (but not before a fogger can push fog out at all, unless at the cap)
+                if not blast[j] and (h >= max_fog or h >= want and t - began[j] >= MIN_ON_S):
                     on_until[j] = t
                     ready_at[j] = t + rest(m, t - began[j])
                 else:

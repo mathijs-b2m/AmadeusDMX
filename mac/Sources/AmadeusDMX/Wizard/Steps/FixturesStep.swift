@@ -76,6 +76,7 @@ struct FixturesStep: View {
         case "laser": "rays"
         case "par": "light.recessed"
         case "blinder": "light.panel"
+        case "smoke": "cloud.fog"
         default: "lightbulb"
         }
     }

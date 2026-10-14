@@ -328,6 +328,7 @@ enum FixtureIcon {
         case "laser": "rays"
         case "strobe": "bolt"
         case "blinder": "light.panel"
+        case "smoke": "cloud.fog"
         default: "light.recessed"
         }
     }

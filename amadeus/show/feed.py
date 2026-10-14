@@ -53,7 +53,7 @@ def element_info(rig: dict, e: dict, real=None) -> dict:
         info["length"] = round(fxlib.bar_length_m(fx, defn), 3)
     if e["kind"] == "head":
         info["up"] = [round(float(v), 3) for v in geometry.mount_up(fx)]
-    if e["kind"] in ("par", "blinder", "strobe"):
+    if e["kind"] in ("par", "blinder", "strobe", "smoke"):  # a smoke machine: where its nozzle blows
         info["dir"] = [round(float(v), 3) for v in geometry.static_dir(fx, e["kind"])]
     if real is not None:  # real lens, zoom range and beam strength
         info.update(real.hello_info(e["id"]))

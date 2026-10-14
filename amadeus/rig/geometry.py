@@ -63,7 +63,8 @@ def position(rig: dict, element: dict, fx: dict) -> tuple[float, float, float]:
     return (x, y, z)
 
 
-STATIC_AIM = {"par": (0.0, 80.0), "blinder": (0.0, 7.0), "strobe": (0.0, 8.0)}  # (azimuth, elevation) by default
+# (azimuth, elevation) by default; a smoke machine blows forward, a little up
+STATIC_AIM = {"par": (0.0, 80.0), "blinder": (0.0, 7.0), "strobe": (0.0, 8.0), "smoke": (0.0, 10.0)}
 
 
 def static_dir(fx: dict, kind: str) -> np.ndarray:

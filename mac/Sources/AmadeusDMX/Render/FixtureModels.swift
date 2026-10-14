@@ -73,7 +73,7 @@ struct MeshBuilder {
 
 /// The rig's fixtures as models.
 final class FixtureModels {
-    enum Shape { case beamHead, spotHead, washHead, movingBar, parBar, par, strobe, blinder, laser }
+    enum Shape { case beamHead, spotHead, washHead, movingBar, parBar, par, strobe, blinder, laser, smoke }
 
     struct Unit {
         var id: String
@@ -130,6 +130,7 @@ final class FixtureModels {
             case "strobe": shape = .strobe
             case "blinder": shape = .blinder
             case "laser": shape = .laser
+            case "smoke": shape = .smoke
             case "moving_head": shape = f.beamDeg <= 6 ? .beamHead : f.beamDeg <= 20 ? .spotHead : .washHead
             default: shape = f.kind == .head ? .spotHead : idx.count > 1 ? .parBar : .par
             }
@@ -211,6 +212,16 @@ final class FixtureModels {
             case .blinder:
                 let b = Basis.along(u.up, hint: u.across)
                 m.box(u.p - u.up * 0.06, b, [0.42, 0.24, 0.12], col, emissive: em)
+            case .smoke:
+                // a level box (the real housing when known), its nozzle towards where it blows
+                let s = u.size ?? [0.4, 0.25, 0.22]
+                var fwd = SIMD3<Float>(u.up.x, u.up.y, 0)
+                fwd = simd_length(fwd) > 0.05 ? simd_normalize(fwd) : SIMD3(0, 1, 0)
+                let b = Basis(x: simd_cross(fwd, [0, 0, 1]), y: [0, 0, 1], z: fwd)
+                let c = u.p - fwd * (s.y / 2) + SIMD3(0, 0, s.z / 2 - 0.1)
+                m.box(c, b, [s.x, s.z, s.y], col, emissive: em)
+                m.cylinder(u.p + SIMD3(0, 0, s.z / 2 - 0.12) + u.up * 0.02, u.up, radius: min(0.045, s.x * 0.15), length: 0.06,
+                           col * 1.4, emissive: em)
             case .laser:
                 let b = Basis.along(u.up, hint: [1, 0, 0])
                 m.box(u.p - u.up * 0.12, b, [0.24, 0.12, 0.24], col * 0.9, emissive: em)
@@ -346,6 +357,12 @@ final class FixtureModels {
             case .laser:
                 let (dim, lc) = light(u.idx[0], frame, hl)
                 lens(&m, u.p + u.up * 0.002, u.up, 0.025, dim, lc, glow: 3)
+            case .smoke:
+                // its ready light: green, amber while it fires
+                let firing = hl || (frame?.fog[fixtures[u.idx[0]].id] ?? 0) > 0
+                let s = u.size ?? [0.4, 0.25, 0.22]
+                m.disc(u.p + SIMD3(0, 0, s.z / 2 - 0.1 + 0.001), [0, 0, 1], radius: 0.012,
+                       firing ? [1, 0.6, 0.2] : [0.3, 0.8, 0.45], emissive: firing ? 3 : 0.8)
             }
         }
         return m.v

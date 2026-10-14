@@ -321,6 +321,35 @@ function drawZone(P, z) {
   ctx.restore();
 }
 
+// smoke machines: each burst leaves a plume that drifts out of the nozzle and lingers, and the room slowly
+// fills with haze (the engine sends each machine's output now, 0..1, in frame.fog)
+const puffs = {};
+let roomHaze = 0, fogAt = performance.now();
+function updateFog() {
+  const now = performance.now(), dt = Math.min(0.2, (now - fogAt) / 1000); fogAt = now;
+  let sum = 0;
+  for (const fx of show.fixtures) {
+    if (fx.kind !== "smoke") continue;
+    const out = frame.fog?.[fx.id] || 0, p = (puffs[fx.id] ||= { v: 0, age: 9 });
+    if (out > 0) { p.v = Math.max(p.v, out); p.age = 0; } else { p.v *= Math.exp(-dt / 2.5); p.age += dt; }
+    sum += out;
+  }
+  roomHaze = Math.min(1, roomHaze * Math.exp(-dt / 90) + sum * dt * 0.08);
+}
+function drawSmoke(P, fx, t) {
+  const p = puffs[fx.id]; if (!p || p.v < 0.02) return;
+  const d = fx.dir || [0, 0.98, 0.17], reach = 0.6 + 2.2 * Math.min(1, p.age / 2 + p.v * 0.6);
+  for (let k = 0; k < 9; k++) {
+    const u = (k + 0.5) / 9, wob = Math.sin(t * 0.7 + k * 1.7) * 0.12 * u;
+    const q = P([fx.pos[0] + d[0] * reach * u + wob, fx.pos[1] + d[1] * reach * u, fx.pos[2] + d[2] * reach * u + 0.35 * u * u]);
+    if (!q) continue;
+    const r = (0.12 + 0.75 * u) * q[3], a = 0.16 * p.v * (1 - 0.6 * u);
+    const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], r);
+    g.addColorStop(0, `rgba(205,210,222,${a})`); g.addColorStop(1, "rgba(205,210,222,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 7); ctx.fill();
+  }
+}
+
 function draw() {
   requestAnimationFrame(draw);
   const W = cv.width, H = cv.height;
@@ -350,6 +379,9 @@ function draw() {
   });
 
   ctx.globalCompositeOperation = "lighter";
+  updateFog();
+  if (roomHaze > 0.01) { ctx.fillStyle = `rgba(150,158,175,${0.07 * roomHaze})`; ctx.fillRect(0, 0, cv.width, cv.height); }
+  show.fixtures.forEach(fx => { if (fx.kind === "smoke") drawSmoke(P, fx, frame.t); });
   const spots = [];
   // many beams add up: keep the total brightness of a 60-head rig in range (2-4 heads: unchanged)
   const nHeads = show.fixtures.filter(f => f.kind === "head").length;
@@ -464,6 +496,14 @@ function draw() {
     const { c, dim } = colourOf(f);
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "#2a2e3a";
+    if (fx.kind === "smoke") {  // a long box with its nozzle; a small ready light, bright while it fires
+      const s = 0.12 * p[3], out = frame.fog?.[fx.id] || 0;
+      ctx.fillRect(p[0] - s * 1.6, p[1] - s * 0.7, s * 3.2, s * 1.4);
+      ctx.fillStyle = "#3a3f4e"; ctx.beginPath(); ctx.arc(p[0], p[1], s * 0.45, 0, 7); ctx.fill();
+      ctx.fillStyle = out > 0 ? "rgba(255,170,60,0.95)" : "rgba(80,200,120,0.6)";
+      ctx.beginPath(); ctx.arc(p[0] + s * 1.2, p[1] - s * 0.35, Math.max(1.2, s * 0.12), 0, 7); ctx.fill();
+      return;
+    }
     const size = (fx.cells > 1 ? 0.05 : fx.kind === "head" ? 0.16 : fx.kind === "strobe" ? 0.2 : 0.1) * p[3];
     if (!(fx.cells > 1)) ctx.fillRect(p[0] - size, p[1] - size * 0.8, size * 2, size * 1.6);
     ctx.globalCompositeOperation = "lighter";

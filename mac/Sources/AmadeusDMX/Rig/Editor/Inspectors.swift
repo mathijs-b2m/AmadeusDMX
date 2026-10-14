@@ -379,6 +379,7 @@ struct FixtureInspector: View {
         case .laser: [0, 13]
         case .blinder: [0, 7]
         case .strobe: [0, 8]
+        case .smoke: [0, 10]
         default: [0, 80]
         }
     }

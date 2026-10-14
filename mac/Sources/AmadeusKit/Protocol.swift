@@ -74,7 +74,7 @@ public struct Stage: Codable, Sendable, Equatable {
 }
 
 public enum FixtureKind: String, Codable, Sendable {
-    case head, laser, blinder, par, strobe, other
+    case head, laser, blinder, par, strobe, smoke, other
     public init(from decoder: Decoder) throws {
         self = FixtureKind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .other
     }
@@ -297,8 +297,10 @@ public struct Frame: Decodable, Sendable {
     public var link: LinkStatus?
     /// A status frame (Perform mode): time, phrase, decks; no fixtures.
     public var lite: Bool
+    /// Each smoke machine's output now, 0..1 (element id → level).
+    public var fog: [String: Float]
 
-    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, decks, laserGuard = "guard", link, lite }
+    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, decks, laserGuard = "guard", link, lite, fog }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -320,6 +322,7 @@ public struct Frame: Decodable, Sendable {
         laserGuard = try? c.decodeIfPresent([String: String].self, forKey: .laserGuard)
         link = try? c.decodeIfPresent(LinkStatus.self, forKey: .link)
         lite = try c.decodeIfPresent(Bool.self, forKey: .lite) ?? false
+        fog = (try? c.decodeIfPresent([String: Float].self, forKey: .fog)) ?? [:]
     }
 }
 

@@ -44,6 +44,10 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var input: (() -> (StageInput?, Frame?))?
     var highlight: Set<String> = [] { didSet { wake() } }
     var haze: Float = 0.75 { didSet { wake() } }
+    // smoke machines: each one's plume (how much, how long since it last fired) and the haze they built up
+    var fogPuffs: [String: SIMD2<Float>] = [:]
+    var roomFog: Float = 0
+    var fogT: Float = 0
     var exposure: Float = 1.0 { didSet { wake() } }
 
     static let wallInterval: CFTimeInterval = 0.05
@@ -236,7 +240,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         }
 
         var u = Uniforms(viewProj: proj * viewM, camPos: SIMD4(eye, 1), camRight: SIMD4(right, 0), camUp: SIMD4(up, 0),
-                         params: [Float(now - startTime), haze, exposure, 0.9], ambient: SIMD4(ambient, workLight))
+                         params: [Float(now - startTime), haze * (1 + roomFog), exposure, 0.9], ambient: SIMD4(ambient, workLight))
 
         // the wall's picture
         var wp = WallParams(info: .zero, bands: .zero, pal: (.zero, .zero, .zero, .zero))

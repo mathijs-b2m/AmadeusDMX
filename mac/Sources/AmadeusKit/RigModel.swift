@@ -122,6 +122,7 @@ public struct FixtureDefinition: Decodable, Sendable {
         case "laser": .laser
         case "blinder": .blinder
         case "strobe": .strobe
+        case "smoke": .smoke
         default: .par
         }
     }
@@ -292,7 +293,7 @@ public struct RigDocument: Equatable {
 // MARK: - elements, as the engine expands them (amadeus/fixtures.py expand + geometry.position)
 
 public enum RigElements {
-    static let staticAim: [FixtureKind: SIMD2<Double>] = [.par: [0, 80], .blinder: [0, 7], .strobe: [0, 8]]
+    static let staticAim: [FixtureKind: SIMD2<Double>] = [.par: [0, 80], .blinder: [0, 7], .strobe: [0, 8], .smoke: [0, 10]]
 
     public static func direction(azimuth: Double, elevation: Double) -> SIMD3<Double> {
         let a = azimuth * .pi / 180, e = elevation * .pi / 180
@@ -322,7 +323,7 @@ public enum RigElements {
                 if kind == .head { info.up = f.up }
                 info.size = def.map { [$0.size.x, $0.size.y, $0.size.z] }
                 if n > 1 { info.cells = n; info.length = length }
-                if kind == .par || kind == .blinder || kind == .strobe {
+                if kind == .par || kind == .blinder || kind == .strobe || kind == .smoke {
                     let aim = f.aim ?? staticAim[kind] ?? [0, 80]
                     info.dir = direction(azimuth: aim.x - f.rotDeg, elevation: aim.y)
                 }

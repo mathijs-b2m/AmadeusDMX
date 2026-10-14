@@ -29,6 +29,26 @@ extension StageRenderer {
             }
         }
 
+        // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears
+        let dt = min(0.2, max(0, t - fogT))
+        fogT = t
+        var fogSum: Float = 0
+        for fx in inp.fixtures where fx.kind == .smoke {
+            let out = highlight.contains(fx.id) ? 0.6 : frame?.fog[fx.id] ?? 0
+            var pf = fogPuffs[fx.id] ?? [0, 9]   // (amount, seconds since it fired)
+            pf = out > 0 ? [max(pf.x, out), 0] : [pf.x * exp(-dt / 2.5), pf.y + dt]
+            fogPuffs[fx.id] = pf
+            fogSum += out
+            guard pf.x > 0.02 else { continue }
+            let p = SIMD3<Float>(Float(fx.pos.x), Float(fx.pos.y), Float(fx.pos.z))
+            var d = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 0.98, 0.17)
+            d = simd_normalize(d + SIMD3(0, 0, 0.15 * min(1, pf.y / 3)))   // warm fog rises as it drifts
+            let reach = 0.6 + 2.6 * min(1, pf.y / 2 + pf.x * 0.6)
+            beam(p, d, spreadDeg: 38 + 20 * min(1, pf.y / 3), color: [0.82, 0.85, 0.9], intensity: 0.5 * pf.x,
+                 maxLen: reach, spot: false)
+        }
+        roomFog = min(1, roomFog * exp(-dt / 90) + fogSum * dt * 0.08)
+
         for (i, fx) in inp.fixtures.enumerated() {
             let p = SIMD3<Float>(Float(fx.pos.x), Float(fx.pos.y), Float(fx.pos.z))
             var dim: Float = 0, col = SIMD3<Float>(repeating: 1)
@@ -41,7 +61,7 @@ extension StageRenderer {
             if highlight.contains(fx.id) { dim = max(dim, 0.9); col = [1, 1, 1] }
             let cm = max(col.max(), 1)
             col /= cm
-            if dim <= 0.01 { continue }   // a dark fixture: its model shows it (dark glass in the lens)
+            if dim <= 0.01 || fx.kind == .smoke { continue }   // a dark fixture: its model shows it (dark glass in the lens)
             lightSum += col * dim
 
             switch fx.kind {
@@ -114,7 +134,7 @@ extension StageRenderer {
                 sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.35 * (1 + 1.5 * dim)), color: SIMD4(0.9, 0.95, 1, dim * 3),
                                               extra: [1, 0, 0, 0]))
                 lightSum += SIMD3(repeating: dim * 8)   // the whole room lights up
-            case .par, .other:
+            case .par, .smoke, .other:
                 // a bar's cells share its light: many small beams, not many full-strength ones
                 let cellK: Float = (fx.cells ?? 1) > 1 ? 1.6 / Float(fx.cells!) : 1
                 let pd = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 0.18, 1)
