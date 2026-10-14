@@ -34,16 +34,28 @@ def test_a_uv_bar_converts_to_a_bar_of_uv_cells(uv_bar):
     assert [c.get("head") for c in chans if c["attr"] == "uv"] == [1, 2, 3, 4]
 
 
-def test_the_light_test_lights_the_uv_the_show_keeps_dark(uv_bar):
+def test_the_light_test_lights_every_uv_section(uv_bar):
     fx = {"id": "buv1", "fixture": "beamz/buv-463-led-uv", "mode": "Default", "universe": 1, "address": 43, "x": 0.5}
-    show = bytearray(512)
-    fxlib.patch(show, fx, {e["id"]: State(dimmer=1, r=1, g=1, b=1) for e in fxlib.expand(fx)})
-    assert show[46:50] == bytes(4)  # the show: UV held dark
     test = bytearray(512)
     fxlib.test_light(test, fx)
     assert test[42] == 255  # master dimmer
     assert all(v > 100 for v in test[46:50])  # every UV section
     assert test[44] == 0  # auto programs stay off
+
+
+def test_the_show_plays_a_blacklight_in_uv_at_its_level(uv_bar):
+    """A UV-only bar plays like the other bars, whatever colour the look gives it; the visualiser shows UV."""
+    from amadeus.engine.realism import Realism
+
+    fx = {"id": "buv1", "fixture": "beamz/buv-463-led-uv", "mode": "Default", "universe": 1, "address": 43, "x": 0.5}
+    for level, cells in ((0.0, 0), (0.5, 128), (1.0, 255)):
+        show = bytearray(512)
+        fxlib.patch(show, fx, {e["id"]: State(dimmer=level, r=1, g=0.3, b=0) for e in fxlib.expand(fx)})
+        assert list(show[46:50]) == [cells] * 4, level
+    rig = {"fixtures": [fx], "elements": fxlib.expand(fx)}
+    seen = Realism(rig).step({e["id"]: State(dimmer=0.7, r=1, g=0.3, b=0) for e in rig["elements"]}, 0.025)
+    assert all(v == (0.7, *fxlib.UV_RGB, 0.0) for v in seen.values())
+    assert not fxlib.uv_only(fxlib.get("ayra/compar-kit-2"))  # RGB(+UV) fixtures mix as before
 
 
 def test_lasers_and_smoke_are_not_tested():

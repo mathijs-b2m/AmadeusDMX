@@ -39,9 +39,12 @@ class Realism:
                 output_wide = min(1.0, max(0.15, math.sqrt(lumens / wide**2 / REF_INTENSITY)))
             else:
                 output = output_wide = 1.0
-            # no colour channels at all: the lamp's own colour (halogen lamps glow warm, strobes are white)
+            # no colour channels at all: the lamp's own colour (halogen lamps glow warm, strobes are white,
+            # blacklights UV)
             fixed = None
-            if not attrs & {"red", "green", "blue", "cyan", "color_wheel"}:
+            if fxlib.uv_only(defn):
+                fixed = fxlib.UV_RGB
+            elif not attrs & {"red", "green", "blue", "cyan", "color_wheel"}:
                 fixed = (1.0, 1.0, 1.0) if e["kind"] == "strobe" else (1.0, 0.72, 0.42)
             self.info[e["id"]] = {
                 "kind": e["kind"],

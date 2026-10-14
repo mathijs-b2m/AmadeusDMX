@@ -432,7 +432,7 @@ Included: **beamZ Fuze75B Beam** (12ch/10ch, measured motion, named gobos and co
 1. Connect the Net-2/5 to the same network as the Mac. It can use DHCP on a home network; otherwise set the Mac to 2.x.x.x / 255.0.0.0 for the factory default 2.0.0.1.
 2. Find it: setup page → *Find node*, or `amadeus discover --write`. Note which Art-Net universe each output port uses (our Net-2/5 port 1 = universe 1).
 3. Patch the fixtures (setup page or `amadeus patch …`) and set the same mode and start address on each fixture's display. DMX chain order doesn't matter.
-4. `amadeus test`: every fixture on its own, then head orientation (calibration is saved). In the Mac app, each fixture on the Set page has a **Test** button: it stays lit (the rest of the set dark, a running show paused) until you switch it off, a minute at most, and says which universe, channels and output its DMX goes to. It also lights the emitters the show keeps dark (UV, amber), so a blacklight shows whether it is connected.
+4. `amadeus test`: every fixture on its own, then head orientation (calibration is saved). In the Mac app, each fixture on the Set page has a **Test** button: it stays lit (the rest of the set dark, a running show paused) until you switch it off, a minute at most, and says which universe, channels and output its DMX goes to. It also lights the emitters the show doesn't mix in (UV, amber).
 5. Optionally `amadeus motion`, `amadeus gobos`, `amadeus colors` per head model.
 6. First show with `safety.master` at about 0.5.
 
@@ -472,7 +472,7 @@ Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress
 - djay Pro is read from its window: a djay update that renames its controls can break it. Without SYNC its position is less precise (up to ~70 ms).
 - Mixxx must be started after the live show (it only looks for MIDI devices at start), unless the IAC bus is used.
 - The Fuze75S colour wheel colours are still guesses until named with `amadeus colors`.
-- UV, amber, lime and indigo emitters are not played by the show yet (held dark): a UV-only fixture such as a blacklight bar stays dark in the show; only the light test lights it.
+- UV, amber, lime and indigo emitters are not mixed into the show's colours yet (held dark). A UV-only fixture (a blacklight bar) does play: like the other bars and pars, always in UV.
 
 ## Contributing and license
 

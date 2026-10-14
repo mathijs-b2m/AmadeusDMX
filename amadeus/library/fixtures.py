@@ -33,9 +33,11 @@ ELEMENT_KIND = {
     "smoke": "smoke",  # a smoke machine or hazer: engine/fog.py decides when and how much
 }
 MOVING = ("moving_head", "moving_bar")
-# Colour emitters the show does not drive yet (held at 0), lit only by the light test. On a bar they still
-# belong to their cell: a UV bar's sections are its heads.
+# Colour emitters the show does not mix into its colours (held at 0, lit by the light test). On a bar they still
+# belong to their cell: a UV bar's sections are its heads. A fixture with UV and nothing else (a blacklight) is
+# played all the same: always UV, at the level the show gives it (uv_only).
 DARK_EMITTERS = ("uv", "amber", "lime", "indigo")
+UV_RGB = (0.35, 0.0, 1.0)  # how UV looks (setup/colors.py "uv")
 
 # Lasers from the QLC+ / Open Fixture Library come without the hand-made mapping the show needs to drive them
 # safely: they are "inert", every channel held at its off value (the visualisers draw them dark). So is a smoke
@@ -104,6 +106,12 @@ def mark_inert(defn: dict, unsafe: list[str]):
             f"DMX can't keep it off ({', '.join(sorted(set(unsafe)))} at 0 is a sound or auto mode): "
             "power it from a switch you control"
         )
+
+
+def uv_only(defn: dict) -> bool:
+    """A blacklight: UV emitters and no other colour."""
+    attrs = {c["attr"] for m in defn.get("modes", {}).values() for c in m}
+    return "uv" in attrs and not attrs & {"red", "green", "blue", "white", "cyan", "color_wheel"}
 
 
 def is_moving(defn: dict) -> bool:
@@ -267,6 +275,7 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
     per_head_colour = len(els) > 1
     has_dimmer = any(c["attr"] == "dimmer" for c in chans)
     head_dimmers = any(c["attr"] == "dimmer" and "head" in c for c in chans)  # a dimmer per cell (Sunstrip)
+    blacklight = uv_only(defn)
 
     pan_l, tilt_l = fx.get("pan_limits", [0, 1]), fx.get("tilt_limits", [0, 1])  # optional hard limits
     want_pan = first.pan if getattr(first, "dmx_pan", None) is None else first.dmx_pan
@@ -306,6 +315,9 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
             v = 0 if s.dimmer <= 0 else on + round(min(s.dimmer, 1.0) * (255 - on))
         elif a == "fog_fan":  # a hazer's fan: spreads what it makes; resting when it makes nothing
             v = round((0.4 + 0.6 * min(s.dimmer, 1.0)) * 255) if s.dimmer > 0 else c.get("default", 0)
+        elif a == "uv" and blacklight:  # its only colour: the level, as a dimmer-only lamp shows it
+            lvl = max(s.dimmer, s.white) if (per_head_colour and not head_dimmers) or not has_dimmer else 1.0
+            v = round(min(max(lvl, 0), 1) * 255)
         elif "default" in c:
             v = c["default"]
         elif a == "pan":
