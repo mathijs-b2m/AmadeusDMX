@@ -58,6 +58,9 @@ class Analysis:
     lead_tonal: np.ndarray | None = None  # 0..1: how much the melodic range is one clear pitch class
     stutter_gate: np.ndarray | None = None  # 0..1 per frame: the synth's on/off chopping, at full speed
     stutter_strength: np.ndarray | None = None  # 0..1 per frame: how clearly the synths are chopped right now
+    # the snare roll into a drop (amadeus/audio/rolls.py): per beat the hits per beat it plays (1, 2, 4, 8; 0: none)
+    roll: np.ndarray | None = None
+    pauses: np.ndarray | None = None  # (start, drop) per drop the music pauses before
     # from the separated synth/melody instrument (Demucs "other"), if available: (times, strengths, pitch 0..1)
     synth_notes: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
     # what kind of music it is (amadeus/audio/genre.py): one word, where that came from, and the facts

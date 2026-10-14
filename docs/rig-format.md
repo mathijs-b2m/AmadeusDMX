@@ -40,7 +40,9 @@ every fixture hangs.
 
 Per fixture: `id`, `fixture` (the library key, `fixtures/<brand>/<model>.json`), `mode`, `universe`, `address`,
 and calibration (`pan_invert`, `tilt_invert`, `pan_home_deg`, `tilt_home_deg`, …). `output` is optional (absent:
-Art-Net to `artnet.ip`); see `amadeus/dmx/outputs.py`. `safety.max_fog` (0..1, default 0.7) caps how hazy smoke
+Art-Net to `artnet.ip`); see `amadeus/dmx/outputs.py`. `safety.allow_fast_strobe` lets a snare roll's last seconds
+before a drop flash faster than `max_flash_hz` (each light at most 10 Hz); `safety.strobe_free` leaves out every
+flash (`amadeus/engine/rolls.py`). `safety.max_fog` (0..1, default 0.7) caps how hazy smoke
 machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 
 ## The rig file

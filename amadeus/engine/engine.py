@@ -22,6 +22,7 @@ from amadeus.engine.fog import FogMixin
 from amadeus.engine.lasers import LasersMixin
 from amadeus.engine.looks import DROP_DARK_FROM, XFADE, LooksMixin
 from amadeus.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
+from amadeus.engine.rolls import RollsMixin
 from amadeus.engine.state import State
 from amadeus.engine.timing import TimingMixin, _ease, note_env, pick_stabs
 from amadeus.library import fixtures as fxlib
@@ -30,7 +31,7 @@ from amadeus.rig import geometry
 PICKUP_LEAD = 0.65  # a section that leads in early: how far its look has come in by the downbeat (which lands it)
 
 
-class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, FogMixin):
+class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, FogMixin, RollsMixin):
     def __init__(
         self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False, fog_carry: bool = False
     ):
@@ -94,6 +95,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, 
         self.low = np.maximum(analysis.band_norm("sub"), analysis.band_norm("bass"))
         self.level = analysis.band_norm("mid") * 0.5 + self.low * 0.5
         self.flash_t, self.flash_s = self._flash_timeline(rig["safety"]["max_flash_hz"])
+        if rig["safety"].get("strobe_free"):  # no flashes on the big hits either
+            self.flash_t, self.flash_s = np.zeros(0), np.zeros(0)
         self.stage = geometry.stage(rig)
         fixtures = {f["id"]: f for f in rig["fixtures"]}
         self.head_pos = [np.array(geometry.position(rig, e, fixtures[e["fixture"]])) for e in self.heads]
@@ -125,6 +128,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, 
         on = analysis.onsets
         self.fill_t = np.sort(np.concatenate([on["snare"][0], on["accent"][0]])) if on else np.zeros(0)  # fill hits
         self.drops = [plan[i].start for i in sorted(self.drop_idx)]
+        self._init_rolls(rig)  # the snare roll into a drop, and the pause before it
         self.goals: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         self._reach_uv = (1.0, 1.0)
         self.move_beats: dict[int, tuple[int, int]] = {}
@@ -191,6 +195,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, 
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
+        self._roll(t, states, skip={e["id"] for e in self.heads} if ahead is not None else frozenset())
         self._kick_return(t, states)
         self._drop_moment(t, states)
         return i, self._finish(states, t)

@@ -29,6 +29,7 @@ async function load() {
   $("outdoor").checked = !!rig.stage.outdoor;
   $("master").value = rig.safety.master ?? 1; $("masterVal").textContent = Math.round($("master").value * 100) + "%";
   $("strobe").checked = !!rig.safety.allow_fast_strobe;
+  $("strobeFree").checked = !!rig.safety.strobe_free;
   render(); msg("");
   } catch (e) {
     msg("Can't reach the show/setup server. Start it (amadeus live or amadeus setup) and reload this page.", "bad");
@@ -162,7 +163,7 @@ function collect() {
     rig.output = { type: "enttec_pro", port: $("usbPort").value, universe: +$("usbUni").value || 1 };
   }
   rig.stage = { ...rig.stage, width_m: +$("width").value, ceiling_m: +$("ceiling").value, room_depth_m: +$("depth").value, outdoor: $("outdoor").checked };
-  rig.safety = { ...rig.safety, master: +$("master").value, allow_fast_strobe: $("strobe").checked };
+  rig.safety = { ...rig.safety, master: +$("master").value, allow_fast_strobe: $("strobe").checked, strobe_free: $("strobeFree").checked };
 }
 $("save").onclick = async () => {
   collect();

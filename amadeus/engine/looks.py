@@ -137,7 +137,9 @@ class LooksMixin:
         nxt = self.plan[i + 1] if i + 1 < len(self.plan) else None
         max_hz = float(self.rig["safety"].get("max_flash_hz", 3.0))
         dim = 0.0
-        if nxt is not None and nxt.section == "drop" and d.section != "drop":
+        if self.rig["safety"].get("strobe_free"):
+            pass  # strobe-free: the strobes stay dark
+        elif nxt is not None and nxt.section == "drop" and d.section != "drop":
             left = d.end - t
             span = d.end - d.start
             if 0 < left < max(span * 0.25, 4 * period):
@@ -307,8 +309,8 @@ class LooksMixin:
     def _kick_return(self, t: float, states: dict[str, State]) -> None:
         """The kick comes back after a break: a breath of darkness just before (after a break of two bars or
         more), then everything hits on the downbeat: full, with a white flash, settling over one beat. A real
-        drop has its own, bigger moment (_drop_moment)."""
-        if not self.kick_breaks:
+        drop has its own, bigger moment (_drop_moment), and inside a snare roll the lights play the roll."""
+        if not self.kick_breaks or self._roll_at(t) is not None:
             return
         _, _, period = self.beat_info(t)
         k = bisect.bisect_right(self._break_starts, t)  # breaks that started before t
@@ -568,7 +570,7 @@ class LooksMixin:
     def _drop_moment(self, t: float, states: dict[str, State]) -> None:
         """What an operator does at a drop: a breath of darkness just before it, then everything hits.
 
-        - last half beat before the drop: all lights dark
+        - last half beat before the drop (or the music's own pause before it, when longer): all lights dark
         - the first beat: a white flash on everything
         - the first bar: everything at full, settling into the drop's own look
         """
@@ -577,7 +579,7 @@ class LooksMixin:
             return
         k = bisect.bisect_right(self.drops, t)
         _, _, period = self.beat_info(t)
-        if k < len(self.drops) and 0 < self.drops[k] - t < period * 0.5:
+        if k < len(self.drops) and self._pause_dark(self.drops[k], t, period):
             if size >= DROP_DARK_FROM:  # smaller drops: no breath of darkness, a lift
                 keep = 1.0 - min(1.0, (size - DROP_DARK_FROM) / (1.0 - DROP_DARK_FROM))
                 for s in states.values():

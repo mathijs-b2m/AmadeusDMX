@@ -35,10 +35,11 @@ from amadeus.audio.features import (
     spectral_features,
     stutter_features,
 )
-from amadeus.audio.model import Analysis, Phrase
+from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
+from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 40
+ANALYSIS_VERSION = 41
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -147,6 +148,7 @@ def analyze(
     log(f"  beat grid: {'one tempo' if grid is not None else 'following the tempo'}")
     audio, audio_sr = sf.read(str(path), dtype="float32", always_2d=True)
     heard = attack_offset(audio.mean(axis=1), audio_sr, beat_times)
+    fine_snare, fine_db, fine_fps = fine_envelopes(audio.mean(axis=1), audio_sr)
     del audio
     beat_times = beat_times + heard  # onsets are noticed a little before they are loud: date them as heard
     onsets = {k: (t + heard, s) for k, (t, s) in onsets.items()}
@@ -157,6 +159,16 @@ def analyze(
     )
     downbeat_idx = downbeats(beat_frames, accent_env, low)
     phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets)
+    # the snare rolls into the drops (looked for from the drop before) and the pauses before them, on the
+    # audio's own clock (not dated as heard)
+    at = [i for i, p in enumerate(phrases) if i and p.drop_score >= DROP_THRESHOLD]
+    starts = [phrases[i].start - heard for i in at]
+    builds = [phrases[i - 1].start - heard for i in at]
+    roll, pauses = snare_rolls(
+        fine_snare, fine_db, fine_fps, beat_times - heard, beat_times[downbeat_idx] - heard,
+        list(zip([0.0, *starts[:-1]], builds, starts)),
+    )  # fmt: skip
+    pauses = pauses + heard
     log(
         f"  {len(beat_times)} beats, {len(downbeat_idx)} bars, {len(phrases)} phrases, "
         + ", ".join(f"{len(v[0])} {k}" for k, v in onsets.items())
@@ -179,6 +191,8 @@ def analyze(
         lead_tonal=lead_tonal,
         stutter_gate=stutter_gate,
         stutter_strength=stutter_strength,
+        roll=roll,
+        pauses=pauses,
     )
     _save(a, npz_path, json_path)
     return _finish(a, path)
@@ -311,6 +325,8 @@ def _save(a: Analysis, npz_path: Path, json_path: Path):
         lead_tonal=a.lead_tonal,
         stutter_gate=a.stutter_gate,
         stutter_strength=a.stutter_strength,
+        roll=a.roll,
+        pauses=a.pauses,
         **arrays,
         **(
             {"syn_t": a.synth_notes[0], "syn_s": a.synth_notes[1], "syn_p": a.synth_notes[2]}
@@ -342,5 +358,7 @@ def _load(npz_path: Path, json_path: Path) -> Analysis:
         lead_tonal=z["lead_tonal"],
         stutter_gate=z["stutter_gate"],
         stutter_strength=z["stutter_strength"],
+        roll=z["roll"],
+        pauses=z["pauses"],
         synth_notes=(z["syn_t"], z["syn_s"], z["syn_p"]) if "syn_t" in z.files else None,
     )
