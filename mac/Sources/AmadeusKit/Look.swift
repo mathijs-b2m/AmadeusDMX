@@ -36,10 +36,13 @@ public struct Room: Sendable {
     public var depth: Float
     public var back: Float
     public var side: Float = 2
+    /// An open-air stage: no ceiling, beams going up end in the air.
+    public var outdoor = false
 
     public init(stage: Stage, fixtures: [FixtureInfo]) {
         width = Float(stage.widthM)
         ceiling = Float(stage.ceilingM)
+        outdoor = stage.outdoor
         depth = Float(stage.roomDepthM)
         back = min(-2.5, Float(fixtures.map(\.pos.y).min() ?? -1) - 1.5)
     }
@@ -49,7 +52,7 @@ public struct Room: Sendable {
         var best: (Float, Surface) = (maxLen, .air)
         func consider(_ t: Float, _ s: Surface) { if t > 0, t < best.0 { best = (t, s) } }
         if d.z < -1e-3 { consider(-p.z / d.z, .floor) }
-        if d.z > 1e-3 { consider((ceiling - p.z) / d.z, .ceiling) }
+        if d.z > 1e-3, !outdoor { consider((ceiling - p.z) / d.z, .ceiling) }
         if d.y > 1e-3 { consider((depth - p.y) / d.y, .front) }
         if d.y < -1e-3 { consider((back - p.y) / d.y, .back) }
         if d.x > 1e-3 { consider((width + side - p.x) / d.x, .right) }

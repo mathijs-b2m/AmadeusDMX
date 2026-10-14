@@ -138,7 +138,7 @@ function beamEnd(pos, d, st, nearCam = 4) {
   const depth = st.room_depth_m || 6, side = 2.0, W = st.width_m;
   const hits = [];
   if (d[2] < -1e-3) hits.push([-pos[2] / d[2], "floor"]);
-  if (d[2] > 1e-3) hits.push([(st.ceiling_m - pos[2]) / d[2], "ceiling"]);
+  if (d[2] > 1e-3 && !st.outdoor) hits.push([(st.ceiling_m - pos[2]) / d[2], "ceiling"]);  // outdoors: the sky
   if (d[1] > 1e-3) hits.push([(depth - pos[1]) / d[1], "wall"]);
   // beams scanning the audience: drawn until a few metres in front of the viewer (not through the camera)
   if (d[1] > 1e-3 && show.eye && show.eye[1] - nearCam < depth) hits.push([(show.eye[1] - nearCam - pos[1]) / d[1], "air"]);

@@ -13,6 +13,7 @@ from amadeus.engine.timing import BREAK_FROM, BREAK_TO, NO_KICK_S, _decay, _ease
 XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 
 
+DROP_DARK_FROM = 0.35  # drop size (the show arc's knob) from which the breath of darkness comes in, full at 1
 PREDROP_BEATS = 2.0  # heads go dark and move to the drop's position/colour/gobo this many beats early
 
 
@@ -52,6 +53,11 @@ PAR_BASE_LEVEL = {"off": 0.0, "dim": 0.22, "full": 0.75, "fade": 0.5}
 
 
 INTENSITY_MASTER = [0.55, 0.7, 0.85, 1.0]  # "Subtle" must still be clearly visible
+
+
+# Colour variety (the show arc's knob, 0..1; None: as designed, which is what 0.5..0.85 gives):
+COLOUR_HOLD = ((0.25, 4), (0.5, 2))  # below this variety, one palette for this many phrases
+COLOUR_BUSY = 0.85  # from this variety, base and accent swap every eight bars
 
 
 def _lerp(a, b, k: float):
@@ -217,7 +223,28 @@ class LooksMixin:
     # ------------------------------------------------------------ scenes
 
     def _colours(self, d: Decision):
-        return PALETTES.get(d.palette, PALETTES["cool"])[1]
+        return PALETTES.get(self._palette_of(d), PALETTES["cool"])[1]
+
+    def _palette_of(self, d: Decision) -> str:
+        """The phrase's palette; with little colour variety (the show arc's knob) one palette is kept for two or
+        four phrases, but a drop still brings its own."""
+        v = getattr(self, "colour_variety", None)
+        if v is None or v >= COLOUR_HOLD[-1][0]:
+            return d.palette
+        hold = next(n for below, n in COLOUR_HOLD if v < below)
+        i = d.phrase
+        anchor = max([i - i % hold, *(k for k in self.drop_idx if i - i % hold < k <= i)])
+        return self.plan[anchor].palette if 0 <= anchor < len(self.plan) else d.palette
+
+    def _colour_swap(self, d: Decision, t: float, progress: float) -> bool:
+        """Base and accent change places: halfway through a long phrase (as designed); with a lot of colour
+        variety every eight bars, with little never."""
+        v = getattr(self, "colour_variety", None)
+        if v is not None and v >= COLOUR_BUSY:
+            return (self.bar_info(t) // 8) % 2 == 1
+        if v is not None and v < COLOUR_HOLD[-1][0]:
+            return False
+        return progress >= 0.5 and (d.end - d.start) > 20
 
     def _trigger(self, name: str, d: Decision | None = None, t: float = 0.0):
         return {
@@ -360,7 +387,7 @@ class LooksMixin:
         beat, phase, _ = self.beat_info(t)
         bar = self.bar_info(t)
         progress = min(max((t - d.start) / max(d.end - d.start, 1e-6), 0.0), 1.0)
-        if progress >= 0.5 and (d.end - d.start) > 20:  # long phrase: swap colours halfway for variation
+        if self._colour_swap(d, t, progress):  # long phrase: swap colours halfway for variation
             base, accent = accent, base
         env, hit = self._note(d.trigger, t)
         hits = hit + 1  # hits so far: steps chases, alternation, sparkles
@@ -421,7 +448,9 @@ class LooksMixin:
             hc = d.head_color
             if grouping == "split" and not self._featured(d, j):  # the counter-movement in a contrasting colour
                 hc = {"base": "accent", "white": "accent", "accent": "base"}.get(hc, hc)
-            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + bar) % len(cols)]}[hc]
+            cv = self.colour_variety
+            step = bar // 4 if cv is not None and cv < 0.5 else bar  # little colour variety: a slower cycle
+            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + step) % len(cols)]}[hc]
             hl = d.head_light
             mine = env if kick_turn(head_pattern, rank[f["id"]], nh, hit) else 0.0  # this head's kick
             if hl == "flick":  # on around the beat, when the head arrives and turns; dark while travelling
@@ -522,6 +551,20 @@ class LooksMixin:
                 st.r, st.g, st.b = _lerp((st.r, st.g, st.b), (1.0, 0.97, 0.92), min(1.0, v * 1.2))
                 st.dimmer = max(st.dimmer, v)
 
+    def big_moment(self, t: float) -> bool:
+        """A moment the surprises come out for (the show arc's special effects): a drop the analysis found, from
+        the heads moving in black before it to the end of its phrase."""
+        i = self.decision_at(t)[0]
+        return i in self.drop_idx or self.in_drop_moment(t)
+
+    def in_drop_moment(self, t: float) -> bool:
+        """From the heads moving in black before a drop to the end of its first bar: timing nobody touches."""
+        if not self.drops:
+            return False
+        _, _, period = self.beat_info(t)
+        k = bisect.bisect_right(self.drops, t + PREDROP_BEATS * period)
+        return k > 0 and -PREDROP_BEATS * period <= t - self.drops[k - 1] < 4 * period
+
     def _drop_moment(self, t: float, states: dict[str, State]) -> None:
         """What an operator does at a drop: a breath of darkness just before it, then everything hits.
 
@@ -529,21 +572,24 @@ class LooksMixin:
         - the first beat: a white flash on everything
         - the first bar: everything at full, settling into the drop's own look
         """
-        if not self.drops:
+        size = 1.0 if self.drop_strength is None else self.drop_strength  # the show arc's "drops" knob
+        if not self.drops or size <= 0.01:
             return
         k = bisect.bisect_right(self.drops, t)
         _, _, period = self.beat_info(t)
         if k < len(self.drops) and 0 < self.drops[k] - t < period * 0.5:
-            for s in states.values():
-                s.dimmer, s.white = 0.0, 0.0
+            if size >= DROP_DARK_FROM:  # smaller drops: no breath of darkness, a lift
+                keep = 1.0 - min(1.0, (size - DROP_DARK_FROM) / (1.0 - DROP_DARK_FROM))
+                for s in states.values():
+                    s.dimmer, s.white = s.dimmer * keep, s.white * keep
             return
         if k == 0:
             return
         since = t - self.drops[k - 1]
         bar = period * 4
         if since < bar:
-            boost = 1.0 - since / bar  # full → the drop's own level over one bar
-            flash = math.exp(-since / 0.18)  # one white hit on the downbeat
+            boost = (1.0 - since / bar) * size  # full → the drop's own level over one bar
+            flash = math.exp(-since / 0.18) * size  # one white hit on the downbeat
             main = self.decision_at(self.drops[k - 1])[1].intensity >= 3
             blinders = getattr(self, "_blinder_ids", set())
             for eid, s in states.items():

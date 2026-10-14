@@ -65,6 +65,11 @@ machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 }
 ```
 
+`stage.outdoor: true` is an open-air stage: there is no ceiling (`ceiling_m` and the ceiling guard are ignored),
+the sky aim goes higher and wider, the directors aim at the sky far more often (the AI is told it is an outdoor
+show), and smoke clears in about a minute instead of five. Indoors nothing changes: the ceiling guard keeps
+beams off the ceiling.
+
 Coordinates are metres: `x` across the stage (a fixture's `x` is a fraction of `stage.width_m`, a truss's `x_m`
 is metres), `y` towards the audience (0 = the stage's front edge, the back is negative), `z` height.
 

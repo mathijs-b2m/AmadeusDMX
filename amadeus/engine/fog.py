@@ -29,6 +29,8 @@ LEVELS = {"none": 0.0, "light": 0.25, "medium": 0.45, "heavy": 0.65, "burst": 0.
 FULL_FILL = 0.1  # the room is fully hazy (1.0) after fog of 10% of its volume (dense machine fog thins out)
 SPREAD_S = 8.0  # fog needs this long to spread through the room: fire this far ahead
 DEFAULT_CLEAR_S = 300.0  # an ordinary room clears in about five minutes (1/e)
+OUTDOOR_CLEAR_S = 60.0  # outdoors the wind takes it in about a minute
+OUTDOOR_HAZE_M = 8.0  # … and it is the air up to this height that needs haze for the beams
 DEFAULT_MAX_FOG = 0.7  # never hazier than this: a crowd still sees the DJ, smoke alarms stay calm
 MIN_ON_S = 0.5  # shorter bursts don't come out of a fogger
 MIN_LEVEL = 0.35  # … nor much below this output
@@ -65,6 +67,8 @@ def room_volume(stage: dict) -> float:
     front (plus the stage) and the ceiling."""
     if stage.get("room_volume_m3"):
         return float(stage["room_volume_m3"])
+    if stage.get("outdoor"):  # open air: the haze only has to fill the air over the stage and the crowd
+        return (stage["width_m"] + 8.0) * (stage["room_depth_m"] + 6.0) * OUTDOOR_HAZE_M
     return (stage["width_m"] + 4.0) * (stage["room_depth_m"] + 3.0) * stage["ceiling_m"]
 
 
@@ -177,7 +181,7 @@ class FogMixin:
             self.a.duration,
             machines,
             room_volume(st),
-            float(st.get("fog_clear_s", DEFAULT_CLEAR_S)),
+            float(st.get("fog_clear_s", OUTDOOR_CLEAR_S if st.get("outdoor") else DEFAULT_CLEAR_S)),
             float(safety.get("max_fog", DEFAULT_MAX_FOG)),
             start,
         )

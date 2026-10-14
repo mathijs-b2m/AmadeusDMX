@@ -83,12 +83,18 @@ struct EditorInspector: View {
         }
         SwiftUI.Section("Venue") {
             ValueSlider(title: "Stage width", value: stageBinding(\.widthM), range: 2...30, step: 0.5)
-            ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
+            Toggle("Outdoor", isOn: Binding(get: { editor.doc.stage.outdoor }, set: { v in editor.updateStage { $0.outdoor = v } }))
+                .help("An open-air stage: no ceiling, so the director uses the sky far more (beams up into the night). Indoors the ceiling is kept clear.")
+            if !editor.doc.stage.outdoor {
+                ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
+            }
             ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
-            Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
-                                                               set: { v in editor.updateStage { $0.ceilingGuard = v } }))
-                .help("Moving heads only go up so far that their beam reaches the ceiling at least the room's depth away")
+            if !editor.doc.stage.outdoor {
+                Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
+                                                                   set: { v in editor.updateStage { $0.ceilingGuard = v } }))
+                    .help("Moving heads only go up so far that their beam reaches the ceiling at least the room's depth away")
+            }
             Toggle("Beams never shine back at the DJ", isOn: Binding(get: { editor.doc.stage.backGuard },
                                                                      set: { v in editor.updateStage { $0.backGuard = v } }))
                 .help("Moving heads never swing back past the rig towards the stage (pointing steeply down is fine)")

@@ -47,6 +47,7 @@ class OpenAIDirector:
         style: Style | None = None,
         theme: str | None = None,
         fog: bool = False,
+        outdoor: bool = False,
     ):
         from openai import OpenAI  # imported lazily so the rules mode works without a key
 
@@ -55,9 +56,9 @@ class OpenAIDirector:
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
         self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
-        self.fog = fog
+        self.fog, self.outdoor = fog, outdoor
         self.questions = questions_for(groups, lasers, screen, style, theme, fog)
-        self.fallback = RuleDirector(groups, lasers, screen, style, theme, fog)
+        self.fallback = RuleDirector(groups, lasers, screen, style, theme, fog, outdoor)
         self.timings = []
 
     timings: list[float]
@@ -73,7 +74,9 @@ class OpenAIDirector:
         return self.cache[key]
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
-        prompt = build_prompt(a, i, history, self.groups, self.lasers, self.screen, self.style, self.theme, self.fog)
+        prompt = build_prompt(
+            a, i, history, self.groups, self.lasers, self.screen, self.style, self.theme, self.fog, self.outdoor
+        )
         d = self.fallback.decide(a, i, history)  # supplies any refused or failed answer
         d.prompt = prompt
         try:
@@ -229,6 +232,7 @@ class OllamaDirector(OpenAIDirector):
         style: Style | None = None,
         theme: str | None = None,
         fog: bool = False,
+        outdoor: bool = False,
     ):
         from amadeus import paths
 
@@ -237,9 +241,9 @@ class OllamaDirector(OpenAIDirector):
         self.cache_file = cache_file
         self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
         self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
-        self.fog = fog
+        self.fog, self.outdoor = fog, outdoor
         self.questions = questions_for(groups, lasers, screen, style, theme, fog)
-        self.fallback = RuleDirector(groups, lasers, screen, style, theme, fog)
+        self.fallback = RuleDirector(groups, lasers, screen, style, theme, fog, outdoor)
         self.timings = []
 
     def _questions(self) -> dict:

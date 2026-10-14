@@ -131,6 +131,7 @@ def build_prompt(
     style: Style | None = None,
     theme: str | None = None,
     fog: bool = False,
+    outdoor: bool = False,
 ) -> str:
     phrases = a.phrases
     p = phrases[i]
@@ -187,6 +188,13 @@ def build_prompt(
             "something: ambient colour in calm parts, playful outlined characters (a runner, a dancer, a "
             "jumping crowd, pong) or big words in grooves and builds, and full psychedelic visuals only for "
             "the biggest moments. Keep it fun to watch, not only abstract; vary it."
+        )
+    if outdoor:  # (indoors the prompt is unchanged: the ceiling guard keeps beams off a low ceiling)
+        parts.append(
+            "This is an OUTDOOR show: there is no ceiling, the night sky is the canvas. Beams up into the sky "
+            "(aim 'sky') are a big part of the look here, not only for breakdowns and buildups: tall still beams, "
+            "slow fans and sweeps across the sky, a sky full of beams for the big moments. Still bring the beams "
+            "down over the crowd for contrast in grooves and drops."
         )
     if fog:
         parts.append(

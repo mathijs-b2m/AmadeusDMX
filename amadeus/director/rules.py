@@ -138,6 +138,13 @@ RULE_FOG = {  # smoke lingers: long arcs. Clear air at the edges, a burst only a
 }
 
 
+def apply_open_sky(d: Decision, n_before: int):
+    """Outdoors the sky is the canvas: calm and building parts always aim up, grooves and drops every other time
+    (the others still come down over the crowd, for contrast)."""
+    if d.section in ("intro", "breakdown", "buildup", "outro") or n_before % 2 == 0:
+        d.aim = "sky"
+
+
 def apply_fog(d: Decision, fog: bool, last: Decision | None, final: bool):
     """`final`: the track's last phrase: stop firing (the haze lingers into whatever comes next)."""
     if fog:
@@ -191,8 +198,10 @@ class RuleDirector:
         style: Style | None = None,
         theme: str | None = None,
         fog: bool = False,
+        outdoor: bool = False,
     ):
         self.groups = groups
+        self.outdoor = outdoor  # an open-air stage: no ceiling, so the sky is used much more
         self.fog = fog  # the rig has a smoke machine
         self.lasers = lasers
         self.screen = screen
@@ -255,6 +264,8 @@ class RuleDirector:
         )
         if self.style:
             self.style.adjust(d, n_before)
+        if self.outdoor:
+            apply_open_sky(d, n_before)
         if self.theme == "stars":  # a starfield in the calm parts and as each drop lands
             first_drop = section == "drop" and not (last and last.section == "drop")
             twice = len(history) >= 2 and all(h.special == "stars" for h in history[-2:])

@@ -321,10 +321,14 @@ const Screen = (() => {
     S = show_;
     const d = show_.plan?.[f.phrase];
     const want = wanted(f, d);
+    // the show arc's LED wall knob (live mode): dimmer, below half only calm colour, at zero off
+    const wall = !force && f.arc?.on ? (f.arc.values?.screen ?? 1) : 1;
+    if (wall < 0.03) want.mode = want.scene = "off";
+    else if (wall < 0.5 && want.mode !== "off") want.mode = want.scene = "ambient";
     const nextDrop = show_.plan?.[f.phrase + 1]?.section === "drop" && d?.section !== "drop";
     const beatsLeft = nextDrop ? (show_.plan[f.phrase + 1].start - f.t) * (show_.bpm || 120) / 60 : 99;
-    if (want.mode === "off" && beatsLeft <= 4.5) want.mode = want.scene = "words";  // a dark wall wakes up to count in
-    const shout = d?.section === "drop" && cur.mode !== "off" && cur.mode !== "psychedelic"
+    if (want.mode === "off" && beatsLeft <= 4.5 && wall >= 0.5) want.mode = want.scene = "words";  // a dark wall wakes up to count in
+    const shout = wall >= 0.5 && d?.section === "drop" && cur.mode !== "off" && cur.mode !== "psychedelic"
       && (f.t - d.start) * (show_.bpm || 120) / 60 < 2;
     if (shout) fade = 1;  // DROP! at full strength; the drop's own scene comes after it
     else if (want.scene !== cur.scene) {
@@ -360,7 +364,7 @@ const Screen = (() => {
       g.restore();
       target = cur.mode === "off" ? 0 : cur.mode === "ambient" ? 0.4 : 0.95;
     }
-    level += (target * fade - level) * Math.min(1, dt * 10);
+    level += (target * Math.min(1, wall * 2) * fade - level) * Math.min(1, dt * 10);
     return {canvas, level, tint};
   }
 

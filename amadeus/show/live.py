@@ -24,6 +24,7 @@ from amadeus.engine import State
 from amadeus.engine.realism import Realism
 from amadeus.library import fixtures as fxlib
 from amadeus.show import feed as feedlib
+from amadeus.show.arc import ShowArc
 from amadeus.show.clock import light_lead
 from amadeus.show.mixer import Mixer
 from amadeus.show.sources.base import PhaseLock
@@ -222,6 +223,8 @@ async def run(
     real = Realism(rig)
     feed = feedlib.Feed(rig, real, period)
     mixer, bands = Mixer(rig), Bands()
+    arc = ShowArc(rig)  # the night: its stages and the operator's knobs
+    feed.on_message = lambda m: arc.control(m) if m.get("type") == "arc" else None
     locks: dict[int, PhaseLock] = {}  # per deck: its position locked to Ableton Link's beat, when it sends one
     showing = None  # (deck, file, director, plan) the visualiser's hello describes
     phrase_of: dict[int, tuple] = {}  # per deck: (file, phrase) last logged
@@ -280,6 +283,7 @@ async def run(
                     if show is None or weight <= 0.01:
                         continue
                     a, _, engine, _ = show
+                    engine.colour_variety, engine.drop_strength = arc.colour_variety(), arc.drop_strength()
                     pos = locks.setdefault(deck.deck, PhaseLock()).at(deck, now, a.beats, deck.file)
                     t = min(max(pos + lead, 0.0), a.duration - 0.05)  # the lights a little ahead (clock.py)
                     i, states = engine.render(t)
@@ -307,6 +311,14 @@ async def run(
                         print(f"  ▶ heads follow deck {deck.deck}: {Path(deck.file).name}")
                 else:
                     states, i, t = {eid: State() for eid in ids}, 0, 0.0
+                wall = time.time()
+                shows.set_shape(arc.plan_shape())  # calmer heads, fewer look changes (rebuilt in the background)
+                if parts:
+                    bpm = deck.bpm or a.bpm * deck.speed
+                    arc.observe(wall, plan[i], bpm)
+                    arc.apply(states, engine, t, period)
+                else:
+                    arc.observe(wall)
 
                 if sender:
                     unis: dict[int, bytearray] = {}
@@ -321,6 +333,7 @@ async def run(
                         "phrase": i,
                         "decks": decks,
                         "bp": round(b + ph, 3),
+                        "arc": arc.snapshot(wall),
                         **({"link": listener.status()} if remote else {}),
                         **({"guard": guard} if guard else {}),
                     }
@@ -332,6 +345,7 @@ async def run(
                     feed.send(status, fixtures)
                 await asyncio.sleep(max(0.0, next_tick - time.monotonic()))
         finally:
+            arc.save(time.time())
             if sender:
                 sender.blackout(universes)
                 sender.close()

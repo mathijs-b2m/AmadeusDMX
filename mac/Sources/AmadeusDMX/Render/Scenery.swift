@@ -130,7 +130,7 @@ struct Scenery {
             trussBar(xs.min()! - 0.5, xs.max()! + 0.5, y, z, truss)
             if fs.count >= 3 || big {  // chain motors up to the ceiling
                 for x in [xs.min()! - 0.3, xs.max()! + 0.3] {
-                    box(x - 0.015, x + 0.015, y - 0.015, y + 0.015, z + 0.15, room.ceiling, [0.08, 0.08, 0.09])
+                    box(x - 0.015, x + 0.015, y - 0.015, y + 0.015, z + 0.15, room.outdoor ? z + 1.2 : room.ceiling, [0.08, 0.08, 0.09])
                 }
             }
         }

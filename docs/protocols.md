@@ -57,6 +57,25 @@ visualiser and the Mac app both read it.
 | `decks` | live mode: each deck's track, volume, play state and preparation progress |
 | `link` | Amadeus Link: the link's health (offset, jitter, lost packets) |
 | `guard` | what the laser guard did this frame (laser id → note) |
+| `arc` | live mode: the show arc (below) |
+
+**The show arc** (`amadeus/show/arc.py`, live mode): the night as a whole. `arc` in every frame holds the
+night's `length` and `elapsed` seconds (null until the music first plays), the `event` type (`club`,
+`wedding`, `party`, `latin`) and the `stages` named for it, the `stage` the music is in and whether the
+operator `locked` it, the music's `heat` (0..1) and `trend`, the tempo (`bpm`, `base_bpm`: tonight's warm-up
+tempo), every knob's value in `values` (0..1; in play: `groups`, `specials`, `screen`, `smoke`; character:
+`movement`, `changes`, `colour`; reaction: `response`, `drops`, `flashes`; level: `intensity`), the knobs the
+operator holds (`manual`), how many light `groups` the rig has and how many are `playing`, and the shape the
+plans are played in (`movement_level` 0 calm / 1 moderate / 2 as directed, `hold`: phrases a look is held).
+The LED wall is drawn by the visualisers: they dim it by `values.screen`, below 0.5 show only calm colour, at 0
+nothing. Before the first track there is no `hello`, but lite status frames with `arc` still
+come (so the night can be set up before the music).
+
+**Client → engine.** Clients may send JSON on the same socket. `{"type": "arc", …}` with any of: `knob`
+(`{name: value}`: the operator takes the knob over), `auto` (a knob's name, or `"all"`: back to the arc),
+`stage` (force a stage), `lock` (bool), `length_s`, `event`, `reset` (`true`: a new night) and `enabled`.
+The engine remembers it in `config/show-arc.json`; a night continues over an engine restart unless the
+music has been silent for two hours.
 
 **Lite clients** connect to `ws://…/lite` and get a `frame` with `"lite": true` and only the small fields
 (`t`, `phrase`, `bp`, `decks`, `link`, `guard`), 5 times a second. The Mac app uses this in Perform mode.

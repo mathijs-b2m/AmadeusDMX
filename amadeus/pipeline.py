@@ -105,6 +105,7 @@ def get_plan(
     lasers = laser_list(rig) if rig else []
     screen = bool(rig and rig.get("screen"))
     fog = has_smoke(rig) if rig else False
+    outdoor = bool(rig and rig.get("stage", {}).get("outdoor"))
     layout = "-".join(
         x
         for x in (
@@ -112,6 +113,7 @@ def get_plan(
             f"l{len(lasers)}" if lasers else None,
             "scr" if screen else None,
             "fog" if fog else None,
+            "out" if outdoor else None,
             f"s{style.genre}" if style else None,
             f"t{theme}" if theme else None,
             _sections_key(a),
@@ -135,13 +137,24 @@ def get_plan(
             style=style,
             theme=theme,
             fog=fog,
+            outdoor=outdoor,
         )
     elif director.startswith("ollama"):
         model = director.split(":", 1)[1] if ":" in director else "nimble"
         cache = CACHE / f"{base}.{_file_tag(director)}.decisions-cache.json"
-        d = OllamaDirector(cache, model, groups=groups, lasers=lasers, screen=screen, style=style, theme=theme, fog=fog)
+        d = OllamaDirector(
+            cache,
+            model,
+            groups=groups,
+            lasers=lasers,
+            screen=screen,
+            style=style,
+            theme=theme,
+            fog=fog,
+            outdoor=outdoor,
+        )
     else:
-        d = RuleDirector(groups, lasers, screen, style, theme, fog)
+        d = RuleDirector(groups, lasers, screen, style, theme, fog, outdoor)
     if isinstance(d, OllamaDirector):
         with LOCAL_MODEL:
             plan = direct(a, d, cancel=cancel, progress=progress)

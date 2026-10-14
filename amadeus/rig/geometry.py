@@ -23,6 +23,7 @@ import numpy as np
 DEFAULT_STAGE = {
     "width_m": 6.0,  # distance between the outermost fixtures, roughly
     "ceiling_m": 4.5,
+    "outdoor": False,  # an open-air stage: no ceiling, the sky is free for beams (ceiling_m is then ignored)
     "room_depth_m": 6.0,  # from the stage edge to the far wall (beams stop there in the visualiser)
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …
@@ -193,8 +194,8 @@ def eye_safe(d: np.ndarray, head_z: float, st: dict) -> np.ndarray:
 
 
 def ceiling_top_deg(head_pos, st: dict) -> float | None:
-    """The highest elevation a head's beam may have under the ceiling guard (None: guard off)."""
-    if not st.get("ceiling_guard", True):
+    """The highest elevation a head's beam may have under the ceiling guard (None: guard off, or outdoors)."""
+    if not st.get("ceiling_guard", True) or st.get("outdoor"):
         return None
     lo, hi = CEILING_RUN_M
     run = min(hi, max(lo, float(st.get("room_depth_m", 6.0))))
@@ -230,11 +231,11 @@ def room_safe_v(d: np.ndarray, head_pos, st: dict) -> np.ndarray:
 
 
 def beam_end(pos, d, st: dict, max_len: float = 12.0):
-    """Where the beam lands: floor, ceiling, or max_len away. Returns (point, length, surface)."""
+    """Where the beam lands: floor, ceiling (indoors), or max_len away. Returns (point, length, surface)."""
     p = np.asarray(pos, dtype=float)
     if d[2] < -1e-3:
         t, surf = -p[2] / d[2], "floor"
-    elif d[2] > 1e-3:
+    elif d[2] > 1e-3 and not st.get("outdoor"):
         t, surf = (st["ceiling_m"] - p[2]) / d[2], "ceiling"
     else:
         t, surf = max_len, "air"

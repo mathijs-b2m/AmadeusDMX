@@ -10,6 +10,7 @@ from pathlib import Path
 from amadeus.director.style import SetGenre
 from amadeus.engine import Engine
 
+MOVES = ("calm", "moderate", "as directed")
 RETRY_S = 30.0  # a track that couldn't be prepared is tried again this much later (not for every packet)
 
 
@@ -26,6 +27,8 @@ class TrackShows:
         self.pool = ThreadPoolExecutor(max_workers=2)
         self.lock = threading.Lock()
         self.set_genre = SetGenre()  # the set's genre: tracks of a genre share a house style
+        self.shape = (2, 1, True)  # the show arc's shape for the plans (show/arc.py, plan_shape)
+        self.directed: dict[str, list] = {}  # file → the director's plan, before calming
 
     def _style_genre(self, file: str):
         return lambda a: self.set_genre.genre_for(file, a.genre, a.genre_source)
@@ -42,6 +45,37 @@ class TrackShows:
                 self.pending.add(f)
         for f in files:
             self.pool.submit(self._build, f, False)
+
+    def set_shape(self, shape: tuple[int, int, bool]):
+        """The show arc's shape changed (head movement, look changes): every track's engine is built again from
+        its reshaped plan, in the background (the old one keeps playing until the new one is ready)."""
+        if shape == self.shape:
+            return
+        print(f"  ⇄ plans: heads {MOVES[shape[0]]}, a look held {shape[1]} phrase(s)", flush=True)
+        self.shape = level = shape
+        with self.lock:
+            files = [f for f in self.shows if f in self.directed]
+        for f in files:
+            self.pool.submit(self._recalm, f, level)
+
+    def _recalm(self, file: str, level: tuple[int, int, bool]):
+        from amadeus.show.arc import shape_plan
+
+        try:
+            with self.lock:
+                show, plan = self.shows.get(file), self.directed.get(file)
+            if show is None or plan is None or level != self.shape:
+                return
+            played = shape_plan(plan, level)
+            engine = Engine(show[0], played, self.rig, real_output=self.real_output, fog_carry=True)
+            with self.lock:  # only if nothing newer came meanwhile (the AI's plan, another level)
+                if self.directed.get(file) is plan and self.shape == level:
+                    self.shows[file] = (show[0], played, engine, show[3])
+                    print(
+                        f"  ✓ {Path(file).name}: reshaped (heads {MOVES[level[0]]}, looks held {level[1]})", flush=True
+                    )
+        except BaseException as e:  # noqa: BLE001 - a bad track must never stop the show
+            print(f"  ⚠ could not calm {Path(file).name}: {e}")
 
     def get(self, file: str):
         with self.lock:
@@ -155,7 +189,15 @@ class TrackShows:
         return True
 
     def _install(self, file, a, plan, director):
-        engine = Engine(a, plan, self.rig, real_output=self.real_output, fog_carry=True)
+        from amadeus.show.arc import shape_plan
+
+        level = self.shape
+        played = shape_plan(plan, level)
+        engine = Engine(a, played, self.rig, real_output=self.real_output, fog_carry=True)
         with self.lock:
-            self.shows[file] = (a, plan, engine, director)
-        print(f"  ✓ {Path(file).name}: {len(plan)} phrases, {a.bpm:.1f} BPM ({director})")
+            if level != self.shape:  # changed while building: the next build has it
+                self.pool.submit(self._recalm, file, self.shape)
+            self.directed[file] = plan
+            self.shows[file] = (a, played, engine, director)
+        how = "" if level == (2, 1, True) else f", heads {MOVES[level[0]]}, looks held {level[1]}"
+        print(f"  ✓ {Path(file).name}: {len(plan)} phrases, {a.bpm:.1f} BPM ({director}{how})")

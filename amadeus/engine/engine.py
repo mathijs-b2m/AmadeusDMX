@@ -20,7 +20,7 @@ from amadeus.engine import zones
 from amadeus.engine.cinematic import CinematicMixin
 from amadeus.engine.fog import FogMixin
 from amadeus.engine.lasers import LasersMixin
-from amadeus.engine.looks import XFADE, LooksMixin
+from amadeus.engine.looks import DROP_DARK_FROM, XFADE, LooksMixin
 from amadeus.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
 from amadeus.engine.state import State
 from amadeus.engine.timing import TimingMixin, _ease, note_env, pick_stabs
@@ -39,6 +39,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, 
         self.a = analysis
         self.real_output = real_output
         self.fog_carry = fog_carry
+        self.colour_variety: float | None = None  # the show arc's knob, set live (looks.py); None: as designed
+        self.drop_strength: float | None = None  # … how big drops land (looks.py, _drop_moment); None: full
         self.plan = plan
         self.rig = rig
         self.starts = [d.start for d in plan]
@@ -176,7 +178,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, 
         if self.program == "cinematic":
             return i, self._finish(self._cinematic_scene(t), t)
         states = self._scene(d, t)
-        ahead = self._drop_ahead(i, t)
+        big = self.drop_strength is None or self.drop_strength >= DROP_DARK_FROM  # (small drops: no moving in black)
+        ahead = self._drop_ahead(i, t) if big else None
         if ahead is not None:  # heads take the drop's colour/gobo/prism while dark, so the wheels are ready
             drop_look = self._scene(self.plan[ahead], t)
             for e in self.heads:

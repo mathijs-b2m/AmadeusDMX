@@ -25,5 +25,6 @@ let package = Package(
         .executableTarget(name: "AmadeusLink", dependencies: ["AmadeusKit"], swiftSettings: [.swiftLanguageMode(.v5)]),
         // what Amadeus Link reads from djay Pro and Mixxx, checked against the engine's own readers (swift test)
         .testTarget(name: "AmadeusLinkTests", dependencies: ["AmadeusLink"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "AmadeusKitTests", dependencies: ["AmadeusKit"], swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

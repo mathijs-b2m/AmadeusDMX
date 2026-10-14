@@ -88,12 +88,15 @@ final class WallRenderer {
     func update(frame f: Frame, hello h: Hello, dt: Float) -> WallOutput {
         let d = h.plan.indices.contains(f.phrase) ? h.plan[f.phrase] : nil
         var want = wanted(f, d)
+        // the show arc's LED wall knob (live mode): dimmer, below half only calm colour, at zero off
+        let wall = force == .auto ? Float(f.arc.flatMap { $0.on ? $0.values["screen"] : nil } ?? 1) : 1
+        if wall < 0.03 { want = ("off", .off) } else if wall < 0.5, want.0 != "off" { want = ("ambient", .ambient) }
         let next = h.plan.indices.contains(f.phrase + 1) ? h.plan[f.phrase + 1] : nil
         let spb = 60 / max(h.bpm, 60)
         let nextDrop = next?.section == "drop" && d?.section != "drop"
         let beatsLeft = nextDrop ? (next!.start - f.t) / spb : 99
-        if want.0 == "off" && beatsLeft <= 4.5 && force == .auto { want = ("words", .words) }  // a dark wall counts in
-        let shout = d?.section == "drop" && cur.mode != "off" && cur.mode != "psychedelic" && (f.t - d!.start) / spb < 2
+        if want.0 == "off" && beatsLeft <= 4.5 && force == .auto && wall >= 0.5 { want = ("words", .words) }  // a dark wall counts in
+        let shout = wall >= 0.5 && d?.section == "drop" && cur.mode != "off" && cur.mode != "psychedelic" && (f.t - d!.start) / spb < 2
         if shout { fade = 1 }
         else if want.1 != cur.scene {
             fade = max(0, fade - dt * 5)
@@ -116,7 +119,7 @@ final class WallRenderer {
             draw(f, d, h, cols, bp, bass, dt)
             target = cur.mode == "off" ? 0 : cur.mode == "ambient" ? 0.4 : 0.95
         }
-        level += (target * fade - level) * min(1, dt * 10)
+        level += (target * min(1, wall * 2) * fade - level) * min(1, dt * 10)
         return WallOutput(level: level, psychedelic: cur.mode == "psychedelic", palette: Palettes.colors(d?.palette),
                           bands: bandsV, scene: cur.scene)
     }

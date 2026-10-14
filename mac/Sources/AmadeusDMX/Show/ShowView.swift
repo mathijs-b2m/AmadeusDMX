@@ -26,6 +26,9 @@ struct ShowView: View {
                 HStack(alignment: .top, spacing: 12) {
                     NowPlayingCard()
                     Spacer(minLength: 12)
+                    if let arc = model.feed.arc, model.feed.state == .connected {
+                        NightCard(arc: arc)   // every mode: the card floats over the stage and the Perform board alike
+                    }
                     if !model.feed.decks.isEmpty, model.engineRunning || model.showState == .attached {
                         DecksCard()
                     }

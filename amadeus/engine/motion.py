@@ -72,6 +72,9 @@ AIMS = {  # direction aims: centre azimuth/elevation and swing; point aims: (y c
 LOW_HEAD_M = 1.0  # heads below this (on the floor) aim up and over the crowd instead of down onto it
 
 
+OPEN_SKY = {"el": 66, "az_amp": 60, "el_amp": 18}  # outdoors: the sky aim goes higher and wider (no ceiling)
+
+
 LOW_CEILING_SWING_DEG = 12.0  # an upward aim under a low ceiling: this much swing below the ceiling limit
 
 
@@ -206,9 +209,12 @@ class MotionMixin:
         )
 
     def _fit_aim(self, name: str, head_pos) -> dict:
-        """An aim for this head: floor heads aim up over the crowd; an aim up into a low ceiling comes down
+        """An aim for this head: floor heads aim up over the crowd; outdoors the sky aim reaches higher; an aim up
+        into a low ceiling comes down
         under it with a swing it can still make (clamped flat it would freeze the movement)."""
         aim = AIMS.get(name, AIMS["crowd"])
+        if name == "sky" and self.stage.get("outdoor"):
+            aim = {**aim, **OPEN_SKY}
         if head_pos[2] < LOW_HEAD_M:
             aim = {**aim, **LOW_AIMS.get(name, {})}
         top = geometry.ceiling_top_deg(head_pos, self.stage)

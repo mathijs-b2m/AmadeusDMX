@@ -5,6 +5,7 @@ Two kinds of client:
 - lite (the Mac app in Perform mode): a small status frame a few times a second (time, phrase, decks).
 
 Full frames are only built while a full client is connected, so a show without a visualiser costs nothing.
+Clients may also talk back: each JSON message they send goes to `on_message` (the show arc's knobs).
 """
 
 from __future__ import annotations
@@ -119,6 +120,7 @@ class Feed:
         }
         self.lite_every = max(1, round(1.0 / (period * LITE_HZ)))
         self.tick = 0
+        self.on_message: Callable[[dict], None] | None = None  # what a client asks for (the operator's controls)
 
     async def handler(self, ws):
         group = self.lite if is_lite(ws) else self.full
@@ -126,7 +128,19 @@ class Feed:
         try:
             if self.hello:
                 await ws.send(self.hello)
-            await ws.wait_closed()
+            async for raw in ws:  # until it closes
+                try:
+                    msg = json.loads(raw)
+                except ValueError:
+                    continue
+                if isinstance(msg, dict) and self.on_message:
+                    try:
+                        self.on_message(msg)
+                    except (TypeError, ValueError, KeyError) as e:
+                        print(f"  feed: ignored a message ({e})", flush=True)
+        except Exception as e:  # noqa: BLE001 (a client that goes away mid-message is not the show's problem)
+            if type(e).__name__ not in ("ConnectionClosedError", "ConnectionClosedOK"):
+                raise
         finally:
             group.discard(ws)
 
@@ -146,7 +160,9 @@ class Feed:
         from websockets.asyncio.server import broadcast
 
         self.tick += 1
-        if not self.hello:
+        if not self.hello:  # no track yet: only the status (the show arc can be set up before the music)
+            if "arc" in status and self.tick % self.lite_every == 0:
+                broadcast(self.full | self.lite, json.dumps({"type": "frame", "lite": True, **status}))
             return
         if self.lite and self.tick % self.lite_every == 0:
             broadcast(self.lite, json.dumps({"type": "frame", "lite": True, **status}))

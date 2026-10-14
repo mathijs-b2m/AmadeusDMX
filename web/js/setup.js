@@ -26,6 +26,7 @@ async function load() {
   }
   showOutput();
   $("width").value = rig.stage.width_m ?? 6; $("ceiling").value = rig.stage.ceiling_m ?? 4.5; $("depth").value = rig.stage.room_depth_m ?? 6;
+  $("outdoor").checked = !!rig.stage.outdoor;
   $("master").value = rig.safety.master ?? 1; $("masterVal").textContent = Math.round($("master").value * 100) + "%";
   $("strobe").checked = !!rig.safety.allow_fast_strobe;
   render(); msg("");
@@ -160,7 +161,7 @@ function collect() {
   } else {
     rig.output = { type: "enttec_pro", port: $("usbPort").value, universe: +$("usbUni").value || 1 };
   }
-  rig.stage = { ...rig.stage, width_m: +$("width").value, ceiling_m: +$("ceiling").value, room_depth_m: +$("depth").value };
+  rig.stage = { ...rig.stage, width_m: +$("width").value, ceiling_m: +$("ceiling").value, room_depth_m: +$("depth").value, outdoor: $("outdoor").checked };
   rig.safety = { ...rig.safety, master: +$("master").value, allow_fast_strobe: $("strobe").checked };
 }
 $("save").onclick = async () => {

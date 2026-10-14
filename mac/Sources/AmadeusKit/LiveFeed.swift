@@ -26,6 +26,8 @@ public final class LiveFeed {
     public private(set) var link: LinkStatus?
     /// Frames per second actually received.
     public private(set) var fps: Double = 0
+    /// Live mode: the show arc (the night's stage and knobs), else nil.
+    public private(set) var arc: ArcStatus?
 
     /// The newest frame (any thread may read it; the receiver writes it).
     @ObservationIgnored private let box = OSAllocatedUnfairLock<(Frame?, Date)>(initialState: (nil, .distantPast))
@@ -33,6 +35,8 @@ public final class LiveFeed {
     public nonisolated var latestFrameArrival: Date { box.withLock { $0.1 } }
 
     @ObservationIgnored private var loop: Task<Void, Never>?
+    /// The open connection, to talk back to the engine (the show arc's controls).
+    @ObservationIgnored private let socket = OSAllocatedUnfairLock<URLSessionWebSocketTask?>(initialState: nil)
     public let url: URL
     /// Status frames only, a few a second (Perform mode: no 3D stage to feed). Reconnects when it changes.
     public var lite = false {
@@ -50,10 +54,10 @@ public final class LiveFeed {
 
     public func start() {
         guard loop == nil else { return }
-        let url = lite ? self.url.appending(path: "lite") : self.url, box = self.box
+        let url = lite ? self.url.appending(path: "lite") : self.url, box = self.box, socket = self.socket
         loop = Task.detached(priority: .userInitiated) { [weak self] in
             while !Task.isCancelled {
-                await Self.receive(url: url, box: box, feed: self)
+                await Self.receive(url: url, box: box, socket: socket, feed: self)
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -64,6 +68,15 @@ public final class LiveFeed {
         state = .idle
     }
 
+    /// Tell the engine something (a JSON object), e.g. `["type": "arc", "knob": ["intensity": 0.7]]`.
+    /// Dropped when no engine is connected.
+    public func send(_ message: [String: Any]) {
+        guard let task = socket.withLock({ $0 }),
+              let data = try? JSONSerialization.data(withJSONObject: message),
+              let text = String(data: data, encoding: .utf8) else { return }
+        task.send(.string(text)) { _ in }
+    }
+
     /// True while frames keep arriving (the engine is sending, i.e. a show runs).
     public var isReceiving: Bool { Date().timeIntervalSince(latestFrameArrival) < 1.5 }
 
@@ -71,11 +84,14 @@ public final class LiveFeed {
     public nonisolated var latestFullFrame: Frame? { latestFrame.flatMap { $0.lite ? nil : $0 } }
 
     /// One connection: receive until it drops. Runs off the main thread.
-    private nonisolated static func receive(url: URL, box: OSAllocatedUnfairLock<(Frame?, Date)>, feed: LiveFeed?) async {
+    private nonisolated static func receive(url: URL, box: OSAllocatedUnfairLock<(Frame?, Date)>,
+                                            socket: OSAllocatedUnfairLock<URLSessionWebSocketTask?>, feed: LiveFeed?) async {
         await feed?.set(state: .connecting)
         let task = URLSession.shared.webSocketTask(with: url)
         task.maximumMessageSize = 16 << 20
         task.resume()
+        socket.withLock { $0 = task }
+        defer { socket.withLock { if $0 === task { $0 = nil } } }
         var connected = false
         var count = 0, since = Date(), lastUI = Date.distantPast, lastPhrase = -1
         do {
@@ -109,9 +125,9 @@ public final class LiveFeed {
                     // the UI: a few times a second, or at once when the phrase changes
                     if now.timeIntervalSince(lastUI) >= 0.2 || f.phrase != lastPhrase || fps != nil {
                         lastUI = now; lastPhrase = f.phrase
-                        let t = f.t, p = f.phrase, d = f.decks, g = f.laserGuard ?? [:], l = f.link
+                        let t = f.t, p = f.phrase, d = f.decks, g = f.laserGuard ?? [:], l = f.link, a = f.arc
                         // hand the UI its update without waiting: a busy main thread must never hold up the frames
-                        Task { @MainActor in feed?.update(time: t, phrase: p, decks: d, guard: g, link: l, fps: fps) }
+                        Task { @MainActor in feed?.update(time: t, phrase: p, decks: d, guard: g, link: l, arc: a, fps: fps) }
                     }
                 }
             }
@@ -126,8 +142,9 @@ public final class LiveFeed {
     private func set(hello h: Hello) { hello = h }
 
     private func update(time t: Double, phrase p: Int, decks d: [DeckInfo]?, guard g: [String: String], link l: LinkStatus?,
-                        fps f: Double?) {
+                        arc a: ArcStatus?, fps f: Double?) {
         if l != link { link = l }
+        if a != arc { arc = a }
         time = t
         if p != phrase { phrase = p }
         if let d, d != decks { decks = d }

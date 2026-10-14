@@ -53,10 +53,12 @@ public struct Stage: Codable, Sendable, Equatable {
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public var ceilingGuard = true
     public var backGuard = true
+    /// An open-air stage: no ceiling, the sky is free for beams (the director aims there far more often).
+    public var outdoor = false
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case backGuard = "back_guard"
+        case backGuard = "back_guard", outdoor
     }
 
     public init(widthM: Double = 6, ceilingM: Double = 4.5, roomDepthM: Double = 6) {
@@ -70,6 +72,7 @@ public struct Stage: Codable, Sendable, Equatable {
         roomDepthM = try c.decodeIfPresent(Double.self, forKey: .roomDepthM) ?? 6
         ceilingGuard = try c.decodeIfPresent(Bool.self, forKey: .ceilingGuard) ?? true
         backGuard = try c.decodeIfPresent(Bool.self, forKey: .backGuard) ?? true
+        outdoor = try c.decodeIfPresent(Bool.self, forKey: .outdoor) ?? false
     }
 }
 
@@ -279,6 +282,42 @@ public struct LaserBeam: Sendable {
     public var bright: Float
 }
 
+/// The show arc (live mode): the night's clock, the stage the music is in, and the knobs
+/// (amadeus/show/arc.py). Every value is 0..1; `manual` names the knobs the operator holds.
+public struct ArcStatus: Decodable, Sendable, Equatable {
+    public var on: Bool
+    public var length: Double
+    /// Seconds since the music first played tonight (nil: the night hasn't started).
+    public var elapsed: Double?
+    public var stage: String
+    /// [key, name] per stage, named for the event.
+    public var stages: [[String]]
+    public var event: String
+    /// [key, title] per event type.
+    public var events: [[String]]
+    public var locked: Bool
+    public var heat: Double
+    public var trend: Double
+    public var bpm: Double?
+    public var baseBpm: Double?
+    public var values: [String: Double]
+    public var manual: [String]
+    public var groups: Int
+    public var playing: Int
+    /// The heads' movement the plans are calmed to: 0 calm, 1 moderate, 2 as the director planned.
+    public var movementLevel: Int?
+    /// How many phrases a look is held (1: every phrase as the director planned it).
+    public var hold: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case on, length, elapsed, stage, stages, event, events, locked, heat, trend, bpm, baseBpm = "base_bpm"
+        case values, manual, groups, playing, movementLevel = "movement_level", hold
+    }
+
+    public var stageName: String { stages.first { $0.first == stage }?.last ?? stage }
+    public var remaining: Double? { elapsed.map { length - $0 } }
+}
+
 public struct Frame: Decodable, Sendable {
     public var t: Double
     public var phrase: Int
@@ -299,8 +338,10 @@ public struct Frame: Decodable, Sendable {
     public var lite: Bool
     /// Each smoke machine's output now, 0..1 (element id → level).
     public var fog: [String: Float]
+    /// The show arc (live mode).
+    public var arc: ArcStatus?
 
-    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, decks, laserGuard = "guard", link, lite, fog }
+    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, decks, laserGuard = "guard", link, lite, fog, arc }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -323,6 +364,7 @@ public struct Frame: Decodable, Sendable {
         link = try? c.decodeIfPresent(LinkStatus.self, forKey: .link)
         lite = try c.decodeIfPresent(Bool.self, forKey: .lite) ?? false
         fog = (try? c.decodeIfPresent([String: Float].self, forKey: .fog)) ?? [:]
+        arc = try? c.decodeIfPresent(ArcStatus.self, forKey: .arc)
     }
 }
 
