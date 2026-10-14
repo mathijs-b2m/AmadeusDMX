@@ -64,3 +64,9 @@
   .step.failed { color: #ff6b6b; border-color: #6b2c2c; }
   .step.wait { opacity: .55; }
   .waiting { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+
+  /* the brightness limiter: impossible to miss while it is below 100 % */
+  .limitbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 20px; font-weight: 700;
+              color: #1a1000; background: repeating-linear-gradient(-45deg, #ff9f1a 0 14px, #ffb84d 14px 28px); }
+  .limitbar[hidden] { display: none; }
+  .limitbar button { font-weight: 600; background: #1a1000; color: #ffcf80; border-color: #1a1000; }

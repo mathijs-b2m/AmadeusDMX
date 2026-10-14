@@ -557,6 +557,9 @@ function deckLine(d) {
 
 function onFrame(msg) {
   frame = msg;
+  const lim = msg.limit ?? 1;  // the brightness limiter: the visualiser shows the show, the lights get at most this
+  $("limitBar").hidden = lim >= 1;
+  if (lim < 1) $("limitText").textContent = `⚠ Brightness limited to ${Math.round(lim * 100)}% · the lights get at most this; set it to 100% for a show`;
   if (msg.decks) $("decks").innerHTML = msg.decks.map(deckLine).join("");
   const rn = document.getElementById("rulesNote");
   if (rn) { const t = rulesNote(); if (rn.innerHTML !== t) rn.innerHTML = t; }

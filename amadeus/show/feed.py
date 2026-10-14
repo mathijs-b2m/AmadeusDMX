@@ -19,6 +19,7 @@ import numpy as np
 
 from amadeus.audio.model import Analysis
 from amadeus.director import Decision
+from amadeus.dmx import limiter
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
 
@@ -155,11 +156,14 @@ class Feed:
         broadcast(self.full | self.lite, msg)
 
     def send(self, status: dict, fixtures: Callable[[], dict]):
-        """`status`: t, phrase, bp and whatever else both kinds of client get (decks, link, guard).
+        """`status`: t, phrase, bp and whatever else both kinds of client get (decks, link, guard; `limit` is added
+        while the brightness limiter is on).
         `fixtures()`: the full frame's extra fields, only called when a full client is connected."""
         from websockets.asyncio.server import broadcast
 
         self.tick += 1
+        if limiter.level() < 1.0:  # the brightness limiter is on: every client shows it
+            status = {**status, "limit": round(limiter.level(), 3)}
         if not self.hello:  # no track yet: only the status (the show arc can be set up before the music)
             if "arc" in status and self.tick % self.lite_every == 0:
                 broadcast(self.full | self.lite, json.dumps({"type": "frame", "lite": True, **status}))

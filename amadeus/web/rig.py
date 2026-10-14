@@ -417,6 +417,22 @@ def _test_loop():
         release()
 
 
+def get_limiter(req=None):
+    """The brightness limiter (dmx/limiter.py): {"level": 0.05..1}, 1 is off."""
+    from amadeus.dmx import limiter
+
+    return {"level": limiter.read()}
+
+
+def set_limiter(req):
+    """{"level": 0.05..1}: the ceiling every light is limited to, in every running engine (1: off)."""
+    from amadeus.dmx import limiter
+
+    level = limiter.save(req.body().get("level", 1.0))
+    event(f"{req.client} brightness limiter: " + ("off" if level >= 1.0 else f"{round(level * 100)}%"))
+    return {"level": level}
+
+
 def page_log(req):
     """Events from the phone page, into the same log."""
     event(f"{req.client} page: {str(req.body().get('event', ''))[:300]}")
@@ -430,6 +446,7 @@ GET = {
     "/api/devices": get_devices,
     "/api/sets": list_sets,
     "/api/rigs": list_sets,
+    "/api/limiter": get_limiter,
 }
 POST = {
     "/api/rig": save_rig,
@@ -444,4 +461,5 @@ POST = {
     "/api/log": page_log,
     "/api/devices": save_devices,
     "/api/fixture/rename": rename_fixture,
+    "/api/limiter": set_limiter,
 }

@@ -97,6 +97,31 @@ final class AppModel {
     @ObservationIgnored private var remoteCode: String?
     var showInspector = true
 
+    /// The brightness limiter (Workspace.limiterLevel): a ceiling on every light while testing and setting up.
+    /// 1 is off. The app starts at 100 %: a limiter left on from the afternoon's setup never dims the night's show.
+    private(set) var limiter: Double = 1
+    var limiterOn: Bool { limiter < 0.995 }
+
+    func setLimiter(_ level: Double) {
+        let v = min(max(level, Workspace.limiterMinimum), 1)
+        limiter = v
+        workspace?.setLimiterLevel(v)
+    }
+
+    /// Follows a change made elsewhere (the web setup page) while the app runs.
+    private func watchLimiter() {
+        Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self else { return }
+                if let ws = self.workspace {
+                    let v = ws.limiterLevel()
+                    if abs(v - self.limiter) > 0.001 { self.limiter = v }
+                }
+            }
+        }
+    }
+
     /// Open the rig editor.
     func editLayout() {
         section = .rig
@@ -144,6 +169,8 @@ final class AppModel {
             DispatchQueue.main.async { self.play(URL(filePath: file), from: from) }
         }
         feed.start()
+        if let ws = workspace, ws.limiterLevel() < 1 { ws.setLimiterLevel(1) }
+        watchLimiter()
     }
 
     var needsSetup: Bool { workspace == nil }

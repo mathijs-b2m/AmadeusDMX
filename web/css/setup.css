@@ -25,3 +25,9 @@
   .nodes button { margin: 4px 6px 0 0; }
   .note { font-size: 12px; color: var(--muted); }
   @media (max-width: 760px) { .hide-sm { display: none; } }
+
+  /* the brightness limiter: impossible to miss while it is below 100 % */
+  .limitbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 20px; font-weight: 700;
+              color: #1a1000; background: repeating-linear-gradient(-45deg, #ff9f1a 0 14px, #ffb84d 14px 28px); }
+  .limitbar[hidden] { display: none; }
+  .limitbar button { font-weight: 600; background: #1a1000; color: #ffcf80; border-color: #1a1000; }

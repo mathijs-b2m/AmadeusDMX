@@ -29,6 +29,8 @@ POST /api/rig/add            {"key", "mode", "addresses", "universe"}: add fixtu
 GET  /api/outputs            DMX outputs: the set's, in words, and the USB DMX interfaces plugged in
 GET  /api/devices            your DMX devices (config/devices.json) and the USB DMX interfaces plugged in
 POST /api/devices            {"devices": [...]}: save them (a set maps its universes onto them: "dmx")
+GET  /api/limiter            the brightness limiter: {"level": 0.05..1} (1: off)
+POST /api/limiter            {"level": 0.7}: limit every light to that, in every running engine
 """
 
 from __future__ import annotations

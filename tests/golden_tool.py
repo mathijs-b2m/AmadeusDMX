@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from amadeus.director import RuleDirector, direct  # noqa: E402
+from amadeus.dmx import limiter  # noqa: E402
 from amadeus.engine import Engine, motion  # noqa: E402
 from amadeus.rig.groups import head_groups, laser_list  # noqa: E402
 from amadeus.rig.loader import load_rig  # noqa: E402
@@ -34,6 +35,7 @@ def render_hash(rig_path: Path) -> str:
     plan = direct(a, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
     with tempfile.TemporaryDirectory() as tmp:
         motion.TRAJ_CACHE = Path(tmp)  # always simulate: a cache hit would hide a change
+        limiter.use(Path(tmp) / "limiter.json")  # the lights as the show plays them, not as limited here
         eng = Engine(a, plan, rig)
         h = hashlib.sha256()
         h.update(json.dumps([d.__dict__ for d in plan], sort_keys=True, default=str).encode())

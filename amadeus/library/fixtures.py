@@ -16,6 +16,7 @@ from functools import cache
 from pathlib import Path
 
 from amadeus import paths
+from amadeus.dmx import limiter
 
 LIB_DIR = paths.FIXTURES
 # Your fixtures, when they live apart from the shipped library (the Mac app): they win over LIB_DIR, and additions
@@ -258,11 +259,13 @@ def has_wheel(defn: dict) -> bool:
 # ---------------------------------------------------------------- patching
 
 
-def patch(buf: bytearray, fx: dict, states: dict) -> None:
+def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) -> None:
     """Write one rig fixture's channels into a 512-byte universe buffer.
 
-    `states` maps element id → engine State (dimmer, r, g, b, white, pan, tilt, all 0..1).
+    `states` maps element id → engine State (dimmer, r, g, b, white, pan, tilt, all 0..1). `limit`: the
+    brightness limiter's ceiling (dmx/limiter.py; None: its saved level), applied here, last, to the light only.
     """
+    ceiling = limiter.level() if limit is None else min(max(limit, 0.0), 1.0)
     defn = get(fx["fixture"])
     chans = channels(defn, fx["mode"])
     if inert(defn):  # never driven: every channel at its off value
@@ -276,6 +279,15 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
     has_dimmer = any(c["attr"] == "dimmer" for c in chans)
     head_dimmers = any(c["attr"] == "dimmer" and "head" in c for c in chans)  # a dimmer per cell (Sunstrip)
     blacklight = uv_only(defn)
+    rgb_level = (per_head_colour and not head_dimmers) or not has_dimmer  # the RGB carries the level, not a dimmer
+
+    def ceiled(s) -> float:
+        """How much the limiter turns this element's emitters down (1: not at all), the same for all of them so
+        the colour keeps its hue. Only where they carry the level; a dimmer channel is limited on its own."""
+        if ceiling >= 1.0 or not rgb_level:
+            return 1.0
+        peak = min((max(s.r, s.g, s.b, 0.0) + max(s.white, 0.0)) * s.dimmer, 1.0)
+        return ceiling / peak if peak > ceiling else 1.0
 
     pan_l, tilt_l = fx.get("pan_limits", [0, 1]), fx.get("tilt_limits", [0, 1])  # optional hard limits
     want_pan = first.pan if getattr(first, "dmx_pan", None) is None else first.dmx_pan
@@ -307,7 +319,8 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
         a = c["attr"]
         s = els.get(c.get("head", 0), first)
         # Per-head colour without per-head dimmers: master dimmer full, intensity goes into RGB.
-        scale = s.dimmer if ((per_head_colour and not head_dimmers) or not has_dimmer) else 1.0
+        scale = s.dimmer if rgb_level else 1.0
+        level = min(max(max(s.dimmer, s.white), 0), 1, ceiling)  # a dimmer channel's level, under the limiter
         if a in overrides:
             v = overrides[a]
         elif a == "fog":  # smoke output: the element's level (engine/fog.py), above the value where smoke starts
@@ -316,8 +329,8 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
         elif a == "fog_fan":  # a hazer's fan: spreads what it makes; resting when it makes nothing
             v = round((0.4 + 0.6 * min(s.dimmer, 1.0)) * 255) if s.dimmer > 0 else c.get("default", 0)
         elif a == "uv" and blacklight:  # its only colour: the level, as a dimmer-only lamp shows it
-            lvl = max(s.dimmer, s.white) if (per_head_colour and not head_dimmers) or not has_dimmer else 1.0
-            v = round(min(max(lvl, 0), 1) * 255)
+            lvl = max(s.dimmer, s.white) if rgb_level else 1.0
+            v = round(min(max(lvl, 0), 1, ceiling) * 255)
         elif "default" in c:
             v = c["default"]
         elif a == "pan":
@@ -329,20 +342,20 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
         elif a == "tilt_fine":
             v = t16 & 255
         elif a == "dimmer" and "head" in c:  # this cell's own dimmer
-            v = round(min(max(max(s.dimmer, s.white), 0), 1) * 255)
+            v = round(level * 255)
         elif a == "dimmer":
-            v = 255 if per_head_colour else round(min(max(max(s.dimmer, s.white), 0), 1) * 255)
+            v = 255 if per_head_colour else round(level * 255)
         elif a == "dimmer_fine":  # low byte of a 16-bit dimmer
-            v = 255 if per_head_colour else round(min(max(max(s.dimmer, s.white), 0), 1) * 65535) & 255
+            v = 255 if per_head_colour else round(level * 65535) & 255
         elif a in ("cyan", "magenta", "yellow"):  # subtractive: filter out what the colour lacks
             mx = max(s.r, s.g, s.b) + s.white
             base = {"cyan": s.r, "magenta": s.g, "yellow": s.b}[a] + s.white
             v = 0 if mx < 1e-6 else round(min(max(1 - base / mx, 0), 1) * 255)
         elif a in ("red", "green", "blue"):
             base = {"red": s.r, "green": s.g, "blue": s.b}[a]
-            v = round(min(max((base + s.white) * scale, 0), 1) * 255)
+            v = round(min(max((base + s.white) * scale, 0), 1) * ceiled(s) * 255)
         elif a == "white":
-            v = round(min(max(s.white * scale, 0), 1) * 255)
+            v = round(min(max(s.white * scale, 0), 1) * ceiled(s) * 255)
         elif a == "color_wheel" and getattr(first, "lcolor", "") in defn.get("laser", {}).get("color_modes", {}):
             v = defn["laser"]["color_modes"][first.lcolor]  # laser multicolour modes
         elif a == "color_wheel":

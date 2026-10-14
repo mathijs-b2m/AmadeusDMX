@@ -219,3 +219,22 @@ $("gMake").onclick = () => {
              lasers: +$("gLasers").value } });
 };
 load().then(loadSets);
+
+// The brightness limiter (one for every engine, config/limiter.json): a ceiling, not a scale.
+function showLimit(level) {
+  $("limit").value = level;
+  const pct = Math.round(level * 100);
+  $("limitVal").textContent = level >= 1 ? "100% (off)" : pct + "%";
+  $("limitBar").hidden = level >= 1;
+  $("limitText").textContent = `⚠ Brightness limited to ${pct}% · lights above ${pct}% play at ${pct}%, the rest as the show plays them. Set it to 100% for a show.`;
+}
+async function setLimit(level) {
+  showLimit(level);
+  try { showLimit((await fetch("/api/limiter", { method: "POST", body: JSON.stringify({ level }) }).then(r => r.json())).level); }
+  catch { msg("Couldn't change the brightness limiter", "bad"); }
+}
+$("limit").oninput = () => showLimit(+$("limit").value);
+$("limit").onchange = () => setLimit(+$("limit").value);
+$("limitOff").onclick = () => setLimit(1);
+fetch("/api/limiter").then(r => r.json()).then(r => showLimit(r.level)).catch(() => {});
+setInterval(() => document.hidden || fetch("/api/limiter").then(r => r.json()).then(r => { if (document.activeElement !== $("limit")) showLimit(r.level); }).catch(() => {}), 3000);

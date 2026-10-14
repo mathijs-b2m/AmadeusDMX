@@ -72,7 +72,7 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 </td>
 <td valign="top">
 <h3>🛡️ Safe by default</h3>
-<p>Flashes are capped at 3 Hz, nothing strobes along with the music, and laser zones, keep-out zones and eye-safety rules keep beams where they belong.</p>
+<p>Flashes are capped at 3 Hz, nothing strobes along with the music, and laser zones, keep-out zones and eye-safety rules keep beams where they belong. While you set up, a brightness limiter caps every light (and tells you it's on).</p>
 </td>
 </tr>
 </table>

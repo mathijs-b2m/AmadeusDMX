@@ -58,6 +58,7 @@ visualiser and the Mac app both read it.
 | `link` | Amadeus Link: the link's health (offset, jitter, lost packets) |
 | `guard` | what the laser guard did this frame (laser id → note) |
 | `arc` | live mode: the show arc (below) |
+| `limit` | only while the brightness limiter is on: its ceiling, 0.05..1 (the lights get at most this; `fx` shows the show unlimited) |
 
 **The show arc** (`amadeus/show/arc.py`, live mode): the night as a whole. `arc` in every frame holds the
 night's `length` and `elapsed` seconds (null until the music first plays), the `event` type (`club`,

@@ -26,6 +26,7 @@ struct MainView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) { LimiterBanner() }
             .toolbar { toolbar }
         }
         .alert(model.pendingMode.map { "Switch to \($0.title)?" } ?? "", isPresented: Binding(
@@ -83,6 +84,7 @@ struct MainView: View {
             StatusPill()
         }
         ToolbarItemGroup(placement: .primaryAction) {
+            LimiterButton()
             ModeMenu()
             EngineButton()
             if model.section == .show {

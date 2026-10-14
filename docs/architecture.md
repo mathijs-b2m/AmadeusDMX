@@ -50,6 +50,12 @@ plan, the rig and the engine's code.
 3. **Laser guard** (`engine/lasers.py`), last in every frame: raises or shrinks a pattern, or blanks the
    laser, so no modelled beam enters a laser zone; with real lights and no laser zone, lasers stay dark.
    It is a software layer on top of the laser's own masking, scan-fail safety and E-stop, never instead.
+4. **Brightness limiter** (`dmx/limiter.py`, applied in `library/fixtures.patch`, the last step before DMX):
+   a ceiling on every light for testing and setting up without eye strain (`config/limiter.json`, shared by
+   every process that sends DMX: the show, the light test, Identify, the setup tools). It limits, it doesn't
+   scale: at 70 % a light at 50 % stays at 50 %, one at 100 % plays at 70 %, colours keep their hue; smoke
+   isn't limited. The Mac app shows it in its toolbar and in a striped banner on every page, and starts at
+   100 % each time it opens; the web setup page has it in its header. For a show it belongs at 100 %.
 
 ## The Mac app
 
