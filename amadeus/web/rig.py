@@ -336,6 +336,87 @@ def _identify(rig: dict, fixture_id: str, seconds: float = 2.0):
     sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
 
 
+# The light test: fixtures switched on one by one from the Set page stay lit (and the show paused) until
+# switched off, or for TEST_SECONDS at most.
+TEST_SECONDS = 60.0
+_test_lock = threading.Lock()
+_test: dict = {"rig": None, "lit": {}, "thread": None}
+
+
+def test_light(req):
+    """{"fixture": id, "rig": {...}, "on": bool}: light that fixture (or stop), to see it is patched and
+    connected. Says where its DMX goes."""
+    from amadeus.dmx import outputs
+    from amadeus.rig.loader import load_rig_dict
+
+    body = req.body()
+    rig, fixture_id, on = load_rig_dict(body["rig"]), body["fixture"], bool(body.get("on", True))
+    fx = next((f for f in rig["fixtures"] if f["id"] == fixture_id), None)
+    if fx is None:
+        return {"error": f"The set has no fixture called {fixture_id}"}, 400
+    refusal = fxlib.test_refusal(fxlib.get(fx["fixture"]))
+    if on and refusal:
+        return {"error": refusal}, 400
+    with _test_lock:
+        ids = {f["id"] for f in rig["fixtures"]}
+        _test["lit"] = {fid: until for fid, until in _test["lit"].items() if fid in ids}  # another set's: dark
+        _test["rig"] = rig
+        if on:
+            _test["lit"][fixture_id] = time.monotonic() + TEST_SECONDS
+        else:
+            _test["lit"].pop(fixture_id, None)
+        if _test["lit"] and not (_test["thread"] and _test["thread"].is_alive()):
+            _test["thread"] = threading.Thread(target=_test_loop, daemon=True)
+            _test["thread"].start()
+    return {
+        "on": on,
+        "seconds": TEST_SECONDS,
+        "output": outputs.describe(rig),
+        "universe": fx["universe"],
+        "wire_universe": outputs.wire_universe(rig, fx["universe"]),
+        "channels": [fx["address"], fx["address"] + fxlib.footprint(fx) - 1],
+    }
+
+
+def _test_loop():
+    from amadeus.dmx.artnet import hold, release
+    from amadeus.dmx.outputs import open_output
+    from amadeus.engine.state import State
+
+    rig, sender = None, None
+    try:
+        while True:
+            with _test_lock:
+                now = time.monotonic()
+                for fid, until in list(_test["lit"].items()):
+                    if until < now:
+                        del _test["lit"][fid]
+                lit = set(_test["lit"])
+                if _test["rig"] is not rig:
+                    if sender:
+                        sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
+                        sender.close()
+                    rig, sender = _test["rig"], open_output(_test["rig"], owner=True)
+                if not lit:
+                    _test["thread"] = None
+                    break
+            hold(1.0)  # a running show pauses while fixtures are tested
+            unis: dict[int, bytearray] = {}
+            for f in rig["fixtures"]:
+                buf = unis.setdefault(f["universe"], bytearray(512))
+                if f["id"] in lit:
+                    fxlib.test_light(buf, f)
+                else:
+                    fxlib.patch(buf, f, {e["id"]: State() for e in fxlib.expand(f)})
+            sender.send(unis)
+            time.sleep(0.025)
+    finally:
+        if sender:
+            sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
+            sender.close()
+        release()
+
+
 def page_log(req):
     """Events from the phone page, into the same log."""
     event(f"{req.client} page: {str(req.body().get('event', ''))[:300]}")
@@ -359,6 +440,7 @@ POST = {
     "/api/autopatch": autopatch,
     "/api/discover": discover,
     "/api/identify": identify,
+    "/api/test-light": test_light,
     "/api/log": page_log,
     "/api/devices": save_devices,
     "/api/fixture/rename": rename_fixture,

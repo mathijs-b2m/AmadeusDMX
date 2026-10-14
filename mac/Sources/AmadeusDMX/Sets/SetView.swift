@@ -13,6 +13,8 @@ struct SetView: View {
     @State private var names: [String: FixtureDefinition] = [:]
     @State private var showAdd = false
     @State private var message: String?
+    @State private var lit = Set<String>()   // fixtures the light test keeps on
+    @State private var testOff: [String: Task<Void, Never>] = [:]   // their switch-off when the engine's time runs out
     @State private var error: String?
 
     var body: some View {
@@ -44,7 +46,10 @@ struct SetView: View {
                     List(selection: $selection) {
                         ForEach(groups(doc), id: \.key) { g in
                             SwiftUI.Section {
-                                ForEach(g.fixtures) { f in FixtureRow(fixture: f, doc: doc) }
+                                ForEach(g.fixtures) { f in
+                                    FixtureRow(fixture: f, doc: doc, lit: lit.contains(f.id),
+                                               test: testRefusal(g.definition)) { toggleTest(f.id) }
+                                }
                             } header: {
                                 GroupHeader(group: g)
                             }
@@ -96,7 +101,9 @@ struct SetView: View {
         .alert("Couldn’t Change the Set", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
         } message: { Text(error ?? "") }
         .onAppear(perform: load)
-        .onChange(of: model.editingSet) { selection = []; load() }
+        .onDisappear { switchOffTests() }
+        .onChange(of: model.editingSet) { old, _ in switchOffTests(set: old); selection = []; load() }
+        .onChange(of: model.engineRunning) { if model.engineRunning { switchOffTests() } }
         .onChange(of: model.sets) { load() }
         .onChange(of: selection) { stage.highlight = Set(selection.flatMap { id in elementIDs(id) }) }
     }
@@ -170,9 +177,9 @@ struct SetView: View {
         }
     }
 
-    private func flash(_ text: String) {
+    private func flash(_ text: String, seconds: Double = 3) {
         message = text
-        Task { try? await Task.sleep(for: .seconds(3)); if message == text { message = nil } }
+        Task { try? await Task.sleep(for: .seconds(seconds)); if message == text { message = nil } }
     }
 
     private func identify(_ ids: Set<String>) {
@@ -182,6 +189,48 @@ struct SetView: View {
             for id in ids { try? await model.api.identify(fixture: id, rig: rig, set: set) }
             flash("Lit \(ids.count == 1 ? ids.first! : "\(ids.count) fixtures") for 2 s")
         }
+    }
+
+    /// Why the light test can't light this model here (nil: it can).
+    private func testRefusal(_ d: FixtureDefinition?) -> String? {
+        if editingSummary?.isVirtual ?? true { return "This set only feeds the visualiser: give it a DMX output to test the real lights" }
+        if model.engineRunning { return "Stop the show to test the lights" }
+        if let d, !d.inert.isEmpty { return "Not tested: \(d.inert)" }
+        if d?.kind == "smoke" { return "Smoke machines fire only in the show or the hardware test" }
+        return nil
+    }
+
+    /// The light test: the fixture on (the rest of the set dark) until switched off again, to see that it is
+    /// patched and connected. The engine switches it off by itself after a minute.
+    private func toggleTest(_ id: String) {
+        let on = !lit.contains(id), rig = model.selectedRig, set = model.editingSet
+        if on { lit.insert(id) } else { lit.remove(id) }
+        testOff[id]?.cancel()
+        Task {
+            do {
+                guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+                let r = try await model.api.testLight(fixture: id, on: on, rig: rig, set: set)
+                if on {
+                    flash("\(id) on: \(r.summary)", seconds: 8)
+                    testOff[id] = Task {
+                        try? await Task.sleep(for: .seconds(r.seconds))
+                        if !Task.isCancelled { lit.remove(id) }
+                    }
+                }
+            } catch {
+                lit.remove(id)
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    private func switchOffTests(set: String? = nil) {
+        guard !lit.isEmpty else { return }
+        let ids = lit, rig = model.selectedRig, set = set ?? model.editingSet
+        lit = []
+        testOff.values.forEach { $0.cancel() }
+        testOff = [:]
+        Task { for id in ids { _ = try? await model.api.testLight(fixture: id, on: false, rig: rig, set: set) } }
     }
 
     private func remove(_ ids: Set<String>) {
@@ -302,6 +351,9 @@ private struct GroupHeader: View {
 private struct FixtureRow: View {
     let fixture: PlacedFixture
     let doc: RigDocument
+    let lit: Bool
+    let test: String?   // why it can't be tested now (nil: it can)
+    let toggle: () -> Void
 
     var body: some View {
         HStack {
@@ -312,11 +364,17 @@ private struct FixtureRow: View {
                 .help("Universe.address: set this start address on the fixture's display")
             Text(fixture.mode).font(.callout).foregroundStyle(.secondary)
             Spacer()
+            Button(lit ? "On" : "Test", systemImage: lit ? "lightbulb.fill" : "lightbulb") { toggle() }
+                .labelStyle(.titleAndIcon)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(lit ? .yellow : nil)
+                .disabled(test != nil && !lit)
+                .help(test ?? (lit ? "Switch it off again"
+                               : "Light it on the real rig until you switch it off (a minute at most): is it patched and connected?"))
         }
         .tag(fixture.id)
     }
-
-
 }
 
 /// SF Symbols for fixture kinds (library `kind`).

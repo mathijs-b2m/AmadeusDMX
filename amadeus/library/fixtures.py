@@ -33,6 +33,9 @@ ELEMENT_KIND = {
     "smoke": "smoke",  # a smoke machine or hazer: engine/fog.py decides when and how much
 }
 MOVING = ("moving_head", "moving_bar")
+# Colour emitters the show does not drive yet (held at 0), lit only by the light test. On a bar they still
+# belong to their cell: a UV bar's sections are its heads.
+DARK_EMITTERS = ("uv", "amber", "lime", "indigo")
 
 # Lasers from the QLC+ / Open Fixture Library come without the hand-made mapping the show needs to drive them
 # safely: they are "inert", every channel held at its off value (the visualisers draw them dark). So is a smoke
@@ -339,6 +342,33 @@ def patch(buf: bytearray, fx: dict, states: dict) -> None:
         else:
             v = 0
         buf[addr] = min(max(int(v), 0), 255)  # a bad value in a definition must never stop the show
+
+
+def test_light(buf: bytearray, fx: dict, level: float = 0.6) -> None:
+    """Light one fixture for the light test (is it patched and connected?): every cell white at `level`, its
+    emitters the show keeps dark (UV, amber…) lit too, heads centred. Not for lasers and smoke machines."""
+    defn = get(fx["fixture"])
+    if inert(defn) or defn["kind"] == "smoke":
+        raise ValueError(test_refusal(defn))
+    from amadeus.engine.state import State
+
+    patch(buf, fx, {e["id"]: State(dimmer=level, r=1, g=1, b=1, pan=0.5, tilt=0.5) for e in expand(fx)})
+    chans = channels(defn, fx["mode"])
+    has_dimmer = any(c["attr"] == "dimmer" for c in chans)
+    cells_mixed = len(heads(defn, fx["mode"])) > 1 and not any(c["attr"] == "dimmer" and "head" in c for c in chans)
+    scale = level if cells_mixed or not has_dimmer else 1.0  # as patch scales the RGB: the dimmer sets the level
+    for off, c in enumerate(chans):
+        if c["attr"] in DARK_EMITTERS and 0 <= fx["address"] - 1 + off < 512:
+            buf[fx["address"] - 1 + off] = round(scale * 255)
+
+
+def test_refusal(defn: dict) -> str:
+    """Why the light test leaves this fixture alone ('' if it lights it)."""
+    if inert(defn):
+        return f"Not tested: {inert(defn)}."
+    if defn.get("kind") == "smoke":
+        return "Not tested: a smoke machine fires only in the show or the hardware test (amadeus test)."
+    return ""
 
 
 def _laser_value(a: str, laser: dict, s) -> int:

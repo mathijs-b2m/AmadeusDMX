@@ -283,6 +283,35 @@ public struct SetupAPI: Sendable {
         let rig = try await rig(rig: rigName, set: set)
         let _: [String: JSONValue] = try await post("api/identify", ["fixture": fixture, "rig": rig])
     }
+
+    /// Keeps one fixture lit on the real rig (the show pauses), or switches it off again: is it patched and
+    /// connected? It goes dark by itself after `seconds`. Lasers and smoke machines are refused.
+    public func testLight(fixture: String, on: Bool, rig rigName: String? = nil, set: String? = nil) async throws -> LightTest {
+        let rig = try await rig(rig: rigName, set: set)
+        return try await post("api/test-light", ["fixture": fixture, "rig": rig, "on": on])
+    }
+}
+
+/// Where a tested fixture's DMX goes.
+public struct LightTest: Decodable, Sendable {
+    public var on: Bool
+    public var seconds: Double
+    public var output: String           // the set's output, in words ("Art-Net → 192.168.2.18:6454")
+    public var universe: Int
+    public var wireUniverse: Int?       // the Art-Net / sACN universe it goes out as
+    public var channels: [Int]          // first and last DMX channel
+
+    enum CodingKeys: String, CodingKey {
+        case on, seconds, output, universe, wireUniverse = "wire_universe", channels
+    }
+
+    /// "universe 1, channels 43–50 · Art-Net → 192.168.2.18:6454 (universe 1 on the wire)"
+    public var summary: String {
+        let first = channels.first ?? 0, last = channels.last ?? first
+        var s = "universe \(universe), channels \(first)–\(last) · \(output)"
+        if let w = wireUniverse { s += " (universe \(w) on the wire)" }
+        return s
+    }
 }
 
 // MARK: - DMX devices (config/devices.json): the controllers, apart from the sets

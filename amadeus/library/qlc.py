@@ -27,7 +27,7 @@ FIXTURES_DIR = REPO_DIR / "resources" / "fixtures"
 REPO_URL = "https://github.com/mcallegari/qlcplus.git"
 RAW_URL = "https://raw.githubusercontent.com/mcallegari/qlcplus/master/resources/fixtures/{path}"
 NS = {"q": "http://www.qlcplus.org/FixtureDefinition"}
-CONVERTER_VERSION = 6
+CONVERTER_VERSION = 7
 
 PRESET_ATTR = {
     "IntensityMasterDimmer": "dimmer",
@@ -208,7 +208,8 @@ def _classify(ch) -> dict:
     if preset == "BeamZoomFine":
         return {"attr": "zoom_fine", "default": 0}
     if preset in QUIET_INTENSITY:
-        return {"attr": re.sub(r"(?<!^)(?=[A-Z])", "_", preset.removeprefix("Intensity")).lower(), "default": 0}
+        words = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", preset.removeprefix("Intensity"))
+        return {"attr": words.lower(), "default": 0}  # IntensityUV → uv, IntensityRedFine → red_fine
     if group == "Intensity" or preset.startswith("Intensity"):
         colour = ch.find("q:Colour", NS)
         c = (colour.text or "").strip().lower() if colour is not None else ""
@@ -369,7 +370,7 @@ def convert(rel: str) -> dict:
             if spec["attr"] == "frost" and spec.get("_on") is not None:
                 beam_fx["frost"] = {"frost": spec["_on"]}
             spec = {k: v for k, v in spec.items() if not k.startswith("_")}
-            if n in head_of and spec["attr"] in ("red", "green", "blue", "white", "dimmer"):
+            if n in head_of and spec["attr"] in ("red", "green", "blue", "white", "dimmer", *fxlib.DARK_EMITTERS):
                 spec["head"] = head_of[n]
             chans.append(spec)
         out["modes"][

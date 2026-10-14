@@ -275,6 +275,19 @@ def _specs(rig: dict) -> list[dict]:
     return spec if isinstance(spec, list) else [spec]
 
 
+def wire_universe(rig: dict, universe: int) -> int | None:
+    """The Art-Net or sACN universe a set's universe goes out as (after its offset or map); None over USB or
+    when no output carries it."""
+    for s in _specs(rig):
+        if s.get("universes") and universe not in s["universes"]:
+            continue
+        if s.get("type", "artnet") not in ("artnet", "sacn"):
+            return None
+        mapped = {int(k): int(v) for k, v in (s.get("universe_map") or {}).items()}
+        return mapped.get(universe, universe + int(s.get("universe_offset", 0)))
+    return None
+
+
 def describe(rig: dict) -> str:
     """How a set's DMX goes out, in words (without opening anything)."""
     if "dmx" in rig:
