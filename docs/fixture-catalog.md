@@ -41,7 +41,8 @@ undefined. The Mac app's Set page marks such a model **Plays nothing**; its **Ma
   (programs off, a shutter open, a macro parked on a colour), or *keep* what the converter made of it
   (a colour wheel, zoom);
 - **Try on the Lights** sends the values as they are to one fixture of the set (the rest dark, a running
-  show paused), so you can find out what a channel does;
+  show paused), so you can find out what a channel does; the channels that carry light (as the file has
+  them, or as you map them) stay under the brightness limiter;
 - what it is when the channels don't say (par, strobe, blinder, moving head); pan and tilt make a moving
   head, cells a bar.
 

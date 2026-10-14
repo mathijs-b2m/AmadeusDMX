@@ -381,10 +381,25 @@ def test_light(buf: bytearray, fx: dict, level: float = 0.6) -> None:
     chans = channels(defn, fx["mode"])
     has_dimmer = any(c["attr"] == "dimmer" for c in chans)
     cells_mixed = len(heads(defn, fx["mode"])) > 1 and not any(c["attr"] == "dimmer" and "head" in c for c in chans)
-    scale = level if cells_mixed or not has_dimmer else 1.0  # as patch scales the RGB: the dimmer sets the level
+    # as patch scales the RGB (the dimmer sets the level), under the brightness limiter where the emitter carries it
+    scale = min(level, limiter.level()) if cells_mixed or not has_dimmer else 1.0
     for off, c in enumerate(chans):
         if c["attr"] in DARK_EMITTERS and 0 <= fx["address"] - 1 + off < 512:
             buf[fx["address"] - 1 + off] = round(scale * 255)
+
+
+LIGHT_ATTRS = ("dimmer", "red", "green", "blue", "white", "uv", "amber", "lime", "indigo")
+
+
+def test_raw(buf: bytearray, fx: dict, raw: list[int], light: set[int] = frozenset()) -> None:
+    """The DMX mapper's values, as they are, on one fixture's channels; the ones that carry light (the definition's
+    and `light`, the channels the mapper gives a light role) kept under the brightness limiter."""
+    chans = channels(get(fx["fixture"]), fx["mode"])
+    ceiling = round(limiter.level() * 255)
+    for off, v in enumerate(raw[: len(chans)]):
+        if 0 <= fx["address"] - 1 + off < 512:
+            lit = off in light or chans[off]["attr"] in LIGHT_ATTRS
+            buf[fx["address"] - 1 + off] = min(v, ceiling) if lit else v
 
 
 def test_refusal(defn: dict) -> str:

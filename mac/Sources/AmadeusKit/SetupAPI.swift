@@ -286,12 +286,13 @@ public struct SetupAPI: Sendable {
 
     /// Keeps one fixture lit on the real rig (the show pauses), or switches it off again: is it patched and
     /// connected? It goes dark by itself after `seconds`. Lasers and smoke machines are refused.
-    /// With `raw`, its channels get those values as they are (the DMX mapper: what does this channel do?).
-    public func testLight(fixture: String, on: Bool, raw: [Int]? = nil, rig rigName: String? = nil,
+    /// With `raw`, its channels get those values as they are (the DMX mapper: what does this channel do?);
+    /// `light`: the channels (from 0) that carry light, kept under the brightness limiter.
+    public func testLight(fixture: String, on: Bool, raw: [Int]? = nil, light: [Int] = [], rig rigName: String? = nil,
                           set: String? = nil) async throws -> LightTest {
         let rig = try await rig(rig: rigName, set: set)
         var body: [String: Any] = ["fixture": fixture, "rig": rig, "on": on]
-        if let raw { body["raw"] = raw }
+        if let raw { body["raw"] = raw; body["light"] = light }
         return try await post("api/test-light", body)
     }
 

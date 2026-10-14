@@ -144,3 +144,18 @@ def test_the_library_names_and_ranges_come_along_when_at_hand():
     names = mapper.source_channels({"qlc": {"key": "beamZ/beamZ-BUV-463-LED-UV.qxf"}}, "Default")
     assert [n["name"] for n in names][:3] == ["Master dimmer", "Strobe", "Auto"]
     assert [51, 100, "Auto Program 1"] in names[2]["ranges"]
+
+
+def test_tried_light_stays_under_the_brightness_limiter(library, tmp_path):
+    from amadeus.dmx import limiter
+
+    before = limiter.FILE
+    limiter.use(tmp_path / "limiter.json")
+    try:
+        limiter.save(0.5)
+        fx = {"id": "fx1", "fixture": "test/effect", "mode": "5ch", "universe": 1, "address": 1, "x": 0.5}
+        buf = bytearray(512)
+        fxlib.test_raw(buf, fx, [255, 255, 255, 40, 255], light={1, 2})
+        assert list(buf[:5]) == [255, 128, 128, 40, 255]  # programs and unknowns as they are: they aren't light
+    finally:
+        limiter.use(before)

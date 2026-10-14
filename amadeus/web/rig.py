@@ -346,7 +346,8 @@ _test: dict = {"rig": None, "lit": {}, "raw": {}, "thread": None}
 def test_light(req):
     """{"fixture": id, "rig": {...}, "on": bool}: light that fixture (or stop), to see it is patched and
     connected. Says where its DMX goes. With "raw": [v, …] its channels get those values as they are (the DMX
-    mapper: what does this channel do?)."""
+    mapper: what does this channel do?); "light": [channel index, …] the ones it plays light on, kept under the
+    brightness limiter with the definition's own."""
     from amadeus.dmx import outputs
     from amadeus.rig.loader import load_rig_dict
 
@@ -369,7 +370,8 @@ def test_light(req):
         if on:
             _test["lit"][fixture_id] = time.monotonic() + TEST_SECONDS
             if raw is not None:
-                _test["raw"][fixture_id] = raw[: fxlib.footprint(fx)]
+                light = {int(i) for i in body.get("light", []) if isinstance(i, int)}
+                _test["raw"][fixture_id] = (raw[: fxlib.footprint(fx)], light)
             else:
                 _test["raw"].pop(fixture_id, None)
         else:
@@ -415,9 +417,7 @@ def _test_loop():
             for f in rig["fixtures"]:
                 buf = unis.setdefault(f["universe"], bytearray(512))
                 if f["id"] in raw:  # as they are: the mapper tries what a channel does
-                    for off, v in enumerate(raw[f["id"]]):
-                        if 0 <= f["address"] - 1 + off < 512:
-                            buf[f["address"] - 1 + off] = v
+                    fxlib.test_raw(buf, f, *raw[f["id"]])
                 elif f["id"] in lit:
                     fxlib.test_light(buf, f)
                 else:  # dark, and heads where a blackout leaves them (DMX 0): they don't move on every test

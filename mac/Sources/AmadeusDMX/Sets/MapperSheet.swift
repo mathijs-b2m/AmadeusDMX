@@ -151,6 +151,11 @@ struct MapperSheet: View {
     // MARK: trying on the lights
 
     private var raw: [Int] { mapping?.channels.map(\.value) ?? [] }
+    /// The channels given a light role: the engine keeps them under the brightness limiter.
+    private var light: [Int] {
+        let roles = Set((mapping?.roles ?? []).filter { $0.group != "Position" }.map(\.role))
+        return (mapping?.channels ?? []).enumerated().filter { roles.contains($0.element.role) }.map(\.offset)
+    }
 
     private func startTrying() {
         trying = true
@@ -170,11 +175,11 @@ struct MapperSheet: View {
     /// The values to the fixture, at most ~20 times a second while a slider moves.
     private func send() {
         sending?.cancel()
-        let values = raw, id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        let values = raw, lit = light, id = target.fixture, rig = model.selectedRig, set = model.editingSet
         sending = Task {
             try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled, trying else { return }
-            do { _ = try await model.api.testLight(fixture: id, on: true, raw: values, rig: rig, set: set) }
+            do { _ = try await model.api.testLight(fixture: id, on: true, raw: values, light: lit, rig: rig, set: set) }
             catch { trying = false; problems = [error.localizedDescription] }
         }
     }
