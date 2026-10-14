@@ -13,20 +13,23 @@ struct MainView: View {
             Sidebar()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
-            Group {
-                if model.needsSetup {
-                    EngineMissingView()
-                } else {
-                    switch model.section {
-                    case .show: ShowView(stage: stage)
-                    case .rig: RigView()
-                    case .set: SetView()
-                    case .engine: EngineView()
-                    case .settings: SettingsView(page: true)
+            VStack(spacing: 0) {
+                LimiterBanner()  // a row of its own above the page: it pushes the page down, never covers it
+                Group {
+                    if model.needsSetup {
+                        EngineMissingView()
+                    } else {
+                        switch model.section {
+                        case .show: ShowView(stage: stage)
+                        case .rig: RigView()
+                        case .set: SetView()
+                        case .engine: EngineView()
+                        case .settings: SettingsView(page: true)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .safeAreaInset(edge: .top, spacing: 0) { LimiterBanner() }
             .toolbar { toolbar }
         }
         .alert(model.pendingMode.map { "Switch to \($0.title)?" } ?? "", isPresented: Binding(
