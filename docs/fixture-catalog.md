@@ -27,6 +27,27 @@ zoom). Every other channel gets a value that keeps the fixture quiet: shutter op
 macros. OFL 16-bit channels are scaled to bytes, and an OFL alias follows the fixture it points to.
 Moving heads get an estimated speed (measure it), brightness comes from the lumens or else the power.
 
+### Fixtures the show can't play: the DMX mapper
+
+Some fixtures come through with nothing the show can play: effect lights with only program and rotation
+channels, colour-macro-only modes, numbered emitters (`blue_1`, `blue_2`…), channels a library leaves
+undefined. The Mac app's Set page marks such a model **Plays nothing**; its **Map Channels…** button (also
+*Map DMX Channels…* on a fixture's menu) opens the DMX mapper (`amadeus/library/mapper.py`):
+
+- every channel of the mode, with its name and what its value ranges do from QLC+ or the Open Fixture
+  Library (pick a range to set it);
+- per channel what the show plays on it (dimmer, red, green, blue, white, UV, cyan/magenta/yellow, pan,
+  tilt, their fine channels; a colour or dimmer optionally for one cell of a bar), or *hold at value*
+  (programs off, a shutter open, a macro parked on a colour), or *keep* what the converter made of it
+  (a colour wheel, zoom);
+- **Try on the Lights** sends the values as they are to one fixture of the set (the rest dark, a running
+  show paused), so you can find out what a channel does;
+- what it is when the channels don't say (par, strobe, blinder, moving head); pan and tilt make a moving
+  head, cells a bar.
+
+It saves into your copy of the definition (`"mapped": {"modes": [...]}`), so every fixture of that model in
+your sets plays by it. Lasers and smoke machines aren't mapped here.
+
 ### Lasers: dark until mapped by hand
 
 A converted laser is **inert**: every channel is held at its off value (a range called off, blackout or

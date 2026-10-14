@@ -15,6 +15,7 @@ struct SetView: View {
     @State private var message: String?
     @State private var lit = Set<String>()   // fixtures the light test keeps on
     @State private var testOff: [String: Task<Void, Never>] = [:]   // their switch-off when the engine's time runs out
+    @State private var mapTarget: MapTarget?   // the DMX mapper, for a model and mode of the set
     @State private var error: String?
 
     var body: some View {
@@ -51,13 +52,17 @@ struct SetView: View {
                                                test: testRefusal(g.definition)) { toggleTest(f.id) }
                                 }
                             } header: {
-                                GroupHeader(group: g)
+                                GroupHeader(group: g) { mapChannels(g.fixtures.first) }
                             }
                         }
                     }
                     .contextMenu(forSelectionType: String.self) { ids in
                         Button("Identify on the Lights", systemImage: "lightbulb.max") { identify(ids) }
                             .disabled(editingSummary?.isVirtual ?? true || model.engineRunning)
+                        Button("Map DMX Channels…", systemImage: "slider.vertical.3") {
+                            mapChannels(doc.fixtures.first { ids.contains($0.id) })
+                        }
+                        .disabled(ids.isEmpty || model.engineRunning)
                         Divider()
                         Button("Remove from the Set", systemImage: "trash", role: .destructive) { remove(ids) }
                             .disabled(model.engineRunning)
@@ -91,6 +96,14 @@ struct SetView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showAdd) { AddToSetSheet { load() }.environment(model) }
+        .sheet(item: $mapTarget) { t in
+            MapperSheet(target: t, tryRefusal: tryRefusal) {
+                names[t.key] = model.workspace?.definition(t.key)
+                load()
+                flash("Mapped \(names[t.key]?.name ?? t.key) (\(t.mode)): every one in your sets plays by it")
+            }
+            .environment(model)
+        }
         .toolbar {
             ToolbarItem {
                 Button("Identify", systemImage: "lightbulb.max") { identify(selection) }
@@ -191,10 +204,23 @@ struct SetView: View {
         }
     }
 
-    /// Why the light test can't light this model here (nil: it can).
-    private func testRefusal(_ d: FixtureDefinition?) -> String? {
+    /// The DMX mapper for this fixture's model and mode (tried on this fixture).
+    private func mapChannels(_ f: PlacedFixture?) {
+        guard let f else { return }
+        switchOffTests()
+        mapTarget = MapTarget(key: f.key, mode: f.mode, fixture: f.id, address: f.address, universe: f.universe)
+    }
+
+    /// Why nothing can be lit on the real rig now (nil: it can).
+    private var tryRefusal: String? {
         if editingSummary?.isVirtual ?? true { return "This set only feeds the visualiser: give it a DMX output to test the real lights" }
         if model.engineRunning { return "Stop the show to test the lights" }
+        return nil
+    }
+
+    /// Why the light test can't light this model here (nil: it can).
+    private func testRefusal(_ d: FixtureDefinition?) -> String? {
+        if let r = tryRefusal { return r }
         if let d, !d.inert.isEmpty { return "Not tested: \(d.inert)" }
         if d?.kind == "smoke" { return "Smoke machines fire only in the show or the hardware test" }
         return nil
@@ -332,7 +358,9 @@ private struct SetHeader: View {
 }
 
 private struct GroupHeader: View {
+    @Environment(AppModel.self) private var model
     let group: SetView.Group
+    let map: () -> Void
 
     var body: some View {
         let d = group.definition
@@ -343,6 +371,20 @@ private struct GroupHeader: View {
                 Text("\(f.mode) · \(d?.channels(f.mode) ?? 0) ch").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            if let d, let f = group.fixtures.first, d.inert.isEmpty, d.kind != "smoke" {
+                let dark = !d.plays(f.mode)
+                if dark {
+                    Label("Plays nothing", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                        .help("The show finds no dimmer or colour channel in this mode: map its channels by hand")
+                }
+                Button(dark ? "Map Channels…" : "Channels…", systemImage: "slider.vertical.3", action: map)
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+                    .tint(dark ? .orange : nil)
+                    .disabled(model.engineRunning)
+                    .help("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture")
+            }
         }
         .padding(.vertical, 2)
     }

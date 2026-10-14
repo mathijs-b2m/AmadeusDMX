@@ -423,7 +423,7 @@ Every DMX mode from the manual, safe defaults for channels the engine doesn't dr
 - **`gobo_names` / `gobo_groups`:** name them with `amadeus gobos` (the styles map the names to dots, shapes, rings, curves).
 - **`color_wheel`:** slot colours (name them with `amadeus colors`; `"verified": false` means guessed).
 
-Any fixture from the QLC+ library and the Open Fixture Library can be added: all of them ship already converted in `fixtures/catalog/`, so it works offline. Converted lasers stay dark until mapped by hand; smoke machines and hazers are played by the show, sized to the machine and the room. See [docs/fixture-catalog.md](docs/fixture-catalog.md).
+Any fixture from the QLC+ library and the Open Fixture Library can be added: all of them ship already converted in `fixtures/catalog/`, so it works offline. A fixture the show can't play from its library file (only effect, macro or unnamed channels) is marked on the Mac app's Set page and mapped there by hand with the **DMX mapper**, trying each channel on the real fixture. Converted lasers stay dark until mapped by hand; smoke machines and hazers are played by the show, sized to the machine and the room. See [docs/fixture-catalog.md](docs/fixture-catalog.md).
 
 Included: **beamZ Fuze75B Beam** (12ch/10ch, measured motion, named gobos and colour wheel), **beamZ Fuze75S Spot** (13ch/11ch, colours and motion still estimated), **Ayra ComPar Kit 2** (4 RGB heads, 16/12/7/3ch), and conversions of popular fixtures from the QLC+ library (Sharpy, Pointe, MAC Aura, MAC Encore, Atomic 3000, …; see `THIRD_PARTY_NOTICES.md`).
 

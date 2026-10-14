@@ -65,6 +65,28 @@ def add_to_rig(req):
     return {"saved": not problems, "problems": problems, "added": new}
 
 
+def get_mapping(req):
+    """A fixture mode, channel by channel, for the DMX mapper."""
+    from amadeus.library import mapper
+
+    try:
+        return mapper.describe(req.query["key"], req.query["mode"])
+    except SystemExit as e:  # an unknown fixture or mode
+        return {"error": str(e)}, 400
+
+
+def save_mapping(req):
+    """{"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}: save a hand mapping (nothing saved if
+    there are problems)."""
+    from amadeus.library import mapper
+
+    b = req.body()
+    problems = mapper.apply(b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])))
+    if not problems:
+        event(f"{req.client} mapped {b['key']} {b['mode']} by hand")
+    return {"saved": not problems, "problems": problems}
+
+
 def label_engines(req):
     from amadeus.library import label
 
@@ -94,6 +116,7 @@ GET = {
     "/api/library": library,
     "/api/catalog": search,
     "/api/catalog/details": details,
+    "/api/fixture/map": get_mapping,
     "/api/label/engines": label_engines,
 }
 POST = {
@@ -101,4 +124,5 @@ POST = {
     "/api/suggest": suggest,
     "/api/rig/add": add_to_rig,
     "/api/label": identify_label,
+    "/api/fixture/map": save_mapping,
 }

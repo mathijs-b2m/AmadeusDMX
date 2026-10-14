@@ -132,6 +132,17 @@ public struct FixtureDefinition: Decodable, Sendable {
         return max(1, heads.count)
     }
     public func channels(_ mode: String) -> Int { modes[mode]?.count ?? 0 }
+    /// Does the show light anything in this mode? (amadeus/library/mapper.py `plays`) A fixture that plays
+    /// nothing (only effect, macro or unnamed channels) is one for the DMX mapper.
+    public func plays(_ mode: String) -> Bool {
+        let light: Set<String> = ["dimmer", "red", "green", "blue", "white", "uv", "cyan", "magenta", "yellow"]
+        let attrs = Set(modes.values.joined().compactMap { $0["attr"]?.string })
+        let blacklight = attrs.contains("uv") && attrs.isDisjoint(with: ["red", "green", "blue", "white", "cyan", "color_wheel"])
+        return (modes[mode] ?? []).contains { c in
+            guard let a = c["attr"]?.string, light.contains(a) else { return false }
+            return c["default"] == nil || (a == "uv" && blacklight)
+        }
+    }
     public var defaultMode: String { modes.max { $0.value.count < $1.value.count }?.key ?? "" }
 }
 

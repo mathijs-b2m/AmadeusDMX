@@ -340,12 +340,13 @@ def _identify(rig: dict, fixture_id: str, seconds: float = 2.0):
 # switched off, or for TEST_SECONDS at most.
 TEST_SECONDS = 60.0
 _test_lock = threading.Lock()
-_test: dict = {"rig": None, "lit": {}, "thread": None}
+_test: dict = {"rig": None, "lit": {}, "raw": {}, "thread": None}
 
 
 def test_light(req):
     """{"fixture": id, "rig": {...}, "on": bool}: light that fixture (or stop), to see it is patched and
-    connected. Says where its DMX goes."""
+    connected. Says where its DMX goes. With "raw": [v, …] its channels get those values as they are (the DMX
+    mapper: what does this channel do?)."""
     from amadeus.dmx import outputs
     from amadeus.rig.loader import load_rig_dict
 
@@ -354,17 +355,26 @@ def test_light(req):
     fx = next((f for f in rig["fixtures"] if f["id"] == fixture_id), None)
     if fx is None:
         return {"error": f"The set has no fixture called {fixture_id}"}, 400
-    refusal = fxlib.test_refusal(fxlib.get(fx["fixture"]))
+    defn, raw = fxlib.get(fx["fixture"]), body.get("raw")
+    if raw is not None and not (isinstance(raw, list) and all(isinstance(v, int) and 0 <= v <= 255 for v in raw)):
+        return {"error": "raw: a list of DMX values (0–255)"}, 400
+    refusal = fxlib.test_refusal(defn) or (raw is not None and defn["kind"] == "laser" and "Lasers aren't driven raw.")
     if on and refusal:
         return {"error": refusal}, 400
     with _test_lock:
         ids = {f["id"] for f in rig["fixtures"]}
         _test["lit"] = {fid: until for fid, until in _test["lit"].items() if fid in ids}  # another set's: dark
         _test["rig"] = rig
+        _test["raw"] = {fid: v for fid, v in _test["raw"].items() if fid in _test["lit"]}
         if on:
             _test["lit"][fixture_id] = time.monotonic() + TEST_SECONDS
+            if raw is not None:
+                _test["raw"][fixture_id] = raw[: fxlib.footprint(fx)]
+            else:
+                _test["raw"].pop(fixture_id, None)
         else:
             _test["lit"].pop(fixture_id, None)
+            _test["raw"].pop(fixture_id, None)
         if _test["lit"] and not (_test["thread"] and _test["thread"].is_alive()):
             _test["thread"] = threading.Thread(target=_test_loop, daemon=True)
             _test["thread"].start()
@@ -391,7 +401,7 @@ def _test_loop():
                 for fid, until in list(_test["lit"].items()):
                     if until < now:
                         del _test["lit"][fid]
-                lit = set(_test["lit"])
+                lit, raw = set(_test["lit"]), dict(_test["raw"])
                 if _test["rig"] is not rig:
                     if sender:
                         sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
@@ -404,7 +414,11 @@ def _test_loop():
             unis: dict[int, bytearray] = {}
             for f in rig["fixtures"]:
                 buf = unis.setdefault(f["universe"], bytearray(512))
-                if f["id"] in lit:
+                if f["id"] in raw:  # as they are: the mapper tries what a channel does
+                    for off, v in enumerate(raw[f["id"]]):
+                        if 0 <= f["address"] - 1 + off < 512:
+                            buf[f["address"] - 1 + off] = v
+                elif f["id"] in lit:
                     fxlib.test_light(buf, f)
                 else:  # dark, and heads where a blackout leaves them (DMX 0): they don't move on every test
                     fxlib.patch(buf, f, {e["id"]: State(pan=0.0, tilt=0.0) for e in fxlib.expand(f)})

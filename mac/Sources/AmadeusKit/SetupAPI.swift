@@ -286,10 +286,65 @@ public struct SetupAPI: Sendable {
 
     /// Keeps one fixture lit on the real rig (the show pauses), or switches it off again: is it patched and
     /// connected? It goes dark by itself after `seconds`. Lasers and smoke machines are refused.
-    public func testLight(fixture: String, on: Bool, rig rigName: String? = nil, set: String? = nil) async throws -> LightTest {
+    /// With `raw`, its channels get those values as they are (the DMX mapper: what does this channel do?).
+    public func testLight(fixture: String, on: Bool, raw: [Int]? = nil, rig rigName: String? = nil,
+                          set: String? = nil) async throws -> LightTest {
         let rig = try await rig(rig: rigName, set: set)
-        return try await post("api/test-light", ["fixture": fixture, "rig": rig, "on": on])
+        var body: [String: Any] = ["fixture": fixture, "rig": rig, "on": on]
+        if let raw { body["raw"] = raw }
+        return try await post("api/test-light", body)
     }
+
+    /// A fixture mode channel by channel, for the DMX mapper.
+    public func mapping(key: String, mode: String) async throws -> FixtureMapping {
+        try await get("api/fixture/map", query: ["key": key, "mode": mode])
+    }
+
+    /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it).
+    public func saveMapping(_ m: FixtureMapping) async throws -> [String] {
+        let chans = m.channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value] as [String: Any] }
+        let r: SaveResult = try await post("api/fixture/map", ["key": m.key, "mode": m.mode, "kind": m.kind, "channels": chans])
+        return r.problems ?? []
+    }
+}
+
+/// A fixture mode as the DMX mapper shows it (amadeus/library/mapper.py).
+public struct FixtureMapping: Decodable, Sendable {
+    public struct Role: Decodable, Sendable, Hashable {
+        public var role: String
+        public var label: String
+        public var group: String
+        public var cell: Bool
+    }
+    /// What a range of a channel's values does, from the QLC+ or OFL file.
+    public struct Range: Decodable, Sendable, Hashable {
+        public var lo: Int, hi: Int, what: String
+        public init(from decoder: Decoder) throws {
+            var c = try decoder.unkeyedContainer()
+            lo = try c.decode(Int.self); hi = try c.decode(Int.self); what = try c.decode(String.self)
+        }
+        public var mid: Int { (lo + hi) / 2 }
+    }
+    public struct Channel: Decodable, Sendable, Identifiable {
+        public var n: Int
+        public var attr: String
+        public var role: String          // a Role's role, "hold" (held at value) or "keep" (as converted)
+        public var cell: Int             // 0: the whole fixture
+        public var value: Int
+        public var name: String
+        public var ranges: [Range]
+        public var id: Int { n }
+    }
+    public var key: String
+    public var name: String
+    public var mode: String
+    public var kind: String
+    public var kinds: [String: String]
+    public var roles: [Role]
+    public var channels: [Channel]
+    public var plays: Bool
+    public var mapped: Bool
+    public var refusal: String
 }
 
 /// Where a tested fixture's DMX goes.

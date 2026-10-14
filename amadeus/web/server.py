@@ -9,7 +9,10 @@ POST /api/rig                validate and save the rig (returns problems; nothin
 POST /api/autopatch          assign non-overlapping addresses + stage layout to the posted fixtures
 POST /api/discover           ArtPoll on the network; returns the nodes found
 POST /api/identify           {"fixture": id, "rig": {...}}: light that fixture white for 2 s
-POST /api/test-light         {"fixture": id, "rig": {...}, "on": bool}: keep that fixture lit (≤ 60 s) or stop
+POST /api/test-light         {"fixture": id, "rig": {...}, "on": bool}: keep that fixture lit (≤ 60 s) or stop;
+                             "raw": [v, …] sends those values to its channels instead (the DMX mapper)
+GET  /api/fixture/map?key=…&mode=…   a mode channel by channel, with the library's names and ranges (DMX mapper)
+POST /api/fixture/map        {"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}: save a hand mapping
 GET  /api/directors          decision models available right now (rules, OpenAI, local Ollama decision models)
 POST /api/director           {"director": "..."}: switch the decision model (saved in the rig file on its own)
 GET  /api/catalog?q=fuze     search our library + the QLC+ library + the Open Fixture Library
