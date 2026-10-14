@@ -82,8 +82,12 @@ def test_the_endpoint_keeps_it_lit_until_switched_off(uv_bar, monkeypatch, tmp_p
         assert data[299] == 255 and all(v > 100 for v in data[303:307])
         dark = bytearray(512)
         for f in rig["fixtures"][:-1]:
-            fxlib.patch(dark, f | {"x": f.get("x", 0.5)}, {e["id"]: State() for e in fxlib.expand(f)})
-        assert data[:299] == dark[:299]  # the rest of the set stays dark (heads parked)
+            fxlib.patch(dark, f | {"x": f.get("x", 0.5)}, {e["id"]: State(pan=0.0, tilt=0.0) for e in fxlib.expand(f)})
+        assert data[:299] == dark[:299]  # the rest of the set stays dark
+        for f in rig["fixtures"][:-1]:  # and its heads stay where a blackout left them: they don't swing
+            for off, c in enumerate(fxlib.channels(fxlib.get(f["fixture"]), f["mode"])):
+                if c["attr"] in fxlib.PAN_TILT:
+                    assert data[f["address"] - 1 + off] == 0, (f["id"], c["attr"])
         web_rig.test_light(Req({"fixture": "buv1", "rig": rig, "on": False}))
         deadline = time.monotonic() + 2
         while web_rig._test["thread"] is not None and time.monotonic() < deadline:

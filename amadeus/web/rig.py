@@ -322,7 +322,7 @@ def _identify(rig: dict, fixture_id: str, seconds: float = 2.0):
     rig = load_rig_dict(rig)
     sender = open_output(rig, owner=True)
     hold(seconds + 0.5)
-    states = {e["id"]: State(pan=0.5, tilt=0.5) for e in rig["elements"]}
+    states = {e["id"]: State(pan=0.0, tilt=0.0) for e in rig["elements"]}  # the others stay where a blackout left them
     for e in rig["elements"]:
         if e["fixture"] == fixture_id:
             states[e["id"]] = State(dimmer=0.6, r=1, g=1, b=1, pan=0.5, tilt=0.5)
@@ -406,8 +406,8 @@ def _test_loop():
                 buf = unis.setdefault(f["universe"], bytearray(512))
                 if f["id"] in lit:
                     fxlib.test_light(buf, f)
-                else:
-                    fxlib.patch(buf, f, {e["id"]: State() for e in fxlib.expand(f)})
+                else:  # dark, and heads where a blackout leaves them (DMX 0): they don't move on every test
+                    fxlib.patch(buf, f, {e["id"]: State(pan=0.0, tilt=0.0) for e in fxlib.expand(f)})
             sender.send(unis)
             time.sleep(0.025)
     finally:
