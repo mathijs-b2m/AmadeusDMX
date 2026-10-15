@@ -135,6 +135,21 @@ class Bands:
         return [round(x / total, 3) for x in acc] if acc and total > 0 else [0, 0, 0, 0, 0]
 
 
+def _copy_offset(a, deck) -> float:
+    """A streamed track's copy against the stream (streamed.copy_offset), said once in the log."""
+    from amadeus.show.sources.streamed import copy_offset
+
+    off = copy_offset(a.beats, a.duration, deck.stream_info)
+    name = deck.stream_info.name
+    if off is None:
+        print(f"  ⇥ {name}: the copy's beats don't line up clearly with {deck.stream.title()}'s grid: played as is")
+        return 0.0
+    if abs(off) >= 0.002:
+        print(f"  ⇥ {name}: the copy runs {abs(off) * 1000:.0f} ms {'behind' if off > 0 else 'ahead of'} the "
+              f"{deck.stream.title()} stream: lit at the stream's beat")  # fmt: skip
+    return off
+
+
 def _health_line(hs: dict, listener: Listener, shows: TrackShows):
     """One line of vital signs (live --health)."""
     import resource
@@ -226,6 +241,7 @@ async def run(
     arc = ShowArc(rig)  # the night: its stages and the operator's knobs
     feed.on_message = lambda m: arc.control(m) if m.get("type") == "arc" else None
     locks: dict[int, PhaseLock] = {}  # per deck: its position locked to Ableton Link's beat, when it sends one
+    aligned: dict[str, float] = {}  # per streamed track's copy: how much later in it the music comes (s)
     showing = None  # (deck, file, director, plan) the visualiser's hello describes
     phrase_of: dict[int, tuple] = {}  # per deck: (file, phrase) last logged
 
@@ -287,6 +303,10 @@ async def run(
                     a, _, engine, _ = show
                     engine.colour_variety, engine.drop_strength = arc.colour_variety(), arc.drop_strength()
                     pos = locks.setdefault(deck.deck, PhaseLock()).at(deck, now, a.beats, deck.file)
+                    if deck.stream_info is not None:  # a copy of a streamed track: lined up with the stream
+                        if deck.file not in aligned and getattr(deck.stream_info, "grid", None):
+                            aligned[deck.file] = _copy_offset(a, deck)
+                        pos += aligned.get(deck.file, 0.0)
                     t = min(max(pos + lead, 0.0), a.duration - 0.05)  # the lights a little ahead (clock.py)
                     i, states = engine.render(t)
                     if phrase_of.get(deck.deck) != (deck.file, i):  # the log: where the show is vs the DJ software

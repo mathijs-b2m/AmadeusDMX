@@ -40,6 +40,17 @@ class Style:
     palettes: tuple[str, ...]  # the colours of the genre, the most typical first
     avoid: dict[str, frozenset] = field(default_factory=dict)  # per layer: options that don't fit
     prefer: dict[str, tuple] = field(default_factory=dict)  # per layer: what to use instead (taken in turn)
+    beat: str = ""  # a trigger that IS the genre (reggaeton: boom-tac): not a lean, the beat of its body
+
+    def keep_beat(self, d) -> bool:
+        """The genre's own beat where the music plays a beat: in the body of the track (grooves, verses,
+        choruses, drops), instead of any other beat trigger. True if changed."""
+        if not self.beat or d.section not in BEAT_SECTIONS or d.trigger not in BEAT_TRIGGERS:
+            return False
+        d.trigger = self.beat
+        if d.par_accent in ("none", "melody", "sparkle") and d.section != "verse":
+            d.par_accent = "pulse"  # the pars play it (a verse may stay calm)
+        return True
 
     def allows(self, layer: str, value: str) -> bool:
         return value not in self.avoid.get(layer, ())
@@ -47,7 +58,7 @@ class Style:
     def adjust(self, d, k: int) -> bool:
         """The genre's colours for decision `d`, and in a groove its misfits swapped for what fits (k: rotates
         the choice). True if changed."""
-        changed = False
+        changed = self.keep_beat(d)
         if d.palette not in self.palettes:
             d.palette, changed = self.palettes[k % len(self.palettes)], True
         if d.section not in ("groove", "verse", "chorus"):
@@ -61,13 +72,19 @@ class Style:
         return changed
 
 
-def _style(genre, text, palettes, avoid=None, prefer=None) -> Style:
+BEAT_SECTIONS = ("groove", "verse", "chorus", "drop")
+# the triggers that play a beat (accents, bars, lead and roll don't: they stay)
+BEAT_TRIGGERS = ("kick", "backbeat", "hats", "eighths", "sixteenths", "synth")
+
+
+def _style(genre, text, palettes, avoid=None, prefer=None, beat="") -> Style:
     return Style(
         genre,
         text,
         tuple(palettes),
         {k: frozenset(v) for k, v in (avoid or {}).items()},
         {k: tuple(v) for k, v in (prefer or {}).items()},
+        beat,
     )
 
 
@@ -226,6 +243,17 @@ STYLES: dict[str, Style] = {
                 "head_color": ("white", "base"),
                 "beam_fx": ("open",),
             },
+        ),  # fmt: skip
+        _style(
+            "reggaeton",
+            "Reggaeton: hot and sensual, and always the dembow: boom-tac, boom-tac. The lights play kick and "
+            "snare as two voices, whole groups each (the dembow trigger), all through the body of the track; a "
+            "breath of darkness where the beat drops out, every light on its return. Warm, neon and gold "
+            "colours, rounded swinging movement with a bounce; the voice leads, the light dances.",
+            ["warm", "neon", "gold"],
+            {"movement": {"nod", "ballyhoo"}, "par_base": {"off"}},
+            {"movement": ("swing", "bounce", "figure8"), "par_base": ("dim", "full")},
+            beat="dembow",
         ),  # fmt: skip
         _style(
             "latin",

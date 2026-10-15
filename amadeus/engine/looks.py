@@ -8,7 +8,7 @@ import math
 from amadeus.director import Decision
 from amadeus.director.vocabulary import PALETTES
 from amadeus.engine.state import State
-from amadeus.engine.timing import BREAK_FROM, BREAK_TO, NO_KICK_S, _decay, _ease, note_env, stab_env
+from amadeus.engine.timing import BREAK_FROM, BREAK_TO, NO_KICK_S, _decay, _ease, _release, note_env, stab_env
 
 XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 
@@ -27,6 +27,13 @@ KICK_LED = {"hats", "eighths", "sixteenths", "synth", "roll"}
 KICK_PATTERNS = ("all", "alternate", "sides", "rotate")
 DROP_PATTERNS = ("all", "all", "sides", "rotate")
 
+
+# Boom-tac (the dembow trigger, reggaeton): the rig plays kick and snare as two voices, whole groups each.
+BOOM_TAC_BASE = 0.22  # the pars glow at most this much between their hits (dim), so the hits stand out
+BOOM_TAC_HEAD_BASE = 0.08  # the heads' beams, between their hits
+BOOM_TAC_HANDOVER_S = 0.12  # a voice lets go this quickly when the other one hits
+BREATHER_FADE_S = 0.15  # a breather: the light pauses this quickly (down to a glow) …
+BREATHER_GLOW = 0.3  # … of its glow between hits
 
 ACCENT_SHARE = 3  # one light in this many plays the accents (the synth's stabs); the others keep the rhythm
 ACCENT_SECTIONS = ("groove", "drop", "buildup", "verse", "chorus")
@@ -263,7 +270,7 @@ class LooksMixin:
 
     def _note(self, name: str, t: float) -> tuple[float, int]:
         """The light of a trigger, played as notes (timing.note_env); fast triggers play the kick."""
-        name = "kick" if name in KICK_LED else name
+        name = "kick" if name in KICK_LED or name == "dembow" else name  # dembow: the kick is its boom
         if name == "kick" and (brk := self._break_at(t)) is not None:  # the kick is out: hold and build
             start, end, _ = brk
             return BREAK_FROM + (BREAK_TO - BREAK_FROM) * _ease((t - start) / max(end - start, 1e-6)), -1
@@ -274,6 +281,54 @@ class LooksMixin:
             if nxt >= len(times) or float(times[nxt]) - t > 0.5 * NO_KICK_S:  # no kick around: hold, don't blink
                 return 0.6, -1
         return env, hit
+
+    def _boom_tac(self, t: float) -> tuple[float, float, float]:
+        """Reggaeton's two voices, (boom, tac, pause): the boom (the kick, its 1/8 runs too) and the tac (the
+        snare on its pattern), call and response: each lets go quickly when the other one hits. In a breather
+        (the beat gone for a moment) both pause (`pause` 0..1); the beat's return hits with both voices."""
+        boom, bi = note_env(self.boom_t, self.boom_s, t)
+        tac, ti = note_env(self.tac_t, self.tac_s, t)
+        last_boom = float(self.boom_t[bi]) if bi >= 0 else -1e9
+        last_tac = float(self.tac_t[ti]) if ti >= 0 else -1e9
+        if last_tac > last_boom:
+            boom *= _release(t - last_tac, 1.0, 0.0, BOOM_TAC_HANDOVER_S)
+        else:
+            tac *= _release(t - last_boom, 1.0, 0.0, BOOM_TAC_HANDOVER_S)
+        k = bisect.bisect_right(self._breather_starts, t) - 1
+        pause = 0.0
+        if k >= 0 and t < self.breathers[k][1]:
+            pause = _ease((t - self.breathers[k][0]) / BREATHER_FADE_S)
+            boom, tac = boom * (1 - pause), tac * (1 - pause)
+        elif k >= 0 and abs(last_boom - self.breathers[k][1]) < 0.1:  # the beat is back: both voices, together
+            tac = max(tac, boom)
+        return boom, tac, pause
+
+    @property
+    def _breather_starts(self) -> list[float]:
+        if "_brs" not in self.__dict__:
+            self._brs = [s for s, _ in self.breathers]
+        return self._brs
+
+    def _voice(self, d: Decision, eid: str) -> str:
+        """Which voice of boom-tac a light plays in this phrase: "boom", "tac" or "both" (a rig of one light).
+        Whole groups: the pars, and the heads by the class of their group (overhead, front, towers …; with one
+        class, by group), the units taking turns; one unit is split left/right. The roles hold all track long (a
+        section of the orchestra keeps its part; swapping them reads as a blink at every phrase)."""
+        if "_voices" not in self.__dict__:
+            classes = {}
+            for g in self.groups:
+                classes.setdefault(g["cls"], []).extend(g["ids"])
+            heads = list(classes.values()) if len(classes) > 1 else [g["ids"] for g in self.groups]
+            units = [u for u in [[p["id"] for p in self.pars], *heads] if u]
+            if len(units) == 1:
+                rank = {**self._x_rank(self.pars), **self._x_rank(self.heads)}
+                units = [[e for e in units[0] if rank.get(e, 0) % 2 == k] for k in (0, 1)]
+                units = [u for u in units if u]
+            self._voices = {e: k % 2 for k, u in enumerate(units) for e in u}
+            self._voices_one = len(units) == 1
+        if self._voices_one:
+            return "both"
+        return "boom" if self._voices.get(eid, 0) == 0 else "tac"
 
     def _accents(self, d: Decision, t: float, out: dict, accent) -> None:
         """Accent lights flash on the synth's stabs, exactly on the note, in the accent colour (white in the
@@ -310,8 +365,8 @@ class LooksMixin:
         """The kick comes back after a break: a breath of darkness just before (after a break of two bars or
         more), then everything hits on the downbeat: full, with a white flash, settling over one beat. A real
         drop has its own, bigger moment (_drop_moment), and inside a snare roll the lights play the roll."""
-        if not self.kick_breaks or self._roll_at(t) is not None:
-            return
+        if not self.kick_breaks or self._roll_at(t) is not None or self.decision_at(t)[1].trigger == "dembow":
+            return  # (boom-tac has its own breathers)
         _, _, period = self.beat_info(t)
         k = bisect.bisect_right(self._break_starts, t)  # breaks that started before t
         for start, end, returns in self.kick_breaks[max(0, k - 1) : k + 1]:
@@ -341,7 +396,7 @@ class LooksMixin:
         """The lights that play the accents in this phrase: one in ACCENT_SHARE (heads and pars together, left
         to right, so they're spread over the rig; of two lights one), shifting per phrase. None in calm parts or
         where the synth has no stabs; a single light plays both (_scene layers the stabs over its rhythm)."""
-        if d.section not in ACCENT_SECTIONS or d.intensity < 1:
+        if d.section not in ACCENT_SECTIONS or d.intensity < 1 or d.trigger == "dembow":  # boom-tac: the tac is
             return set()
         a, b = bisect.bisect_left(self.stab_t, d.start), bisect.bisect_left(self.stab_t, d.end)
         if b - a < MIN_STABS:
@@ -392,6 +447,8 @@ class LooksMixin:
         if self._colour_swap(d, t, progress):  # long phrase: swap colours halfway for variation
             base, accent = accent, base
         env, hit = self._note(d.trigger, t)
+        dembow = d.trigger == "dembow"
+        boom, tac, pause = self._boom_tac(t) if dembow else (env, 0.0, 0.0)
         hits = hit + 1  # hits so far: steps chases, alternation, sparkles
         pattern = self._kick_pattern(d, t)
         flash = _decay(self.flash_t, self.flash_s, t, 0.07)
@@ -407,7 +464,17 @@ class LooksMixin:
             col = _mix(cols, ((beat + phase) / 32 + k / n) % 1.0) if d.par_base == "fade" else base
             dim = base_level
             a = d.par_accent
-            if a in ("pulse", "stutter"):  # on its turn in the phrase's pattern ("stutter": older plans)
+            tac_voice = False
+            if dembow and a not in ("none", "melody"):  # boom-tac: this par's voice
+                low = min(base_level, BOOM_TAC_BASE) * (1 - (1 - BREATHER_GLOW) * pause)
+                voice = self._voice(d, f["id"])
+                if voice == "both":  # one light plays both: the boom, and the tac in the accent colour
+                    col, dim = _lerp(col, accent, tac), low + (1 - low) * max(boom, tac)
+                elif voice == "boom":
+                    dim = low + (1 - low) * boom
+                else:
+                    col, dim, tac_voice = accent, low + (1 - low) * tac, True
+            elif a in ("pulse", "stutter"):  # on its turn in the phrase's pattern ("stutter": older plans)
                 dim = base_level + (1 - base_level) * (env if kick_turn(pattern, k, n, hit) else 0.0)
             elif a == "color_pop":
                 col, dim = _lerp(col, accent, env), max(base_level, env)
@@ -434,7 +501,7 @@ class LooksMixin:
                 col = _lerp(col, (1.0, 1.0, 1.0), 0.6 * progress**2)
                 dim = dim * (0.45 + 0.55 * progress) + 0.15 * progress
             st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
-            if d.dynamics == "impact" or rise:
+            if (d.dynamics == "impact" or rise) and not tac_voice:  # (the flash is on the kick: the boom's)
                 st.white = flash
             out[f["id"]] = st
 
@@ -483,10 +550,18 @@ class LooksMixin:
                 dim *= 0.1  # the others wait, barely glowing
             elif grouping == "chase":  # one group lit per beat, in turn
                 dim *= 1.0 if beat % max(len(self.groups), 1) == self.hgroup[j]["g"] else 0.12
+            voice = self._voice(d, f["id"]) if dembow and hl != "off" else ""
+            if voice:  # boom-tac: the head's group plays its voice (the tac in the accent colour)
+                low = BOOM_TAC_HEAD_BASE * (1 - (1 - BREATHER_GLOW) * pause)
+                dim = low + (1 - low) * {"boom": boom, "tac": tac}.get(voice, max(boom, tac))
+                if voice == "tac":
+                    col = accent
+                elif voice == "boom" and col == accent:
+                    col = base
             if rise:
                 dim *= 0.4 + 0.6 * progress
             st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
-            if d.dynamics == "impact" and d.head_light != "off":
+            if d.dynamics == "impact" and d.head_light != "off" and voice != "tac":  # (the flash: the boom's)
                 st.white = flash
             st.fx = d.beam_fx
             group = self.gobo_groups[j].get(d.gobo_style) or self.gobo_all[j]

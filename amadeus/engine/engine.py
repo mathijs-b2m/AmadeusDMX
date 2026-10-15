@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from amadeus.audio.dembow import boom, breathers, tac
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director import Decision
 from amadeus.engine import zones
@@ -75,6 +76,10 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, LasersMixin, CinematicMixin, 
             self.synth_t, self.synth_s = np.zeros(0), np.zeros(0, np.float32)
         self.kick_t, self.kick_s = analysis.onsets["kick"]
         self.snare_t, self.snare_s = analysis.onsets["snare"]
+        # boom-tac (the dembow trigger): the snare on its pattern, the kick with its 1/8 runs, and the breathers
+        self.tac_t, self.tac_s = tac(analysis)
+        self.boom_t, self.boom_s = boom(analysis)
+        self.breathers = breathers(analysis)
         self.hat_t, self.hat_s = analysis.onsets["hat"]
         self.acc_t, self.acc_s = analysis.onsets["accent"]
         self.lead_t, self.lead_s = analysis.onsets.get("lead", (np.zeros(0), np.zeros(0)))

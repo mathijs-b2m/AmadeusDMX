@@ -6,11 +6,16 @@ From strong to weak:
    techno and Hans Zimmer writes film scores). Used when there is an OPENAI_API_KEY and it is confident
    (more so with a title alone), and a beat-less genre only when the audio has no groove either;
 3. a genre tag in the file, when it maps onto a word we know;
-4. the audio, as the fallback. First its form (amadeus/audio/form.py): a song, with a voice singing through
+4. the audio, as the fallback. Reggaeton first, by its rhythm whatever its form: the dembow, a snare (or rim)
+   on the 16th before the second beat and on the "and" of it, every two beats (3+3+2), where house and pop
+   put theirs on the beat. Then its form (amadeus/audio/form.py): a song, with a voice singing through
    its loud parts, is rock when guitars lead it, hip-hop when it is slow and they don't, else pop; never a
    beat-less genre, however loose its groove. Otherwise how much of the track grooves (the same rhythm pattern
    bar after bar, in the low end or the highs) tells music made for a pulse from music that isn't (cinematic,
    ambient); for music with a groove the tempo gives the club family.
+
+A Latin call (from the model or a tag) on a track with a dembow is reggaeton: the model knows Karol G sings
+Latin music, the audio hears which kind.
 
 The music facts behind the call are kept (`GenreCall.facts`) so the choice can be shown and checked.
 """
@@ -27,6 +32,7 @@ from pathlib import Path
 import numpy as np
 
 from amadeus import paths
+from amadeus.audio.dembow import dembow
 from amadeus.audio.model import Analysis
 
 GENRES = {
@@ -46,7 +52,8 @@ GENRES = {
     "pop": "pop songs: verses and choruses, vocal-led",
     "rock": "rock, indie, alternative, punk",
     "metal": "metal, heavy metal, metalcore",
-    "latin": "latin, reggaeton, salsa, afrobeats, dancehall",
+    "reggaeton": "reggaeton, latin trap, perreo, dembow: Bad Bunny, Karol G, J Balvin; the 3+3+2 dembow beat",
+    "latin": "other latin and afro: salsa, bachata, cumbia, merengue, afrobeats, dancehall",
     "funk": "funk, disco, nu-disco, boogie",
     "jazz": "jazz, swing, blues",
 }
@@ -58,9 +65,14 @@ BEATLESS = {"cinematic", "classical", "ambient"}  # the model may only say these
 OVERRIDES = paths.CONFIG / "genres.json"
 CACHE = paths.CACHE / "genres"
 GROOVE_BAR_SIM = 0.5  # a bar whose rhythm shape matches the next bar this well grooves
+DEMBOW = 0.04  # a track whose snare plays the dembow more clearly than this is reggaeton (measured: reggaeton
+# 0.05–0.30, house, techno and pop 0.0; Dutch hip-hop on a dembow-ish beat lands in between, 0.0–0.03)
+DEMBOW_BPM = (78, 130)  # reggaeton's tempo (89 for Karol G's Matadora; faster pop-reggaeton up to ~125)
 CINEMATIC_GROOVE = 0.35  # less of the track grooves than this: not music made for a pulse (cinematic
 # scores went to ~0.2, every club track tried ≥ 0.54)
 TAG_WORDS = {  # words in a file's genre tag → our word (first match wins: specific words first)
+    "reggaeton": "reggaeton", "reggaetón": "reggaeton", "perreo": "reggaeton", "dembow": "reggaeton",
+    "urbano": "reggaeton", "latin trap": "reggaeton", "dancehall": "latin",
     "soundtrack": "cinematic", "score": "cinematic", "cinematic": "cinematic", "trailer": "cinematic",
     "epic": "cinematic", "classical": "classical", "orchestra": "classical", "ambient": "ambient",
     "chill": "ambient", "downtempo": "ambient", "psy": "psytrance", "goa": "psytrance", "trance": "trance",
@@ -68,8 +80,8 @@ TAG_WORDS = {  # words in a file's genre tag → our word (first match wins: spe
     "d&b": "dnb", "jungle": "dnb", "dubstep": "dubstep", "bass music": "dubstep", "techno": "techno",
     "minimal": "techno", "big room": "edm", "electro house": "edm", "edm": "edm", "dance": "edm",
     "house": "house", "hip": "hiphop", "rap": "hiphop", "trap": "hiphop", "r&b": "rnb", "rnb": "rnb",
-    "soul": "rnb", "metal": "metal", "rock": "rock", "indie": "rock", "punk": "rock", "reggaeton": "latin",
-    "latin": "latin", "salsa": "latin", "afro": "latin", "dancehall": "latin", "funk": "funk", "disco": "funk",
+    "soul": "rnb", "metal": "metal", "rock": "rock", "indie": "rock", "punk": "rock",
+    "latin": "latin", "salsa": "latin", "afro": "latin", "funk": "funk", "disco": "funk",
     "jazz": "jazz", "blues": "jazz", "pop": "pop",
 }  # fmt: skip
 
@@ -106,7 +118,7 @@ def facts(a: Analysis) -> dict:
     """What the genre call rests on: how much of the track grooves, the bass pump, tempo, melody."""
     frames = (a.beats * a.fps).astype(int)
     if len(frames) < 24:
-        return {"groove": 0.0, "pump_db": 0.0, "bpm": round(a.bpm, 1), "tonal": 0.0, "hat_density": 0.0}
+        return {"groove": 0.0, "pump_db": 0.0, "bpm": round(a.bpm, 1), "tonal": 0.0, "hat_density": 0.0, "dembow": 0.0}
     beat_len = int(round(np.median(np.diff(frames))))
     low = np.maximum(a.bands_db["sub"], a.bands_db["bass"])
     sim_low, sim_high = _bar_similarity(low, frames, beat_len), _bar_similarity(a.bands_db["high"], frames, beat_len)
@@ -129,6 +141,7 @@ def facts(a: Analysis) -> dict:
         "tonal": round(float(np.mean(a.lead_tonal)) if a.lead_tonal is not None else 0.0, 2),
         "hat_density": round(float(np.sum(weights * hats) / weights.sum()), 2),
         "dynamics_db": round(float(np.percentile(a.rms_db, 95) - np.percentile(a.rms_db, 10)), 1),
+        "dembow": round(dembow(a), 2),
     }
 
 
@@ -136,7 +149,13 @@ ROCK_GUITAR = 0.7  # a song whose melodic part is a guitar this share of the tim
 HIPHOP_GUITAR, HIPHOP_BPM = 0.45, 100  # a song slower than this, with less guitar than this: hip-hop
 
 
+def is_dembow(f: dict) -> bool:
+    return f.get("dembow", 0.0) > DEMBOW and DEMBOW_BPM[0] <= f["bpm"] <= DEMBOW_BPM[1]
+
+
 def from_audio(f: dict) -> str:
+    if is_dembow(f):  # the rhythm says reggaeton, song or not (it is sung, and slow: it would be hip-hop)
+        return "reggaeton"
     if f.get("song"):  # a song: by what leads it, never by its tempo (Olivia Rodrigo at 144 BPM isn't psytrance)
         if f.get("guitar_led", 0.0) >= ROCK_GUITAR:
             return "rock"
@@ -261,8 +280,13 @@ def detect(a: Analysis, ask_model: bool = True, song: dict | None = None) -> Gen
         # a beat-less genre for a track that clearly grooves is a wrong guess (and would change the show)
         plausible = genre not in BEATLESS or (f["groove"] < CINEMATIC_GROOVE and not f.get("song"))
         if sure and plausible:
-            return GenreCall(genre, "ai", {**f, "confidence": round(confidence, 2)})
+            return GenreCall(_kind_of_latin(genre, f), "ai", {**f, "confidence": round(confidence, 2)})
     tagged = from_tag(meta)
     if tagged:
-        return GenreCall(tagged, "tag", f)
+        return GenreCall(_kind_of_latin(tagged, f), "tag", f)
     return GenreCall(from_audio(f), "audio", f)
+
+
+def _kind_of_latin(genre: str, f: dict) -> str:
+    """Latin, and the audio hears a dembow: reggaeton."""
+    return "reggaeton" if genre == "latin" and is_dembow(f) else genre

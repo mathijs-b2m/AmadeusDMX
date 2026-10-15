@@ -59,6 +59,7 @@ class Stream:
     isrc: str = ""
     length: float = 0.0  # seconds
     bpm: float = 0.0  # the DJ software's own tempo for it, when it has analysed it
+    grid: tuple[float, float] | None = None  # the DJ software's beat grid of the stream: (a beat's time, seconds/beat)
 
     @property
     def name(self) -> str:
@@ -170,6 +171,54 @@ def vdj_length(text: str) -> float:
     return 0.0 if length == int(length) else length
 
 
+def vdj_grid(scan) -> tuple[float, float] | None:
+    """VirtualDJ's beat grid from its <Scan>: Phase is a beat's time (s), Bpm the seconds per beat."""
+    try:
+        anchor, period = float(scan.get("Phase")), float(scan.get("Bpm"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return (anchor, period) if 0.2 < period < 1.5 else None
+
+
+# --- lining the copy up with the stream ---------------------------------------------------------------------
+#
+# A copy from YouTube is the same recording, but rarely cut the same: a few ms to half a second more or less
+# at the start (another upload, its own encoder's padding). Played at the stream's position, every hit then
+# lands that much late (or early). The DJ software's beat grid of the stream says where its beats are: the
+# copy's own beats (the analysis) against it give the offset. Trusted only when it is clear: the grid steady
+# against our beats, the same tempo (or the grid at half of ours), and an offset the two lengths allow (the
+# extra or missing audio is at the start or the end, so the offset lies between 0 and the length difference).
+
+GRID_SPREAD_S = 0.03  # our beats scatter at most this much around the grid's: the same beats
+GRID_SLACK_S = 0.04  # the offset may lie this far outside 0 … the length difference (a length is a little off)
+GRID_TEMPO = 0.01  # the grid's tempo within this much of ours (or of half of it)
+
+
+def copy_offset(beats, copy_length: float, stream: Stream) -> float | None:
+    """How much later in the copy the same moment comes than in the stream (s): play the copy at the stream's
+    position + this. None: not known (no grid, not clear): play it at the stream's position."""
+    import numpy as np
+
+    beats = np.asarray(beats, float)
+    if stream.grid is None or len(beats) < 16:
+        return None
+    anchor, period = stream.grid
+    ours = float(np.median(np.diff(beats)))
+    if not any(abs(period / ours - k) <= GRID_TEMPO * k for k in (1, 2)):
+        return None
+    angle = 2 * np.pi * (beats - anchor) / ours  # each beat's place in the grid's beat, as an angle
+    mean = np.mean(np.exp(1j * angle))
+    if abs(mean) < 1e-6 or ours / (2 * np.pi) * np.sqrt(-2 * np.log(min(abs(mean), 1.0))) > GRID_SPREAD_S:
+        return None  # (the circular spread of our beats around the grid's)
+    offset = float(np.angle(mean)) / (2 * np.pi) * ours  # within ± half a beat
+    if not stream.length or not copy_length:
+        return offset if abs(offset) <= GRID_SLACK_S else None
+    diff = copy_length - stream.length
+    lo, hi = min(0.0, diff) - GRID_SLACK_S, max(0.0, diff) + GRID_SLACK_S
+    fits = [c for c in (offset + k * ours for k in range(-3, 4)) if lo <= c <= hi]
+    return min(fits, key=abs) if fits else None
+
+
 def vdj_streams(db: Path) -> dict[str, Stream]:
     """Every streamed track VirtualDJ's database knows, by the path its decks report ("netsearch://sp…").
     VirtualDJ can leave bytes of a longer, older file after its closing tag (a NUL, "e>"): those are ignored."""
@@ -190,6 +239,7 @@ def vdj_streams(db: Path) -> dict[str, Stream]:
             found[m.group(0)] = Stream(
                 SERVICES.get(m.group(1), m.group(1)), m.group(2), tags.get("Title", ""), tags.get("Author", ""),
                 length=vdj_length(infos.get("SongLength", "") if infos is not None else ""),
+                grid=vdj_grid(song.find("Scan")),
             )  # fmt: skip
         song.clear()
     return found

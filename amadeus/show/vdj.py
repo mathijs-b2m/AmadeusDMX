@@ -67,7 +67,7 @@ class Listener(Source):
         if s is None:
             self._say(path, f"deck {d.deck}: {path} streams, but VirtualDJ's database doesn't name it yet: dark")
             return
-        d.title, d.artist, d.stream = s.title, s.artist, s.service
+        d.title, d.artist, d.stream, d.stream_info = s.title, s.artist, s.service, s
         if self.fetcher is None:
             self.fetcher = False
             if enabled():

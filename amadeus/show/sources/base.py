@@ -37,6 +37,7 @@ class Deck:
     phase: float | None = None  # beat phase 0..1 at `received` from a shared clock (Ableton Link), when synced
     stream: str = ""  # the service the DJ software streams this track from ("spotify"), "" for a local file
     copy: str = ""  # a streamed track's local copy: "running" (being fetched), "done", "failed"
+    stream_info: object = None  # a streamed track: what the DJ software knows of it (streamed.Stream)
 
     def now(self, t: float) -> float:
         """Track position right now: last reported position + time since, at the current playback speed."""

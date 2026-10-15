@@ -141,8 +141,10 @@ class OpenAIDirector:
         if d.trigger == "synth" and synth_riff(a, ph) < 0.4:
             d.trigger, guarded = "eighths", True
         # No beat: percussive triggers have nothing to follow; no robotic note/vocal-following either.
-        if ph.kick_ratio < 0.3 and d.trigger in ("kick", "backbeat", "hats", "lead"):
+        if ph.kick_ratio < 0.3 and d.trigger in ("kick", "backbeat", "hats", "lead", "dembow"):
             d.trigger, guarded = "accents", True
+        elif self.style and self.style.keep_beat(d):  # the genre's own beat (reggaeton: boom-tac)
+            guarded = True
         if d.movement == "follow_lead":  # retired option (old cached answers)
             d.movement, guarded = "sweep", True
 

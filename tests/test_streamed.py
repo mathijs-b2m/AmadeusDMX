@@ -268,3 +268,48 @@ def test_virtualdj_streamed_deck(tmp_path, monkeypatch):
     d = Deck(2, "netsearch://sp1fI4E7jeOiyfa3LmwNnD0o", 34.4, 330.0, True, 125.4, 137.4, 1.0, 0.0)
     lst._streamed(d)
     assert d.file.endswith("[spotify-1fI4E7jeOiyfa3LmwNnD0o].opus") and d.copy == "done"
+
+
+def _copy(offset: float, n: int = 200, period: float = 60 / 100, jitter: float = 0.004):
+    """A copy's beats: the stream's (a beat at 1.0 s), `offset` later, a little loose like any analysis."""
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    return 1.0 + offset + np.arange(n) * period + rng.normal(0, jitter, n)
+
+
+def test_a_copy_is_lined_up_with_the_streams_beat_grid():
+    s = Stream("spotify", "x", "T", "A", length=180.0, grid=(1.0 + 7 * 0.6, 0.6))
+    assert abs(streamed.copy_offset(_copy(0.056), 180.231, s) - 0.056) < 0.005  # 56 ms more at the start
+    assert abs(streamed.copy_offset(_copy(-0.26), 179.52, s) + 0.26) < 0.005  # a copy that starts early
+    assert abs(streamed.copy_offset(_copy(0.0), 180.0, s)) < 0.005  # the master itself: nothing to do
+
+
+def test_an_offset_the_lengths_dont_allow_is_not_trusted():
+    s = Stream("spotify", "x", "T", "A", length=180.0, grid=(1.0, 0.6))
+    assert streamed.copy_offset(_copy(0.3), 180.01, s) is None  # the same length, half a beat off: the grid's error
+
+
+def test_an_unclear_grid_is_not_trusted():
+    s = Stream("spotify", "x", "T", "A", length=180.0, grid=(1.0, 60 / 127))  # the grid at another tempo
+    assert streamed.copy_offset(_copy(0.05), 180.05, s) is None
+    s = Stream("spotify", "x", "T", "A", length=180.0, grid=(1.0, 0.6))
+    assert streamed.copy_offset(_copy(0.05, jitter=0.08), 180.05, s) is None  # beats all over the grid
+    assert streamed.copy_offset(_copy(0.05), 180.05, Stream("spotify", "x", "T", "A", length=180.0)) is None
+
+
+def test_the_grid_at_half_our_tempo_counts():
+    s = Stream("spotify", "x", "T", "A", length=180.0, grid=(1.0, 1.2))  # it counts every other beat
+    assert abs(streamed.copy_offset(_copy(0.04), 180.04, s) - 0.04) < 0.005
+
+
+def test_virtualdj_database_beat_grid(tmp_path):
+    db = tmp_path / "database.xml"
+    db.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<VirtualDJ_Database Version="2026">\n'
+        ' <Song FilePath="netsearch://sp3k3NWokhRRkEPhCzPmV8TW" Flag="256">\n'
+        '  <Tags Author="Bad Bunny" Title="Ojitos Lindos" />\n  <Infos SongLength="258.2980" />\n'
+        '  <Scan Version="801" Bpm="0.75" Phase="12.345" />\n </Song>\n</VirtualDJ_Database>\n'
+    )
+    s = streamed.vdj_streams(db)["netsearch://sp3k3NWokhRRkEPhCzPmV8TW"]
+    assert s.grid == (12.345, 0.75)

@@ -85,6 +85,12 @@ PAR_ACCENT = [
 TRIGGERS = [
     ("kick", "Every kick drum (four to the floor): the main pulse, and what leads the lights on and off."),
     ("backbeat", "Snares and claps, usually beats 2 and 4: a looser, bouncier feel."),
+    (
+        "dembow",
+        "Boom-tac, for reggaeton: the rig plays kick and snare as two voices, whole groups each: some on the "
+        "kick (boom, its 1/8 runs too) in the base colour, the others on the snare's dembow (tac) in the accent "
+        "colour. Where the beat drops out for a moment the light pauses, and the beat's return hits on all.",
+    ),
     ("hats", "Hi-hats: an energetic groove; the lights still switch on the kick (never blinking per hat)."),
     ("accents", "Only big hits and impacts: sparse and dramatic."),
     ("bars", "Only the first beat of each bar: slow and stately."),

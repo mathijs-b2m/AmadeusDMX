@@ -225,12 +225,14 @@ tested on, and exactly what that permission is used for: [docs/dj-software.md](d
 
 ## Genres and programs
 
-Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, dnb, dubstep, hiphop, rnb, pop, rock, metal, latin, funk, jazz), shown with the track in the app and the visualiser:
+Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, dnb, dubstep, hiphop, rnb, pop, rock, metal, reggaeton, latin, funk, jazz), shown with the track in the app and the visualiser:
 
 1. **your choice** (`amadeus genre TRACK GENRE`, kept in `config/genres.json`);
 2. the **Decisions API**, given the artist and title (from the file's tags, or its name), when there's a key and it is reasonably sure (30% with the artist known: torn between pop and edm for Coldplay is still far better than a tempo guess). A title alone ("Symphony") has to be very sure, and a beat-less genre (cinematic, classical, ambient) only counts when the audio has no groove either;
 3. a **genre tag** in the file;
-4. the **audio**, as the fallback: how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
+4. the **audio**, as the fallback. Reggaeton first, by its **dembow**: the snare on the 16th before the second beat and on its "and" (3+3+2), where house and pop put theirs on the beat. Then how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
+
+A Latin call from the Decisions API or a tag, on a track whose audio plays the dembow, becomes reggaeton.
 
 ### A house style per genre
 
