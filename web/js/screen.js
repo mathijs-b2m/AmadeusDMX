@@ -349,7 +349,9 @@ const Screen = (() => {
     } else {
       g.save();
       g.shadowBlur = 0; g.globalAlpha = 1;
-      g.fillStyle = `rgba(0,0,0,${cur.scene === "words" ? 0.8 : 0.45})`;  // a short trail behind moving lines
+      // a short trail behind moving lines, its fade set per 1/60 s: as short at any refresh rate
+      const fadeShare = cur.scene === "words" ? 0.8 : 0.45;
+      g.fillStyle = `rgba(0,0,0,${1 - Math.pow(1 - fadeShare, Math.max(dt, 1 / 240) * 60)})`;
       g.fillRect(0, 0, W, H);
       const phraseFrac = d ? clamp((f.t - d.start) / Math.max(d.end - d.start, 1)) : 0;
       if (!(cur.mode !== "off" && countdown(f, d, cols, bp))) {

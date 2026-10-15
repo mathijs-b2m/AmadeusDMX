@@ -53,6 +53,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     static let wallInterval: CFTimeInterval = 0.05
     private var wallOut: WallOutput?
     private var wallAt: CFTimeInterval = 0
+    private var wallShowT: Double?
     private var wallDt: Float = 0
 
     /// Every frame's GPU time (seconds), for the power meter.
@@ -245,12 +246,14 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         // the wall's picture
         var wp = WallParams(info: .zero, bands: .zero, pal: (.zero, .zero, .zero, .zero))
         if let inp, let h = inp.hello, let frame, scenery?.wall != nil {
-            // the wall's picture is drawn on the CPU: 20 times a second is plenty for a picture on a wall
+            // the wall's picture is drawn on the CPU, once per show frame (the engine's 40 a second: its figures move
+            // with the music as fluently as the lights); while the show stands still, wallInterval keeps it alive
             wallDt += dt
-            if wallOut == nil || now - wallAt >= Self.wallInterval {
+            if wallOut == nil || frame.t != wallShowT || now - wallAt >= Self.wallInterval {
                 let o = wall.update(frame: frame, hello: h, dt: wallDt)
                 wallOut = o
                 wallAt = now
+                wallShowT = frame.t
                 wallDt = 0
                 if !o.psychedelic, let data = wall.context.data {
                     wallTexture.replace(region: MTLRegionMake2D(0, 0, WallRenderer.W, WallRenderer.H), mipmapLevel: 0,

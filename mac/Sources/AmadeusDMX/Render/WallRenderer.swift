@@ -148,7 +148,10 @@ final class WallRenderer {
     private func draw(_ f: Frame, _ d: Decision?, _ h: Hello, _ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ dt: Float) {
         g.saveGState()
         g.setShadow(offset: .zero, blur: 0, color: nil)
-        g.setFillColor(CGColor(gray: 0, alpha: cur.scene == .words ? 0.8 : 0.45))   // a short trail behind moving lines
+        // a short trail behind moving lines: how much of the last picture fades is set per 1/60 s, so the trail
+        // is as short at any drawing rate (a fixed share per picture ghosted when the wall was drawn less often)
+        let fadeShare = cur.scene == .words ? 0.8 : 0.45
+        g.setFillColor(CGColor(gray: 0, alpha: CGFloat(1 - pow(1 - fadeShare, Double(max(dt, 1 / 240)) * 60))))
         g.fill(CGRect(x: 0, y: 0, width: Self.W, height: Self.H))
         let phraseFrac = d.map { min(1, max(0, ($0.end > $0.start ? (f.t - $0.start) / ($0.end - $0.start) : 0))) } ?? 0
         if !(cur.mode != "off" && countdown(f, d, h, cols)) {
