@@ -171,11 +171,17 @@ def vdj_length(text: str) -> float:
 
 
 def vdj_streams(db: Path) -> dict[str, Stream]:
-    """Every streamed track VirtualDJ's database knows, by the path its decks report ("netsearch://sp…")."""
+    """Every streamed track VirtualDJ's database knows, by the path its decks report ("netsearch://sp…").
+    VirtualDJ can leave bytes of a longer, older file after its closing tag (a NUL, "e>"): those are ignored."""
+    import io
     import xml.etree.ElementTree as ET
 
+    data = db.read_bytes()
+    end = data.rfind(b"</VirtualDJ_Database>")
+    if end >= 0:
+        data = data[: end + len(b"</VirtualDJ_Database>")]
     found: dict[str, Stream] = {}
-    for _, song in ET.iterparse(db, events=("end",)):
+    for _, song in ET.iterparse(io.BytesIO(data), events=("end",)):
         if song.tag != "Song":
             continue
         m = NETSEARCH.fullmatch(song.get("FilePath") or "")
@@ -204,7 +210,8 @@ class VdjStreams:
             try:
                 mtime = self.db.stat().st_mtime
                 if mtime != self.mtime:
-                    self.mtime, self.known = mtime, vdj_streams(self.db)
+                    self.mtime = mtime  # a database that doesn't read is tried again when it changes, not every packet
+                    self.known = vdj_streams(self.db)
             except (OSError, ValueError, SyntaxError) as e:  # SyntaxError: ElementTree's ParseError
                 print(f"  ⚠ VirtualDJ database: {e}", flush=True)
         return self.known.get(file)

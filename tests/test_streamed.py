@@ -1,5 +1,6 @@
 """Streamed tracks: djay's records read, the right YouTube result picked, and YouTube asked gently."""
 
+import os
 import sqlite3
 import struct
 import sys
@@ -229,6 +230,18 @@ def test_virtualdj_database(tmp_path):
         "spotify", "1fI4E7jeOiyfa3LmwNnD0o", "Paul Kalkbrenner", "DIE TROMPETEN VON BERLIN", 330.022)  # fmt: skip
     assert v.find("netsearch://sp4eE4vEaakr3ZnSt1UNfOhz").length == 0.0  # 240.0: VirtualDJ's guess, unknown
     assert v.find("/Music/local.mp3") is None and v.find("netsearch://spUnknown") is None
+
+
+def test_virtualdj_database_with_trailing_bytes(tmp_path, capsys):
+    db = tmp_path / "database.xml"
+    db.write_bytes(VDJ_DB.replace("\n", "\r\n").encode() + b"\x00e>\r\n")  # VirtualDJ left the old file's tail
+    v = streamed.VdjStreams(db)
+    assert v.find("netsearch://sp1fI4E7jeOiyfa3LmwNnD0o").title == "DIE TROMPETEN VON BERLIN"
+    db.write_bytes(b"<VirtualDJ_Database>\r\n <Song")  # mid-write: said once, not on every packet
+    os.utime(db, (1, 1))
+    for _ in range(5):
+        v.find("netsearch://spUnknown")
+    assert capsys.readouterr().out.count("VirtualDJ database") == 1
 
 
 def test_virtualdj_streamed_deck(tmp_path, monkeypatch):
