@@ -40,6 +40,7 @@ LASER_CLEAR_M = (
 
 
 LASER_MIN_EL_DEG = 3.0  # lasers aim at least this far above horizontal
+TURN = np.linspace(0, 2 * math.pi, 8, endpoint=False)  # where the guard checks a spinning pattern in its turn
 
 
 class LasersMixin:
@@ -183,29 +184,35 @@ class LasersMixin:
         """The beams a laser draws for its DMX state (shape, size, x/y offset, rotation) as unit directions:
         the model the laser guard checks, and what the visualiser draws. The pattern's centre points along the
         laser's aim (set in the rig editor, or a safe default), moved by the offsets within the laser's range."""
+        return self._laser_dirs_turned(s, info, t, [math.radians(t * s.spin * 360.0) if rot is None else rot])[0]
+
+    def _laser_dirs_turned(self, s: State, info: dict, t: float, rots) -> np.ndarray:
+        """_laser_dirs at each rotation in `rots` at once (the guard checks a spinning pattern's whole turn every
+        frame, so this is the hot path): shape (rotations, beams, 3), the same numbers as one call per rotation."""
         scan = float(info["defn"].get("physical", {}).get("scan_deg", 40))
         n, frac, lift = LASER_SHAPES.get(s.fx, LASER_SHAPES["beams"])
         spread = scan * frac * (0.4 + 0.6 * min(max(s.size, 0.0), 1.0))
         az0 = info["aim_az"] + (s.pan - 0.5) * max(scan - spread, 4.0)
         el_axis = info["base_el"] + lift + (min(max(s.tilt, 0.0), 1.0) - 0.5) * info["offset"]
-        rot = math.radians(t * s.spin * 360.0) if rot is None else rot
-        up = np.array([0.0, 0.0, 1.0])
         A = geometry.direction(az0, el_axis)
-        P0 = np.cross(A, up)
+        a0, a1, a2 = A.tolist()
+        # A × up and P0 × A, written out: np.cross costs ~20 µs on a 3-vector (same operations, same results)
+        P0 = np.array([a1 * 1.0 - a2 * 0.0, a2 * 0.0 - a0 * 1.0, a0 * 0.0 - a1 * 0.0])
         P0 /= np.linalg.norm(P0) + 1e-9
-        V0 = np.cross(P0, A)
+        p0, p1, p2 = P0.tolist()
+        V0 = np.array([p1 * a2 - p2 * a1, p2 * a0 - p0 * a2, p0 * a1 - p1 * a0])
         q = np.arange(n)
         if s.fx in ("tunnel", "cone"):
             h = math.radians(spread / 2)
-            ang = rot + 2 * math.pi * q / n
-            return math.cos(h) * A + math.sin(h) * (np.cos(ang)[:, None] * P0 + np.sin(ang)[:, None] * V0)
-        zr = rot if s.fx in ("fan", "wave", "beams") else 0.0  # a sheet stays flat
-        P = math.cos(zr) * P0 + math.sin(zr) * V0
+            ang = np.array([float(r) for r in rots])[:, None] + 2 * math.pi * q / n
+            return math.cos(h) * A + math.sin(h) * (np.cos(ang)[..., None] * P0 + np.sin(ang)[..., None] * V0)
+        spun = s.fx in ("fan", "wave", "beams")  # a sheet stays flat
+        P = np.array([math.cos(r if spun else 0.0) * P0 + math.sin(r if spun else 0.0) * V0 for r in rots])
         th = np.radians(spread * (q / max(n - 1, 1) - 0.5))
-        v = np.cos(th)[:, None] * A + np.sin(th)[:, None] * P
+        v = np.cos(th)[None, :, None] * A + np.sin(th)[None, :, None] * P[:, None, :]
         if s.fx == "wave":
             v = v + (np.sin(t * 4 + q * 0.45) * math.radians(5))[:, None] * V0
-        return v / np.linalg.norm(v, axis=1, keepdims=True)
+        return v / np.linalg.norm(v, axis=-1, keepdims=True)
 
     def _laser_guard(self, states: dict, t: float):
         """Safety for lasers, every frame, on the state that goes out as DMX (so the visualiser shows the truth).
@@ -234,9 +241,7 @@ class LasersMixin:
             note = None
             for _ in range(24):
                 if spins:  # the worst moment of its turn
-                    dirs = np.concatenate(
-                        [self._laser_dirs(s, info, t, rot=a) for a in np.linspace(0, 2 * math.pi, 8, endpoint=False)]
-                    )
+                    dirs = self._laser_dirs_turned(s, info, t, TURN).reshape(-1, 3)
                 else:
                     dirs = self._laser_dirs(s, info, t)
                 low = math.degrees(math.asin(float(np.clip(dirs[:, 2].min(), -1, 1))))

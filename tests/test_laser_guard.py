@@ -48,3 +48,34 @@ def test_no_beam_enters_a_laser_zone(times):
                 continue
             dirs = eng._laser_dirs(s, info, float(t))
             assert eng.zones.laser_violation(info["pos"], dirs) is None
+
+
+def test_a_spinning_pattern_is_checked_over_its_turn_at_once():
+    """The guard checks a spinning pattern at every TURN rotation in one go: the same beams as one rotation at
+    a time, for every shape."""
+    from amadeus.engine.lasers import LASER_SHAPES, TURN
+    from amadeus.engine.state import State
+
+    eng = engine("laser-zones", real_output=True)
+    info = eng.laser_info[0]
+    for fx in LASER_SHAPES:
+        s = State(fx=fx, size=0.6, pan=0.3, tilt=0.7, spin=0.4)
+        turned = eng._laser_dirs_turned(s, info, 12.3, TURN)
+        one_by_one = np.stack([eng._laser_dirs(s, info, 12.3, rot=a) for a in TURN])
+        assert turned.shape == one_by_one.shape and np.array_equal(turned, one_by_one), fx
+
+
+def test_the_laser_guard_keeps_a_big_rig_in_time():
+    """Ten lasers the guard has to raise, shrink or blank, every frame: well inside one 40 fps frame."""
+    import time
+
+    eng = engine("concert60", real_output=False)
+    _, states = eng.render(30.0)
+    eng.laser_info = [{**info, "min_el": 89.0} for info in eng.laser_info]  # nothing is safe: raise, shrink, blank
+    for e in eng.lasers:  # every laser spinning low, where the guard works hardest
+        s = states[e["id"]]
+        s.fx, s.dimmer, s.white, s.size, s.tilt, s.spin = "fan", 1.0, 1.0, 1.0, 0.0, 0.5
+    t0 = time.perf_counter()
+    eng._laser_guard(states, 30.0)
+    assert time.perf_counter() - t0 < 0.02  # was ~47 ms: the light loop fell behind the music
+    assert all(states[e["id"]].dimmer == 0 for e in eng.lasers)

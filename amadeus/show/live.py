@@ -251,6 +251,8 @@ async def run(
                     if time.monotonic() - hs["t0"] >= health:
                         _health_line(hs, listener, shows)
                 now = time.monotonic()
+                if now - next_tick > period:  # fell behind: skip the missed frames instead of a burst to catch up
+                    next_tick = now
                 if follower:
                     follower.poll(now)
                 alive = listener.alive()

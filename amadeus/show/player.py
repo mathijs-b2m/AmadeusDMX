@@ -53,6 +53,8 @@ async def play(
         try:
             while not clock.finished.is_set():
                 next_tick += period  # absolute schedule: sleep jitter doesn't accumulate
+                if time.monotonic() - next_tick > period:  # fell behind: skip the missed frames, no burst
+                    next_tick = time.monotonic()
                 t = clock.now() + lead  # the lights a little ahead, so they show on the beat
                 if t >= a.duration:
                     break
