@@ -111,7 +111,7 @@ MODERATE_GROUPING = {"chase": "per_group", "solo": "per_group"}
 CALM_BEAM = {"prism": "open", "prism_spin": "open", "gobo_shake": "gobo", "gobo_spin": "gobo"}
 # The warm-up with calm heads (dinner and drinks, an empty floor): a static wash of cozy colour as the base, the
 # heads very slow, projecting gobos onto the floor (on an empty floor people actually look at them).
-AMBIENT_PALETTES = ("warm", "gold")  # cozy; any other palette becomes the first
+AMBIENT_PALETTES = ("warm", "gold")  # cozy; any other palette becomes one of them (they take turns, per 8 phrases)
 AMBIENT_PATH = {"nod": "sweep", "figure8": "circle"}  # (after CALM_PATH) the slowest, longest paths
 
 # How each stage sounds: (its heat, the trend it likes: +1 rising, -1 falling, 0 either)
@@ -248,7 +248,7 @@ def ambient_look(d):
 
     return replace(
         d,
-        palette=d.palette if d.palette in AMBIENT_PALETTES else AMBIENT_PALETTES[0],
+        palette=d.palette if d.palette in AMBIENT_PALETTES else AMBIENT_PALETTES[d.phrase // 8 % 2],
         par_base="full",
         par_accent="none",
         head_light="steady" if d.head_light != "off" else "off",
@@ -348,6 +348,13 @@ class ShowArc:
         groups += sorted(heads, key=len)  # the biggest group of heads last: the night's reveal
         self.groups = [g for g in groups if g]
         self.member_of = {eid: k for k, g in enumerate(self.groups) for eid in g}
+        model = {e["id"]: fxlib.get(by_fixture[e["fixture"]]["fixture"]) for e in els if e["kind"] == "head"}
+        gobos = [
+            k for k, g in enumerate(self.groups) if all("gobo" in model.get(eid, {}).get("beam_fx", {}) for eid in g)
+        ]
+        heads = [k for k, g in enumerate(self.groups) if all(eid in model for eid in g)]
+        # the warm-up's heads: the smallest group with gobos (their patterns on the floor), else the smallest
+        self.ambient_group = gobos[0] if gobos else heads[0] if heads else None
         self.cumulative = [sum(len(g) for g in self.groups[: k + 1]) for k in range(len(self.groups))]
         self.gain = [1.0] * len(self.groups)
         self.playing_groups = len(self.groups)
@@ -536,8 +543,11 @@ class ShowArc:
         level, how many phrases a look is held, whether a drop still brings its own look (not for small drops),
         and the warm-up's ambient look (in the warm-up while the heads are calm)."""
         move = self.movement_level()
-        ambient = self.enabled and move == 0 and STAGE_KEYS[self.stage] == "warmup"
-        return move, self.hold(), self._level("drops", (DROPS_OWN_LOOK,)) == 1, ambient
+        return move, self.hold(), self._level("drops", (DROPS_OWN_LOOK,)) == 1, self.ambient()
+
+    def ambient(self) -> bool:
+        """The warm-up's ambient look (shape_plan): in the warm-up while the heads are calm."""
+        return self.enabled and self.movement_level() == 0 and STAGE_KEYS[self.stage] == "warmup"
 
     def drop_strength(self) -> float | None:
         """For the engines (looks.py, the drop moment): None lands drops in full."""
@@ -603,7 +613,9 @@ class ShowArc:
         """How many groups play: the first ones in the list (washes, then heads, the smaller groups first: the big
         ones are kept for later). The arc changes them on a phrase line; a group that hasn't played yet tonight is
         a surprise kept in the box until a drop reveals it (or a few phrases at most). When the operator holds the
-        knob, the change comes on the next bar. Groups fade in over two seconds (at once on a drop), out over four."""
+        knob, the change comes on the next bar. Groups fade in over two seconds (at once on a drop), out over four.
+        The warm-up's ambient look plays the smallest group of heads with gobos as well (its gobos on the floor;
+        without gobos the smallest group of heads): slow beams over the static wash, never a frozen picture."""
         n = len(self.groups)
         if not n:
             return
@@ -637,8 +649,9 @@ class ShowArc:
                     self.waited = 0
                     self.reveal_now = big  # at once on a big drop; otherwise a gentle fade on the phrase line
             self.bar, self.phrase_at = bar, phrase
+        gobos = self.ambient_group if want and self.ambient() else None
         for k in range(n):
-            on = k < self.playing_groups
+            on = k < self.playing_groups or k == gobos
             if on and engine is not None:
                 self.revealed.add(k)
             fade = 0.05 if on and self.reveal_now else 3.0 if on else 4.0

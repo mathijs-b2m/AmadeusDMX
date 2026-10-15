@@ -103,7 +103,7 @@ def test_groups_specials_and_off(tmp_path):
     rig = load_rig(RIG)
     arc = ShowArc(rig, tmp_path / "arc.json", now=0.0)
     lit = lambda: {e["id"]: State(dimmer=1.0, white=1.0) for e in rig["elements"]}  # noqa: E731
-    arc.control({"knob": {"groups": 0.1, "specials": 0.0, "intensity": 1.0, "response": 1.0}}, now=0.0)
+    arc.control({"knob": {"groups": 0.1, "specials": 0.0, "intensity": 1.0, "response": 1.0, "movement": 1.0}}, now=0.0)
     states = lit()
     for _ in range(400):  # ten seconds: every fade done
         states = lit()
@@ -344,3 +344,22 @@ def test_warmup_ambience(tmp_path):
     assert all(d.beam_fx in ("gobo", "gobo_rotate") and d.aim == "crowd" and d.intensity == 0 for d in ambient)
     assert all(d.movement in ("still", "sweep", "circle") for d in ambient)
     assert [d.brightness for d in ambient] == [d.intensity for d in plan]  # each phrase its own energy
+
+
+def test_warmup_ambience_plays_gobo_heads(tmp_path):
+    """Few lights in the warm-up (the washes), but a group of heads with gobos plays: the gobos on the floor."""
+    rig = load_rig(RIG)
+    arc = ShowArc(rig, tmp_path / "arc.json", now=0.0)
+    arc.control({"stage": "warmup", "lock": True, "knob": {"movement": 0.1, "groups": 0.4}}, now=0.0)
+    gobo = set(arc.groups[arc.ambient_group])
+    assert arc.ambient_group >= 2 and arc.ambient()  # (past the groups the knob plays)
+
+    def lit():
+        for _ in range(400):
+            states = {e["id"]: State(dimmer=1.0) for e in rig["elements"]}
+            arc.apply(states, None, 0.0, 0.025)
+        return {e for e in arc.heads if states[e].dimmer > 0}
+
+    assert lit() == gobo
+    arc.control({"knob": {"movement": 0.9}}, now=1.0)
+    assert not lit()  # livelier heads: no ambient look, the knob's groups only
