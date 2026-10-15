@@ -48,6 +48,35 @@ RULE_LOOKS = {
         ("dim", "none", "bars", "steady", "circle", "focus", "stage", "base", "steady"),
     ],
     "outro": [("fade", "none", "bars", "steady", "sweep", "mirror", "sky", "base", "steady")],
+    # a song: the verse lights the band and leaves room, the chorus opens everything up, the bridge turns the page
+    "verse": [
+        ("dim", "pulse", "backbeat", "steady", "sweep", "mirror", "stage", "base", "steady"),
+        ("dim", "none", "bars", "breathe", "circle", "fan", "stage", "accent", "steady"),
+        ("dim", "alternate", "backbeat", "steady", "nod", "sync", "stage", "base", "steady"),
+        ("fade", "pulse", "kick", "steady", "sweep", "wave", "stage", "white", "steady"),
+    ],
+    "chorus": [
+        ("full", "color_pop", "backbeat", "steady", "swing", "fan", "crowd", "white", "steady"),
+        ("full", "pulse", "kick", "pulse", "sweep", "mirror", "crowd", "accent", "steady"),
+        ("full", "color_pop", "kick", "steady", "circle", "cross", "sky", "white", "steady"),
+        ("full", "alternate", "backbeat", "pulse", "step_on_beat", "fan", "crowd", "accent", "steady"),
+    ],
+    "bridge": [
+        ("dim", "none", "bars", "breathe", "circle", "focus", "sky", "accent", "steady"),
+        ("fade", "sparkle", "accents", "steady", "sweep", "wave", "sky", "white", "steady"),
+    ],
+}
+
+# The part of a song a phrase is (amadeus/audio/form.py) → the section it is lit as.
+PART_SECTION = {
+    "intro": "intro",
+    "verse": "verse",
+    "prechorus": "buildup",
+    "chorus": "chorus",
+    "bridge": "bridge",
+    "instrumental": "groove",
+    "drop": "drop",
+    "outro": "outro",
 }
 
 
@@ -65,6 +94,9 @@ RULE_BEAM_FX = {  # rotated per section, like RULE_LOOKS; an open beam is the de
     "drop": [("prism_spin", "dots"), ("open", "dots")],
     "breakdown": [("gobo_rotate", "rings"), ("open", "curves")],
     "outro": [("open", "rings")],
+    "verse": [("open", "dots"), ("open", "curves"), ("gobo", "dots")],
+    "chorus": [("open", "dots"), ("open", "shapes"), ("prism", "dots")],
+    "bridge": [("gobo_rotate", "rings"), ("open", "curves")],
 }
 
 
@@ -75,6 +107,9 @@ RULE_GROUPING = {  # rotated per section, like RULE_LOOKS (rigs with several hea
     "drop": ["unison", "split", "per_group"],
     "breakdown": ["solo", "individual", "per_group"],
     "outro": ["solo"],
+    "verse": ["per_group", "solo", "individual"],
+    "chorus": ["unison", "split", "per_group"],
+    "bridge": ["solo", "individual"],
 }
 
 
@@ -94,6 +129,9 @@ RULE_LAYERS = {  # (layer_split, base_glow), rotated per section
     "drop": [("none", "low"), ("alternate", "medium"), ("high_low", "low")],
     "breakdown": [("high_low", "breathe"), ("alternate", "breathe")],
     "outro": [("high_low", "breathe")],
+    "verse": [("featured", "low"), ("alternate", "low")],
+    "chorus": [("none", "low"), ("alternate", "medium")],
+    "bridge": [("high_low", "breathe")],
 }
 
 
@@ -115,6 +153,9 @@ RULE_LASERS = {  # (laser_look, laser_move, laser_color): off for much of the se
     ],
     "breakdown": [("off", "still", "base"), ("tunnel", "rotate", "base"), ("off", "still", "base")],
     "outro": [("off", "still", "base")],
+    "verse": [("off", "still", "base")],
+    "chorus": [("off", "still", "base"), ("fan", "wave", "base"), ("off", "still", "base")],
+    "bridge": [("off", "still", "base"), ("tunnel", "rotate", "base")],
 }
 
 
@@ -125,6 +166,9 @@ RULE_SCREEN = {  # rotated per section; a real wall is often dark
     "drop": ["psychedelic", "figure", "equalizer"],
     "breakdown": ["ambient", "off", "figure"],
     "outro": ["ambient", "off"],
+    "verse": ["off", "ambient", "words"],
+    "chorus": ["figure", "equalizer", "words"],
+    "bridge": ["ambient", "off"],
 }
 
 
@@ -135,13 +179,16 @@ RULE_FOG = {  # smoke lingers: long arcs. Clear air at the edges, a burst only a
     "drop": "heavy",
     "breakdown": "light",
     "outro": "none",
+    "verse": "light",
+    "chorus": "medium",
+    "bridge": "light",
 }
 
 
 def apply_open_sky(d: Decision, n_before: int):
     """Outdoors the sky is the canvas: calm and building parts always aim up, grooves and drops every other time
     (the others still come down over the crowd, for contrast)."""
-    if d.section in ("intro", "breakdown", "buildup", "outro") or n_before % 2 == 0:
+    if d.section in ("intro", "breakdown", "buildup", "outro", "bridge") or n_before % 2 == 0:
         d.aim = "sky"
 
 
@@ -216,7 +263,11 @@ class RuleDirector:
         pos = p.start / a.duration
 
         low_jump = p.low_pct - prev.low_pct if prev else 0
-        if p.drop_score >= DROP_THRESHOLD:
+        if p.part:  # a song: its form says which part this is (a real drop inside a song is still a drop)
+            section = PART_SECTION.get(p.part, "groove")
+            if nxt and nxt.drop_score >= DROP_THRESHOLD and section != "drop":
+                section = "buildup"
+        elif p.drop_score >= DROP_THRESHOLD:
             section = "drop"
         elif nxt and nxt.drop_score >= DROP_THRESHOLD:
             section = "buildup"
@@ -240,13 +291,17 @@ class RuleDirector:
 
         palettes = list(self.style.palettes) if self.style else DEFAULT_PALETTES
         palette = last.palette if last and last.palette in palettes else palettes[0 if self.style else 1]
-        if section in ("drop", "breakdown") and last and last.section != section:
+        if section in ("drop", "breakdown", "chorus", "bridge") and last and last.section != section:
             palette = palettes[(palettes.index(palette) + 1) % len(palettes)]
 
         variants = RULE_LOOKS[section]
         n_before = sum(1 for d in history if d.section == section)
         look = variants[n_before % len(variants)]
         intensity = 3 if section == "drop" else min(3, int(p.loudness_pct / 25))
+        if section == "chorus":  # the song opens up, without a drop's impact (the arc saves 3 for the last chorus)
+            intensity = 2
+        elif section == "verse":
+            intensity = min(intensity, 2)
         fx, style = RULE_BEAM_FX[section][n_before % len(RULE_BEAM_FX[section])]
         head_trigger = "kick" if look[2] in ("synth", "eighths") else "same"  # layer: heads hold the pulse
         d = Decision(

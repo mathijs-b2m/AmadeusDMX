@@ -7,8 +7,8 @@ wash in hardstyle, a spinning prism in techno), what to use instead, and a few l
 A style is a lean, not a rule: the genre sets the COLOURS, the music of each part decides the moves. A song
 is not one genre all the way through (a pop song's piano ballad, then a mainstage drop):
 
-- The rule director uses the genre's palettes everywhere, and swaps a look's misfits only in the grooves (the
-  body of a genre); intros, breakdowns, buildups and drops follow their own music.
+- The rule director uses the genre's palettes everywhere, and swaps a look's misfits only in the grooves, verses
+  and choruses (the body of a genre); intros, breakdowns, bridges, buildups and drops follow their own music.
 - The decision models get the genre's palettes as the only colour answers, and the rest of the style in the
   prompt as a lean, with every option still open.
 
@@ -50,8 +50,8 @@ class Style:
         changed = False
         if d.palette not in self.palettes:
             d.palette, changed = self.palettes[k % len(self.palettes)], True
-        if d.section != "groove":
-            return changed  # intros, breakdowns, buildups and drops: their own music decides
+        if d.section not in ("groove", "verse", "chorus"):
+            return changed  # intros, breakdowns, bridges, buildups and drops: their own music decides
         for layer, bad in self.avoid.items():
             if getattr(d, layer, None) in bad:
                 fits = [v for v in self.prefer.get(layer, ()) if v not in bad]

@@ -19,10 +19,11 @@ public enum Palettes {
 }
 
 public enum Sections {
-    public static let order = ["intro", "groove", "buildup", "drop", "breakdown", "outro"]
+    public static let order = ["intro", "groove", "buildup", "drop", "breakdown", "outro", "verse", "chorus", "bridge"]
     public static let colors: [String: SIMD3<Float>] = [
         "intro": [0.357, 0.420, 0.549], "groove": [0.247, 0.561, 0.420], "buildup": [0.788, 0.510, 0.169],
         "drop": [0.847, 0.271, 0.310], "breakdown": [0.424, 0.333, 0.722], "outro": [0.290, 0.322, 0.376],
+        "verse": [0.310, 0.498, 0.659], "chorus": [0.816, 0.439, 0.227], "bridge": [0.541, 0.373, 0.627],
     ]
     public static func color(_ s: String) -> SIMD3<Float> { colors[s] ?? [0.4, 0.4, 0.45] }
 }

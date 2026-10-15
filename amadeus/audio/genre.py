@@ -6,9 +6,11 @@ From strong to weak:
    techno and Hans Zimmer writes film scores). Used when there is an OPENAI_API_KEY and it is confident
    (more so with a title alone), and a beat-less genre only when the audio has no groove either;
 3. a genre tag in the file, when it maps onto a word we know;
-4. the audio, as the fallback: how much of the track grooves (the same rhythm pattern bar after bar, in the
-   low end or the highs) tells music made for a pulse from music that isn't (cinematic, ambient); for music
-   with a groove the tempo gives the family.
+4. the audio, as the fallback. First its form (amadeus/audio/form.py): a song, with a voice singing through
+   its loud parts, is rock when guitars lead it, hip-hop when it is slow and they don't, else pop; never a
+   beat-less genre, however loose its groove. Otherwise how much of the track grooves (the same rhythm pattern
+   bar after bar, in the low end or the highs) tells music made for a pulse from music that isn't (cinematic,
+   ambient); for music with a groove the tempo gives the club family.
 
 The music facts behind the call are kept (`GenreCall.facts`) so the choice can be shown and checked.
 """
@@ -130,7 +132,17 @@ def facts(a: Analysis) -> dict:
     }
 
 
+ROCK_GUITAR = 0.7  # a song whose melodic part is a guitar this share of the time is rock
+HIPHOP_GUITAR, HIPHOP_BPM = 0.45, 100  # a song slower than this, with less guitar than this: hip-hop
+
+
 def from_audio(f: dict) -> str:
+    if f.get("song"):  # a song: by what leads it, never by its tempo (Olivia Rodrigo at 144 BPM isn't psytrance)
+        if f.get("guitar_led", 0.0) >= ROCK_GUITAR:
+            return "rock"
+        if f["bpm"] < HIPHOP_BPM and f.get("guitar_led", 0.0) < HIPHOP_GUITAR:
+            return "hiphop"
+        return "pop"
     if f["groove"] < CINEMATIC_GROOVE:
         if f["pump_db"] < 15 and f["tonal"] >= 0.6:
             return "cinematic" if f["dynamics_db"] >= 10 or f["hat_density"] >= 0.5 else "ambient"
@@ -234,8 +246,9 @@ def from_model(artist: str, title: str) -> tuple[str, float] | None:
     return genre, confidence
 
 
-def detect(a: Analysis, ask_model: bool = True) -> GenreCall:
-    f = facts(a)
+def detect(a: Analysis, ask_model: bool = True, song: dict | None = None) -> GenreCall:
+    """`song`: what the audio says about the track's form (amadeus/audio/form.facts), part of the facts."""
+    f = {**facts(a), **(song or {})}
     you = overrides().get(_key(a))
     if you in GENRES:
         return GenreCall(you, "you", f)
@@ -246,7 +259,7 @@ def detect(a: Analysis, ask_model: bool = True) -> GenreCall:
         genre, confidence = named
         sure = confidence >= (MIN_CONFIDENCE if artist else MIN_CONFIDENCE_TITLE_ONLY)
         # a beat-less genre for a track that clearly grooves is a wrong guess (and would change the show)
-        plausible = genre not in BEATLESS or f["groove"] < CINEMATIC_GROOVE
+        plausible = genre not in BEATLESS or (f["groove"] < CINEMATIC_GROOVE and not f.get("song"))
         if sure and plausible:
             return GenreCall(genre, "ai", {**f, "confidence": round(confidence, 2)})
     tagged = from_tag(meta)

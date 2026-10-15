@@ -20,7 +20,12 @@ SECTIONS = [
     ),
     ("breakdown", "Kick and/or bass gone, atmospheric or melodic, clearly lower energy."),
     ("outro", "Elements leaving and energy falling: the track ends or is being mixed out."),
+    # the parts of a song (a track with verses and choruses: rock, pop, a singer-songwriter, hip-hop)
+    ("verse", "A song's verse: the singer tells the story over the band, the quieter sung part between choruses."),
+    ("chorus", "A song's chorus: the hook everybody sings, the big, open part (bigger than a verse, not a drop)."),
+    ("bridge", "A song's bridge: the one part unlike the others, late in the song, before the last chorus."),
 ]
+SONG_SECTIONS = ("verse", "chorus", "bridge")
 
 PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 2 = accent.
     "warm": (

@@ -35,6 +35,11 @@ class Phrase:
     pickup_start: float = 0.0  # when the pickup starts (= start when there is none)
     instruments: str = ""  # the melodic instruments heard, most likely first ("keys 0.55, synth 0.20")
     melody_change: bool = False  # a new melody comes in at the start (the melodic part changes sound or register)
+    # the song's form (amadeus/audio/form.py), in a track with verses and choruses ("" in a club track):
+    # intro, verse, prechorus, chorus, bridge, instrumental, drop (a real drop inside a song) or outro
+    part: str = ""
+    vocal: float = -1.0  # share of the phrase a voice sings the lead (-1: not known, the track isn't separated)
+    lift: float = 0.0  # a chorus that came in like a drop: its drop score (the jump), kept for the light's size
 
 
 @dataclass
@@ -72,6 +77,12 @@ class Analysis:
     hits: object | None = None
     # which instrument family plays (amadeus/audio/stems.load_instruments), when separated and the models exist
     instruments: dict | None = None
+    # per bar (downbeat to downbeat): the harmony, as 12 pitch-class strengths (unit length), for the song's form
+    bar_chroma: np.ndarray | None = None
+    # the track's form (amadeus/audio/form.py): "song" (verses and choruses), "club" (built around drops) or ""
+    # (not known), and the facts behind the call
+    form: str = ""
+    form_facts: dict = field(default_factory=dict)
 
     def band_norm(self, name: str) -> np.ndarray:
         """Band energy scaled to 0..1 between the set's 10th and 97th percentile."""

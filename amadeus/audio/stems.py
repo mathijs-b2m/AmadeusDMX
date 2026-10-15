@@ -155,6 +155,38 @@ def vocal_envelope(path: str | Path) -> tuple[np.ndarray, float] | None:
     return env, fps
 
 
+VOCAL_LEAD_DB = -8.0  # the voice this close to the whole mix's loudness: someone is singing (or rapping) the lead
+VOCAL_ALIVE_DB = 30.0  # frames this far under the track's loud level are silence: they don't count
+
+
+def vocal_presence(path: str | Path) -> tuple[np.ndarray, np.ndarray, float] | None:
+    """Per frame: is a voice singing the lead (the vocal part within VOCAL_LEAD_DB of the whole mix), and is the
+    music playing at all; and the frame rate. Absolute, unlike the vocal envelope's own scale: an instrumental
+    track's separated "vocals" are leftovers far below the mix, a song's are its loudest part. None if the track
+    hasn't been separated (computed once, cached next to the parts)."""
+    d = _dir(Path(path))
+    f = d / "vocal_presence.npz"
+    if f.exists():
+        z = np.load(f)
+        return z["sung"], z["alive"], float(z["fps"])
+    parts = [cached_part(path, n) for n in NAMES]
+    if any(x is None for x in parts):
+        return None
+    n = min(len(x) for x in parts) // VOCAL_ENV_HOP
+
+    def power(x):
+        return (x[: n * VOCAL_ENV_HOP].reshape(n, VOCAL_ENV_HOP) ** 2).mean(axis=1)
+
+    powers = [power(x) for x in parts]
+    mix = 10 * np.log10(sum(powers) + 1e-10)
+    voice = 10 * np.log10(powers[NAMES.index("vocals")] + 1e-10)
+    sung = voice - mix > VOCAL_LEAD_DB
+    alive = mix > np.percentile(mix, 95) - VOCAL_ALIVE_DB
+    fps = STEM_SR / VOCAL_ENV_HOP
+    np.savez_compressed(f, sung=sung, alive=alive, fps=fps)
+    return sung, alive, fps
+
+
 def load_notes(path: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """The synth/melody notes of a track if it has been separated already (cheap), else None."""
     f = _dir(Path(path)) / "notes.npz"

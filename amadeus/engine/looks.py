@@ -29,7 +29,7 @@ DROP_PATTERNS = ("all", "all", "sides", "rotate")
 
 
 ACCENT_SHARE = 3  # one light in this many plays the accents (the synth's stabs); the others keep the rhythm
-ACCENT_SECTIONS = ("groove", "drop", "buildup")
+ACCENT_SECTIONS = ("groove", "drop", "buildup", "verse", "chorus")
 BLOCK_BARS = 4  # in energetic parts the group's kick pattern and the accent roles change this often
 MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 

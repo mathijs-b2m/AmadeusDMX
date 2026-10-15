@@ -191,7 +191,8 @@ DEFAULT_EVENT = "club"
 
 LIFT = 0.3  # intensity (calm stages) and responsiveness follow the music's heat this much (against the stage) …
 LIFT_MAX = 0.12  # … at most this far
-SECTION_HEAT = {"drop": 1.0, "buildup": 0.8, "groove": 0.65, "breakdown": 0.3, "intro": 0.3, "outro": 0.3}
+SECTION_HEAT = {"drop": 1.0, "buildup": 0.8, "groove": 0.65, "breakdown": 0.3, "intro": 0.3, "outro": 0.3,
+                "verse": 0.5, "chorus": 0.85, "bridge": 0.45}  # fmt: skip
 SPECIALS_MOMENTS, SPECIALS_FREE = 0.25, 0.75  # specials knob: in the box below, big moments only, free above
 REVEAL_WAIT_PHRASES = 4  # a group new tonight waits for a drop to be revealed, but at most this many phrases
 GLIDE_S = 8.0  # the knobs follow a stage the music brings this quickly (1/e)

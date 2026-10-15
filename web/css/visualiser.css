@@ -2,6 +2,7 @@
     --bg: #0b0c10; --panel: #14161d; --line: #262a35; --text: #e7e9ee; --muted: #8b91a1;
     --accent: #ffcc33;
     --intro: #5b6b8c; --groove: #3f8f6b; --buildup: #c9822b; --drop: #d8454f; --breakdown: #6c55b8; --outro: #4a5260;
+    --verse: #4f7fa8; --chorus: #d0703a; --bridge: #8a5fa0;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);

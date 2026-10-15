@@ -7,7 +7,7 @@ const PALETTES = {
   gold: [[1,.65,.1],[.55,0,.9],[1,.85,.45],[.9,.3,.6]],
   stage: [[1,.85,.65],[1,.55,.1],[.1,.2,.9],[1,1,1]],
 };
-const SECTIONS = ["intro","groove","buildup","drop","breakdown","outro"];
+const SECTIONS = ["intro","groove","buildup","drop","breakdown","outro","verse","chorus","bridge"];
 const BANDS = ["sub","bass","mid","high","air"];
 const $ = id => document.getElementById(id);
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();

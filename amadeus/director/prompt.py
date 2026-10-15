@@ -96,6 +96,18 @@ def synth_riff(a: Analysis, p: Phrase) -> float:
 SYNTH_SNAP_S = 0.02
 
 
+SONG_PART = {
+    "intro": "the INTRO, before the voice comes in",
+    "verse": "a VERSE",
+    "prechorus": "a PRE-CHORUS, climbing into the chorus",
+    "chorus": "a CHORUS",
+    "bridge": "the BRIDGE, the part unlike the others",
+    "instrumental": "an INSTRUMENTAL part (no singing: a solo or a break)",
+    "drop": "a real DROP inside the song (the voice steps back, the beat slams in)",
+    "outro": "the OUTRO, after the voice has gone",
+}
+
+
 def drop_scores(a: Analysis) -> list[float]:
     return [p.drop_score for p in a.phrases]
 
@@ -241,6 +253,20 @@ def build_prompt(
             "Analysis: the NEXT phrase starts with a drop, so this phrase is most likely the BUILDUP "
             "towards it (use the rise energy curve; the 'roll' trigger accelerates with the build)."
         )
+    if p.part:
+        n = sum(1 for q in phrases[: i + 1] if q.part == p.part)
+        sung = f" (a voice sings {p.vocal:.0%} of it)" if p.vocal >= 0 else ""
+        hints.append(
+            f"Analysis: this track is a SONG, with verses and choruses, not a club track built around drops. "
+            f"This phrase is {SONG_PART[p.part]} (#{n}){sung}. Light it like a concert: follow the song's form "
+            f"(verses lit for the singer and the band, choruses wide and open, the last chorus the biggest); "
+            f"keep the drop vocabulary (impact, blackout-and-bang) for real drops only."
+        )
+        if p.lift:
+            hints.append(
+                f"Analysis: this chorus comes in with a big jump (score {p.lift:.2f}), but it is a chorus, not a "
+                f"drop: give it a clear entrance on its downbeat, without a drop's impact."
+            )
     if getattr(p, "melody_change", False):
         hints.append(
             "Analysis: a NEW MELODY comes in at the start of this phrase (the melodic part clearly changes sound or "

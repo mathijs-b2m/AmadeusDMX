@@ -20,6 +20,7 @@ const Screen = (() => {
     intro: ["off", "ambient"], groove: ["off", "figure", "equalizer", "off", "figure", "words"],
     buildup: ["words", "figure"], drop: ["psychedelic", "figure", "equalizer"],
     breakdown: ["ambient", "off", "figure"], outro: ["ambient", "off"],
+    verse: ["off", "ambient", "words"], chorus: ["figure", "equalizer", "words"], bridge: ["ambient", "off"],
   };
 
   // ---------------------------------------------------------------- Butterchurn (psychedelic)

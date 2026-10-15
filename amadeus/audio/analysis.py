@@ -39,7 +39,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 41
+ANALYSIS_VERSION = 42
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -169,6 +169,7 @@ def analyze(
         list(zip([0.0, *starts[:-1]], builds, starts)),
     )  # fmt: skip
     pauses = pauses + heard
+    bar_chroma = _bar_chroma(feats["chroma"], fps, beat_times[downbeat_idx])
     log(
         f"  {len(beat_times)} beats, {len(downbeat_idx)} bars, {len(phrases)} phrases, "
         + ", ".join(f"{len(v[0])} {k}" for k, v in onsets.items())
@@ -193,20 +194,34 @@ def analyze(
         stutter_strength=stutter_strength,
         roll=roll,
         pauses=pauses,
+        bar_chroma=bar_chroma,
     )
     _save(a, npz_path, json_path)
     return _finish(a, path)
 
 
+def _bar_chroma(chroma: np.ndarray, fps: float, db_times: np.ndarray) -> np.ndarray:
+    """Per bar: its harmony, the pitch classes' strengths (amplitude, so a loud bass note doesn't drown the
+    chord) scaled to unit length."""
+    rows = []
+    for t0, t1 in zip(db_times[:-1], db_times[1:]):
+        s = int(t0 * fps)
+        c = np.sqrt(chroma[s : max(int(t1 * fps), s + 1)]).mean(axis=0)
+        rows.append(c / (np.linalg.norm(c) + 1e-9))
+    return np.array(rows, dtype=np.float32).reshape(-1, 12)
+
+
 def _finish(a: Analysis, path: Path) -> Analysis:
-    """What isn't cached with the analysis itself: the separated notes, the genre (your choice can change it),
-    and, for a track with a program of its own (cinematic), its hits."""
-    from amadeus.audio import genre, hits
+    """What isn't cached with the analysis itself: the separated notes, the song's form and the genre (your
+    choice can change both), and, for a track with a program of its own (cinematic), its hits."""
+    from amadeus.audio import form, genre, hits
 
     a = _with_notes(a, path)
     _with_vocal_pickups(a, path)
-    call = genre.detect(a)
+    song = form.facts(a, path)  # (what the audio says: verses and choruses, or drops)
+    call = genre.detect(a, song=song)
     a.genre, a.genre_source, a.genre_facts = call.genre, call.source, call.facts
+    form.apply(a, call, song)
     if call.program == "cinematic":
         a.hits = hits.load_or_detect(path)
     return a
@@ -327,6 +342,7 @@ def _save(a: Analysis, npz_path: Path, json_path: Path):
         stutter_strength=a.stutter_strength,
         roll=a.roll,
         pauses=a.pauses,
+        bar_chroma=a.bar_chroma if a.bar_chroma is not None else np.zeros((0, 12), np.float32),
         **arrays,
         **(
             {"syn_t": a.synth_notes[0], "syn_s": a.synth_notes[1], "syn_p": a.synth_notes[2]}
@@ -360,5 +376,6 @@ def _load(npz_path: Path, json_path: Path) -> Analysis:
         stutter_strength=z["stutter_strength"],
         roll=z["roll"],
         pauses=z["pauses"],
+        bar_chroma=z["bar_chroma"] if "bar_chroma" in z.files else None,
         synth_notes=(z["syn_t"], z["syn_s"], z["syn_p"]) if "syn_t" in z.files else None,
     )

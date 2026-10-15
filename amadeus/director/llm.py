@@ -20,8 +20,11 @@ from amadeus.director.decision import (
     Decision,
 )
 from amadeus.director.prompt import build_prompt, questions_for, synth_riff
-from amadeus.director.rules import PER_BEAT, RuleDirector
+from amadeus.director.rules import PART_SECTION, PER_BEAT, RuleDirector
 from amadeus.director.style import Style
+from amadeus.director.vocabulary import SONG_SECTIONS
+
+CLUB_SECTION = {"verse": "groove", "chorus": "groove", "bridge": "breakdown"}  # song parts in a club track
 
 MODEL = "gpt-6-luna"
 
@@ -29,7 +32,7 @@ MODEL = "gpt-6-luna"
 HOLD_CONFIDENCE = 0.35  # mean look confidence below this, in an unchanged section → keep the previous look
 
 
-PROMPT_VERSION = 25
+PROMPT_VERSION = 26
 
 
 class OpenAIDirector:
@@ -119,6 +122,15 @@ class OpenAIDirector:
                 d.section, guarded = "buildup", True
             if d.dynamics == "steady":
                 d.dynamics, guarded = "rise", True
+        # The song's form is a musical fact too: a song's parts are what its form says (a chorus is no drop), and
+        # a club track has no verses.
+        part = a.phrases[i].part
+        if part and score < DROP_THRESHOLD and nxt < DROP_THRESHOLD and d.section != PART_SECTION.get(part, d.section):
+            d.section, guarded = PART_SECTION[part], True
+        elif not part and d.section in SONG_SECTIONS:
+            d.section, guarded = CLUB_SECTION[d.section], True
+        if part and d.section != "drop" and d.dynamics == "impact":
+            d.dynamics, guarded = "steady", True  # in a song the impact curve is for its real drops only
 
         # High energy keeps moving: loud with a running kick (e.g. the phrases right after a drop).
         ph = a.phrases[i]
@@ -136,7 +148,7 @@ class OpenAIDirector:
 
         # Crisp beam by default: frost only as a rare soft moment in calm sections.
         recent_frost = any(h.beam_fx == "frost" for h in history[-3:])
-        if d.beam_fx == "frost" and (d.section not in ("intro", "breakdown", "outro") or recent_frost):
+        if d.beam_fx == "frost" and (d.section not in ("intro", "breakdown", "bridge", "outro") or recent_frost):
             d.beam_fx, guarded = "open", True
 
         # Variety: when a choice repeats too long, take the model's next most likely option instead.

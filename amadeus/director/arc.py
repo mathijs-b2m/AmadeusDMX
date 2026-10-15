@@ -21,11 +21,14 @@ def song_arc(a: Analysis) -> list[dict]:
     """Where each phrase sits in the song's dramaturgy, so the show saves its biggest weapons for the
     biggest moment: per phrase its energy relative to the song's biggest drop, and a role:
     main_drop, gentle_drop (an early or smaller drop: hold back), into_main (the build into a main drop),
-    peak (the high-energy phrases right after a main drop), early (before the first main drop), other."""
+    peak (the high-energy phrases right after a main drop), early (before the first main drop), other.
+    A song without a real drop (amadeus/audio/form.py) builds to its last chorus instead: main_chorus, with the
+    earlier choruses holding something back (early)."""
     ph = a.phrases
     energy = [0.55 * p.loudness_pct + 0.45 * p.low_pct for p in ph]
     drops = [i for i, p in enumerate(ph) if p.drop_score >= DROP_THRESHOLD]
-    main_level = max([energy[i] for i in drops] or [max(energy or [1.0])]) or 1.0
+    last_chorus = _last_chorus(a) if not drops else []
+    main_level = max([energy[i] for i in drops or last_chorus] or [max(energy or [1.0])]) or 1.0
     early_end = EARLY_SHARE * a.duration
     mains = [
         i
@@ -37,12 +40,15 @@ def song_arc(a: Analysis) -> list[dict]:
     ]
     if drops and not mains:
         mains = [max(drops, key=lambda i: energy[i])]
+    mains = mains or last_chorus
     first_main = mains[0] if mains else len(ph)
     laser_song = bool(re.search(r"la[sz]er", Path(str(a.path)).stem, re.I))  # the track is ABOUT lasers
     out = []
     for i, p in enumerate(ph):
         rel = energy[i] / main_level
-        if i in mains:
+        if i in last_chorus:
+            role = "main_chorus"
+        elif i in mains:
             role = "main_drop"
         elif i in drops:
             role = "gentle_drop"
@@ -61,9 +67,22 @@ def song_arc(a: Analysis) -> list[dict]:
                 "laser_song": laser_song,
                 "synth": round(synth_line(a, p), 2),
                 "main_at": ph[first_main].start if first_main < len(ph) else None,
+                "main": "last chorus" if last_chorus else "main drop",
             }
         )
     return out
+
+
+def _last_chorus(a: Analysis) -> list[int]:
+    """A song's last chorus: its last run of chorus phrases in a row."""
+    ph = a.phrases
+    choruses = [i for i, p in enumerate(ph) if p.part == "chorus"]
+    if not choruses:
+        return []
+    k = choruses[-1]
+    while k - 1 >= 0 and ph[k - 1].part == "chorus":
+        k -= 1
+    return list(range(k, choruses[-1] + 1))
 
 
 def synth_line(a: Analysis, p) -> float:
@@ -77,7 +96,8 @@ def synth_line(a: Analysis, p) -> float:
 
 
 def arc_hint(arc: dict) -> str:
-    when = f" (the main drop is at {fmt_time(arc['main_at'])})" if arc.get("main_at") else ""
+    main = arc.get("main", "main drop")
+    when = f" (the {main} is at {fmt_time(arc['main_at'])})" if arc.get("main_at") else ""
     if arc.get("laser_song") and arc["role"] in ("early", "gentle_drop", "other"):
         return (
             "Song arc: build the show over the track; the lasers are the star of this track, so use them "
@@ -89,10 +109,12 @@ def arc_hint(arc: dict) -> str:
         "gentle_drop": f"Song arc: this is a GENTLE drop: only {arc['energy']:.0%} of the energy of the song's "
         f"biggest drop{when}. Hold back: no lasers, moderate movement, not the whole rig at once; "
         "save the full show for the main drop.",
-        "into_main": "Song arc: this phrase builds into the MAIN drop. Build with flashing, pulsing light and "
-        "accelerating rhythm rather than big movement; lasers may come in late in the build.",
+        "main_chorus": "Song arc: the LAST CHORUS, the song's biggest moment (it has no drop): the whole rig, wide "
+        "and open, maximum intensity, the light singing along with the band.",
+        "into_main": f"Song arc: this phrase builds into the {main.upper()}. Build with flashing, pulsing light "
+        "and accelerating rhythm rather than big movement; lasers may come in late in the build.",
         "peak": "Song arc: the peak right after the main drop: full energy is fine.",
-        "early": f"Song arc: early in the song, before its first main drop{when}. Keep something in reserve: "
+        "early": f"Song arc: early in the song, before its first {main}{when}. Keep something in reserve: "
         "no lasers, moderate intensity; buildups use flashing light, not big movement.",
     }.get(arc["role"], "")
 
@@ -106,7 +128,7 @@ def laser_star(d: Decision, arc: dict, lasers, next_best=None) -> bool:
             d.laser_move = "melody"
             return True
         return False
-    if d.section in ("groove", "buildup", "drop") and arc["energy"] >= 0.6:
+    if d.section in ("groove", "buildup", "drop", "chorus") and arc["energy"] >= 0.6:
         d.laser_look = (next_best("laser_look", {"off"}) if next_best else None) or "fan"
         if arc.get("synth", 0) >= SYNTH_LINE:
             d.laser_move = "melody"
@@ -122,16 +144,16 @@ def apply_arc(d: Decision, arc: dict, lasers, groups, next_best=None) -> bool:
     if lasers and d.laser_move == "melody" and arc.get("synth", 0) < 0.3:  # nothing to play: lasers would be dark
         d.laser_move, changed = (next_best("laser_move", {"melody", "still"}) if next_best else None) or "scan", True
     role = arc["role"]
-    laser_ok = role in ("main_drop", "into_main", "peak")
+    laser_ok = role in ("main_drop", "main_chorus", "into_main", "peak")
     if arc.get("laser_song"):  # a track about lasers: they are the star, everywhere but the quiet edges
         laser_ok = d.section not in ("intro", "outro") and arc["energy"] >= 0.3
     if lasers and d.laser_look != "off" and not laser_ok:
         d.laser_look, changed = "off", True  # lasers only where the song really needs them
-    if d.screen == "psychedelic" and role not in ("main_drop", "peak"):
+    if d.screen == "psychedelic" and role not in ("main_drop", "main_chorus", "peak"):
         d.screen, changed = "figure", True  # the full-on visuals are for the biggest moments
     elif role == "main_drop" and d.source == "rules" and d.screen != "off":
         d.screen = "psychedelic"
-    if d.fog == "burst" and role != "main_drop":
+    if d.fog == "burst" and role not in ("main_drop", "main_chorus"):
         d.fog, changed = "medium" if role in ("gentle_drop", "early") else "heavy", True  # blasts: big drops only
     if d.fog == "heavy" and role in ("gentle_drop", "early"):
         d.fog, changed = "medium", True
@@ -151,11 +173,11 @@ def apply_arc(d: Decision, arc: dict, lasers, groups, next_best=None) -> bool:
         if d.movement in ("ballyhoo", "figure8", "circle"):
             d.movement, changed = "nod", True
     # the tilt wave and randomly pulsing heads are for medium and intense moments, not for calm ones
-    calm = d.section in ("intro", "breakdown", "outro") or d.intensity < 1
+    calm = d.section in ("intro", "breakdown", "bridge", "outro") or d.intensity < 1
     if calm and d.movement == "tilt_wave":
         d.movement, changed = "nod", True
     if calm and d.head_light == "random":
         d.head_light, changed = "breathe", True
-    if role == "main_drop" and d.intensity < 3:
+    if role in ("main_drop", "main_chorus") and d.intensity < 3:
         d.intensity, changed = 3, True
     return changed
