@@ -27,7 +27,7 @@ class TrackShows:
         self.pool = ThreadPoolExecutor(max_workers=2)
         self.lock = threading.Lock()
         self.set_genre = SetGenre()  # the set's genre: tracks of a genre share a house style
-        self.shape = (2, 1, True)  # the show arc's shape for the plans (show/arc.py, plan_shape)
+        self.shape = (2, 1, True, False)  # the show arc's shape for the plans (show/arc.py, plan_shape)
         self.directed: dict[str, list] = {}  # file → the director's plan, before calming
 
     def _style_genre(self, file: str):
@@ -46,19 +46,20 @@ class TrackShows:
         for f in files:
             self.pool.submit(self._build, f, False)
 
-    def set_shape(self, shape: tuple[int, int, bool]):
+    def set_shape(self, shape: tuple):
         """The show arc's shape changed (head movement, look changes): every track's engine is built again from
         its reshaped plan, in the background (the old one keeps playing until the new one is ready)."""
         if shape == self.shape:
             return
-        print(f"  ⇄ plans: heads {MOVES[shape[0]]}, a look held {shape[1]} phrase(s)", flush=True)
+        ambient = ", warm-up ambience" if len(shape) > 3 and shape[3] else ""
+        print(f"  ⇄ plans: heads {MOVES[shape[0]]}, a look held {shape[1]} phrase(s){ambient}", flush=True)
         self.shape = level = shape
         with self.lock:
             files = [f for f in self.shows if f in self.directed]
         for f in files:
             self.pool.submit(self._recalm, f, level)
 
-    def _recalm(self, file: str, level: tuple[int, int, bool]):
+    def _recalm(self, file: str, level: tuple):
         from amadeus.show.arc import shape_plan
 
         try:

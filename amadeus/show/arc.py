@@ -50,18 +50,20 @@ KNOBS = (
 STAGE_KEYS = ["warmup", "build", "peak", "deep", "finale", "outro"]
 
 # Each stage's knobs as it begins → as it ends (a peak ends in a breather, the finale climbs to the climax).
-# Special effects come from the event (EVENTS[...]["specials"]), the other knobs from here.
+# Special effects and intensity come from the event (EVENTS[...]["specials"], ["calm"]), the other knobs from here:
+# a night runs at full intensity (a quiet stage plays fewer lights, not dimmer ones), only the event's calm stages
+# (a wedding's dinner) are dimmed.
 # fmt: off
 PROFILES = {  # per stage, per knob: (as the stage begins, as it ends)
-    #         groups       response     movement    smoke        colour      intensity     flashes     LED wall     changes      drops  # noqa: E501
-    "warmup": ((0.4, 0.55), (0.3, 0.45), (0.2, 0.3), (0.2, 0.35), (0.2, 0.3), (0.75, 0.8), (0.0, 0.1), (0.0, 0.2),  (0.15, 0.3), (0.2, 0.3)),  # noqa: E501
-    "build":  ((0.5, 0.75), (0.5, 0.7),  (0.5, 0.7), (0.4, 0.55), (0.4, 0.55), (0.85, 0.9), (0.2, 0.5), (0.35, 0.6), (0.4, 0.6), (0.5, 0.7)),  # noqa: E501
-    "peak":   ((1.0, 0.9),  (0.95, 0.8), (1.0, 0.9), (0.75, 0.65), (0.8, 0.6), (1.0, 0.95),  (1.0, 0.7), (1.0, 0.9),  (0.9, 0.8), (1.0, 0.9)),  # noqa: E501
-    "deep":   ((0.6, 0.6),  (0.5, 0.55), (0.5, 0.5), (0.7, 0.7),  (0.3, 0.35), (0.8, 0.85), (0.2, 0.3), (0.4, 0.45), (0.35, 0.4), (0.5, 0.5)),  # noqa: E501
-    "finale": ((0.85, 1.0), (0.85, 1.0), (0.85, 1.0), (0.7, 0.9), (0.7, 0.9), (0.95, 1.0),  (0.7, 1.0), (0.85, 1.0), (0.8, 1.0), (0.9, 1.0)),  # noqa: E501
-    "outro":  ((0.5, 0.35), (0.3, 0.2),  (0.3, 0.2), (0.6, 0.4),  (0.2, 0.2), (0.8, 0.65),  (0.0, 0.0), (0.3, 0.1),  (0.2, 0.1), (0.2, 0.1)),  # noqa: E501
+    #         groups       response     movement    smoke        colour      flashes     LED wall     changes      drops  # noqa: E501
+    "warmup": ((0.4, 0.55), (0.3, 0.45), (0.2, 0.3), (0.2, 0.35), (0.2, 0.3), (0.0, 0.1), (0.0, 0.2),  (0.15, 0.3), (0.2, 0.3)),  # noqa: E501
+    "build":  ((0.5, 0.75), (0.5, 0.7),  (0.5, 0.7), (0.4, 0.55), (0.4, 0.55), (0.2, 0.5), (0.35, 0.6), (0.4, 0.6), (0.5, 0.7)),  # noqa: E501
+    "peak":   ((1.0, 0.9),  (0.95, 0.8), (1.0, 0.9), (0.75, 0.65), (0.8, 0.6),  (1.0, 0.7), (1.0, 0.9),  (0.9, 0.8), (1.0, 0.9)),  # noqa: E501
+    "deep":   ((0.6, 0.6),  (0.5, 0.55), (0.5, 0.5), (0.7, 0.7),  (0.3, 0.35), (0.2, 0.3), (0.4, 0.45), (0.35, 0.4), (0.5, 0.5)),  # noqa: E501
+    "finale": ((0.85, 1.0), (0.85, 1.0), (0.85, 1.0), (0.7, 0.9), (0.7, 0.9),  (0.7, 1.0), (0.85, 1.0), (0.8, 1.0), (0.9, 1.0)),  # noqa: E501
+    "outro":  ((0.5, 0.35), (0.3, 0.2),  (0.3, 0.2), (0.6, 0.4),  (0.2, 0.2),  (0.0, 0.0), (0.3, 0.1),  (0.2, 0.1), (0.2, 0.1)),  # noqa: E501
 }
-PROFILE_KNOBS = ("groups", "response", "movement", "smoke", "colour", "intensity", "flashes", "screen", "changes", "drops")  # noqa: E501
+PROFILE_KNOBS = ("groups", "response", "movement", "smoke", "colour", "flashes", "screen", "changes", "drops")
 # fmt: on
 # The LED wall is drawn by the visualisers (the app, web/js/screen.js): they read the "screen" knob from the feed,
 # dim the wall by it, and below SCREEN_CALM show only calm colour (no characters, words or psychedelics).
@@ -90,6 +92,7 @@ OWN_FIELDS = (
     "confidence",
     "probabilities",
     "prompt",
+    "brightness",
 )
 CALM_PATH = {  # per-beat and wild paths → smooth ones
     "step_on_beat": "sweep",
@@ -106,6 +109,10 @@ CALM_LIGHT = {"flick": "steady", "beat": "breathe", "alternate": "breathe", "ran
 CALM_GROUPING = {"chase": "unison", "solo": "unison", "split": "unison"}
 MODERATE_GROUPING = {"chase": "per_group", "solo": "per_group"}
 CALM_BEAM = {"prism": "open", "prism_spin": "open", "gobo_shake": "gobo", "gobo_spin": "gobo"}
+# The warm-up with calm heads (dinner and drinks, an empty floor): a static wash of cozy colour as the base, the
+# heads very slow, projecting gobos onto the floor (on an empty floor people actually look at them).
+AMBIENT_PALETTES = ("warm", "gold")  # cozy; any other palette becomes the first
+AMBIENT_PATH = {"nod": "sweep", "figure8": "circle"}  # (after CALM_PATH) the slowest, longest paths
 
 # How each stage sounds: (its heat, the trend it likes: +1 rising, -1 falling, 0 either)
 MOODS = {
@@ -122,7 +129,8 @@ STICK = 0.6  # the stage the night is in counts this much extra: no flapping bet
 PULL = 1.0  # a stage in its own part of the night (the warm-up early, the finale late) counts this much extra
 
 # The event types: the stages' names, where in the night a stage may come (share from, to) and where it is
-# pulled to, which stages have special effects, and the character of the knobs (smoke and flashes scaled,
+# pulled to, which stages have special effects, which are calm (intensity as the stage begins, as it ends;
+# the others run at full), and the character of the knobs (smoke and flashes scaled,
 # colour variety and responsiveness lifted). The tempo counts for less where the genres change tempo a lot.
 _ANYWHERE = (0.04, 9.0)
 EVENTS = {
@@ -132,6 +140,7 @@ EVENTS = {
         "allowed": {"warmup": (0, 0.35), "finale": (0.7, 9), "outro": (0.92, 9)},
         "pull": {"warmup": (0, 0.15), "finale": (0.8, 9), "outro": (0.96, 9)},
         "specials": {"peak": 0.5, "deep": 0.5, "finale": 1.0, "outro": 0.5},
+        "calm": {},
         "smoke": 1.0,
         "flashes": 1.0,
         "colour": 0.0,
@@ -144,6 +153,7 @@ EVENTS = {
         "allowed": {"warmup": (0, 0.45), "finale": (0.75, 9), "outro": (0.93, 9)},
         "pull": {"warmup": (0, 0.3), "finale": (0.85, 9), "outro": (0.97, 9)},
         "specials": {"peak": 0.5, "finale": 0.5},
+        "calm": {"warmup": (0.65, 0.75), "deep": (0.85, 0.85), "outro": (0.8, 0.65)},
         "smoke": 0.5,
         "flashes": 0.6,
         "colour": 0.0,
@@ -156,6 +166,7 @@ EVENTS = {
         "allowed": {"warmup": (0, 0.25), "finale": (0.7, 9), "outro": (0.92, 9)},
         "pull": {"warmup": (0, 0.1), "finale": (0.8, 9), "outro": (0.96, 9)},
         "specials": {"peak": 0.5, "finale": 1.0},
+        "calm": {"warmup": (0.8, 0.9), "outro": (0.9, 0.8)},
         "smoke": 0.6,
         "flashes": 0.8,
         "colour": 0.1,
@@ -168,6 +179,7 @@ EVENTS = {
         "allowed": {"warmup": (0, 0.2), "finale": (0.7, 9), "outro": (0.93, 9)},
         "pull": {"warmup": (0, 0.08), "finale": (0.8, 9), "outro": (0.97, 9)},
         "specials": {"peak": 0.5, "finale": 1.0},
+        "calm": {},
         "smoke": 0.6,
         "flashes": 0.7,
         "colour": 0.2,
@@ -177,7 +189,7 @@ EVENTS = {
 }
 DEFAULT_EVENT = "club"
 
-LIFT = 0.3  # intensity and responsiveness follow the music's heat this much (against what the stage expects) …
+LIFT = 0.3  # intensity (calm stages) and responsiveness follow the music's heat this much (against the stage) …
 LIFT_MAX = 0.12  # … at most this far
 SECTION_HEAT = {"drop": 1.0, "buildup": 0.8, "groove": 0.65, "breakdown": 0.3, "intro": 0.3, "outro": 0.3}
 SPECIALS_MOMENTS, SPECIALS_FREE = 0.25, 0.75  # specials knob: in the box below, big moments only, free above
@@ -188,15 +200,18 @@ BIG_DROP = 0.5  # drops at least this big keep their full response and flash (th
 DROPS_OWN_LOOK = 0.25  # drops at least this big bring their own look, also when looks are held
 
 
-def calm_plan(plan: list, level: int) -> list:
+def calm_plan(plan: list, level: int, ambient: bool = False) -> list:
     """The director's plan at a movement level: 2 as it is, 1 without the wildest paths and at most "high"
-    intensity, 0 smooth slow paths, beams that stay on (no flicks or kick on/off), no prism, no flash accents."""
+    intensity, 0 smooth slow paths, beams that stay on (no flicks or kick on/off), no prism, no flash accents.
+    The lights keep the director's brightness (only the intensity knob dims). `ambient` (at level 0): the
+    warm-up's look (`ambient_look`)."""
     from dataclasses import replace
 
     if level >= 2:
         return plan
     out = []
     for d in plan:
+        bright = d.intensity if d.brightness < 0 else d.brightness
         if level == 1:
             out.append(
                 replace(
@@ -205,23 +220,46 @@ def calm_plan(plan: list, level: int) -> list:
                     movement2=MODERATE_PATH.get(d.movement2, d.movement2),
                     grouping=MODERATE_GROUPING.get(d.grouping, d.grouping),
                     intensity=min(d.intensity, 2),
+                    brightness=bright,
                 )
             )
         else:
-            out.append(
-                replace(
-                    d,
-                    movement=CALM_PATH.get(d.movement, d.movement),
-                    movement2=CALM_PATH.get(d.movement2, d.movement2),
-                    head_light=CALM_LIGHT.get(d.head_light, d.head_light),
-                    beam_fx=CALM_BEAM.get(d.beam_fx, d.beam_fx),
-                    dynamics="steady" if d.dynamics == "impact" else d.dynamics,
-                    grouping=CALM_GROUPING.get(d.grouping, d.grouping),
-                    layer_split="none",  # (an accent layer plays the hits: on, off, on)
-                    intensity=min(d.intensity, 1),
-                )
+            d = replace(
+                d,
+                movement=CALM_PATH.get(d.movement, d.movement),
+                movement2=CALM_PATH.get(d.movement2, d.movement2),
+                head_light=CALM_LIGHT.get(d.head_light, d.head_light),
+                beam_fx=CALM_BEAM.get(d.beam_fx, d.beam_fx),
+                dynamics="steady" if d.dynamics == "impact" else d.dynamics,
+                grouping=CALM_GROUPING.get(d.grouping, d.grouping),
+                layer_split="none",  # (an accent layer plays the hits: on, off, on)
+                intensity=min(d.intensity, 1),
+                brightness=bright,
             )
+            out.append(ambient_look(d) if ambient else d)
     return out
+
+
+def ambient_look(d):
+    """The warm-up's look: the pars a static wash in a cozy palette (no hits), the heads steady beams in its
+    colour, very slow (the calmest pace, the longest paths), a gobo (turning, where the director turned one)
+    projected onto the floor."""
+    from dataclasses import replace
+
+    return replace(
+        d,
+        palette=d.palette if d.palette in AMBIENT_PALETTES else AMBIENT_PALETTES[0],
+        par_base="full",
+        par_accent="none",
+        head_light="steady" if d.head_light != "off" else "off",
+        head_color="base" if d.head_color in ("white", "cycle") else d.head_color,
+        movement=AMBIENT_PATH.get(d.movement, d.movement),
+        movement2=AMBIENT_PATH.get(d.movement2, d.movement2),
+        aim="crowd",
+        beam_fx="gobo_rotate" if d.beam_fx == "gobo_rotate" else "gobo",
+        dynamics="steady",
+        intensity=0,  # the slowest paths, the slowest gobo turn, no accents
+    )
 
 
 def hold_looks(plan: list, hold: int, at_drops: bool = True) -> list:
@@ -246,9 +284,10 @@ def hold_looks(plan: list, hold: int, at_drops: bool = True) -> list:
     return out
 
 
-def shape_plan(plan: list, shape: tuple[int, int, bool]) -> list:
-    """The director's plan in the show arc's shape: (movement level, phrases a look is held, new look at drops)."""
-    return hold_looks(calm_plan(plan, shape[0]), shape[1], shape[2])
+def shape_plan(plan: list, shape: tuple) -> list:
+    """The director's plan in the show arc's shape: (movement level, phrases a look is held, new look at drops,
+    the warm-up's ambient look)."""
+    return hold_looks(calm_plan(plan, shape[0], len(shape) > 3 and shape[3]), shape[1], shape[2])
 
 
 def _ramp(share: float, lo: float, hi: float) -> float:
@@ -445,11 +484,14 @@ class ShowArc:
         q = self.stage_progress(now if now is not None else time.time())
         out = {k: a + (b - a) * q for k, (a, b) in zip(PROFILE_KNOBS, PROFILES[key])}
         out["specials"] = ev["specials"].get(key, 0.0)
+        calm = ev["calm"].get(key)
+        out["intensity"] = 1.0 if calm is None else calm[0] + (calm[1] - calm[0]) * q
         out["smoke"] *= ev["smoke"]
         out["flashes"] *= ev["flashes"]
         out["colour"] += ev["colour"]
         lift = min(max(LIFT * (heat - MOODS[key][0]), -LIFT_MAX), LIFT_MAX)
-        out["intensity"] += lift
+        if calm is not None:  # (a stage at full intensity stays at full)
+            out["intensity"] += lift
         out["response"] += lift + ev["response"]
         return {k: min(max(v, 0.0), 1.0) for k, v in out.items()}
 
@@ -489,10 +531,13 @@ class ShowArc:
         """How many phrases a look is held for (1: every phrase as directed)."""
         return HOLD_PHRASES[self._level("changes", CHANGE_LEVELS)] if self.enabled else 1
 
-    def plan_shape(self) -> tuple[int, int, bool]:
+    def plan_shape(self) -> tuple[int, int, bool, bool]:
         """What the plans are shaped to (show/tracks.py rebuilds a track's engine when it changes): the movement
-        level, how many phrases a look is held, and whether a drop still brings its own look (not for small drops)."""
-        return self.movement_level(), self.hold(), self._level("drops", (DROPS_OWN_LOOK,)) == 1
+        level, how many phrases a look is held, whether a drop still brings its own look (not for small drops),
+        and the warm-up's ambient look (in the warm-up while the heads are calm)."""
+        move = self.movement_level()
+        ambient = self.enabled and move == 0 and STAGE_KEYS[self.stage] == "warmup"
+        return move, self.hold(), self._level("drops", (DROPS_OWN_LOOK,)) == 1, ambient
 
     def drop_strength(self) -> float | None:
         """For the engines (looks.py, the drop moment): None lands drops in full."""
@@ -678,6 +723,7 @@ class ShowArc:
             "movement_level": self.movement_level(),
             "hold": self.hold(),
             "drop_look": self.plan_shape()[2],
+            "ambient": self.plan_shape()[3],
         }
 
     # ------------------------------------------------------------ remembered between engine starts

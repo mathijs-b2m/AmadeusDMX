@@ -291,3 +291,56 @@ def test_a_stage_you_pick_applies_at_once_and_small_drops_reveal_nothing(tmp_pat
     for k in range(int(10 / dt), int(41 / dt)):
         arc.apply({x["id"]: State(dimmer=1.0) for x in rig["elements"]}, e, k * dt, dt)
     assert arc.playing_groups < n  # a warm-up's small drop at 40 s is no moment for the surprises
+
+
+@pytest.mark.parametrize("event", ["club", "latin", "wedding", "party"])
+def test_intensity_is_full_but_in_calm_stages(tmp_path, event):
+    """A night runs at full intensity (a quiet stage plays fewer lights); only the calm stages (a wedding's
+    dinner) are dimmed, whatever the music does."""
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.control({"event": event}, now=0.0)
+    for stage in STAGE_KEYS:
+        arc.control({"stage": stage, "lock": True}, now=1.0)
+        for heat in (0.0, 1.0):
+            target = arc._targets(heat, now=1.0)["intensity"]
+            calm = {"wedding": {"warmup", "deep", "outro"}, "party": {"warmup", "outro"}}.get(event, set())
+            if stage in calm:
+                assert target < 1.0 or heat > 0.5  # (hot music lifts a calm stage, up to full)
+            else:
+                assert target == 1.0, (stage, heat)
+
+
+def test_calm_heads_keep_their_brightness():
+    """Calmer heads lower a plan's intensity (slower paths, fewer effects), not its brightness."""
+    from amadeus.director.plan import direct
+    from amadeus.director.rules import RuleDirector
+    from amadeus.show.arc import calm_plan
+    from tests.synthetic import synthetic_analysis
+
+    plan = direct(synthetic_analysis(), RuleDirector(), verbose=False)
+    for level in (0, 1):
+        assert [d.brightness for d in calm_plan(plan, level)] == [d.intensity for d in plan]
+        assert [d.brightness for d in calm_plan(calm_plan(plan, level), 0)] == [d.intensity for d in plan]
+
+
+def test_warmup_ambience(tmp_path):
+    """The warm-up with calm heads: a static cozy wash, very slow heads projecting gobos onto the floor."""
+    from amadeus.director.plan import direct
+    from amadeus.director.rules import RuleDirector
+    from amadeus.show.arc import AMBIENT_PALETTES, shape_plan
+    from tests.synthetic import synthetic_analysis
+
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.control({"event": "wedding", "stage": "warmup", "lock": True, "knob": {"movement": 0.1}}, now=0.0)
+    assert arc.plan_shape()[3]
+    arc.control({"knob": {"movement": 0.6}}, now=1.0)
+    assert not arc.plan_shape()[3]  # livelier heads: the director's looks
+    arc.control({"stage": "build", "knob": {"movement": 0.1}}, now=2.0)
+    assert not arc.plan_shape()[3]
+
+    plan = direct(synthetic_analysis(), RuleDirector(), verbose=False)
+    ambient = shape_plan(plan, (0, 4, False, True))
+    assert all(d.palette in AMBIENT_PALETTES and d.par_accent == "none" and d.par_base == "full" for d in ambient)
+    assert all(d.beam_fx in ("gobo", "gobo_rotate") and d.aim == "crowd" and d.intensity == 0 for d in ambient)
+    assert all(d.movement in ("still", "sweep", "circle") for d in ambient)
+    assert [d.brightness for d in ambient] == [d.intensity for d in plan]  # each phrase its own energy

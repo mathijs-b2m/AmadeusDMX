@@ -501,7 +501,8 @@ class LooksMixin:
         if getattr(d, "special", "off") == "stars":
             self._stars(d, t, out)
         self._accents(d, t, out, accent)
-        master = INTENSITY_MASTER[max(0, min(3, d.intensity))] * self.rig["safety"]["master"]
+        level = d.intensity if getattr(d, "brightness", -1) < 0 else d.brightness
+        master = INTENSITY_MASTER[max(0, min(3, level))] * self.rig["safety"]["master"]
         for st in out.values():
             st.dimmer *= master
         return out

@@ -74,6 +74,9 @@ class Decision:
     screen: str = "off"  # LED wall: off | ambient | figure | words | equalizer | psychedelic
     special: str = "off"  # a theme's own look, switched on at key moments: off | stars
     fog: str = "none"  # smoke machines: none | light | medium | heavy | burst (engine/fog.py plays it)
+    # The show arc calms a plan's effects by lowering its intensity; the brightness stays the director's (0..3,
+    # -1: the intensity's own). The arc's intensity knob dims the lights, nothing else.
+    brightness: int = -1
 
     def look(self) -> tuple:
         return tuple(getattr(self, n) for n in LAYER_NAMES)
