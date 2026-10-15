@@ -61,3 +61,15 @@ def test_attack_offset_finds_where_the_hit_is_heard():
         i = int((b + 0.015) * SR)
         audio[i : i + n] = 0.8 * np.sin(2 * np.pi * 60 * np.arange(n) / SR)
     assert abs(attack_offset(audio, SR, beats) - 0.015) < 0.004
+
+
+def test_constant_grid_stays_inside_the_track():
+    """The tracker's last beat half a beat off the grid, right at the end: the grid's beat after it would fall
+    past the last frame (and past the end of every envelope indexed by it)."""
+    fps, period = 50.0, 0.5
+    beats = np.r_[np.arange(0, 100) * period, 99.5 * period]
+    low_rise = np.zeros(int(beats[-1] * fps) + 2)
+    low_rise[np.round(np.arange(0, 100) * period * fps).astype(int)] = 1.0
+    grid = constant_grid(beats, low_rise, fps)
+    assert grid is not None
+    assert np.round(grid * fps).max() < len(low_rise)

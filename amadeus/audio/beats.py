@@ -152,7 +152,8 @@ def constant_grid(beat_times: np.ndarray, low_rise: np.ndarray, fps: float, agre
     first = int(np.ceil((beat_times[0] - phase) / period - 0.5))
     last = int(np.floor((beat_times[-1] - phase) / period + 0.5))
     grid = phase + period * np.arange(first, last + 1)
-    return grid[grid >= 0.0]  # a grid continued back to before the track starts
+    # a grid continued back to before the track starts, or on past its last frame
+    return grid[(grid >= 0.0) & (grid <= (len(low_rise) - 1) / fps)]
 
 
 def refine_beats(beat_frames: np.ndarray, onset_env: np.ndarray, fps: float, span: int = 8) -> np.ndarray:
