@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from amadeus.audio import drums
 from amadeus.audio.dembow import boom, breathers, tac
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director import Decision
@@ -81,6 +82,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, Cine
         self.tac_t, self.tac_s = tac(analysis)
         self.boom_t, self.boom_s = boom(analysis)
         self.breathers = breathers(analysis)
+        # the drum kit (the drums trigger, rock): kick and snare from the separated drums when there are some
+        self.kit = drums.kit(analysis) if any(d.trigger == "drums" for d in plan) else drums.Kit.empty()
         self.hat_t, self.hat_s = analysis.onsets["hat"]
         self.acc_t, self.acc_s = analysis.onsets["accent"]
         self.lead_t, self.lead_s = analysis.onsets.get("lead", (np.zeros(0), np.zeros(0)))

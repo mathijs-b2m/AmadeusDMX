@@ -26,6 +26,9 @@ STAB_GAP_S = 0.35  # accent lights: stabs at least this far apart (no flicker)
 STAB_STANDOUT = 1.4  # a stab: a synth note this much stronger than the notes around it…
 STAB_REST_S = 0.2  # …or one that comes after a rest this long
 STAB_HOLD_S, STAB_RELEASE_S = 0.06, 0.16  # the flash: on at once, held a moment, let go quickly but softly
+STRUM_HOLD_S, STRUM_RELEASE_S = 0.1, 0.3  # a guitar's strum rings a little longer than a synth's stab
+RING_HOLD_S, RING_MIN_S = 0.08, 0.15  # a ringing drum (the snare and its reverb): held a moment, released over
+# its ring (at least this long), and let go before the next hit
 BREAK_MAX_BARS = 8  # a kick break builds over at most this many bars (the ones before the kick returns)
 BREAK_FROM, BREAK_TO = 0.35, 0.85  # kick break: kick-led light holds, building from this level to that
 
@@ -54,13 +57,30 @@ def note_env(times: np.ndarray, strengths: np.ndarray, t: float) -> tuple[float,
     return _release(t - last, level, min(0.4 * gap, 0.6), min(0.5 * gap, 0.8)), i - 1
 
 
-def stab_env(times: np.ndarray, strengths: np.ndarray, t: float) -> float:
+def stab_env(
+    times: np.ndarray, strengths: np.ndarray, t: float, hold: float = STAB_HOLD_S, release: float = STAB_RELEASE_S
+) -> float:
     """A stab played on a key: full at once (two levels), held a moment, let go quickly but softly."""
     i = bisect.bisect_right(times, t)
     if i == 0:
         return 0.0
     level = 1.0 if float(strengths[i - 1]) >= 0.5 else 0.7
-    return _release(t - float(times[i - 1]), level, STAB_HOLD_S, STAB_RELEASE_S)
+    return _release(t - float(times[i - 1]), level, hold, release)
+
+
+def ring_env(times: np.ndarray, strengths: np.ndarray, rings: np.ndarray, t: float) -> tuple[float, int]:
+    """A drum that rings (the snare in its reverb), played as a note: on at once to a quantised level, held a
+    moment, then released over as long as it rings, let go before the next hit. (level, index of the hit)"""
+    i = bisect.bisect_right(times, t)
+    if i == 0:
+        return 0.0, -1
+    last = float(times[i - 1])
+    gap = float(times[i]) - last if i < len(times) else 2.0
+    level = round((0.6 + 0.4 * min(1.0, float(strengths[i - 1]))) * 5) / 5
+    if gap < MIN_GAP_S:
+        return level, i - 1
+    release = min(max(float(rings[i - 1]), RING_MIN_S), 0.85 * gap - RING_HOLD_S)
+    return _release(t - last, level, RING_HOLD_S, release), i - 1
 
 
 def pick_stabs(times: np.ndarray, strengths: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

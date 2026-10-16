@@ -114,7 +114,7 @@ def get_plan(
             "scr" if screen else None,
             "fog" if fog else None,
             "out" if outdoor else None,
-            f"s{style.genre}" if style else None,
+            f"s{style.genre}" + (f"-{style.beat}" if style.beat else "") if style else None,  # (a new beat: replan)
             f"t{theme}" if theme else None,
             _sections_key(a),
         )

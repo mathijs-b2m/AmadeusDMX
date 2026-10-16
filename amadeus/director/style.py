@@ -47,7 +47,8 @@ class Style:
     def keep_beat(self, d) -> bool:
         """The genre's own beat where the music plays a beat: in the body of the track (grooves, verses,
         choruses, drops), instead of any other beat trigger. True if changed."""
-        if not self.beat or d.section not in BEAT_SECTIONS or d.trigger not in BEAT_TRIGGERS:
+        beats = BEAT_TRIGGERS + KIT_ALSO if self.beat == "drums" else BEAT_TRIGGERS
+        if not self.beat or d.section not in BEAT_SECTIONS or d.trigger not in beats:
             return False
         before = (d.trigger, d.par_accent)
         d.trigger = self.beat
@@ -94,6 +95,7 @@ OWN_LOOK_RUN = 2  # a genre's own look for this many phrases in a row at most
 BEAT_SECTIONS = ("groove", "verse", "chorus", "drop")
 # the triggers that play a beat (accents, bars, lead and roll don't: they stay)
 BEAT_TRIGGERS = ("kick", "backbeat", "hats", "eighths", "sixteenths", "synth")
+KIT_ALSO = ("bars",)  # a band: where its drums play, the kit plays them, also where a calm look would only count bars
 
 
 def _style(genre, text, palettes, avoid=None, prefer=None, beat="", looks=None) -> Style:
@@ -234,8 +236,10 @@ STYLES: dict[str, Style] = {
         ),  # fmt: skip
         _style(
             "rock",
-            "Rock: white and amber, like a concert. Punch on the snare and the big hits, light on the stage and "
-            "the band, little movement and few colours; no disco patterns.",
+            "Rock: white and amber, like a concert, and the band plays the light: the drums trigger all through "
+            "the body of the song, the kick on some groups and the snare on others, ringing out with its reverb, "
+            "and a few lights on the guitar's strums. Light on the stage and the band, few colours; no disco "
+            "patterns.",
             ["stage", "fire", "ice"],
             {
                 "par_accent": {"sparkle", "melody"},
@@ -249,11 +253,12 @@ STYLES: dict[str, Style] = {
                 "head_color": ("white", "base"),
                 "beam_fx": ("open", "gobo"),
             },
+            beat="drums",
         ),  # fmt: skip
         _style(
             "metal",
-            "Metal: hard white and red. Fast flicks on the double kick, punches on the snare, light on the stage; "
-            "no soft colours, no disco patterns.",
+            "Metal: hard white and red. The drums trigger: the kick and the snare as two voices, punches on the "
+            "snare; light on the stage; no soft colours, no disco patterns.",
             ["fire", "stage", "ice"],
             {
                 "par_base": {"fade"},
@@ -269,6 +274,7 @@ STYLES: dict[str, Style] = {
                 "head_color": ("white", "base"),
                 "beam_fx": ("open",),
             },
+            beat="drums",
         ),  # fmt: skip
         _style(
             "reggaeton",

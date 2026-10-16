@@ -298,7 +298,7 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 |---|---|
 | `par_base`: pars between hits | off · dim · full · fade |
 | `par_accent`: pars on a hit | none · pulse · color_pop · chase · alternate · sparkle · melody |
-| `trigger`: what a hit is | kick · backbeat · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
+| `trigger`: what a hit is | kick · backbeat · dembow · drums · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
 | `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · off |
 | `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) |
