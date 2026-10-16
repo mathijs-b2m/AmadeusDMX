@@ -42,7 +42,7 @@ private struct RigList: View {
 
     var body: some View {
         List(selection: Binding(get: { model.editingRig }, set: { if let v = $0 { model.editingRig = v; model.editingRigSet = "" } })) {
-            SwiftUI.Section("Rigs") {
+            SwiftUI.Section {
                 ForEach(model.rigs) { r in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(r.name).font(.headline)
@@ -52,12 +52,24 @@ private struct RigList: View {
                     }
                     .tag(Optional(r.name))
                 }
+            } header: {
+                HStack {
+                    Text("Rigs")
+                    Spacer()
+                    Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                        .help("Make a new rig (⌥⌘N)")
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
-            Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
-                .buttonStyle(.borderless).padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // a real button, full width under the list: the first place you look for a new rig
+            Button { model.showNewRig = true } label: {
+                Label("New Rig…", systemImage: "plus").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass).controlSize(.large)
+            .help("Make a new rig: start from an empty room or a template (⌥⌘N)")
+            .padding(10)
         }
     }
 }

@@ -129,7 +129,7 @@ goes (the set), the **rig** (a new one from a template, or one you have), and ho
 - **Rigs:** a list of your rigs (venues). Pick one to edit its structure in 3D. **On this rig** chooses what you
   edit: *the rig alone*, or one of the sets placed on it (where its fixtures hang). **Place a Set** puts another
   set on this rig, auto-mounted or to place by hand: that is the only place auto-mount is offered. *Take Off…*
-  removes a set from the rig. **New Rig…** (under the list) offers templates with a sketch of each (an empty room,
+  removes a set from the rig. **New Rig…** (the big button under the list, the + by "Rigs", or File › New Rig… ⌥⌘N) offers templates with a sketch of each (an empty room,
   two stands, a truss over the booth, a club, a concert stage), sized with sliders.
 - **Show:** the toolbar picker lists the **combinations**: the sets placed on rigs. A show runs one of those;
   there is no picking a set and a rig that were never put together.

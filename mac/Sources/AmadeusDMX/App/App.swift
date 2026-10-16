@@ -83,6 +83,9 @@ struct AppCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("New Set…") { openWindow(id: "wizard") }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("New Rig…") { model.section = .rig; model.showNewRig = true }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(model.workspace == nil)
         }
         CommandMenu("Show") {
             Button(model.engineRunning ? "Stop Show" : "Start Live Show") {
