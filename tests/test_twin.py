@@ -65,15 +65,15 @@ def _run(show, **changes):
 def test_a_twin_with_the_engines_numbers_matches_the_visualiser(show):
     """The engine's prediction is consistent with the DMX it sends: any gap on a real head is its numbers."""
     for axis, c in _run(show).items():
-        assert c["rms"] < 2.5, axis
+        assert c["rms_aligned"] < 2.5, axis  # the lag is checked on its own: a fast motor makes it cost degrees
         assert c["range"] == pytest.approx(1.0, abs=0.03), axis
         assert abs(c["lag_ms"]) < 40, axis
         assert "matches" in twin.verdict(axis, c)
 
 
 def test_a_smaller_range_is_a_range_not_a_delay(show):
-    c = _run(show, tilt__range_deg=220)["tilt"]
-    assert c["range"] == pytest.approx(220 / 270, abs=0.03)
+    c = _run(show, tilt__range_deg=180)["tilt"]
+    assert c["range"] == pytest.approx(180 / show[0].engine_range["tilt"], abs=0.03)
     assert abs(c["lag_ms"]) < 40
     assert "range" in twin.verdict("tilt", c)
 
@@ -112,7 +112,8 @@ def test_apply_writes_the_range_and_keeps_home_on_the_same_dmx_value(tmp_path, m
     notes = twin.apply_to_engine(head, profile, Selection(file=rig_file))
 
     saved = json.loads((lib / "beamz" / "fuze75b-beam.json").read_text())
-    assert saved["physical"]["pan_deg"] == 600 and saved["physical"]["tilt_deg"] == 270
+    tilt_deg = json.loads((ROOT / "fixtures/beamz/fuze75b-beam.json").read_text())["physical"]["tilt_deg"]
+    assert saved["physical"]["pan_deg"] == 600 and saved["physical"]["tilt_deg"] == tilt_deg
     assert saved["motion"]["tilt_speed_dps"] == 120
     fx = json.loads(rig_file.read_text())["fixtures"][0]
     assert fx["pan_home_deg"] == 400  # 360 of 540 is the same DMX value as 400 of 600

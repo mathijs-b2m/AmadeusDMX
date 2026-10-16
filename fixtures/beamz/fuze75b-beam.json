@@ -8,20 +8,21 @@
     "_lumens_note": "estimated: 75 W LED at ~20 lm/W",
     "size_mm": [250, 350, 150],
     "pan_deg": 540,
-    "tilt_deg": 270,
+    "tilt_deg": 225,
     "beam_deg": 2,
     "light": "75 W white LED + colour wheel"
   },
   "motion": {
     "_note": "Measured with `amadeus motion` (per axis). Used to size per-beat moves and to predict where the head is; DMX gets the target slightly ahead and the fixture moves at its own speed.",
     "estimated": false,
-    "pan_speed_dps": 200,
-    "tilt_speed_dps": 160,
-    "accel_dps2": 374,
-    "_measured_tilt": "40\u00b0 full swing per beat at 145 BPM (amadeus motion)",
-    "_measured_pan": "20\u00b0 full swing per beat at 145 BPM (amadeus motion)",
-    "tilt_accel_dps2": 748,
-    "pan_accel_dps2": 374
+    "pan_speed_dps": 700,
+    "tilt_speed_dps": 700,
+    "accel_dps2": 450,
+    "_measured_tilt": "90\u00b0 swing on the beat at 128 BPM covers ~70\u00b0 (tools/twin.py, 2026-10-16); single moves from rest are faster",
+    "_measured_pan": "90\u00b0 swing on the beat covers ~25\u00b0 at 128 BPM, ~75\u00b0 at 90 BPM, all of it at 60 BPM (tools/twin.py, 2026-10-16)",
+    "tilt_accel_dps2": 1300,
+    "pan_accel_dps2": 450,
+    "_twin": "speed and acceleration from the calibrated twin (tools/twin.py)"
   },
   "color_wheel": {
     "_note": "Slot colours as seen on the real fixture (amadeus colors).",
@@ -411,5 +412,27 @@
       14,
       15
     ]
+  },
+  "twin": {
+    "_note": "How the real fixture moves, calibrated with tools/twin.py: what a full DMX sweep turns, top speed, acceleration, braking, the delay from DMX to motion. `motion` is the engine's model of it.",
+    "calibrated": true,
+    "pan": {
+      "range_deg": 540.0,
+      "vmax_dps": 700.0,
+      "accel_dps2": 450.0,
+      "decel_dps2": 450.0,
+      "latency_ms": 120.0,
+      "smooth_ms": 0.0,
+      "slowest": 0.05
+    },
+    "tilt": {
+      "range_deg": 225.0,
+      "vmax_dps": 700.0,
+      "accel_dps2": 1300.0,
+      "decel_dps2": 1300.0,
+      "latency_ms": 120.0,
+      "smooth_ms": 0.0,
+      "slowest": 0.05
+    }
   }
 }
