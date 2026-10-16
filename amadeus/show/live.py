@@ -28,11 +28,14 @@ from amadeus.show.arc import ShowArc
 from amadeus.show.clock import light_lead
 from amadeus.show.mixer import Mixer
 from amadeus.show.sources.base import PhaseLock
+from amadeus.show.standin import NAME as STANDIN
+from amadeus.show.standin import StandIns
 from amadeus.show.tracks import TrackShows
 from amadeus.show.vdj import UDP_PORT, Listener
 from amadeus.web.server import serve as serve_http
 
 DEFAULT_LINK_PORT = 7123
+HANDOVER_S = 0.6  # a deck's stand-in groove crossfades into the track's own show over this long
 DJ_LOOKUP_TRIES = 5  # × 3 s: how long to look for a DJ laptop by name before giving up
 
 
@@ -231,6 +234,9 @@ async def run(
     sender = open_output(rig, None if artnet_ip == "rig" else artnet_ip) if artnet_ip else None
     shows = TrackShows(rig, director, cache, real_output=drives_real_lights(sender, rig))
     follower = DirectorFollower(show, shows) if follow_set else None
+    standins = StandIns(rig, shows.real_output, lambda: shows.set_genre.current or "")
+    handover: dict[int, tuple] = {}  # per deck: (when its own show took over, the stand-in it fades out of)
+    on_standin: set[int] = set()  # decks playing their stand-in groove
     universes = sorted({f["universe"] for f in rig["fixtures"]})
     ids = [e["id"] for e in rig["elements"]]
     period = 1.0 / rig["artnet"].get("fps", 40)
@@ -280,6 +286,13 @@ async def run(
                 parts, decks = [], []
                 for deck in sorted(listener.decks.values(), key=lambda d: d.deck) if alive else []:
                     show = shows.get(deck.file) if deck.file else None  # no file: a track not on this computer
+                    # not prepared yet (loaded late, a streamed copy on its way): a groove on its tempo meanwhile
+                    standin = standins.get(deck) if show is None and (deck.file or deck.bpm > 1) else None
+                    if show is not None and deck.deck in on_standin:  # its own show is ready: fade over to it
+                        handover[deck.deck] = (now, standins.get(deck))
+                    if show is None:
+                        handover.pop(deck.deck, None)
+                    on_standin.discard(deck.deck)
                     decks.append(
                         {
                             "deck": deck.deck,
@@ -292,23 +305,39 @@ async def run(
                             "status": {
                                 **(shows.progress(deck.file) if deck.file else {"missing": True}),
                                 **({"stream": deck.stream, "copy": deck.copy} if deck.stream else {}),
+                                **({"lights": STANDIN} if standin else {}),
                             },
                             "genre": show[0].genre if show else "",
                             "style": show[0].style if show else "",
                         }
                     )
                     weight = deck.vol if deck.play else 0.0
+                    show = show or standin
                     if show is None or weight <= 0.01:
                         continue
                     a, _, engine, _ = show
                     engine.colour_variety, engine.drop_strength = arc.colour_variety(), arc.drop_strength()
                     pos = locks.setdefault(deck.deck, PhaseLock()).at(deck, now, a.beats, deck.file)
+                    if standin:  # the groove loops on the track's beat grid
+                        on_standin.add(deck.deck)
+                        t = standins.position(show, pos + lead)
+                        i, states = engine.render(t)
+                        parts.append((weight, states, deck, show, t, i))
+                        continue
                     if deck.stream_info is not None:  # a copy of a streamed track: lined up with the stream
                         if deck.file not in aligned and getattr(deck.stream_info, "grid", None):
                             aligned[deck.file] = _copy_offset(a, deck)
                         pos += aligned.get(deck.file, 0.0)
                     t = min(max(pos + lead, 0.0), a.duration - 0.05)  # the lights a little ahead (clock.py)
                     i, states = engine.render(t)
+                    since, old = handover.get(deck.deck, (0.0, None))
+                    if old is not None and now - since < HANDOVER_S:  # still fading out of the stand-in groove
+                        k = (now - since) / HANDOVER_S
+                        _, was = old[2].render(standins.position(old, pos + lead))
+                        states = {eid: was[eid].blend(s, k) for eid, s in states.items()}
+                    elif old is not None:
+                        del handover[deck.deck]
+                        print(f"  ♪ deck {deck.deck}: its own show took over from the {old[0].bpm:.1f} BPM groove")
                     if phrase_of.get(deck.deck) != (deck.file, i):  # the log: where the show is vs the DJ software
                         phrase_of[deck.deck] = (deck.file, i)
                         d = show[1][i]
@@ -337,7 +366,7 @@ async def run(
                 shows.set_shape(arc.plan_shape())  # calmer heads, fewer look changes (rebuilt in the background)
                 if parts:
                     bpm = deck.bpm or a.bpm * deck.speed
-                    arc.observe(wall, plan[i], bpm)
+                    arc.observe(wall, *((plan[i], bpm) if used != STANDIN else ()))  # a stand-in tells nothing
                     arc.apply(states, engine, t, period)
                 else:
                     arc.observe(wall)
