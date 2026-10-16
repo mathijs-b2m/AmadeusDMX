@@ -328,6 +328,42 @@ public struct RigDocument: Equatable {
 
     public var width: Double { stage.widthM }
     public var label: String { "\(set) on \(rig)" }
+
+    /// Two fixtures trade places (where each hangs, which way round, on which truss): the check after hanging found
+    /// them hung the other way about. Their gear, patch and calibration stay their own.
+    public mutating func swapPlacements(_ a: String, _ b: String) {
+        guard a != b, let i = fixtures.firstIndex(where: { $0.id == a }), let j = fixtures.firstIndex(where: { $0.id == b }) else { return }
+        let fi = fixtures[i], fj = fixtures[j]
+        for (k, from) in [(i, fj), (j, fi)] {
+            fixtures[k].mount = from.mount; fixtures[k].x = from.x; fixtures[k].yM = from.yM; fixtures[k].zM = from.zM
+            fixtures[k].rotDeg = from.rotDeg; fixtures[k].aim = from.aim; fixtures[k].truss = from.truss
+            fixtures[k].trussPos = from.trussPos; fixtures[k].side = from.side; fixtures[k].mountRoll = from.mountRoll
+            fixtures[k].waiting = from.waiting
+        }
+        // the placement fields the editor doesn't model (reverse, width, group) trade places too
+        let other = Set(Self.placementKeys).subtracting(["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m",
+                                                         "truss_side", "mount_roll_deg"])
+        let ra = rawFixture(a), rb = rawFixture(b)
+        updateRaw(a) { o in for k in other { o[k] = rb[k] } }
+        updateRaw(b) { o in for k in other { o[k] = ra[k] } }
+    }
+
+    /// Calibration fields set on a fixture of the set (pan_invert, pan_home_deg, tilt_invert…).
+    public mutating func calibrate(_ id: String, _ fields: [String: JSONValue]) {
+        updateRaw(id) { o in o.merge(fields) { _, new in new } }
+    }
+
+    public func rawFixture(_ id: String) -> [String: JSONValue] {
+        (raw["fixtures"]?.array ?? []).compactMap(\.object).first { $0["id"]?.string == id } ?? [:]
+    }
+
+    private mutating func updateRaw(_ id: String, _ body: (inout [String: JSONValue]) -> Void) {
+        guard var list = raw["fixtures"]?.array,
+              let i = list.firstIndex(where: { $0.object?["id"]?.string == id }), var o = list[i].object else { return }
+        body(&o)
+        list[i] = .object(o)
+        raw["fixtures"] = .array(list)
+    }
     public var waitingCount: Int { fixtures.filter(\.waiting).count }
 
     public var hasScreen: Bool {

@@ -4,9 +4,11 @@ truss from the stage-left end, on every rig in tests/sets."""
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-from amadeus.rig import automount, hangsheet, store, templates
+from amadeus.library import fixtures as fxlib
+from amadeus.rig import automount, geometry, hangsheet, store, templates
 from amadeus.rig import trusses as T
 
 SETS = sorted(Path("tests/sets").glob("*.json"))
@@ -121,3 +123,76 @@ def test_the_setup_api_serves_it_for_a_saved_rig_and_for_an_editors_layout():
                                  headers={"Content-Type": "application/json"})  # fmt: skip
     page = urllib.request.urlopen(req, timeout=10).read().decode()
     assert "Hang sheet: my-set on my-rig" in page and "ring 1" in page
+
+
+# ---- the check after hanging -----------------------------------------------------------------------------------
+
+
+def _heads(merged: dict):
+    for f in merged["fixtures"]:
+        defn = hangsheet._defn(f)
+        if fxlib.is_moving(defn) and not f.get("mount_roll_deg"):
+            yield {**f, "mode": hangsheet._mode(f, defn)}, defn
+
+
+@pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
+def test_the_check_goes_in_the_sheets_order_and_says_what_to_see(path):
+    merged = mounted(path)
+    steps = hangsheet.check_steps(merged)
+    lay = hangsheet.layout(merged)
+    assert [s["label"] for s in steps] == [r["label"] for st in lay["structures"] for r in st["fixtures"]] + [
+        r["label"] for r in lay["floor"]
+    ]
+    for s in steps:
+        assert bool(s["expect"]) == (s["moving"] and not s["dark"])
+
+
+@pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
+def test_a_head_hung_wrong_shows_at_the_check_and_its_fix_puts_it_right(path):
+    """A real head turned round or mirrored (its pan the other way): its check beam lands in another quarter, the
+    fix the crew picks for what they see makes the app's aim land where it should, at the check and in the show."""
+    targets = [
+        np.array(v, dtype=float) / np.linalg.norm(v) for v in ((0.3, 1, -0.6), (-1, 0.2, -0.3), (0.5, -0.5, -0.7))
+    ]
+    checked = 0
+    merged = mounted(path)
+    for fx, defn in _heads(merged):
+        want = hangsheet.check_dir(fx)
+        aim = hangsheet.check_aim(fx, defn)
+        if float(geometry.fk(fx, defn, *aim) @ want) < 0.97:  # out of this head's reach: not a fair check
+            continue
+        checked += 1
+        step = next(s for s in hangsheet.check_steps(merged) if s["id"] == fx["id"])
+        P = defn["physical"].get("pan_deg", 0) or 0
+        for fault in step["faults"]:  # what the crew sees when it is hung wrong, and the fix they pick for it
+            real = hangsheet._hung_wrong(fx, fault["fix"])
+            assert hangsheet.beam_words(geometry.fk(real, defn, *aim)) == fault["seen"]
+            model = {**fx, **hangsheet.fix(fx, defn, fault["fix"])}  # the app, put right
+            for d in [want, *targets] if P else [want]:
+                dmx = geometry.to_dmx(model, defn, *geometry.ik(model, defn, d, None))
+                assert float(geometry.fk(real, defn, *dmx) @ geometry.fk(model, defn, *dmx)) > 0.999, (fx["id"], fault)
+            assert (
+                float(
+                    geometry.fk(real, defn, *geometry.to_dmx(model, defn, *geometry.ik(model, defn, want, None))) @ want
+                )
+                > 0.97
+            )
+        assert {x["fix"] for x in step["faults"]} == ({"mirrored", "turned", "both"} if P else {"turned"})
+    if path.stem != "small":
+        assert checked
+
+
+def test_the_setup_api_lights_a_head_the_checks_way():
+    from amadeus.web import rig as web
+
+    merged = mounted(Path("tests/sets/ring.json"))
+    head = next(f for f in merged["fixtures"] if fxlib.is_moving(hangsheet._defn(f)))
+    head.setdefault("mode", fxlib.default_mode(hangsheet._defn(head)))
+    steps = [s for s in hangsheet.check_steps(merged) if s["id"] == head["id"]]
+    assert steps and steps[0]["expect"].startswith("Its beam points down towards ") and steps[0]["faults"]
+    buf = bytearray(512)
+    fxlib.test_light(buf, head, aim=hangsheet.check_aim(head, hangsheet._defn(head)))
+    centred = bytearray(512)
+    fxlib.test_light(centred, head)
+    assert buf != centred
+    assert web.POST["/api/hangcheck"] and web.POST["/api/hangcheck/fix"]

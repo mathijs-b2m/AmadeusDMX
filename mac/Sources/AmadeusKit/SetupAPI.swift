@@ -312,6 +312,26 @@ public struct SetupAPI: Sendable {
         return try await post("api/test-light", body)
     }
 
+    /// Light one fixture of a layout (an editor's, saved or not); `point`: a moving head points its beam the way the
+    /// check after hanging says.
+    public func testLight(fixture: String, on: Bool, layout: [String: Any], point: Bool) async throws -> LightTest {
+        try await post("api/test-light", ["fixture": fixture, "rig": layout, "on": on, "point": point])
+    }
+
+    /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
+    public func hangCheck(layout: [String: Any]) async throws -> [HangCheckStep] {
+        struct R: Decodable { var steps: [HangCheckStep] }
+        let r: R = try await post("api/hangcheck", ["rig": layout])
+        return r.steps
+    }
+
+    /// The calibration that puts a head right the check found hung wrong ("mirrored", "turned", "both").
+    public func hangCheckFix(layout: [String: Any], fixture: String, fix: String) async throws -> [String: JSONValue] {
+        struct R: Decodable { var fields: [String: JSONValue] }
+        let r: R = try await post("api/hangcheck/fix", ["rig": layout, "fixture": fixture, "fix": fix])
+        return r.fields
+    }
+
     /// A fixture mode channel by channel, for the DMX mapper.
     public func mapping(key: String, mode: String) async throws -> FixtureMapping {
         try await get("api/fixture/map", query: ["key": key, "mode": mode])
@@ -365,6 +385,24 @@ public struct FixtureMapping: Decodable, Sendable {
 }
 
 /// Where a tested fixture's DMX goes.
+/// One step of the check after hanging (amadeus/rig/hangsheet.py check_steps).
+public struct HangCheckStep: Decodable, Sendable, Identifiable, Hashable {
+    public struct Fault: Decodable, Sendable, Hashable {
+        public var fix: String   // mirrored | turned | both
+        public var seen: String  // where the beam goes then, in words
+    }
+    public var id: String
+    public var label: String
+    public var model: String
+    public var `where`: String
+    public var facing: String
+    public var moving: Bool
+    public var expect: String
+    public var faults: [Fault]
+    public var dark: String      // why it can't be lit (a laser, a smoke machine), or ""
+    public var dmx: String
+}
+
 public struct LightTest: Decodable, Sendable {
     public var on: Bool
     public var seconds: Double

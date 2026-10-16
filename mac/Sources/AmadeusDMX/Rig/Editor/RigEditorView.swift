@@ -26,7 +26,7 @@ struct RigEditorView: View {
                 VStack {
                     Spacer()
                     HStack(alignment: .bottom) {
-                        hint
+                        if editor.check != nil { HangCheckPanel(editor: editor) } else { hint }
                         Spacer()
                         cameraButtons
                     }
@@ -39,6 +39,7 @@ struct RigEditorView: View {
                 .frame(minWidth: 300, idealWidth: 340, maxWidth: 440)
         }
         .onChange(of: undoManager) { editor.undoManager = undoManager }
+        .onDisappear { if editor.check != nil { Task { await editor.stopCheck(model) } } }  // the light goes off
         .onChange(of: model.configVersion) { editor.reloadIfClean() }
         .background {  // ⌘S saves the rig
             Button("") { save() }.keyboardShortcut("s", modifiers: .command).hidden()
@@ -138,6 +139,13 @@ struct RigEditorView: View {
                 .disabled(editor.busy || editor.doc.fixtures.isEmpty)
                 .help("Hang the fixtures that wait in front of the stage: heads on the trusses, lasers high at the back, bars on the floor…")
                 if !editor.doc.set.isEmpty {
+                    Button("Check the Hang", systemImage: "checklist") {
+                        Task { editor.check == nil ? await editor.startCheck(model) : await editor.stopCheck(model) }
+                    }
+                    .buttonStyle(editor.check == nil ? AnyPrimitiveButtonStyle(.glass) : AnyPrimitiveButtonStyle(.glassProminent))
+                    .labelStyle(.iconOnly)
+                    .disabled(editor.busy || editor.doc.fixtures.isEmpty)
+                    .help("The check after hanging: light the fixtures one by one in the hang sheet's order, and put right what was hung the wrong way in the app")
                     Button("Hang Sheet", systemImage: "printer") { Task { await editor.hangSheet(model) } }
                         .buttonStyle(.glass)
                         .labelStyle(.iconOnly)
