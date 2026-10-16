@@ -1,5 +1,6 @@
 // SwiftUI ↔ Metal: the stage view with trackpad/mouse camera control.
 //   drag: orbit · ⌥-drag or two-finger drag with ⌘: pan · scroll / pinch: zoom · double-click: back to the preset
+//   the show also walks and flies: WASD/arrows move, Q/E down/up, +/− zoom, F flies (drag looks around), Esc lands
 import AppKit
 import AmadeusKit
 import MetalKit
@@ -32,6 +33,7 @@ extension StageEditing {
 final class StageMTKView: MTKView {
     weak var renderer: StageRenderer?
     weak var editor: StageEditing?
+    weak var controller: StageController?
     private var last: NSPoint = .zero
     private var dragging = false
 
@@ -116,7 +118,33 @@ final class StageMTKView: MTKView {
 
     override func keyDown(with e: NSEvent) {
         if editor?.key(e) == true { return }
+        if editor == nil, flyKey(e, down: true) { return }
         super.keyDown(with: e)
+    }
+
+    override func keyUp(with e: NSEvent) {
+        renderer?.heldKeys.remove(e.keyCode)
+        super.keyUp(with: e)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        renderer?.heldKeys = []
+        return super.resignFirstResponder()
+    }
+
+    /// The show's walking and flying keys (not the rig editor's: its keys edit the rig).
+    private func flyKey(_ e: NSEvent, down: Bool) -> Bool {
+        guard let renderer, e.modifierFlags.isDisjoint(with: [.command, .control]) else { return false }
+        if StageRenderer.Key.movement.contains(e.keyCode) {
+            renderer.heldKeys.insert(e.keyCode)
+            return true
+        }
+        guard !e.isARepeat else { return false }
+        switch e.keyCode {
+        case 3: controller?.fly.toggle(); return true                       // F
+        case 53 where renderer.fly: controller?.fly = false; return true    // Esc
+        default: return false
+        }
     }
 
     override func mouseDragged(with e: NSEvent) {
@@ -141,7 +169,9 @@ final class StageMTKView: MTKView {
     }
 
     override func scrollWheel(with e: NSEvent) {
-        if e.hasPreciseScrollingDeltas {  // trackpad: two-finger scroll orbits, like turning a model
+        if e.hasPreciseScrollingDeltas && !e.modifierFlags.isDisjoint(with: [.option, .command]) {
+            renderer?.zoom(1 - Float(e.scrollingDeltaY) * 0.01)   // ⌥/⌘ + two-finger scroll: zoom
+        } else if e.hasPreciseScrollingDeltas {  // trackpad: two-finger scroll orbits, like turning a model
             renderer?.orbit(dx: Float(-e.scrollingDeltaX) * 1.5, dy: Float(-e.scrollingDeltaY) * 1.5)
         } else {
             renderer?.zoom(1 - Float(e.scrollingDeltaY) * 0.04)
@@ -164,6 +194,13 @@ final class StageController: ObservableObject {
     @Published var haze: Double = 0.6 { didSet { renderer?.haze = Float(haze) } }
     @Published var exposure: Double = 1.0 { didSet { renderer?.exposure = Float(exposure) } }
     @Published var autoOrbit = false { didSet { renderer?.autoOrbit = autoOrbit } }
+    /// Fly through the room: you are the camera.
+    @Published var fly = false {
+        didSet {
+            renderer?.fly = fly
+            if fly, let v = view { v.window?.makeFirstResponder(v) }   // the keys go to the stage
+        }
+    }
     var workLight: Float = 0 { didSet { renderer?.workLight = workLight } }
     @Published var wallScene: WallScene = .auto { didSet { renderer?.wallScene = wallScene } }
 
@@ -183,6 +220,7 @@ final class StageController: ObservableObject {
         r.haze = Float(haze)
         r.exposure = Float(exposure)
         r.autoOrbit = autoOrbit
+        r.fly = fly
         r.workLight = workLight
         r.wallScene = wallScene
         r.setPreset(preset, animated: false)
@@ -197,6 +235,7 @@ struct StageView: NSViewRepresentable {
         if let r = StageRenderer(view: v) {
             v.renderer = r
             v.editor = controller.editor
+            v.controller = controller
             controller.view = v
             controller.attach(r)
             context.coordinator.renderer = r
