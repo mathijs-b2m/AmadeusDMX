@@ -194,13 +194,13 @@ output line and the Set page's *DMX output* open the window too.
 ## Performance: the lights first
 
 The 3D stage is by far the heaviest part of the app. Measured during a live show on a 60-head rig, the light
-engine took about 10% of one core (0.4 W of CPU power); the 3D stage about 35% of a core (0.8 W) plus its GPU
-work and the window server's compositing of it. That is several times what the lights themselves cost.
+engine took about 10% of one core; the 3D stage about 35% of a core plus its GPU work and the window server's
+compositing of it. That is several times what the lights themselves cost.
 
 - **Show modes** (Show menu): *Perform + Visualise*, *Perform Only* (the lights, no 3D stage: the computer's
   power goes to the show) and *Visualise Only* (no DMX).
 - **Power meter:** while a show runs, the sidebar's engine panel shows the light engine and the 3D stage side by
-  side: CPU use, CPU power and the stage's GPU load (measured per process every 2 s, no admin rights needed).
+  side: CPU use and the stage's GPU load (measured per process every 2 s, no admin rights needed).
 - **Warning:** with the lights on and the 3D stage open, the panel warns when the stage takes clearly more
   than the lights (over twice), or the Mac is on battery, in Low Power Mode or getting hot, and offers
   *Perform Only* in one click. On a laptop or a smaller Mac, use Perform Only for a gig.

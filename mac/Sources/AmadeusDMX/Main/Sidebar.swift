@@ -106,20 +106,20 @@ struct PowerLine: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            row("Lights", power.engine.cpu, power.engine.watts, gpu: nil)
-            if stageOn { row("3D stage", power.stage.cpu, power.stage.watts, gpu: power.gpu) }
+            row("Lights", power.engine.cpu, gpu: nil)
+            if stageOn { row("3D stage", power.stage.cpu, gpu: power.gpu) }
         }
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
-        .help("CPU use (100% = one core) and CPU power of the light engine and of the app's 3D stage, and the GPU time the "
+        .help("CPU use (100% = one core) of the light engine and of the app's 3D stage, and the GPU time the "
               + "stage takes. Measured every \(Int(PowerMeter.interval)) s.")
     }
 
     // one line each, however narrow the sidebar: a taller footer would push the show's timeline out of the window
-    private func row(_ name: String, _ cpu: Double, _ watts: Double, gpu: Double?) -> some View {
+    private func row(_ name: String, _ cpu: Double, gpu: Double?) -> some View {
         HStack(spacing: 6) {
             Text(name).frame(width: 58, alignment: .leading)
-            Text(String(format: "%.0f%% CPU · %.1f W", cpu * 100, watts) + (gpu.map { String(format: " · GPU %.0f%%", $0 * 100) } ?? ""))
+            Text(String(format: "%.0f%% CPU", cpu * 100) + (gpu.map { String(format: " · GPU %.0f%%", $0 * 100) } ?? ""))
                 .lineLimit(1).minimumScaleFactor(0.75)
         }
     }

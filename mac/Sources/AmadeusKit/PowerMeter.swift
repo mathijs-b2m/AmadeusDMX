@@ -1,5 +1,6 @@
-// What the show costs the computer, split between the light engine and the 3D stage: CPU use and CPU power per
-// process (proc_pid_rusage: no admin rights needed), and the stage's GPU load (its own measured GPU time).
+// What the show costs the computer, split between the light engine and the 3D stage: CPU use per process
+// (proc_pid_rusage: no admin rights needed), and the stage's GPU load (its own measured GPU time). No watts: the
+// kernel's per-process estimate covers the CPU only, so it left out the GPU and compositing the 3D stage costs.
 // The 3D stage can easily cost several times what the lights do; on a laptop or a smaller Mac that matters
 // during a gig, so the app shows it and suggests Perform Only when it adds up.
 import Darwin
@@ -11,8 +12,7 @@ import Observation
 @Observable
 public final class PowerMeter {
     public struct Load: Equatable, Sendable {
-        public var cpu: Double = 0    // share of one core, 0..n
-        public var watts: Double = 0  // CPU power
+        public var cpu: Double = 0  // share of one core, 0..n
     }
 
     public private(set) var engine = Load()
@@ -26,7 +26,7 @@ public final class PowerMeter {
 
     /// Seconds of GPU time the 3D stage has used so far (the renderer adds its frames' GPU time).
     @ObservationIgnored public var gpuSeconds: Double = 0
-    @ObservationIgnored private var last: (t: Double, engine: (Double, Double)?, app: (Double, Double)?, gpu: Double)?
+    @ObservationIgnored private var last: (t: Double, engine: Double?, app: Double?, gpu: Double)?
     @ObservationIgnored private var timer: Timer?
 
     public static let interval: TimeInterval = 2
@@ -58,9 +58,9 @@ public final class PowerMeter {
         let e = enginePid.flatMap(Self.usage), a = Self.usage(getpid())
         if let l = last {
             let dt = max(now - l.t, 1e-3)
-            func load(_ x: (Double, Double)?, _ y: (Double, Double)?) -> Load {
+            func load(_ x: Double?, _ y: Double?) -> Load {
                 guard let x, let y else { return Load() }
-                return Load(cpu: max(0, (y.0 - x.0) / dt), watts: max(0, (y.1 - x.1) / dt))
+                return Load(cpu: max(0, (y - x) / dt))
             }
             engine = load(l.engine, e)
             stage = load(l.app, a)
@@ -73,8 +73,8 @@ public final class PowerMeter {
         hot = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
     }
 
-    /// CPU seconds and CPU energy (joules) a process has used so far; nil if it's gone (or not ours).
-    nonisolated static func usage(_ pid: Int32) -> (Double, Double)? {
+    /// CPU seconds a process has used so far; nil if it's gone (or not ours).
+    nonisolated static func usage(_ pid: Int32) -> Double? {
         var info = rusage_info_v6()
         let ok = withUnsafeMutablePointer(to: &info) { p in
             p.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V6, $0) }
@@ -82,8 +82,7 @@ public final class PowerMeter {
         guard ok == 0 else { return nil }
         var tb = mach_timebase_info_data_t()
         mach_timebase_info(&tb)
-        let cpu = Double(info.ri_user_time + info.ri_system_time) * Double(tb.numer) / Double(tb.denom) / 1e9
-        return (cpu, Double(info.ri_energy_nj) / 1e9)
+        return Double(info.ri_user_time + info.ri_system_time) * Double(tb.numer) / Double(tb.denom) / 1e9
     }
 
     nonisolated static func batteryPowered() -> Bool {
