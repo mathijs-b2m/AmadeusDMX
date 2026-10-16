@@ -12,6 +12,7 @@ enum Genre {
         case "rock", "metal": "guitars"
         case "hiphop", "rnb": "music.mic"
         case "jazz", "funk": "music.note.list"
+        case "disco": "sparkles"
         case "pop", "latin", "reggaeton": "music.note"
         default: "waveform"
         }

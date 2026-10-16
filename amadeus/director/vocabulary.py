@@ -50,8 +50,12 @@ PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 
     ),
     # only offered when a genre's style asks for them (amadeus/director/style.py)
     "gold": (
-        "Gold, amber and deep purple. Classy, warm, hip-hop, soul, disco.",
+        "Gold, amber and deep purple. Classy, warm, hip-hop, soul, funk.",
         [(1.0, 0.65, 0.1), (0.55, 0.0, 0.9), (1.0, 0.85, 0.45), (0.9, 0.3, 0.6)],
+    ),
+    "disco": (
+        "Hot pink, violet, gold and turquoise. Glitter: a lit-up dance floor, disco.",
+        [(1.0, 0.0, 0.55), (0.55, 0.0, 1.0), (1.0, 0.7, 0.05), (0.0, 0.85, 0.8)],
     ),
     "stage": (
         "Warm white, amber and deep blue. A concert stage: rock, live bands.",

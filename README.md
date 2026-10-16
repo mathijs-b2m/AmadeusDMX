@@ -225,14 +225,14 @@ tested on, and exactly what that permission is used for: [docs/dj-software.md](d
 
 ## Genres and programs
 
-Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, dnb, dubstep, hiphop, rnb, pop, rock, metal, reggaeton, latin, funk, jazz), shown with the track in the app and the visualiser:
+Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, dnb, dubstep, hiphop, rnb, pop, rock, metal, reggaeton, latin, disco, funk, jazz), shown with the track in the app and the visualiser:
 
 1. **your choice** (`amadeus genre TRACK GENRE`, kept in `config/genres.json`);
 2. the **Decisions API**, given the artist and title (from the file's tags, or its name), when there's a key and it is reasonably sure (30% with the artist known: torn between pop and edm for Coldplay is still far better than a tempo guess). A title alone ("Symphony") has to be very sure, and a beat-less genre (cinematic, classical, ambient) only counts when the audio has no groove either;
 3. a **genre tag** in the file;
-4. the **audio**, as the fallback. Reggaeton first, by its **dembow**: the snare on the 16th before the second beat and on its "and" (3+3+2), where house and pop put theirs on the beat. Then how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
+4. the **audio**, as the fallback. Reggaeton first, by its **dembow**: the snare on the 16th before the second beat and on its "and" (3+3+2), where house and pop put theirs on the beat. Then **disco**, by its sound: its beat is house's, but the style model of the instrument recognition (EffNet-Discogs, with the models installed) hears the band, the strings and the bass guitar's octaves. Disco sounds like disco to it 0.39–0.76 on average and more like disco than like funk or house for most of the track; house stays under 0.33. Then how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
 
-A Latin call from the Decisions API or a tag, on a track whose audio plays the dembow, becomes reggaeton.
+A Latin call from the Decisions API or a tag, on a track whose audio plays the dembow, becomes reggaeton. A funk or house call on a track that unmistakably sounds like disco becomes disco.
 
 ### A house style per genre
 
@@ -240,7 +240,8 @@ Every genre has a **style sheet** ([amadeus/director/style.py](amadeus/director/
 - which palettes the genre uses (techno: cool, ice and fire; hip-hop: gold and purple; rock: a white and amber `stage` look);
 - which looks don't fit it (no spinning prisms or colour cycling in techno, no strobing light in jazz or ambient, no soft fades in hardstyle);
 - what to use instead;
-- a few lines describing the style.
+- a few lines describing the style;
+- for a few genres, a beat or a look of its own: reggaeton's boom-tac, disco's four-to-the-floor kick and its **mirror ball** in the break (the heads fanned over the crowd, circling slowly, their dots gobos turning).
 
 A style is a **lean, not a rule**: the genre sets the colours, and the music of each part decides the moves, because a song is not one genre all the way through (a piano ballad part, then a mainstage drop).
 - The **rule director** uses the genre's palettes everywhere. It swaps a look's misfits only in the grooves, the body of a genre; intros, breakdowns, buildups and drops follow their own music.

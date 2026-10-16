@@ -41,26 +41,44 @@ class Style:
     avoid: dict[str, frozenset] = field(default_factory=dict)  # per layer: options that don't fit
     prefer: dict[str, tuple] = field(default_factory=dict)  # per layer: what to use instead (taken in turn)
     beat: str = ""  # a trigger that IS the genre (reggaeton: boom-tac): not a lean, the beat of its body
+    looks: dict[str, dict] = field(default_factory=dict)  # per section: the genre's own look there (disco's
+    # mirror ball in the break), every layer it names
 
     def keep_beat(self, d) -> bool:
         """The genre's own beat where the music plays a beat: in the body of the track (grooves, verses,
         choruses, drops), instead of any other beat trigger. True if changed."""
         if not self.beat or d.section not in BEAT_SECTIONS or d.trigger not in BEAT_TRIGGERS:
             return False
+        before = (d.trigger, d.par_accent)
         d.trigger = self.beat
         if d.par_accent in ("none", "melody", "sparkle") and d.section != "verse":
             d.par_accent = "pulse"  # the pars play it (a verse may stay calm)
-        return True
+        return (d.trigger, d.par_accent) != before
+
+    def own_look(self, d, history=()) -> bool:
+        """The genre's own look for this section, if it has one (disco: the mirror ball in the break), for
+        OWN_LOOK_RUN phrases in a row at most: a moment, not the whole track. True if changed."""
+        look = self.looks.get(d.section, {})
+        recent = list(history)[-OWN_LOOK_RUN:]
+        if len(recent) == OWN_LOOK_RUN and all(all(getattr(h, k) == v for k, v in look.items()) for h in recent):
+            return False
+        changed = False
+        for layer, value in look.items():
+            if getattr(d, layer) != value:
+                setattr(d, layer, value)
+                changed = True
+        return changed
 
     def allows(self, layer: str, value: str) -> bool:
         return value not in self.avoid.get(layer, ())
 
-    def adjust(self, d, k: int) -> bool:
+    def adjust(self, d, k: int, history=()) -> bool:
         """The genre's colours for decision `d`, and in a groove its misfits swapped for what fits (k: rotates
-        the choice). True if changed."""
+        the choice; history: the decisions so far). True if changed."""
         changed = self.keep_beat(d)
         if d.palette not in self.palettes:
             d.palette, changed = self.palettes[k % len(self.palettes)], True
+        changed = self.own_look(d, history) or changed
         if d.section not in ("groove", "verse", "chorus"):
             return changed  # intros, breakdowns, bridges, buildups and drops: their own music decides
         for layer, bad in self.avoid.items():
@@ -72,12 +90,13 @@ class Style:
         return changed
 
 
+OWN_LOOK_RUN = 2  # a genre's own look for this many phrases in a row at most
 BEAT_SECTIONS = ("groove", "verse", "chorus", "drop")
 # the triggers that play a beat (accents, bars, lead and roll don't: they stay)
 BEAT_TRIGGERS = ("kick", "backbeat", "hats", "eighths", "sixteenths", "synth")
 
 
-def _style(genre, text, palettes, avoid=None, prefer=None, beat="") -> Style:
+def _style(genre, text, palettes, avoid=None, prefer=None, beat="", looks=None) -> Style:
     return Style(
         genre,
         text,
@@ -85,7 +104,14 @@ def _style(genre, text, palettes, avoid=None, prefer=None, beat="") -> Style:
         {k: frozenset(v) for k, v in (avoid or {}).items()},
         {k: tuple(v) for k, v in (prefer or {}).items()},
         beat,
+        dict(looks or {}),
     )
+
+
+# Disco's mirror ball: the heads fanned out over the crowd, circling slowly with their dots turning, light steady
+# (a rig without a gobo wheel turns open beams). Its break: the strings and the voice carry, the kick rests.
+MIRROR_BALL = {"beam_fx": "gobo_rotate", "gobo_style": "dots", "movement": "circle", "formation": "fan",
+               "aim": "crowd", "head_light": "steady", "head_color": "white"}  # fmt: skip
 
 
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
@@ -264,9 +290,40 @@ STYLES: dict[str, Style] = {
             {"movement": ("swing", "figure8", "circle"), "par_base": ("dim", "full")},
         ),  # fmt: skip
         _style(
+            "disco",
+            "Disco: the mirror ball and the lit-up dance floor. Glitter colours (hot pink, violet, gold, "
+            "turquoise); the four-to-the-floor kick leads, the pars step through colours on it like a dance "
+            "floor (colour pops, chases, ping-pong) and are never dark; the heads turn round, swinging paths, "
+            "sweeps and circles, never hard or nervous. In the break the mirror ball turns: dots spinning slowly "
+            "over the crowd from fanned, circling heads. Open beams and prisms on the big choruses. It shines "
+            "and swings, it never hammers.",
+            ["disco", "gold", "neon", "warm"],
+            {
+                "par_base": {"off"},
+                "par_accent": {"none", "melody"},
+                "movement": {"nod", "bounce", "ballyhoo", "step_on_beat"},
+                "head_light": {"flick", "random", "beat"},
+                "beam_fx": {"gobo_shake", "gobo_spin", "frost"},
+                "gobo_style": {"shapes", "curves"},
+            },
+            {
+                "par_base": ("dim", "full"),
+                "par_accent": ("color_pop", "chase", "alternate", "pulse"),
+                "movement": ("circle", "swing", "sweep", "figure8"),
+                "head_light": ("steady", "pulse"),
+                "beam_fx": ("prism", "gobo_rotate", "open"),
+                "gobo_style": ("dots",),
+            },
+            beat="kick",
+            looks={
+                "breakdown": MIRROR_BALL,
+                "bridge": MIRROR_BALL,
+            },
+        ),  # fmt: skip
+        _style(
             "funk",
-            "Funk and disco: glitter and groove. Gold and neon, swinging movement, colour pops and chases, dots "
-            "and prisms like a mirror ball.",
+            "Funk: groove and swagger. Gold and neon, swinging movement, colour pops and chases on the bass and "
+            "the horns, light that dances with the band.",
             ["gold", "neon", "warm"],
             {"movement": {"nod", "still"}, "par_base": {"off"}},
             {"movement": ("swing", "circle", "bounce"), "par_base": ("dim", "full")},
@@ -322,6 +379,12 @@ def check() -> list[str]:
         for layer, bad in s.avoid.items():
             if layer in options and not options[layer] - bad:
                 out.append(f"{s.genre}: nothing left for {layer}")
+        for section, look in s.looks.items():
+            for layer, v in look.items():
+                if layer not in known:
+                    out.append(f"{s.genre}: {section} layer {layer}")
+                elif layer in options and v not in options[layer]:
+                    out.append(f"{s.genre}: {section} {layer}={v}")
     return out
 
 

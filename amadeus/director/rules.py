@@ -318,7 +318,7 @@ class RuleDirector:
             head_trigger=head_trigger,
         )
         if self.style:
-            self.style.adjust(d, n_before)
+            self.style.adjust(d, n_before, history)
         if self.outdoor:
             apply_open_sky(d, n_before)
         if self.theme == "stars":  # a starfield in the calm parts and as each drop lands

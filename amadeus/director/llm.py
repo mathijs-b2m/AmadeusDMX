@@ -145,6 +145,8 @@ class OpenAIDirector:
             d.trigger, guarded = "accents", True
         elif self.style and self.style.keep_beat(d):  # the genre's own beat (reggaeton: boom-tac)
             guarded = True
+        if self.style and self.style.own_look(d, history):  # the genre's own look (disco: the mirror ball)
+            guarded = True
         if d.movement == "follow_lead":  # retired option (old cached answers)
             d.movement, guarded = "sweep", True
 
