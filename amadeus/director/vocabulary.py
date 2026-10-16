@@ -95,6 +95,12 @@ TRIGGERS = [
         "kick (boom, its 1/8 runs too) in the base colour, the others on the snare's dembow (tac) in the accent "
         "colour. Where the beat drops out for a moment the light pauses, and the beat's return hits on all.",
     ),
+    (
+        "drums",
+        "The drum kit, for rock and metal: the rig plays kick and snare as two voices, whole groups each: some on "
+        "the kick in the base colour, the others on the snare in the accent colour, ringing out with its reverb; "
+        "a few lights flash on the guitar's strums.",
+    ),
     ("hats", "Hi-hats: an energetic groove; the lights still switch on the kick (never blinking per hat)."),
     ("accents", "Only big hits and impacts: sparse and dramatic."),
     ("bars", "Only the first beat of each bar: slow and stately."),
