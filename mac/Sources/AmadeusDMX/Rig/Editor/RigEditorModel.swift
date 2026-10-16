@@ -584,6 +584,22 @@ final class RigEditorModel: StageEditing {
         await lightCheck(model)
     }
 
+    /// The fixtures on the spots they already take, put in name order along the rig: top1 at the first place,
+    /// top2 at the next (the hang sheet's order), so a name and a place count the same way.
+    func putInOrder(_ model: AppModel) async {
+        busy = true
+        defer { busy = false }
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            guard let layout = try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any] else { return }
+            let places = try await model.api.inOrderPlacements(layout: layout)
+            apply(places, name: "Put in Name Order")
+            message = places.isEmpty ? "Already in name order" : "\(places.count) fixtures in name order now"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
     /// Placements (fixture id → position fields, as in a rig file) onto the fixtures.
     func apply(_ places: [String: [String: JSONValue]], trusses: [Truss]? = nil, name: String) {
         change(name) { d in

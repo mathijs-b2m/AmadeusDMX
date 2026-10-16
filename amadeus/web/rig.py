@@ -254,11 +254,14 @@ def _generated(g: dict) -> dict:
 def automount(req):
     """{"ids": [...]} (else the fixtures not mounted yet; "all": true for every one): mount the set's fixtures
     on the rig. Returns the new placements and the rig as it is now. With "rig": a combined dict (an editor's
-    unsaved layout), only the placements come back and nothing is saved."""
+    unsaved layout), only the placements come back and nothing is saved; with "order": true as well, the mounted
+    fixtures stay on their spots, put in name order along the rig (automount.in_order)."""
     from amadeus.rig import automount as am
     from amadeus.rig import manage, store
 
     b = req.body()
+    if isinstance(b.get("rig"), dict) and b.get("order"):  # only put the mounted ones in name order on their spots
+        return {"placements": am.in_order(b["rig"], b.get("ids")), "trusses": None}
     if isinstance(b.get("rig"), dict):
         merged = b["rig"]
         ids = b.get("ids") or [f["id"] for f in merged.get("fixtures", []) if b.get("all") or f.get(store.UNPLACED)]

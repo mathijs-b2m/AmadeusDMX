@@ -349,7 +349,7 @@ def _strip_svg(st: dict) -> str:
 
 
 def _table(rows: list[dict], with_label: bool = True) -> str:
-    head = ("<tr>" + ("<th>Label</th>" if with_label else "") + "<th>Fixture</th><th>Model</th><th>Where</th>"
+    head = ("<tr>" + ("<th>Label</th>" if with_label else "") + "<th>Name</th><th>Model</th><th>Where</th>"
             "<th>Which way round</th><th>DMX</th><th>Mode</th></tr>")  # fmt: skip
     body = "".join(
         "<tr>"
@@ -438,8 +438,9 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
     p.append("<p class='note'>Stage left (SL) and stage right (SR) are the performer's, facing the audience: "
              "standing in the audience, stage left is on your right. The plan is seen from above with the audience "
              "at the bottom; the truss drawings are seen from the audience. Distances are to the fixture's clamp, "
-             "in metres from the named end of the truss. A label (“front 3”) is the truss and the place counted "
-             "from that end. Close is good enough: what matters is that every fixture is on the right truss, in the "
+             "in metres from the named end of the truss. A label (“front 3”) is where a fixture goes: the truss and "
+             "the place counted from that end. Its name (“top3”) is what the app calls it, for the DMX patch. "
+             "Close is good enough: what matters is that every fixture is on the right truss, in the "
              "right order, the right way round, with its DMX address and mode set.</p>")  # fmt: skip
     if lay["waiting"]:
         p.append(
@@ -480,7 +481,7 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
     p.append("<section><h2>DMX patch</h2><p class='sub'>Set each fixture to this address and mode before it goes up. "
              "The universe is the DMX line it is on.</p>" + _outputs(merged))  # fmt: skip
     p.append(
-        "<table><tr><th>Universe</th><th>Address</th><th>Channels</th><th>Label</th><th>Fixture</th>"
+        "<table><tr><th>Universe</th><th>Address</th><th>Channels</th><th>Label</th><th>Name</th>"
         "<th>Model</th><th>Mode</th></tr>"
     )
     for r in lay["patch"]:
