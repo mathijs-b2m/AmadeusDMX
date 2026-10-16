@@ -6,6 +6,7 @@ import struct
 import sys
 import time
 import types
+from pathlib import Path
 
 import pytest
 
@@ -147,6 +148,35 @@ def test_a_track_no_longer_on_a_deck_is_skipped(fetcher):
     wait(fetcher, b)
     assert [c for c in calls if c[0] == "search"] == [("search", "6I9"), ("search", "b")]  # one by one, not "a"
     assert "a" not in fetcher.state  # asked for again later, it is queued again
+
+
+def test_a_track_just_loaded_is_found_by_title_and_kept_once_the_library_knows_it(fetcher):
+    calls = []
+    fake(fetcher, {"same": 198.82}, calls)
+    guess = streamed.guessed("Toxic", "Britney Spears", 200.0)  # the deck's clocks: 00:00 and -03:20
+    assert fetcher.file(guess) == ""  # loaded, not played: fetched now
+    wait(fetcher, guess)
+    copy = fetcher.file(guess)
+    assert copy.endswith(f"Britney Spears - Toxic [streamed-{guess.id}].webm")  # within the clocks' second
+    assert fetcher.file(TOXIC) == copy  # played: djay knows it now, and the copy is the same recording
+    assert [c for c in calls if c[0] == "search"] == [("search", guess.id)]  # not fetched again
+    link = fetcher.folder / "Britney Spears - Toxic [spotify-6I9].webm"
+    assert link.is_symlink() and link.resolve() == Path(copy).resolve()  # found by its own name next time
+    assert fetcher.file(TOXIC) == str(link)
+
+
+def test_a_guess_that_is_another_version_is_fetched_again_by_isrc(fetcher):
+    calls = []
+    fake(fetcher, {"edit": 200.4}, calls)
+    guess = streamed.guessed("Toxic", "Britney Spears", 200.0)
+    fetcher.file(guess)
+    wait(fetcher, guess)
+    assert fetcher.file(guess)  # taken: the clocks can't tell 200.4 from 200
+    fake(fetcher, {"same": 198.82}, calls)
+    assert fetcher.file(TOXIC) == ""  # 1.6 s off the exact length: another version, fetched again
+    wait(fetcher, TOXIC)
+    assert fetcher.file(TOXIC).endswith("[spotify-6I9].webm")
+    assert not list(fetcher.folder.glob("*streamed-*"))
 
 
 def test_saved_settings_and_the_command_line(tmp_path):

@@ -13,6 +13,12 @@ length matches the streamed track's within LENGTH_MATCH_S (an edit, a radio vers
 are seconds off), preferably within EXACT_S. A search by ISRC first; else by artist and title, the label's own
 upload preferred. Only tracks loaded on a deck are fetched, one request at a time, GAP_S apart.
 
+djay only records a streamed track in its library once it plays. So a track the DJ has just loaded, that is
+neither a file on this computer nor in djay's library yet, is looked for by its artist and title, its length
+read from the deck's clock (to the second): a guess (`guessed`). When djay then records it, with its ISRC
+and exact length, the guess's copy is checked against that: the same length, and it is kept (the show made
+from it plays on); another version, and the copy is fetched again by ISRC.
+
 Needs yt-dlp (`pip install -e '.[streamed]'`); copies are M4A, which macOS decodes itself (ffmpeg only for
 the WebM a few videos come in). Only fetch audio you are allowed to copy; the copy is
 for analysis on this computer, the music the audience hears is the DJ software's own stream.
@@ -21,6 +27,7 @@ for analysis on this computer, the music the audience hears is the DJ software's
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import queue
 import re
@@ -36,6 +43,7 @@ from amadeus.show.sources.resolve import words
 
 FOLDER = paths.CACHE / "streamed"
 LENGTH_MATCH_S = 1.0  # the copy's length vs the stream's: further off is another version (edit, intro, …)
+GUESS_SLACK_S = 1.0  # more for a guess: its length comes from the deck's clock, to the second
 EXACT_S = 0.1  # this close: the same master (most are within 30 ms); between the two, try one more candidate
 DOWNLOADS = 2  # at most this many candidates downloaded per track
 GAP_S = 3.0  # at least this long between two requests to YouTube (search or download)
@@ -60,10 +68,23 @@ class Stream:
     length: float = 0.0  # seconds
     bpm: float = 0.0  # the DJ software's own tempo for it, when it has analysed it
     grid: tuple[float, float] | None = None  # the DJ software's beat grid of the stream: (a beat's time, seconds/beat)
+    guess: bool = False  # known from the deck only (not in the DJ software's library yet): no ISRC, length to the s
 
     @property
     def name(self) -> str:
         return f"{self.artist} - {self.title}".strip(" -")
+
+    @property
+    def slack(self) -> float:
+        """How far a copy's length may be off this one's and still be the same recording."""
+        return LENGTH_MATCH_S + (GUESS_SLACK_S if self.guess else 0.0)
+
+
+def guessed(title: str, artist: str, length: float) -> Stream:
+    """A track on a deck the DJ software's library doesn't know yet (djay records a streamed track only once it
+    plays), with its length from the deck's clock: looked for by artist and title until the library knows it."""
+    key = hashlib.sha1(f"{artist}\n{title}".encode()).hexdigest()[:12]
+    return Stream("streamed", key, title, artist, length=length, guess=True)
 
 
 def enabled() -> bool:
@@ -273,7 +294,7 @@ class VdjStreams:
 def score(stream: Stream, hit: dict) -> float | None:
     """How likely a search result is the streamed recording itself; None: it isn't (wrong length, or a version)."""
     length = hit.get("duration")
-    if not length or (stream.length and abs(length - stream.length) > LENGTH_MATCH_S + 1.0):
+    if not length or (stream.length and abs(length - stream.length) > stream.slack + 1.0):
         return None  # search results round to whole seconds: the download is checked exactly
     title = set(words(hit.get("title") or ""))
     want = set(words(stream.title))
@@ -324,6 +345,13 @@ class Fetcher:
         if (self.state.get(s.id) == "done" or s.id not in self.state) and (f := self.cached(s)):
             self.state[s.id] = "done"
             return f
+        if not s.guess and s.id not in self.state:  # perhaps found by its title before the library knew it
+            g = guessed(s.title, s.artist, s.length)
+            if self.state.get(g.id) in ("waiting", "running"):
+                self.asked[g.id] = time.monotonic()
+                return ""  # that copy is on its way: checked against this one when it is in
+            if f := self._adopt(s, g):
+                return f
         with self.lock:
             if s.id in self.offline_at and time.monotonic() - self.offline_at[s.id] > OFFLINE_RETRY_S:
                 del self.offline_at[s.id], self.state[s.id]  # perhaps back online: once more
@@ -331,6 +359,35 @@ class Fetcher:
                 self.state[s.id] = "waiting"
                 self.queue.put(s)
         return ""
+
+    def _adopt(self, s: Stream, g: Stream) -> str:
+        """The guess's copy, when it is the same recording as `s` (its length): kept under its own name (the
+        show made from it plays on), and linked under s's (found next time). "": none, or another version."""
+        f = self.cached(g)
+        if not f:
+            return ""
+        f = Path(f)
+        try:
+            length = float(json.loads(f.with_suffix(".json").read_text()).get("length") or 0.0)
+        except (OSError, ValueError):
+            length = 0.0
+        if s.length and length and abs(length - s.length) > LENGTH_MATCH_S:
+            print(f"  ⚠ {s.name}: the copy found by its title is another version ({length - s.length:+.1f} s vs "
+                  f"{s.service.title()}): looking again by ISRC", flush=True)  # fmt: skip
+            f.unlink(missing_ok=True)
+            f.with_suffix(".json").unlink(missing_ok=True)
+            self.state.pop(g.id, None)
+            return ""
+        link = f.with_name(self._stem(s) + f.suffix)
+        link.unlink(missing_ok=True)
+        link.symlink_to(f.name)
+        meta = {"stream": s.__dict__, "copy_of": f.name, "length": length,
+                "fetched": time.strftime("%Y-%m-%d %H:%M:%S")}  # fmt: skip
+        link.with_suffix(".json").write_text(json.dumps(meta, indent=1))
+        self.state[s.id] = "done"
+        delta = f"{(length - s.length) * 1000:+.0f} ms vs {s.service.title()}" if s.length and length else "same"
+        print(f"  ✓ {s.name}: the copy found by its title is the same recording ({delta})", flush=True)
+        return str(f)
 
     def _work(self):
         while True:
@@ -350,7 +407,8 @@ class Fetcher:
     def _fetch(self, s: Stream):
         t0 = time.monotonic()
         try:
-            print(f"  ⇣ {s.name}: streamed from {s.service.title()}, looking for the same recording …", flush=True)
+            how = "not in the library yet, by artist and title" if s.guess else f"streamed from {s.service.title()}"
+            print(f"  ⇣ {s.name}: {how}, looking for the same recording …", flush=True)
             hits = self._search(s)
             if not hits:
                 raise LookupError("no copy of the same length found")
@@ -361,22 +419,23 @@ class Fetcher:
                     continue
                 f, length = got
                 off = abs(length - s.length) if s.length else 0.0
-                if off <= LENGTH_MATCH_S and (best is None or off < best[0]):
+                if off <= s.slack and (best is None or off < best[0]):
                     if best:
                         best[1].unlink(missing_ok=True)
                     best = (off, f, hit, length)
                 else:
                     f.unlink(missing_ok=True)  # another version after all
-                if best and best[0] <= EXACT_S:
-                    break  # the same length to the frame: the same recording
+                if best and best[0] <= (s.slack if s.guess else EXACT_S):
+                    break  # the same length to the frame (a guess: to the second): the same recording
             if best is None:
                 raise LookupError("no download of the same length")
             off, f, hit, length = best
             keep = f.with_name(self._stem(s) + f.suffix)
             f.rename(keep)
-            delta = f"{(length - s.length) * 1000:+.0f} ms vs {s.service.title()}" if s.length else "length unknown"
+            vs = "the deck's clock" if s.guess else s.service.title()
+            delta = f"{(length - s.length) * 1000:+.0f} ms vs {vs}" if s.length else "length unknown"
             print(f"  ✓ {s.name}: copy from YouTube {hit['id']} ({delta}, {time.monotonic() - t0:.1f} s)", flush=True)
-            if off > EXACT_S:
+            if off > EXACT_S and not s.guess:
                 print("    (its length differs a little: a slightly different master; on SYNC the beat corrects it)")
             meta = {"stream": s.__dict__, "youtube": hit["id"], "channel": hit.get("channel"),
                     "length": length, "fetched": time.strftime("%Y-%m-%d %H:%M:%S")}  # fmt: skip

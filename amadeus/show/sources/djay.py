@@ -21,6 +21,8 @@ position to it (base.PhaseLock): the label picks the beat, Link gives the exact 
 
 A track djay streams (Spotify) has no file. djay's library says which recording it is (Spotify id, ISRC,
 length): we fetch a local copy of that same recording once (streamed.py, needs yt-dlp) and light it from that.
+djay records a streamed track there only once it plays: one just loaded (no file, not in the library) is
+looked for by its artist and title, its length from the deck's clocks, so its show is ready before play.
 
 This is off unless switched on (Settings ▸ Integrations ▸ Streamed tracks in the Mac app, or `--opt streamed=1`):
 it downloads from YouTube, which is the user's own call to make.
@@ -41,7 +43,7 @@ from urllib.parse import unquote, urlparse
 
 from amadeus.show.sources.base import Deck, Source
 from amadeus.show.sources.resolve import Resolver, length_of
-from amadeus.show.sources.streamed import DjayStreams, Fetcher, enabled
+from amadeus.show.sources.streamed import DjayStreams, Fetcher, enabled, guessed
 
 BUNDLE = "com.algoriddim.djay"
 LIBRARY = Path.home() / "Music/djay/djay Media Library.djayMediaLibrary/MediaLibrary.db"
@@ -285,15 +287,23 @@ class Djay(Source):
         for n in w.decks():
             title, artist = w.value(f"Title, Deck {n}") or "", w.value(f"Artist, Deck {n}") or ""
             info = self.info.setdefault(n, {})
-            if (title, artist) != (info.get("title"), info.get("artist")) or (title and not info.get("file")):
-                file = self.library.find(title, artist) if title else ""
-                file = self.resolver.find(file, artist, title)
+            guess = getattr(info.get("stream"), "guess", False)  # until djay's library knows it: asked again
+            if (title, artist) != (info.get("title"), info.get("artist")) or (title and not info.get("file")) or guess:
+                known = self.library.find(title, artist) if title else ""
+                file = self.resolver.find(known, artist, title)
                 stream = self.streams.find(title, artist) if title and not file else None
+                if stream is None and title and not (known or file) and self.fetcher and self.resolver.ready.is_set():
+                    stream = self._guess(n, title, artist)  # loaded, not played yet: not in djay's library yet
                 if stream and self.fetcher:
                     file = self.fetcher.file(stream)  # "" while the copy is being fetched
                 if stream and stream.id != getattr(info.get("stream"), "id", None):  # said once per track
                     how = "fetching a copy to light it" if self.fetcher else NO_YTDLP if self.streamed else OFF
-                    print(f"  deck {n}: {stream.name} streams from {stream.service.title()}: {how}", flush=True)
+                    how = "lit from its copy" if file and self.fetcher else how
+                    if stream.guess:
+                        why = "isn't on this computer nor in djay's library yet (streamed, not played yet?)"
+                        print(f"  deck {n}: {stream.name} {why}: looking for a copy by artist and title", flush=True)
+                    else:
+                        print(f"  deck {n}: {stream.name} streams from {stream.service.title()}: {how}", flush=True)
                 length = (stream.length if stream else 0.0) or ((length_of(file) or 0.0) if file else 0.0)
                 info.update(title=title, artist=artist, file=file, length=length, stream=stream)
             if (stream := info.get("stream")) and self.fetcher:
@@ -303,6 +313,18 @@ class Djay(Source):
             info["bpm"] = w.bpm(n)
             info["sync"] = w.value(f"Sync, Deck {n}") == "Active"
             self.heads.setdefault(n, Playhead()).set_speed(1.0 + tempo, now)
+
+    def _guess(self, n: int, title: str, artist: str):
+        """The deck's track as far as its window tells: title, artist and its length (elapsed + remaining)."""
+        elapsed = clock(self.window.value(f"Elapsed time, Deck {n}"))
+        remaining = self.window.value(f"Remaining time, Deck {n}") or ""
+        left = clock(remaining) if remaining.strip().startswith("-") else None
+        if elapsed is None or not left:
+            return None
+        old = self.info.get(n, {}).get("stream")
+        if old is not None and old.guess and (old.title, old.artist) == (title, artist):
+            return old  # the same guess: its length as first read
+        return guessed(title, artist, float(elapsed + left))
 
     def _reading(self, now: float):
         readings = []

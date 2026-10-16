@@ -63,3 +63,73 @@ def test_pause_holds_the_position():
     run(head, 0.0, 3.5)
     head.set_play(False, 3.5)
     assert abs(head.at(10.0) - head.at(3.5)) < 1e-9 and abs(head.at(3.5) - 3.5) < 0.06
+
+
+class FakeWindow:
+    def __init__(self, labels: dict):
+        self.labels = labels
+
+    def value(self, label):
+        return self.labels.get(label)
+
+    def decks(self):
+        return [1]
+
+    def bpm(self, n):
+        return 0.0
+
+
+def test_a_streamed_track_is_fetched_as_soon_as_it_is_loaded(capsys):
+    """djay records a Spotify track in its library only once it plays: loaded and paused, it is looked for by
+    artist and title (length from the deck's clocks); once djay knows it, its copy is checked and kept."""
+    import threading
+
+    from amadeus.show.sources import djay
+    from amadeus.show.sources.base import DeckBook
+    from amadeus.show.sources.streamed import Stream
+
+    class Library:
+        def find(self, title, artist):
+            return ""  # djay's library: no file of it
+
+    class Resolver:
+        ready = threading.Event()
+
+        def find(self, path, artist, title):
+            return ""  # not on this computer
+
+    class Streams:
+        known = {}
+
+        def find(self, title, artist):
+            return self.known.get((title, artist))
+
+    class Fetcher:
+        asked = []
+
+        def file(self, s):
+            self.asked.append(s)
+            return "/cache/streamed/copy.m4a" if len(self.asked) > 1 else ""
+
+        def status(self, s):
+            return "done" if len(self.asked) > 1 else "waiting"
+
+    d = djay.Djay.__new__(djay.Djay)
+    d.window = FakeWindow({"Title, Deck 1": "Toxic", "Artist, Deck 1": "Britney Spears", "Elapsed time, Deck 1":
+                           "00:00", "Remaining time, Deck 1": "-03:20", "Play / Pause, Deck 1": None})  # fmt: skip
+    d.library, d.resolver, d.streams, d.fetcher = Library(), Resolver(), Streams(), Fetcher()
+    d.streamed, d.info, d.heads, d.xfader, d.link = True, {}, {}, 0.5, None
+    d.book, d.latency, d.packets = DeckBook(), 0.0, 0
+    d.resolver.ready.set()
+    d._slow(0.0)
+    guess = d.fetcher.asked[0]
+    assert guess.guess and (guess.title, guess.artist, guess.length) == ("Toxic", "Britney Spears", 200.0)
+    d._slow(0.2)  # the copy is in: the deck has its file while still paused
+    d._reading(0.2)
+    deck = d.decks[1]
+    assert deck.file == "/cache/streamed/copy.m4a" and not deck.play and deck.length == 200.0
+    real = Stream("spotify", "6I9", "Toxic", "Britney Spears", "US1", 198.8)
+    Streams.known[("Toxic", "Britney Spears")] = real
+    d._slow(0.4)  # played: djay's library knows it now
+    assert d.fetcher.asked[-1] is real and d.info[1]["stream"] is real and d.info[1]["length"] == 198.8
+    assert "looking for a copy by artist and title" in capsys.readouterr().out
