@@ -265,6 +265,22 @@ public struct SetupAPI: Sendable {
         return (r.placements, r.trusses)
     }
 
+    /// The hang sheet of a layout (a combined set-on-rig dict, saved or not): a printable HTML page saying where
+    /// every fixture goes, its DMX address and labels for it.
+    public func hangSheet(layout: [String: Any], set: String, rig: String) async throws -> Data {
+        var req = URLRequest(url: base.appending(path: "api/hangsheet"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = 30
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["rig": layout, "names": [set, rig]])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard (resp as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("text/html") == true else {
+            let _: [String: JSONValue] = try decode(data)  // throws the engine's error
+            throw SetupAPIError.server("The engine sent no hang sheet.")
+        }
+        return data
+    }
+
     /// Free start addresses for `count` fixtures of a mode: tightly packed, or on easy-to-dial numbers.
     public func suggest(key: String, mode: String, count: Int, universe: Int = 1) async throws -> [Int] {
         struct R: Decodable { var packed: [Int]?; var easy: [Int]? }

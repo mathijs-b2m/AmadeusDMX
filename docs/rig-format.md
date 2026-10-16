@@ -154,6 +154,17 @@ of the same name the first time the engine or the Mac app runs.
 Every row is symmetric and each model is mirrored around the middle. Fixtures that are already mounted keep
 their place, and their room on a truss is left free.
 
+## Hang sheet
+
+A set designed in the app still has to be hung for real. The hang sheet (`amadeus/rig/hangsheet.py`) is the paperwork for
+the crew, one printable HTML page: a plan of the stage from above (the audience at the bottom), per truss and tower a
+drawing and a table (which fixture goes where, measured from a named end, on which side, which way round), the
+fixtures on the floor and on stands, the DMX patch to set on each fixture, and labels to stick on them. A fixture's
+label is where it goes: its truss and its place counted from the stage-left end (`front 3`). Stage left is the
+performer's left (x = 0); distances are to the clamp, and being 10–20 cm off doesn't matter: the order along the
+truss, the way round and the address do. In the Mac app: the printer button in the rig editor (it prints the layout
+as it is, saved or not); on the command line: `amadeus rig --hang-sheet [FILE]`.
+
 ## Setup API
 
 The setup pages and the Mac app use these (all JSON; `?rig=…&set=…` picks a pair other than the active one):
@@ -164,4 +175,5 @@ The setup pages and the Mac app use these (all JSON; `?rig=…&set=…` picks a 
 | `POST /api/sets` | `{"active"}` switch · `{"name", "copy"\|"grid"}` create · `{"rename", "to"}` · `{"delete"}` |
 | `POST /api/rigs` | `{"active"}` switch · `{"name", "template", "width", "height", "depth", "screen"\|"copy"}` create · `{"rename", "to"}` · `{"delete"}` |
 | `GET /api/rig`, `POST /api/rig` | the set on the rig, combined (see above) |
+| `GET /api/hangsheet`, `POST /api/hangsheet` | the hang sheet (HTML) of the pair; posted `{"rig": <combined dict>, "names": [set, rig]}`: of that layout |
 | `POST /api/automount` | `{"ids"?, "all"?}` mount and save; with `"rig": <combined dict>` only compute the placements |

@@ -137,6 +137,13 @@ struct RigEditorView: View {
                 .buttonStyle(.glass)
                 .disabled(editor.busy || editor.doc.fixtures.isEmpty)
                 .help("Hang the fixtures that wait in front of the stage: heads on the trusses, lasers high at the back, bars on the floor…")
+                if !editor.doc.set.isEmpty {
+                    Button("Hang Sheet", systemImage: "printer") { Task { await editor.hangSheet(model) } }
+                        .buttonStyle(.glass)
+                        .labelStyle(.iconOnly)
+                        .disabled(editor.busy || editor.doc.fixtures.isEmpty)
+                        .help("The hang sheet for the crew: where every fixture goes on which truss, which way round, its DMX address, and labels to stick on them. Opens in your browser to print or save as PDF")
+                }
                 Toggle(isOn: $editor.showZones) { Label("Zones", systemImage: editor.showZones ? "eye" : "eye.slash") }
                     .toggleStyle(.button)
                     .buttonStyle(.glass)

@@ -53,6 +53,9 @@ def add_commands(sub) -> dict:
     p.add_argument("--screen", action="store_true", help="an LED wall behind the DJ")
     p.add_argument("--automount", action="store_true", help="mount the active set's fixtures that aren't yet")
     p.add_argument("--all", action="store_true", help="with --automount: re-mount every fixture")
+    p.add_argument("--hang-sheet", nargs="?", const="", metavar="FILE",
+                   help="write the hang sheet of the active set on this rig (where every fixture goes, its DMX "
+                   "address, labels) as a printable HTML file (default: hang-sheet-SET-RIG.html)")  # fmt: skip
 
     p = sub.add_parser(
         "library", help="list fixture definitions, or search/add from the QLC+ and Open Fixture libraries"
@@ -121,7 +124,7 @@ def sets_command(args):
 def rigs_command(args):
     from amadeus.rig import manage, store
 
-    if not args.name and not args.automount:
+    if not args.name and not args.automount and args.hang_sheet is None:
         for i in store.rig_info():
             mark = "▶" if i["active"] else " "
             parts = [f"{i['width_m'] or '?'} m wide", f"{i['trusses']} trusses"]
@@ -144,6 +147,15 @@ def rigs_command(args):
         places = manage.mount(show, everything=args.all)
         print(f"Mounted {len(places)} fixtures of the set '{show.set}' on the rig '{show.rig}'"
               + (" (all were mounted already)" if not places else ""))  # fmt: skip
+    if args.hang_sheet is not None:
+        from pathlib import Path
+
+        from amadeus.rig import hangsheet
+
+        show = store.current()
+        out = Path(args.hang_sheet or f"hang-sheet-{show.set}-{show.rig}.html")
+        out.write_text(hangsheet.html(show.load(), show.set, show.rig))
+        print(f"Hang sheet of the set '{show.set}' on the rig '{show.rig}': {out} (open it in a browser to print)")
 
 
 def _grid_rig(args) -> dict:

@@ -7,7 +7,7 @@ amadeus live    [--dmx] [--remote …]     follow VirtualDJ (the AmadeusLink plu
 amadeus setup   [--lan]                  web UI for fixtures, node and stage
 
 amadeus set [NAME] [--copy-of SET | --grid MODEL:COUNT]   your gear: list, switch or create sets
-amadeus rig [NAME] [--template T] [--automount]          the venue: list, switch, create rigs; mount the set
+amadeus rig [NAME] [--template T] [--automount] [--hang-sheet]   the venue: rigs; mount the set; print where it hangs
 amadeus library [WORDS] [--add KEY]                       fixture library: ours, QLC+, Open Fixture Library
 amadeus patch MODEL[:COUNT] …                             patch fixtures into the active set
 

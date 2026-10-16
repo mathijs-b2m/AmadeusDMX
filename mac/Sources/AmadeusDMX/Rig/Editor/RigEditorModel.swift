@@ -467,6 +467,24 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    /// The hang sheet of the layout as it is now (saved or not), opened in the browser to print or save as PDF:
+    /// where every fixture goes, which way round, its DMX address, and labels for the fixtures.
+    func hangSheet(_ model: AppModel) async {
+        busy = true
+        defer { busy = false }
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            guard let layout = try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any] else { return }
+            let page = try await model.api.hangSheet(layout: layout, set: doc.set, rig: doc.rig)
+            let url = FileManager.default.temporaryDirectory.appending(path: "Hang Sheet – \(doc.set) on \(doc.rig).html")
+            try page.write(to: url)
+            NSWorkspace.shared.open(url)
+            message = doc.waitingCount > 0 ? "\(doc.waitingCount) fixtures aren’t mounted yet: they’re not on the sheet" : "Hang sheet opened in your browser"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
     /// Placements (fixture id → position fields, as in a rig file) onto the fixtures.
     func apply(_ places: [String: [String: JSONValue]], trusses: [Truss]? = nil, name: String) {
         change(name) { d in
