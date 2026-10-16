@@ -560,14 +560,14 @@ function deckLine(d) {
   const s = d.status || {}, esc = t => String(t).replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
   const run = st => st === "running" && s.elapsed != null ? " " + mmss(s.elapsed) : "";
   const ai = s.ai === "running" ? ` ${s.ai_done || 0}/${s.ai_total || "…"}` : s.ai === "done" ? ` ${s.ai_total}` : "";
-  const lights = s.lights ? (s.lights === "rules" ? "quick plan" : "AI plan") : "dark";
+  const lights = s.lights ? ({rules: "quick plan", tempo: "tempo groove"}[s.lights] || "AI plan") : "dark";
   return `<div class="deck"><b>Deck ${d.deck} ${d.play ? "▶" : "⏸"}</b> <span>${esc(d.track)}</span>
     <span>${Math.round(d.vol * 100)}%</span>
     ${s.stream ? stepChip(`${s.stream[0].toUpperCase()}${s.stream.slice(1)} copy`, s.copy === "waiting" ? "running" : s.copy) : ""}
     ${stepChip("analysis", s.analysis === "running" ? "running" : (s.analysis || (d.ready ? "done" : "running")))}
     ${stepChip("instruments", s.stems, run(s.stems))}
-    ${stepChip("AI plan", s.ai || (s.lights && s.lights !== "rules" ? "done" : undefined), ai + run(s.ai))}
-    <span class="step ${s.lights ? (s.lights === "rules" ? "running" : "done") : "wait"}">lights: ${lights}</span></div>`;
+    ${stepChip("AI plan", s.ai || (s.lights && s.lights !== "rules" && s.lights !== "tempo" ? "done" : undefined), ai + run(s.ai))}
+    <span class="step ${s.lights ? (s.lights === "rules" || s.lights === "tempo" ? "running" : "done") : "wait"}">lights: ${lights}</span></div>`;
 }
 
 function onFrame(msg) {

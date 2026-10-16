@@ -62,7 +62,7 @@ struct DeckRow: View {
                              extra: s.ai == "running" ? "\(s.aiDone ?? 0)/\(s.aiTotal.map(String.init) ?? "…")" : nil)
                     Spacer()
                     if let l = s.lights {
-                        Text(l == "openai" ? "AI plan" : l == "rules" ? "quick plan" : l)
+                        Text(l == "openai" ? "AI plan" : l == "rules" ? "quick plan" : l == "tempo" ? "tempo groove" : l)
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                 }
