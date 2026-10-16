@@ -29,6 +29,8 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     public var shape: String?
     public var diameterM: Double?
     public var arcDeg: Double?
+    /// Where the heads on it play: "audience" or "down"; nil: automatic (down when it hangs over the crowd).
+    public var aim: String?
 
     /// The usual round truss sizes (any other works too) and arcs.
     public static let ringDiameters: [Double] = [2, 3, 4, 5, 6, 8]
@@ -36,7 +38,7 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, type, lengthM = "length_m", xM = "x_m", yM = "y_m", zM = "z_m", rotDeg = "rot_deg", vertical
-        case shape, diameterM = "diameter_m", arcDeg = "arc_deg"
+        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", aim
     }
 
     public init(id: String, lengthM: Double, xM: Double, yM: Double, zM: Double, rotDeg: Double = 0, vertical: Bool = false) {
@@ -57,6 +59,7 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         shape = try c.decodeIfPresent(String.self, forKey: .shape)
         diameterM = try c.decodeIfPresent(Double.self, forKey: .diameterM)
         arcDeg = try c.decodeIfPresent(Double.self, forKey: .arcDeg)
+        aim = try c.decodeIfPresent(String.self, forKey: .aim)
         normalise()
     }
 
@@ -67,6 +70,15 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         t.shape = "circle"; t.diameterM = diameter; t.arcDeg = arc
         t.normalise()
         return t
+    }
+
+    /// A truss this far in front of the stage edge hangs over the crowd (amadeus/rig/trusses.py OVER_CROWD_M).
+    public static let overCrowdM = 1.0
+
+    /// Where the heads on it play, automatic resolved: "audience", "down", or nil (wherever the director aims).
+    public var lightAim: String? {
+        if let aim, aim == "audience" || aim == "down" { return aim }
+        return !vertical && yM >= Self.overCrowdM ? "down" : nil
     }
 
     public var isRing: Bool { shape == "circle" && !vertical }

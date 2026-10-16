@@ -5,7 +5,8 @@ circle's shape (any director's plan, nothing extra to choose):
 
 - fan → a **crown**: every beam out of the circle, the way its head faces, the whole crown twisting one way and
   back with the movement (over the crowd: a chandelier of beams; up: a sunburst). The crown is squeezed into
-  the front of the room so the back of the ring doesn't shine at the DJ (`back_guard`);
+  the front of the room so the back of the ring doesn't shine at the DJ (`back_guard`), more so on a ring set to
+  play towards the audience; a ring playing down (over the crowd) keeps the whole crown, steeply down;
 - focus → a **cone**: every beam towards one point on the ring's axis, moving with the movement (a tunnel of
   light, not one spot: the beams keep a small circle apart);
 - cross → a **twister**: every beam across the circle to a point turned a little further round, so together
@@ -26,6 +27,8 @@ from amadeus.rig import trusses as T
 
 RING_FORMATIONS = ("fan", "focus", "cross", "wave")
 CROWN_FRONT_DEG = 100.0  # the crown squeezed into the front of the room: azimuths within ±this (back_guard on)
+CROWN_AUDIENCE_DEG = 70.0  # …and on a ring set to play towards the audience (the truss's aim), always,
+CROWN_AUDIENCE_MAX_DEG = 80.0  # its twist never past this either side (past 90°: back towards the stage)
 CROWN_TWIST = 0.6  # how far the crown twists with the movement (share of the aim's swing)
 CONE_SPREAD = 0.35  # the cone's beams keep this share of the ring's radius apart at its point
 TWIST_DEG, TWIST_SWING_DEG = 45.0, 30.0  # the twister: how far round its beams reach past straight across, ± swing
@@ -60,6 +63,7 @@ class RingsMixin:
                     "angle": a,
                     "frac": frac,
                     "full": T.is_full_ring(t),
+                    "aim": T.light_aim(t),
                 }
             )
         self._order_pars_on_rings(rings, fixtures)
@@ -92,7 +96,9 @@ class RingsMixin:
         front of the room unless beams may point back."""
         az = 90.0 - math.degrees(ring["angle"])
         az = (az + 180.0) % 360.0 - 180.0
-        if self.stage.get("back_guard", True):
+        if ring.get("aim") == "audience":
+            az *= CROWN_AUDIENCE_DEG / 180.0
+        elif ring.get("aim") != "down" and self.stage.get("back_guard", True):  # over the crowd: all round it
             az *= CROWN_FRONT_DEG / 180.0
         return az
 
@@ -101,6 +107,8 @@ class RingsMixin:
         swing)."""
         if f in ("fan", "wave"):  # the crown
             az = self._crown_az(ring) + u * aim["az_amp"] * CROWN_TWIST
+            if ring.get("aim") == "audience":
+                az = np.clip(az, -CROWN_AUDIENCE_MAX_DEG, CROWN_AUDIENCE_MAX_DEG)
             el = aim["el"] + v * aim["el_amp"]
             return self._direction_v(az, el)
         R = ring["radius"]

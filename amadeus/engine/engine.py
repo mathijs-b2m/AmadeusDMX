@@ -109,6 +109,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, Cine
         self.zones = zones.Zones(rig)  # where beams may (not) go: drawn in the rig editor
         self.head_fx = [(fixtures[e["fixture"]], fxlib.get(fixtures[e["fixture"]]["fixture"])) for e in self.heads]
         self._init_high_risk(rig, fixtures)
+        self._init_truss_aims(rig, fixtures)
         self._init_rings(rig, fixtures)
         self._init_groups(rig)
         self._init_lasers(rig, fixtures)

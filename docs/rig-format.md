@@ -90,6 +90,13 @@ and the formations take its shape: `fan` is a crown of beams out of the circle, 
 `sync` and `mirror` stay as they are. Pars on a full ring chase round it. Auto-mount spreads fixtures evenly round a
 full circle; strobes and blinders stay on a straight truss when there is one.
 
+**Where a truss's heads play.** A horizontal truss can say where the moving heads on it aim: `"aim": "audience"`
+(out towards the crowd, never back at the stage: a director's aim at the stage becomes the crowd, and a ring's crown
+stays in front of it) or `"aim": "down"` (onto the crowd under it: the director's crowd and stage aims become
+straight down, a ring's crown hangs down all round it; an aim at the sky still goes up). Without `aim` it is
+automatic: a truss whose centre is at least 1 m in front of the stage edge hangs over the crowd and plays down, any
+other plays wherever the director aims. The rig editor sets it per truss (Lights › Aim).
+
 Coordinates are metres: `x` across the stage (a fixture's `x` is a fraction of `stage.width_m`, a truss's `x_m`
 is metres), `y` towards the audience (0 = the stage's front edge, the back is negative), `z` height.
 
