@@ -391,7 +391,7 @@ final class AppModel {
     /// The running show's rig, or a preview of the selected set.
     func stageInput() -> StageInput? {
         if let h = feed.hello, feed.state == .connected {
-            return StageInput(key: "show:\(h.fixtures.count):\(h.stage.widthM):\(h.screen):\(h.trusses.count)", fixtures: h.fixtures,
+            return StageInput(key: "show:\(h.stage.widthM):\(h.screen):\(StageInput.layout(h.fixtures, h.trusses))", fixtures: h.fixtures,
                               stage: h.stage, screen: h.screen, hello: h, trusses: h.trusses,
                               zones: showZones ? h.zones : [])
         }
@@ -403,7 +403,7 @@ final class AppModel {
         let key = "\(rig)/\(set)"
         if let c = previewCache, c.key == key { return c.input }
         guard let ws = workspace, let p = ws.preview(rig: rig, set: set) else { return nil }
-        let inp = StageInput(key: "preview:\(key):\(p.fixtures.count):\(p.trusses.count)", fixtures: p.fixtures, stage: p.stage,
+        let inp = StageInput(key: "preview:\(key):\(StageInput.layout(p.fixtures, p.trusses))", fixtures: p.fixtures, stage: p.stage,
                              screen: p.screen, hello: nil, trusses: p.trusses)
         previewCache = (key, inp)
         return inp
