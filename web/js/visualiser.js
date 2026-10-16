@@ -24,7 +24,10 @@ function onHello(msg) {
   show = msg;
   // how big the rig is: the camera, floor grid and back wall follow (a DJ booth or a 16 m truss grid)
   const ps = msg.fixtures.map(f => f.pos);
-  show.ext = {top: Math.max(2, ...ps.map(p => p[2])), back: Math.min(-1, ...ps.map(p => p[1])) - 1.5};
+  const trussBack = (msg.trusses || []).map(t => t.vertical ? t.y_m          // the back wall clears the trusses too
+    : t.shape === "circle" ? t.y_m - (t.diameter_m || 4) / 2                  // (a ring: its whole circle, to be safe)
+    : t.y_m - Math.abs(Math.sin((t.rot_deg || 0) * Math.PI / 180)) * (t.length_m || 2) / 2);
+  show.ext = {top: Math.max(2, ...ps.map(p => p[2])), back: Math.min(-1, ...ps.map(p => p[1]), ...trussBack) - 1.5};
   $("waiting").style.display = "none";
   $("track").textContent = msg.track;
   $("bpm").textContent = `${msg.bpm} BPM`;
@@ -278,13 +281,25 @@ function drawScenery(P, st) {
                 ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
 }
 
-// a 30 cm box truss (quatro): four chords with lacing; vertical ones stand on a base plate
+// a 30 cm box truss (quatro): four chords with lacing; vertical ones stand on a base plate, round ones follow the arc
 function drawTruss(P, t, line) {
   const r = (t.rot_deg || 0) * Math.PI / 180, L = t.length_m || 2, h = 0.15, col = "#3a3f4e";
   if (t.vertical) {
     const z0 = 0, z1 = (t.z_m || 0) + L / 2;
     for (const [dx, dy] of [[-h, -h], [h, -h], [h, h], [-h, h]]) line([t.x_m + dx, t.y_m + dy, z0], [t.x_m + dx, t.y_m + dy, z1], col);
     for (let z = 0.25; z < z1; z += 0.5) line([t.x_m - h, t.y_m - h, z], [t.x_m + h, t.y_m - h, z + 0.25], "#2a2e3a");
+    return;
+  }
+  if (t.shape === "circle") {  // a round truss: the chords follow the arc (amadeus/rig/trusses.py), its middle
+    const R = (t.diameter_m || 4) / 2, arc = Math.min(360, t.arc_deg || 360) * Math.PI / 180;  // facing the audience
+    const ring = (u, sv, sz) => { const a = r + Math.PI / 2 - u / R, q = R + sv;
+                                  return [t.x_m + q * Math.cos(a), t.y_m + q * Math.sin(a), t.z_m + sz]; };
+    const C = arc * R, n = Math.max(12, Math.ceil(C / 0.3));
+    for (let k = 0; k < n; k++) {
+      const u0 = -C / 2 + C * k / n, u1 = -C / 2 + C * (k + 1) / n;
+      for (const [sv, sz] of [[-h, -h], [h, -h], [h, h], [-h, h]]) line(ring(u0, sv, sz), ring(u1, sv, sz), col);
+      if (k % 2 === 0) { line(ring(u0, -h, -h), ring(u1, -h, h), "#2a2e3a"); line(ring(u0, h, -h), ring(u1, h, h), "#2a2e3a"); }
+    }
     return;
   }
   const ax = [Math.cos(r), Math.sin(r)], nx = [-Math.sin(r), Math.cos(r)];

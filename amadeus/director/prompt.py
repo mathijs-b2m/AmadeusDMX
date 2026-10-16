@@ -175,6 +175,10 @@ def build_prompt(
             f"Keep its colours, so the set looks like one show. For movement and light, let the music of THIS "
             f"phrase decide (a song changes: a quiet piano part, a big drop), leaning towards the style where it fits."
         )
+    if groups and len(groups) == 1 and groups[0]["kind"] == "ring":
+        from amadeus.rig.groups import RING_NOTE
+
+        parts.append(f"The RIG: {len(groups[0]['ids'])} moving heads round a circle truss.\n" + RING_NOTE.strip())
     if groups and len(groups) > 1:
         from amadeus.rig.groups import describe as describe_groups
 

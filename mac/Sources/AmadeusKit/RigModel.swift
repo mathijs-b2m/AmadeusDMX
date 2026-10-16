@@ -23,9 +23,20 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     public var zM: Double
     public var rotDeg: Double = 0
     public var vertical: Bool = false
+    /// "circle": a round truss, hung flat (amadeus/rig/trusses.py): a full circle or an arc of `arcDeg` of
+    /// `diameterM`, centred on xM/yM, the middle of the arc facing the audience (turned by rotDeg); lengthM is the
+    /// length round the arc and follows the two.
+    public var shape: String?
+    public var diameterM: Double?
+    public var arcDeg: Double?
+
+    /// The usual round truss sizes (any other works too) and arcs.
+    public static let ringDiameters: [Double] = [2, 3, 4, 5, 6, 8]
+    public static let ringArcs: [Double] = [360, 180]
 
     enum CodingKeys: String, CodingKey {
         case id, type, lengthM = "length_m", xM = "x_m", yM = "y_m", zM = "z_m", rotDeg = "rot_deg", vertical
+        case shape, diameterM = "diameter_m", arcDeg = "arc_deg"
     }
 
     public init(id: String, lengthM: Double, xM: Double, yM: Double, zM: Double, rotDeg: Double = 0, vertical: Bool = false) {
@@ -43,7 +54,36 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         zM = try c.decodeIfPresent(Double.self, forKey: .zM) ?? 3
         rotDeg = try c.decodeIfPresent(Double.self, forKey: .rotDeg) ?? 0
         vertical = try c.decodeIfPresent(Bool.self, forKey: .vertical) ?? false
+        shape = try c.decodeIfPresent(String.self, forKey: .shape)
+        diameterM = try c.decodeIfPresent(Double.self, forKey: .diameterM)
+        arcDeg = try c.decodeIfPresent(Double.self, forKey: .arcDeg)
+        normalise()
     }
+
+    /// A round truss.
+    public static func ring(id: String, diameter: Double, arc: Double = 360, xM: Double, yM: Double, zM: Double,
+                            rotDeg: Double = 0) -> Truss {
+        var t = Truss(id: id, lengthM: 1, xM: xM, yM: yM, zM: zM, rotDeg: rotDeg)
+        t.shape = "circle"; t.diameterM = diameter; t.arcDeg = arc
+        t.normalise()
+        return t
+    }
+
+    public var isRing: Bool { shape == "circle" && !vertical }
+    public var isFullRing: Bool { isRing && arc >= 359.5 }
+    public var arc: Double { min(360, max(10, arcDeg ?? 360)) }
+    public var radius: Double { (diameterM ?? 4) / 2 }
+
+    /// A round truss's length follows its diameter and arc (they are what is edited).
+    public mutating func normalise() {
+        if isRing { lengthM = (arc * .pi / 180 * radius * 1000).rounded() / 1000 }
+    }
+
+    /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.
+    public func ringAngle(_ u: Double) -> Double { (rotDeg + 90) * .pi / 180 - u / radius }
+
+    /// Which way the truss runs at `u` (degrees; on a ring the tangent, so its "front" faces out of the circle).
+    public func directionDeg(_ u: Double) -> Double { isRing ? ringAngle(u) * 180 / .pi - 90 : rotDeg }
 
     /// Unit vector along the truss (horizontal trusses).
     public var axis: SIMD2<Double> { SIMD2(cos(rotDeg * .pi / 180), sin(rotDeg * .pi / 180)) }
@@ -51,12 +91,37 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// A point on the truss: `u` metres from its centre along it (or above its base, for a tower).
     public func point(_ u: Double) -> SIMD3<Double> {
         if vertical { return SIMD3(xM, yM, zM - lengthM / 2 + u) }
+        if isRing {
+            let a = ringAngle(u)
+            return SIMD3(xM + radius * cos(a), yM + radius * sin(a), zM)
+        }
         return SIMD3(xM + axis.x * u, yM + axis.y * u, zM)
+    }
+
+    /// A horizontal truss as straight pieces (one for a straight truss, short chords round a ring), for drawing and
+    /// picking.
+    public func pieces(_ step: Double = 0.4) -> [(SIMD3<Double>, SIMD3<Double>)] {
+        guard isRing else { return [(point(-lengthM / 2), point(lengthM / 2))] }
+        let n = max(8, Int((lengthM / step).rounded(.up)))
+        return (0..<n).map { k in
+            (point(-lengthM / 2 + lengthM * Double(k) / Double(n)), point(-lengthM / 2 + lengthM * Double(k + 1) / Double(n)))
+        }
     }
 
     /// Where a point (seen from above) lands on the truss, and how far it is from it.
     public func project(_ p: SIMD2<Double>) -> (u: Double, distance: Double) {
         if vertical { return (0, simd_length(p - SIMD2(xM, yM))) }
+        if isRing {  // round the circle from the arc's middle, kept on the arc
+            let d = p - SIMD2(xM, yM)
+            var u = ((rotDeg + 90) * .pi / 180 - atan2(d.y, d.x)) * radius
+            let C = 2 * .pi * radius
+            u = (u + C / 2).truncatingRemainder(dividingBy: C)
+            if u < 0 { u += C }
+            u -= C / 2
+            u = max(-lengthM / 2, min(lengthM / 2, u))
+            let q = point(u)
+            return (u, simd_length(p - SIMD2(q.x, q.y)))
+        }
         let d = p - SIMD2(xM, yM)
         let u = max(-lengthM / 2, min(lengthM / 2, simd_dot(d, axis)))
         let q = SIMD2(xM, yM) + axis * u

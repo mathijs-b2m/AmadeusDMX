@@ -458,6 +458,9 @@ class LooksMixin:
         base_level = PAR_BASE_LEVEL[d.par_base]
         bounce = (hits % (2 * n - 2)) if n > 1 else 0
         chase_pos = bounce if bounce < n else 2 * n - 2 - bounce
+        loop = getattr(self, "par_loop", False) and n > 2  # pars round a full ring: the chase runs round it
+        if loop:
+            chase_pos = hits % n
         sparkle = (hits * 7 + 3) % max(n, 1)
         for f in self.pars:
             k = self.order[f["id"]]
@@ -479,7 +482,10 @@ class LooksMixin:
             elif a == "color_pop":
                 col, dim = _lerp(col, accent, env), max(base_level, env)
             elif a == "chase":
-                hit = env * max(0.0, 1.0 - abs(k - chase_pos) * 0.7)  # lit par plus a short tail
+                gap = abs(k - chase_pos)
+                if loop:
+                    gap = min(gap, n - gap)
+                hit = env * max(0.0, 1.0 - gap * 0.7)  # lit par plus a short tail
                 col, dim = _lerp(col, accent, min(1.0, hit * 1.5)), max(base_level, hit)
             elif a == "alternate":
                 if k % 2 == hits % 2:

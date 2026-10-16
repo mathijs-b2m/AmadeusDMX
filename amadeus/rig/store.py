@@ -132,6 +132,10 @@ def compose(set_doc: dict, rig_doc: dict, set_name: str) -> dict:
         f.update(spot)
         f[UNPLACED] = dict(spot)
     _onto_tower_faces(out)
+    from amadeus.rig import trusses
+
+    for t in out.get("trusses", []):  # a round truss's length follows its diameter and arc
+        trusses.normalise(t)
     return out
 
 

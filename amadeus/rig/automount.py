@@ -105,7 +105,8 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
         else:  # a row along the front edge of the stage and one at the back, mirrored
             m.row(on_floor[0::2], y=-0.5, z=0.3, mount="floor", span=0.85)
             m.row(on_floor[1::2], y=back_y, z=0.3, mount="floor", span=0.7)
-    front = [(horiz[0], "front")] if horiz else []
+    straight = [t for t in horiz if not T.is_full_ring(t)]  # a circle has no ends for the blinders
+    front = [((straight or horiz)[0], "front")] if horiz else []
     m.row(m.trusses(by_role["strobe"], front, "strobe", share=0.4), y=-0.3, z=0.25, mount="floor", span=0.3)
     m.row(m.ends(by_role["blinder"], front[0][0] if front else None), y=-0.2, z=0.9, mount="stand", span=0.76)
     m.row(by_role["bar"], y=-0.3, z=0.15, mount="floor", span=0.8)
@@ -245,6 +246,8 @@ class _Mounter:
 
     def _free(self, t: dict, side: str, n: int, kind: str, share: float) -> list[float]:
         """Up to `n` positions on a truss side, spread evenly and symmetric, clear of what hangs there."""
+        if T.is_full_ring(t):  # round a circle: evenly all the way round, no ends to keep clear
+            return self._round(t, side, n, kind)
         span = t["length_m"] * share
         busy = self.used.get((t["id"], side), [])
         if not busy:
@@ -258,6 +261,26 @@ class _Mounter:
         if len(slots) <= n:
             return slots
         return [slots[round(i * (len(slots) - 1) / (n - 1))] for i in range(n)] if n > 1 else [slots[len(slots) // 2]]
+
+    def _round(self, t: dict, side: str, n: int, kind: str) -> list[float]:
+        L = T.normalise(t)["length_m"]
+        busy = self.used.get((t["id"], side), [])
+        k = min(n, int(L / SPACING[kind]))
+        if k <= 0:
+            return []
+        if not busy:  # one in the middle of the front (u = 0), the rest evenly round
+            return [(L * i / k + L / 2) % L - L / 2 for i in range(k)]
+        step = L / int(L / SPACING[kind])
+
+        def gap(a, b):
+            d = abs(a - b) % L
+            return min(d, L - d)
+
+        slots = [-L / 2 + step * i for i in range(int(L / SPACING[kind]))]
+        slots = [s for s in slots if all(gap(s, b) >= MIN_SPACING[kind] for b in busy)]
+        if len(slots) <= n:
+            return slots
+        return [slots[round(i * len(slots) / n)] for i in range(n)]
 
     def trusses(self, fixtures: list[dict], sides: list[tuple[dict, str]], kind: str, share: float = USE) -> list[dict]:
         """Spread over truss sides in proportion to their length (front first); returns what didn't fit."""

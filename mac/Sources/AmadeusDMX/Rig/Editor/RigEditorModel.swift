@@ -192,11 +192,21 @@ final class RigEditorModel: StageEditing {
         selection = .truss(t.id)
     }
 
+    /// A round truss (a circle, or a half circle opening towards the audience) over the middle of the stage.
+    func addRing(diameter: Double, arc: Double = 360) {
+        let W = doc.width
+        let t = Truss.ring(id: newTrussID(arc >= 359.5 ? "ring" : "arc"), diameter: diameter, arc: arc, xM: W / 2,
+                           yM: -0.6 - diameter / 2, zM: min(doc.stage.ceilingM - 1, 4.5), rotDeg: arc >= 359.5 ? 0 : 180)
+        change(arc >= 359.5 ? "Add Round Truss" : "Add Half Circle") { $0.trusses.append(t) }
+        selection = .truss(t.id)
+    }
+
     func updateTruss(_ id: String, _ name: String = "Change Truss", _ body: (inout Truss) -> Void) {
         change(name) { d in
             guard let i = d.trusses.firstIndex(where: { $0.id == id }) else { return }
             let oldRot = d.trusses[i].rotDeg
             body(&d.trusses[i])
+            d.trusses[i].normalise()
             let turn = d.trusses[i].rotDeg - oldRot
             if turn != 0 {  // clamped fixtures turn with their truss
                 for j in d.fixtures.indices where d.fixtures[j].truss == id {
@@ -216,8 +226,19 @@ final class RigEditorModel: StageEditing {
 
     /// Clamp a fixture to a truss (amadeus/rig/trusses.py place: the same rules).
     static func place(_ f: inout PlacedFixture, on t: Truss, at u: Double, width: Double) {
-        let u = t.vertical ? max(0.2, min(t.lengthM, u)) : max(-t.lengthM / 2, min(t.lengthM / 2, u))
+        var u = u
+        if t.isFullRing {  // round the circle: past one end is the other
+            u = (u + t.lengthM / 2).truncatingRemainder(dividingBy: t.lengthM)
+            if u < 0 { u += t.lengthM }
+            u -= t.lengthM / 2
+        }
+        u = t.vertical ? max(0.2, min(t.lengthM, u)) : max(-t.lengthM / 2, min(t.lengthM / 2, u))
         if f.truss != t.id && !t.vertical { f.rotDeg = t.rotDeg }  // clamped on: square to the truss
+        if t.isRing {  // on a ring: always turned with the arc, its front out of the circle
+            var r = (t.directionDeg(u) + 180).truncatingRemainder(dividingBy: 360)
+            if r < 0 { r += 360 }
+            f.rotDeg = ((r - 180) * 10).rounded() / 10
+        }
         f.truss = t.id
         f.trussPos = u
         f.waiting = false
@@ -249,7 +270,8 @@ final class RigEditorModel: StageEditing {
         } else {
             // the box truss's four sides: under it, on top, on the front (audience) or the back face
             let side = f.side.flatMap { sides.contains($0) ? $0 : nil } ?? (f.mount == "stand" ? "top" : "under")
-            let p = t.point(u), r = t.rotDeg * .pi / 180, n = SIMD2(-sin(r), cos(r))  // n: towards the audience
+            // n: towards the audience (on a ring: out of the circle)
+            let p = t.point(u), r = t.directionDeg(u) * .pi / 180, n = SIMD2(-sin(r), cos(r))
             var q = SIMD2(p.x, p.y), z = p.z
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
             switch side {
@@ -681,13 +703,14 @@ final class RigEditorModel: StageEditing {
     private func truss(near o: SIMD3<Double>, _ d: SIMD3<Double>, radius: Double) -> (Truss, Double)? {
         var best: (Truss, Double, Double)?
         for t in doc.trusses {
-            let a = t.vertical ? SIMD3(t.xM, t.yM, 0) : t.point(-t.lengthM / 2)
-            let b = t.vertical ? SIMD3(t.xM, t.yM, t.zM + t.lengthM / 2) : t.point(t.lengthM / 2)
-            let (dist, along) = Self.rayToSegment(o, d, a, b)
-            guard dist < radius, best == nil || dist < best!.2 else { continue }
-            let hit = o + d * along
-            let u = t.vertical ? hit.z - (t.zM - t.lengthM / 2) : t.project(SIMD2(hit.x, hit.y)).u
-            best = (t, u, dist)
+            let pieces = t.vertical ? [(SIMD3(t.xM, t.yM, 0), SIMD3(t.xM, t.yM, t.zM + t.lengthM / 2))] : t.pieces()
+            for (a, b) in pieces {
+                let (dist, along) = Self.rayToSegment(o, d, a, b)
+                guard dist < radius, best == nil || dist < best!.2 else { continue }
+                let hit = o + d * along
+                let u = t.vertical ? hit.z - (t.zM - t.lengthM / 2) : t.project(SIMD2(hit.x, hit.y)).u
+                best = (t, u, dist)
+            }
         }
         return best.map { ($0.0, $0.1) }
     }
@@ -743,6 +766,7 @@ final class RigEditorModel: StageEditing {
                 if Self.rayToSegment(o, d, top, top + [0, 0, 0.01]).0 < 0.35 { raise = (id, doc); return true }
                 return false
             }
+            if t.isRing { return false }  // a ring has no ends to stretch: its size is in the inspector
             let (a, b) = Self.ends(t)
             for (end, other) in [(a, b), (b, a)] {
                 let p = SIMD3(end.x, end.y, t.zM)
@@ -835,7 +859,7 @@ final class RigEditorModel: StageEditing {
             if t.vertical {
                 consider(.truss(t.id), [t.xM, t.yM, 0], [t.xM, t.yM, t.zM + t.lengthM / 2], radius: 0.3)
             } else {
-                consider(.truss(t.id), t.point(-t.lengthM / 2), t.point(t.lengthM / 2), radius: 0.3)
+                for (a, b) in t.pieces() { consider(.truss(t.id), a, b, radius: 0.3) }
             }
         }
         if best == nil {  // zones last: they're big and see-through, never in the way of rigging

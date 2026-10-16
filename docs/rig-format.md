@@ -14,7 +14,8 @@ copies of `examples/sets` and `examples/rigs`. `config/` is not in git: it is yo
 The usual flow (the Mac app's set-up assistant does exactly this):
 
 1. **Make a set**: add your fixtures (the Set page, `amadeus set NAME --new` + `amadeus patch …`, or the setup page).
-2. **Make a rig**: from a template (an empty room, two stands, a truss over the booth, a club, a concert stage),
+2. **Make a rig**: from a template (an empty room, two stands, a truss over the booth, a club, a concert stage,
+   a round truss),
    then move and add trusses in the rig editor (`amadeus rig NAME --template club`).
 3. **Place the set on the rig**: auto-mount (`amadeus rig --automount`, or *Auto-Mount* in the rig editor), or
    drag fixtures onto the trusses: one by one, or a whole group at once.
@@ -71,6 +72,23 @@ machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 the sky aim goes higher and wider, the directors aim at the sky far more often (the AI is told it is an outdoor
 show), and smoke clears in about a minute instead of five. Indoors nothing changes: the ceiling guard keeps
 beams off the ceiling.
+
+**Round truss.** A truss with `"shape": "circle"` hangs flat as a full circle, or as an arc of `arc_deg` (180: a
+half circle), `diameter_m` across; `x_m`/`y_m` are the circle's centre and the middle of an arc faces the audience
+(turned by `rot_deg`). Round truss is sold in a few sizes: the editor offers Ø 2, 3, 4, 5, 6 and 8 m (any other
+diameter works). Its `length_m` is the length round the arc and follows the diameter and the arc. A fixture's
+`truss_pos_m` is measured round the arc from its middle, to the right seen from the audience; it is turned with the
+arc, so its front faces out of the circle, and the truss's `front` face is the outside, `back` the inside.
+
+```json
+{"id": "ring", "type": "quatro", "shape": "circle", "diameter_m": 4, "arc_deg": 360, "x_m": 5, "y_m": -2.6, "z_m": 4.5}
+```
+
+Moving heads on a ring play it as a circle (`amadeus/engine/rings.py`): they are a group of their own (`ring`),
+and the formations take its shape: `fan` is a crown of beams out of the circle, twisting with the movement;
+`focus` a cone of beams to one point; `cross` a twisted hourglass; `wave` (and the tilt wave) runs round the ring.
+`sync` and `mirror` stay as they are. Pars on a full ring chase round it. Auto-mount spreads fixtures evenly round a
+full circle; strobes and blinders stay on a straight truss when there is one.
 
 Coordinates are metres: `x` across the stage (a fixture's `x` is a fraction of `stage.width_m`, a truss's `x_m`
 is metres), `y` towards the audience (0 = the stage's front edge, the back is negative), `z` height.

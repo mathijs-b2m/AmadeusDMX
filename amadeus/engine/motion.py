@@ -12,6 +12,7 @@ import numpy as np
 from amadeus import paths
 from amadeus.director import Decision
 from amadeus.engine.looks import PREDROP_BEATS, XFADE
+from amadeus.engine.rings import RING_FORMATIONS
 from amadeus.engine.timing import _ease
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
@@ -436,7 +437,10 @@ class MotionMixin:
         side, idx, count = role["side"], role["idx"], role["count"]
         f, movement = role["formation"], role["movement"]
         beats = pos + role["phase"]  # (the tilt wave makes its own offsets: by place in the row)
-        if f == "wave":  # one beat per head, but a wave spans at most WAVE_BEATS (60 heads: not 60 beats)
+        ring = self.rings[j] if self.rings else None  # a head on a round truss plays the circle (rings.py)
+        if f == "wave" and ring:  # round the ring
+            pos = self._ring_wave_pos(ring, pos)
+        elif f == "wave":  # one beat per head, but a wave spans at most WAVE_BEATS (60 heads: not 60 beats)
             pos = pos - idx * min(1.0, WAVE_BEATS / max(count - 1, 1))
         pos = pos + role["phase"]
         seed = role["seed"] if role["seed"] is not None else (idx if f in ("wave",) else 0)
@@ -460,11 +464,17 @@ class MotionMixin:
             period = 2.0 if d.intensity >= 3 else 4.0
             amp = TILT_WAVE_DEG * (0.8 if period < 4 else 1.0)
             across = abs(side) if f == "mirror" else (side + 1) / 2
+            if ring:  # round the ring, the beams out of it
+                across = ring["frac"]
             wave = np.sin(2 * math.pi * (beats / period - across * TILT_WAVE_SPAN))
             centre = aim["el"] - 8 if aim["el"] < 0 else aim["el"]  # over the crowd: room for the top of the wave
             az = np.full_like(ts, aim["az"] + side * (30 if f == "fan" else 15), dtype=float)
+            if ring:
+                az = np.full_like(ts, self._crown_az(ring), dtype=float)
             el = centre + amp * wave + role["vside"] * 6
             out = self._direction_v(az, el)
+        elif ring and f in RING_FORMATIONS:  # a crown, a cone, a twister
+            out = self._ring_dir_v(f, ring, aim, u, v, head_pos)
         elif f in ("focus", "cross"):  # a shared point: of the whole rig, or of this head's group
             centre = np.mean(self.head_pos, axis=0) if role["centre"] is None else role["centre"]
             aim_d = self._direction_v(az, el)

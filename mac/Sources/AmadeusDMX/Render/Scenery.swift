@@ -32,7 +32,7 @@ struct Scenery {
     var models: FixtureModels
 
     init(fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss] = [], selected: Set<String> = []) {
-        room = Room(stage: stage, fixtures: fixtures)
+        room = Room(stage: stage, fixtures: fixtures, trusses: trusses)
         models = FixtureModels(fixtures: fixtures, selected: selected)
         let W = room.width, cx = W / 2
         let heads = fixtures.filter { $0.kind == .head }.count
@@ -85,7 +85,7 @@ struct Scenery {
         // the LED wall behind the DJ
         if screen {
             let sw = big ? min(10, W * 0.55) : 2.6, sh = sw * 9 / 16
-            let sy = big ? min(-4.5, Room(stage: stage, fixtures: fixtures).back + 1.5) - 2.2 : -2.0
+            let sy = big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0
             let sz: Float = big ? 1.4 : 1.15
             wall = WallPlacement(center: [cx, sy, sz + sh / 2], width: sw, height: sh)
             box(cx - sw / 2 - 0.12, cx + sw / 2 + 0.12, sy - 0.35, sy - 0.02, sz - 0.12, sz + sh + 0.12, [0.03, 0.03, 0.035])
@@ -112,7 +112,7 @@ struct Scenery {
                 }
             } else {
                 trussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
-                if sel {  // the end handles: drag one to stretch or turn the truss
+                if sel && !t.isRing {  // the end handles: drag one to stretch or turn the truss
                     let r = Float(t.rotDeg) * .pi / 180, ax = SIMD3<Float>(cos(r), sin(r), 0)
                     for e: Float in [-1, 1] {
                         let p = SIMD3<Float>(Float(t.xM), Float(t.yM), Float(t.zM)) + ax * (Float(t.lengthM) / 2 * e)
@@ -195,6 +195,21 @@ struct Scenery {
 
     /// A horizontal quatro truss from the set: four chords along it and lacing, turned with it.
     private mutating func trussBeam(_ t: Truss, color: SIMD3<Float>, emissive: Float) {
+        if t.isRing {  // round: short straight pieces round the arc, end plates only where an arc ends
+            let pieces = t.pieces(0.3)
+            for (k, (a, b)) in pieces.enumerated() {
+                var piece = Truss(id: t.id, lengthM: simd_length(b - a) + 0.02, xM: (a.x + b.x) / 2, yM: (a.y + b.y) / 2,
+                                  zM: t.zM, rotDeg: atan2(b.y - a.y, b.x - a.x) * 180 / .pi)
+                piece.type = t.type
+                straightBeam(piece, color: color, emissive: emissive,
+                             ends: t.isFullRing ? [] : [k == 0 ? -1 : nil, k == pieces.count - 1 ? 1 : nil].compactMap { $0 })
+            }
+            return
+        }
+        straightBeam(t, color: color, emissive: emissive, ends: [-1, 1])
+    }
+
+    private mutating func straightBeam(_ t: Truss, color: SIMD3<Float>, emissive: Float, ends: [Float]) {
         let r = Float(t.rotDeg), L = Float(t.lengthM), h: Float = 0.15
         let c = SIMD3<Float>(Float(t.xM), Float(t.yM), Float(t.zM))
         let ay = SIMD3<Float>(-sin(r * .pi / 180), cos(r * .pi / 180), 0), ax = SIMD3<Float>(cos(r * .pi / 180), sin(r * .pi / 180), 0)
@@ -204,7 +219,7 @@ struct Scenery {
             for dy in [-h, h] { rotatedBox(c + ax * u + ay * dy, [0.016, 0.016, 2 * h], r, color * 0.8, emissive: emissive) }
             u += 0.5
         }
-        for e: Float in [-1, 1] { rotatedBox(c + ax * (L / 2) * e, [0.05, 2 * h + 0.05, 2 * h + 0.05], r, color * 0.9, emissive: emissive) }
+        for e in ends { rotatedBox(c + ax * (L / 2) * e, [0.05, 2 * h + 0.05, 2 * h + 0.05], r, color * 0.9, emissive: emissive) }
     }
 
     /// A 30 cm box truss: four chords and diagonal lacing.

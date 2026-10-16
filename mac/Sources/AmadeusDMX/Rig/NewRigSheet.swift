@@ -1,10 +1,10 @@
 // A new rig (a venue): start from the structure that's there (an empty room, two stands, a truss over the
-// booth, a club, a concert stage), size it, and then mount your set on it: automatically or by hand.
+// booth, a club, a concert stage, a round truss), size it, and then mount your set on it: automatically or by hand.
 import AmadeusKit
 import SwiftUI
 
 enum RigTemplate: String, CaseIterable, Identifiable {
-    case floor, stands, booth, club, stage   // amadeus/rig/templates.py
+    case floor, stands, booth, club, stage, ring   // amadeus/rig/templates.py
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -13,6 +13,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .booth: "Truss over the Booth"
         case .club: "Club"
         case .stage: "Concert Stage"
+        case .ring: "Round Truss"
         }
     }
     var detail: String {
@@ -22,6 +23,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .booth: "One truss over the DJ."
         case .club: "Two trusses over the booth, front and back."
         case .stage: "Two overhead trusses, a low one at the back, a tower each side."
+        case .ring: "A circle over the booth, a half circle behind it: heads play crowns, cones and twisters."
         }
     }
     /// width, truss height, room depth (m)
@@ -32,6 +34,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .booth: (6, 3.5, 12)
         case .club: (10, 4.5, 15)
         case .stage: (16, 7, 25)
+        case .ring: (10, 4.5, 15)
         }
     }
 }
@@ -67,6 +70,12 @@ struct RigSketch: View {
             case .stage:
                 bar(w * 0.1, h * 0.2, w * 0.8); bar(w * 0.14, h * 0.1, w * 0.72); bar(w * 0.22, floor - 22, w * 0.56)
                 tower(6, h * 0.18); tower(w - 10, h * 0.18)
+            case .ring:  // seen a little from below: a flat ellipse, the half circle a wider arc behind it
+                var back = Path()
+                back.addArc(center: CGPoint(x: w / 2, y: h * 0.2), radius: w * 0.36, startAngle: .degrees(195),
+                            endAngle: .degrees(345), clockwise: false)
+                ctx.stroke(back, with: truss, lineWidth: 3)
+                ctx.stroke(Path(ellipseIn: CGRect(x: w * 0.27, y: h * 0.2, width: w * 0.46, height: h * 0.16)), with: truss, lineWidth: 3.5)
             }
         }
         .frame(height: 64)

@@ -5,10 +5,11 @@ a row on the front edge, a tower left and right. The director decides how the gr
 one, each group its own formation, one group featured, ...); the engine uses each head's place in its
 group for formations, waves, chases and focus points.
 
-Groups come from the rig ("group" on a fixture), else from the positions:
+Groups come from the rig ("group" on a fixture), else from the trusses and positions:
+- a ring: the heads on one round truss, in order round it (`amadeus/engine/rings.py` plays them as a circle);
 - a column: 3+ heads at the same spot across the stage, stacked in height (a truss tower);
 - a row: heads with the same mount at about the same depth and height.
-Each group gets a class the director talks about: overhead, back, front, towers (or "all").
+Each group gets a class the director talks about: overhead, ring, back, front, towers (or "all").
 """
 
 from __future__ import annotations
@@ -19,9 +20,11 @@ import numpy as np
 
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
+from amadeus.rig import trusses as T
 
 CLASSES = {
     "overhead": "the heads hung overhead on the truss: they scan down onto the crowd",
+    "ring": "the heads round a circle truss: crowns of beams, cones and twisting tunnels",
     "back": "the row on the stage floor at the back: beams shoot up over the DJ into the room",
     "front": "the low row on the front edge of the stage: beams fan up and over the first rows",
     "towers": "the vertical truss towers left and right: stacked heads, beams from the sides",
@@ -30,7 +33,8 @@ CLASSES = {
 
 
 def head_groups(rig: dict) -> list[dict]:
-    """[{name, cls, kind ('row'|'column'), ids (ordered: left→right, or bottom→top), centre (x, y, z)}]."""
+    """[{name, cls, kind ('row'|'column'|'ring'), ids (ordered: left→right, bottom→top, or round the ring from
+    its front middle), centre (x, y, z)}]."""
     heads = []
     for f in rig["fixtures"]:
         if not fxlib.is_moving(fxlib.get(f["fixture"])):
@@ -42,8 +46,14 @@ def head_groups(rig: dict) -> list[dict]:
         return []
     named: dict[str, list] = {}
     rest = []
+    rings = {t["id"]: t for t in rig.get("trusses", []) if T.is_ring(t)}
     for h in heads:
-        (named.setdefault(h[2]["group"], []) if h[2].get("group") else rest).append(h)
+        if h[2].get("group"):
+            named.setdefault(h[2]["group"], []).append(h)
+        elif h[2].get("truss") in rings:
+            named.setdefault(f"ring:{h[2]['truss']}", []).append(h)
+        else:
+            rest.append(h)
 
     # columns: 3+ heads at (almost) the same x and y, spread over height
     used = set()
@@ -70,10 +80,17 @@ def head_groups(rig: dict) -> list[dict]:
         P = np.array([m[1] for m in members])
         spread = P.max(0) - P.min(0)
         kind = "column" if len(members) >= 3 and spread[2] > max(spread[0], 1.0) else "row"
-        order = np.argsort(P[:, 2] if kind == "column" else P[:, 0])
-        centre = P.mean(0)
+        ring = rings.get(name[5:]) if name.startswith("ring:") else None
+        if ring:
+            kind = "ring"
+            order = np.argsort([m[2].get("truss_pos_m", 0.0) for m in members], kind="stable")
+        else:
+            order = np.argsort(P[:, 2] if kind == "column" else P[:, 0])
+        centre = np.array([ring["x_m"], ring["y_m"], P[:, 2].mean()]) if ring else P.mean(0)
         mounts = {m[2].get("mount", "stand") for m in members}
-        if kind == "column":
+        if ring:
+            cls = "ring"
+        elif kind == "column":
             cls = "towers"
         elif "hang" in mounts or centre[2] > 2.5:
             cls = "overhead"
@@ -92,10 +109,10 @@ def head_groups(rig: dict) -> list[dict]:
             }
         )
     # stable, readable order: overhead first, then back, front, towers, by position
-    rank = {c: i for i, c in enumerate(["overhead", "back", "mid", "front", "towers"])}
+    rank = {c: i for i, c in enumerate(["overhead", "ring", "back", "mid", "front", "towers"])}
     out.sort(key=lambda g: (rank.get(g["cls"], 9), -g["centre"][1] if g["cls"] == "overhead" else 0, g["centre"][0]))
     for g in out:
-        if g["name"].startswith(("row:", "column@")):
+        if g["name"].startswith(("row:", "column@", "ring:")):
             g["name"] = _friendly(g, out)
     if len(out) == 1:
         out[0]["cls"] = "all"
@@ -150,7 +167,10 @@ def classes(groups: list[dict]) -> list[str]:
 
 
 def signature(groups: list[dict]) -> str | None:
-    """Short id of the group layout for plan caches; None for a rig that is one group (plans as before)."""
+    """Short id of the group layout for plan caches; None for a rig that is one group (plans as before), "ring"
+    for a lone ring (the prompt tells of it)."""
+    if len(groups) == 1 and groups[0]["kind"] == "ring":
+        return "ring"
     if len(groups) <= 1:
         return None
     text = ";".join(f"{g['cls']}:{len(g['ids'])}" for g in groups)
@@ -163,6 +183,16 @@ def describe(groups: list[dict]) -> str:
     for g in groups:
         c = g["centre"]
         where = f"{c[2]:.1f} m high, {abs(c[1]):.1f} m {'behind' if c[1] < 0 else 'in front of'} the stage edge"
-        shape = "stacked bottom to top" if g["kind"] == "column" else "in a row left to right"
+        shapes = {"column": "stacked bottom to top", "ring": "round a circle truss"}
+        shape = shapes.get(g["kind"], "in a row left to right")
         lines.append(f"- {g['name']} [{g['cls']}]: {len(g['ids'])} heads {shape}, {where}")
+    if any(g["kind"] == "ring" for g in groups):
+        lines.append(RING_NOTE)
     return "\n".join(lines)
+
+
+RING_NOTE = (
+    "  On a circle truss the formations take its shape: fan = a crown of beams out of the circle, twisting with the "
+    "movement; focus = a cone of beams to one point under or in front of it; cross = a twisted hourglass; wave = "
+    "the movement runs round the ring. Sync and mirror stay plain. Rings shine with circle, sweep and tilt_wave."
+)

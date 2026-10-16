@@ -6,12 +6,15 @@ mounted on it afterwards.
 
 from __future__ import annotations
 
+from amadeus.rig import trusses as T
+
 TEMPLATES = {
     "floor": "An empty room: fixtures on the floor and on stands.",
     "stands": "A mobile DJ: two T-bar stands left and right of the booth.",
     "booth": "One truss over the DJ booth.",
     "club": "Two trusses over the booth, front and back.",
     "stage": "A concert stage: two overhead trusses, a low truss at the back and a tower on each side.",
+    "ring": "A round truss over the DJ booth, a half circle behind it.",
 }
 
 
@@ -49,6 +52,13 @@ def rig(template: str, width: float = 8.0, height: float = 4.5, depth: float = 1
         trusses.append(_truss("back", _length(W * 0.8), W / 2, -1.5 - stage_depth, 1.0))
         for side, x in (("L", 0.3), ("R", W - 0.3)):
             trusses.append(_truss(f"tower{side}", max(2.0, height - 0.5), x, -1.0, 0, vertical=True))
+    elif template == "ring":
+        fits = [d for d in T.DIAMETERS_M if d <= max(W * 0.55, T.DIAMETERS_M[0])]
+        d = fits[-1]
+        trusses.append(T.ring("ring", d, W / 2, -0.6 - d / 2, height))
+        back = [x for x in T.DIAMETERS_M if x <= min(W - 1, d * 1.6)][-1]
+        if back > d:  # a wider half circle behind it, opening towards the audience, a little higher
+            trusses.append(T.ring("arc", back, W / 2, -0.6 - d / 2, height + 0.5, arc=180, rot=180))
     top = max([t["z_m"] + (t["length_m"] / 2 if t.get("vertical") else 0) for t in trusses] or [height])
     out = {
         "description": TEMPLATES[template],

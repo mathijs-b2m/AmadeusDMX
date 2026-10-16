@@ -40,12 +40,17 @@ public struct Room: Sendable {
     /// An open-air stage: no ceiling, beams going up end in the air.
     public var outdoor = false
 
-    public init(stage: Stage, fixtures: [FixtureInfo]) {
+    /// The back wall stands 1.5 m behind the rearmost fixture or truss (a round truss: its back edge).
+    public init(stage: Stage, fixtures: [FixtureInfo], trusses: [Truss] = []) {
         width = Float(stage.widthM)
         ceiling = Float(stage.ceilingM)
         outdoor = stage.outdoor
         depth = Float(stage.roomDepthM)
-        back = min(-2.5, Float(fixtures.map(\.pos.y).min() ?? -1) - 1.5)
+        let trussBack = trusses.map { t -> Double in
+            t.vertical ? t.yM : t.pieces().map { min($0.0.y, $0.1.y) }.min() ?? t.yM
+        }
+        let rear = (fixtures.map { Double($0.pos.y) } + trussBack).min() ?? -1
+        back = min(-2.5, Float(rear) - 1.5)
     }
 
     /// Where a beam from `p` along `d` ends: distance and surface (at most `maxLen`).

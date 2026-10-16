@@ -81,6 +81,16 @@ struct RigEditorView: View {
                             Button("\(Int(l)) m") { editor.addTruss(length: l) }
                         }
                     }
+                    SwiftUI.Section("Round truss (circle)") {
+                        ForEach(Truss.ringDiameters, id: \.self) { d in
+                            Button("Ø \(Int(d)) m circle") { editor.addRing(diameter: d) }
+                        }
+                    }
+                    SwiftUI.Section("Half circle") {
+                        ForEach(Truss.ringDiameters, id: \.self) { d in
+                            Button("Ø \(Int(d)) m half circle") { editor.addRing(diameter: d, arc: 180) }
+                        }
+                    }
                     SwiftUI.Section("Tower") {
                         ForEach([2.0, 3.0, 4.0], id: \.self) { l in
                             Button("\(Int(l)) m tower") { editor.addTruss(length: l, vertical: true) }
