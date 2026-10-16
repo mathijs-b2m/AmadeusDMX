@@ -1,5 +1,6 @@
-"""A snare roll into a drop: the analysis hears its steps and the pause, the lights flash on the roll's own hits
-(denser, brighter, more lights per step) within the flash limits, go dark for the pause and hit on the drop."""
+"""A snare roll into a drop, and a fill into a phrase: the analysis hears their hits, the roll's steps and the
+pause; the lights flash on those hits (denser, brighter, more lights per step) within the flash limits, go dark
+for the pause and hit on the drop."""
 
 import contextlib
 import io
@@ -41,6 +42,41 @@ def test_the_analysis_hears_the_steps_and_the_pause(tmp_path, monkeypatch, bpm, 
     assert not a.roll[a.beats >= start].any()  # the roll stops where the pause starts
 
 
+def _analyse(tmp_path, monkeypatch, **kw):
+    monkeypatch.setattr(genre, "from_model", lambda *a, **k: None)  # (no AI call for the genre)
+    truth = roll_track.make(tmp_path / "roll.wav", **kw)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return analysis.analyze(tmp_path / "roll.wav", cache_dir=tmp_path / "cache"), truth
+
+
+def _found(hits: np.ndarray, truth: list[float], within: float = 0.03) -> float:
+    """The share of the true hits the analysis found, each within `within` (hits are dated as heard, like the
+    beats: a little early)."""
+    return float(np.mean([np.min(np.abs(hits - x)) <= within for x in truth])) if len(hits) else 0.0
+
+
+def test_sixteenths_all_the_way_are_a_roll_too(tmp_path, monkeypatch):
+    """A roll that doesn't speed up (sixteenths for eight bars) is a roll, every hit heard."""
+    a, truth = _analyse(tmp_path, monkeypatch, steps=((8, 4),), pause_beats=0)
+    build = (a.beats >= truth["build"] - 0.03) & (a.beats < truth["drop"] - 0.03)
+    assert np.mean(a.roll[build] == 4) >= 0.9, "".join(map(str, a.roll[build]))
+    assert _found(a.roll_hits[:, 0], truth["hits"]) >= 0.95
+    assert not a.roll[a.beats < truth["build"] - 0.5].any()  # not the groove before it
+
+
+def test_a_fill_into_a_phrase_is_heard(tmp_path, monkeypatch):
+    a, truth = _analyse(tmp_path, monkeypatch, fill=True, steps=((8, 0),), pause_beats=0)
+    assert _found(a.roll_hits[:, 0], truth["fill"]) >= 0.8
+    beat = 60 / 128
+    assert not len(a.roll_hits[a.roll_hits[:, 0] < truth["fill"][0] - beat / 2])  # nothing from the groove before it
+    assert not len(a.roll_hits[a.roll_hits[:, 0] > truth["fill"][-1] + 0.1])  # nor from the riser after it
+
+
+def test_a_riser_alone_is_no_roll(tmp_path, monkeypatch):
+    a, _ = _analyse(tmp_path, monkeypatch, steps=((8, 0),), pause_beats=0)
+    assert not a.roll.any() and not len(a.roll_hits)
+
+
 def test_a_steady_groove_is_no_roll():
     """Kick on every beat with offbeat hats doesn't speed up: no roll, whatever its subdivision."""
     from amadeus.audio import rolls
@@ -52,8 +88,10 @@ def test_a_steady_groove_is_no_roll():
         flux[int(b * fps)] = 1.0
         flux[int((b + beat / 2) * fps)] = 0.4  # the hats, weaker than the beat
     bars = beats[::4]
-    roll, pauses = rolls.snare_rolls(flux, np.full(len(flux), -10.0), fps, beats, bars, [(0.0, 0.0, float(bars[-2]))])
-    assert not roll.any() and not len(pauses)
+    roll, pauses, hits = rolls.snare_rolls(
+        flux, np.full(len(flux), -10.0), fps, beats, bars, [(0.0, 0.0, float(bars[-2]))]
+    )
+    assert not roll.any() and not len(pauses) and not len(hits)
 
 
 # ------------------------------------------------------------------------------------------- the lights
@@ -135,6 +173,47 @@ def test_with_fast_strobe_the_lights_take_turns_on_the_fast_hits(rolled):
         assert np.all(np.diff(_ons(ts, c)) >= 1 / R.FAST_FLASH_HZ - 2 / FPS)  # each light within its limit
     rig_on = _ons(ts, tr.max(axis=1), threshold=0.05)
     assert len(rig_on) >= 2 * 8 - 1  # …while the rig plays every thirty-second
+
+
+def test_with_fast_strobe_every_hit_flashes_where_it_is_heard(rolled):
+    """The flashes land on the roll's own hits, not the beat grid: a played roll is a little loose."""
+    a, first, drop = rolled
+    rng = np.random.default_rng(1)
+    on = np.flatnonzero(a.roll)
+    hits = np.array(
+        [
+            a.beats[j] + k * 60 / 128 / a.roll[j] + rng.uniform(-0.015, 0.015)
+            for j in on
+            for k in range(a.roll[j])
+            if a.roll[j] <= 4
+        ]
+    )
+    e, rig = _engine(replace(a, roll_hits=np.c_[hits, np.ones(len(hits))]), allow_fast_strobe=True)
+    ts = np.arange(a.beats[first] - 0.1, drop - 2 * 60 / 128 - 0.01, 1 / FPS)  # (before the heads move in black)
+    tr = _flashes(e, ts)
+    rig_on = _ons(ts, tr.max(axis=1), threshold=0.05)
+    heard = hits[hits < ts[-1] - 0.01]
+    assert len(rig_on) == len(heard)
+    assert np.all(np.abs(rig_on - heard) <= 2 / FPS)
+    for c in tr.T:
+        assert np.all(np.diff(_ons(ts, c)) >= 1 / R.FAST_FLASH_HZ - 2 / FPS)
+
+
+def test_a_fill_flashes_on_its_hits(rolled):
+    """A fill into a phrase (no drop after it) flashes too; strobe-free leaves it to the look."""
+    a, first, drop = rolled
+    j = int(np.searchsorted(a.beats, a.phrases[1].start - 0.01)) - 2  # the two beats before the second phrase
+    roll = np.zeros(len(a.beats), np.int8)
+    roll[j : j + 2] = 4
+    hits = np.array([a.beats[j] + x * 60 / 128 for x in (0.0, 0.31, 0.5, 1.0, 1.32, 1.5, 1.79)])
+    b = replace(a, roll=roll, roll_hits=np.c_[hits, np.ones(len(hits))], pauses=None)
+    e, rig = _engine(b, allow_fast_strobe=True)
+    assert len(e.rolls) == 1 and e.rolls[0].drop is None
+    ts = np.arange(hits[0] - 0.1, a.beats[j + 2], 1 / FPS)
+    rig_on = _ons(ts, _flashes(e, ts).max(axis=1), threshold=0.05)
+    assert len(rig_on) == len(hits) and np.all(np.abs(rig_on - hits) <= 2 / FPS)
+    e, _ = _engine(b, strobe_free=True)
+    assert not e.rolls
 
 
 def test_strobe_free_plays_the_roll_in_steps(rolled):

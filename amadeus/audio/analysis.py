@@ -39,7 +39,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 42
+ANALYSIS_VERSION = 43
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -148,7 +148,7 @@ def analyze(
     log(f"  beat grid: {'one tempo' if grid is not None else 'following the tempo'}")
     audio, audio_sr = sf.read(str(path), dtype="float32", always_2d=True)
     heard = attack_offset(audio.mean(axis=1), audio_sr, beat_times)
-    fine_snare, fine_db, fine_fps = fine_envelopes(audio.mean(axis=1), audio_sr)
+    fine_snare, fine_db, fine_fps, fine_bands = fine_envelopes(audio.mean(axis=1), audio_sr)
     del audio
     beat_times = beat_times + heard  # onsets are noticed a little before they are loud: date them as heard
     onsets = {k: (t + heard, s) for k, (t, s) in onsets.items()}
@@ -164,11 +164,14 @@ def analyze(
     at = [i for i, p in enumerate(phrases) if i and p.drop_score >= DROP_THRESHOLD]
     starts = [phrases[i].start - heard for i in at]
     builds = [phrases[i - 1].start - heard for i in at]
-    roll, pauses = snare_rolls(
+    others = [(phrases[i - 1].start - heard, phrases[i].start - heard) for i in range(1, len(phrases)) if i not in at]
+    roll, pauses, roll_hits = snare_rolls(
         fine_snare, fine_db, fine_fps, beat_times - heard, beat_times[downbeat_idx] - heard,
-        list(zip([0.0, *starts[:-1]], builds, starts)),
+        list(zip([0.0, *starts[:-1]], builds, starts)), others, fine_bands,
     )  # fmt: skip
+    del fine_bands
     pauses = pauses + heard
+    roll_hits[:, 0] += heard
     bar_chroma = _bar_chroma(feats["chroma"], fps, beat_times[downbeat_idx])
     log(
         f"  {len(beat_times)} beats, {len(downbeat_idx)} bars, {len(phrases)} phrases, "
@@ -193,6 +196,7 @@ def analyze(
         stutter_gate=stutter_gate,
         stutter_strength=stutter_strength,
         roll=roll,
+        roll_hits=roll_hits,
         pauses=pauses,
         bar_chroma=bar_chroma,
     )
@@ -341,6 +345,7 @@ def _save(a: Analysis, npz_path: Path, json_path: Path):
         stutter_gate=a.stutter_gate,
         stutter_strength=a.stutter_strength,
         roll=a.roll,
+        roll_hits=a.roll_hits if a.roll_hits is not None else np.zeros((0, 2)),
         pauses=a.pauses,
         bar_chroma=a.bar_chroma if a.bar_chroma is not None else np.zeros((0, 12), np.float32),
         **arrays,
@@ -375,6 +380,7 @@ def _load(npz_path: Path, json_path: Path) -> Analysis:
         stutter_gate=z["stutter_gate"],
         stutter_strength=z["stutter_strength"],
         roll=z["roll"],
+        roll_hits=z["roll_hits"] if "roll_hits" in z.files else None,
         pauses=z["pauses"],
         bar_chroma=z["bar_chroma"] if "bar_chroma" in z.files else None,
         synth_notes=(z["syn_t"], z["syn_s"], z["syn_p"]) if "syn_t" in z.files else None,

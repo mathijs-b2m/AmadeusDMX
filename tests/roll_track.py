@@ -1,6 +1,7 @@
 """A short track with a snare roll into a drop: groove, a build whose snare speeds up (quarters, eighths,
-sixteenths, thirty-seconds) over a rising noise riser, a pause, the drop. Written as audio, so the whole
-analysis runs on it."""
+sixteenths, thirty-seconds) over a rising noise riser, a pause, the drop. Optionally a fill (a few quick
+hits in its own rhythm) at the end of the groove, into the build. Written as audio, so the whole analysis
+runs on it."""
 
 from __future__ import annotations
 
@@ -12,12 +13,20 @@ SR = 22050
 START_S = 0.5
 GROOVE_BARS, DROP_BARS = 16, 12
 STEPS = ((4, 1), (2, 2), (1, 4), (1, 8))  # the build: (bars, snare hits per beat)
+FILL = (0.31, 0.5, 1.0, 1.32, 1.5, 1.79, 2.07)  # a fill's hits, in beats from the groove's last bar's third beat
 
 
 def make(
-    path: Path, bpm: float = 128.0, steps=STEPS, pause_beats: float = 1.0, riser: bool = True, seed: int = 3
+    path: Path,
+    bpm: float = 128.0,
+    steps=STEPS,
+    pause_beats: float = 1.0,
+    riser: bool = True,
+    seed: int = 3,
+    fill: bool = False,
 ) -> dict:
-    """Write the track; returns its truth: the drop, the roll's step per beat (from its start), the pause."""
+    """Write the track; returns its truth: the drop, the roll's step per beat (from its start), the pause, the
+    roll's hits and the fill's."""
     import soundfile as sf
     from scipy.signal import butter, sosfilt
 
@@ -43,7 +52,14 @@ def make(
     riser_f = butter(2, 2500, "low", fs=SR, output="sos")
 
     drop = START_S + (GROOVE_BARS + build_bars) * 4 * beat
-    truth = {"drop": drop, "build": START_S + GROOVE_BARS * 4 * beat, "steps": [], "pause": None}
+    truth = {
+        "drop": drop,
+        "build": START_S + GROOVE_BARS * 4 * beat,
+        "steps": [],
+        "pause": None,
+        "hits": [],
+        "fill": [],
+    }
     for bar in range(GROOVE_BARS):  # groove: kick, offbeat bass, hats, a clap on 2 and 4
         for b in range(4):
             t = START_S + (bar * 4 + b) * beat
@@ -52,6 +68,12 @@ def make(
             put(t + beat / 2, hat, 0.15)
             if b % 2:
                 put(t, sosfilt(band, rng.standard_normal(len(sn_t))) * np.exp(-sn_t * 45), 0.35)
+    if fill:
+        tom = np.sin(2 * np.pi * 900 * sn_t) * np.exp(-sn_t * 40)
+        for f in FILL:
+            t = truth["build"] - 2 * beat + f * beat * 0.9
+            put(t, sosfilt(band, rng.standard_normal(len(sn_t))) * np.exp(-sn_t * 40) + 0.3 * tom, 0.4)
+            truth["fill"].append(t)
     t_bar = truth["build"]
     k = 0
     for n_bars, div in steps:
@@ -62,6 +84,7 @@ def make(
                     break
                 snare = sosfilt(band, rng.standard_normal(len(sn_t))) * np.exp(-sn_t * (45 + 8 * div))
                 put(t, snare, 0.3 + 0.3 * k / build_bars)
+                truth["hits"].append(t)
             truth["steps"] += [div] * 4
             if riser:
                 seg = sosfilt(riser_f, rng.standard_normal(int(4 * beat * SR)))
