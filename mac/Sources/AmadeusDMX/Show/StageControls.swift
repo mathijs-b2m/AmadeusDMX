@@ -1,4 +1,4 @@
-// Camera presets, the LED wall scene, zones, haze and exposure.
+// Camera presets, flying through the room, the LED wall scene, zones, haze and exposure.
 import AmadeusKit
 import SwiftUI
 
@@ -10,6 +10,14 @@ struct StageControls: View {
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
+                if stage.fly {
+                    Text("WASD move · Q/E down/up · drag to look · ⇧ faster · Esc lands")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .glassEffect()
+                }
                 ForEach(CameraPreset.allCases) { p in
                     Button {
                         stage.preset = p
@@ -19,6 +27,13 @@ struct StageControls: View {
                     .buttonStyle(p == stage.preset ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
                     .help(p.rawValue)
                 }
+                Button {
+                    stage.fly.toggle()
+                } label: {
+                    Image(systemName: "figure.walk.motion").frame(width: 18, height: 18)
+                }
+                .buttonStyle(stage.fly ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
+                .help("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, ⇧ faster. Without flying: WASD still walks, +/− zoom.")
                 Menu {
                     Picker("LED Wall", selection: $stage.wallScene) {
                         ForEach(WallScene.allCases) { s in Label(s.title, systemImage: s.symbol).tag(s) }

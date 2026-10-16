@@ -1,6 +1,7 @@
 // The Metal stage: scenery, volumetric beams, spots, lasers, flares and the LED wall into an HDR target,
 // then bloom (MPS blur at half and quarter resolution) and a tone curve into the window.
 import AmadeusKit
+import AppKit
 import Metal
 import MetalKit
 import MetalPerformanceShaders
@@ -170,6 +171,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     func orbit(dx: Float, dy: Float) {
         wake()
         goal = nil
+        if fly { look(dx: dx, dy: dy); return }
         pose.yaw -= dx * 0.005
         pose.pitch = min(1.45, max(-0.05, pose.pitch + dy * 0.004))
     }
@@ -177,7 +179,79 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     func zoom(_ factor: Float) {
         wake()
         goal = nil
-        pose.distance = min(80, max(2, pose.distance * factor))
+        if fly { move(forward: (1 - factor) * 6); return }
+        pose.distance = min(120, max(0.6, pose.distance * factor))
+    }
+
+    // MARK: flying
+
+    /// Fly mode: you are the camera. Drag turns your head, scroll/pinch and the keys move you through the room.
+    var fly = false {
+        didSet {
+            guard fly != oldValue else { return }
+            wake()
+            goal = nil
+            // keep the eye where it is; only the point it turns around changes: right in front of you while flying
+            // (looking around turns your head), a stage-sized step ahead again when orbiting
+            setDistance(fly ? Self.flyReach : max(6, simd_length(pose.target - pose.eye)))
+        }
+    }
+    static let flyReach: Float = 1
+
+    /// Keys held down (key codes, by position so other layouts fly the same), read every frame.
+    var heldKeys: Set<UInt16> = [] { didSet { if !heldKeys.isEmpty { wake() } } }
+
+    private func setDistance(_ d: Float) {
+        let eye = pose.eye, dir = simd_normalize(pose.target - eye)
+        pose.distance = d
+        pose.target = eye + dir * d
+    }
+
+    /// Turn the head: the eye stays put, the view swings. Drag right looks right, drag up looks up.
+    private func look(dx: Float, dy: Float) {
+        let eye = pose.eye
+        pose.yaw += dx * 0.004
+        pose.pitch = min(1.5, max(-1.5, pose.pitch - dy * 0.004))
+        let dir = SIMD3(sin(pose.yaw) * cos(pose.pitch), cos(pose.yaw) * cos(pose.pitch), sin(pose.pitch))
+        pose.target = eye - dir * pose.distance
+    }
+
+    /// Move the eye (and what it looks at) in metres: forward along the floor, right, up.
+    func move(forward: Float = 0, right: Float = 0, up: Float = 0) {
+        wake()
+        goal = nil
+        let fwd = SIMD3<Float>(-sin(pose.yaw), -cos(pose.yaw), 0), r = SIMD3<Float>(-cos(pose.yaw), sin(pose.yaw), 0)
+        pose.target += fwd * forward + r * right + SIMD3(0, 0, up)
+        let floor: Float = 0.15  // never below the floor
+        let z = pose.eye.z
+        if z < floor { pose.target.z += floor - z }
+    }
+
+    // key codes (ANSI positions)
+    enum Key {
+        static let w: UInt16 = 13, a: UInt16 = 0, s: UInt16 = 1, d: UInt16 = 2, q: UInt16 = 12, e: UInt16 = 14
+        static let left: UInt16 = 123, right: UInt16 = 124, down: UInt16 = 125, up: UInt16 = 126
+        static let plus: UInt16 = 24, minus: UInt16 = 27, keypadPlus: UInt16 = 69, keypadMinus: UInt16 = 78
+        static let movement: Set<UInt16> = [w, a, s, d, q, e, left, right, down, up, plus, minus, keypadPlus, keypadMinus]
+    }
+
+    /// Walk/fly with the held keys: WASD or arrows move, Q/E go down/up, +/− zoom (or move forward/back while
+    /// flying). ⇧ is faster, ⌥ slower.
+    private func applyHeldKeys(_ dt: Float) {
+        guard !heldKeys.isEmpty else { return }
+        func axis(_ pos: [UInt16], _ neg: [UInt16]) -> Float {
+            (pos.contains(where: heldKeys.contains) ? 1 : 0) - (neg.contains(where: heldKeys.contains) ? 1 : 0)
+        }
+        let mods = NSEvent.modifierFlags
+        let speed: Float = 4 * (mods.contains(.shift) ? 3 : 1) * (mods.contains(.option) ? 0.3 : 1) * dt
+        let fwd = axis([Key.w, Key.up], [Key.s, Key.down]), side = axis([Key.d, Key.right], [Key.a, Key.left])
+        let lift = axis([Key.e], [Key.q]), zoomIn = axis([Key.plus, Key.keypadPlus], [Key.minus, Key.keypadMinus])
+        if fly {
+            move(forward: (fwd + zoomIn) * speed, right: side * speed, up: lift * speed)
+        } else {
+            move(forward: fwd * speed, right: side * speed, up: lift * speed)
+            if zoomIn != 0 { zoom(1 - zoomIn * min(0.5, speed / max(1, pose.distance) * 1.5)) }
+        }
     }
 
     func pan(dx: Float, dy: Float) {
@@ -219,7 +293,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         let (inp, frame) = input?() ?? (nil, nil)
         drawingView = view
         if let f = frame, f.t != lastShowT { lastShowT = f.t; lastActive = now }  // the show moves
-        if goal != nil || autoOrbit || (inp.map { $0.key != sceneryKey } ?? false) { lastActive = now; lastInteraction = now }
+        if goal != nil || autoOrbit || !heldKeys.isEmpty || (inp.map { $0.key != sceneryKey } ?? false) { lastActive = now; lastInteraction = now }
         let moving = now - lastInteraction < Self.interactionFor
         let fps = now - lastActive > Self.idleAfter ? Self.idleFPS : moving ? Self.activeFPS : Self.showFPS
         if view.preferredFramesPerSecond != fps { view.preferredFramesPerSecond = fps }
@@ -229,7 +303,9 @@ final class StageRenderer: NSObject, MTKViewDelegate {
             pose = .lerp(pose, g, 1 - exp(-dt * 4))
             if abs(pose.distance - g.distance) < 0.01 && simd_length(pose.target - g.target) < 0.01 { pose = g; goal = nil }
         }
-        if autoOrbit && goal == nil { pose.yaw += dt * 0.05 }
+        if !heldKeys.isEmpty, !(view.window?.isKeyWindow ?? false) { heldKeys = [] }  // keyUp went elsewhere
+        applyHeldKeys(dt)
+        if autoOrbit && goal == nil && !fly { pose.yaw += dt * 0.05 }
 
         adaptScale(now)
         ensureTargets(CGSize(width: (view.drawableSize.width * renderScale).rounded(),
