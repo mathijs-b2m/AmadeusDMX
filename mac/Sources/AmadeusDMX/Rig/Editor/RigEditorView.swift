@@ -128,6 +128,9 @@ struct RigEditorView: View {
                             Task { await editor.autoMount(model, ids: Array(editor.selectedFixtures)) }
                         }
                     }
+                    Button("Put in Name Order", systemImage: "list.number") { Task { await editor.putInOrder(model) } }
+                        .disabled(editor.doc.fixtures.count == editor.doc.waitingCount)
+                        .help("The fixtures stay on their spots, but in name order along the rig: top1 at the first place, top2 at the next")
                     Divider()
                     Button("Re-Mount Everything", systemImage: "arrow.counterclockwise") { Task { await editor.autoMount(model, all: true) } }
                 } label: {

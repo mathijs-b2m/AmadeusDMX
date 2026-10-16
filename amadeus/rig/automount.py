@@ -19,6 +19,7 @@ stage), before anything is mounted: never a field of stands.
 from __future__ import annotations
 
 import math
+import re
 from collections import defaultdict
 
 from amadeus.library import fixtures as fxlib
@@ -111,7 +112,63 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
     m.row(m.ends(by_role["blinder"], front[0][0] if front else None), y=-0.2, z=0.9, mount="stand", span=0.76)
     m.row(by_role["bar"], y=-0.3, z=0.15, mount="floor", span=0.8)
     m.row(by_role["par"], y=back_y - 0.5, z=0.15, mount="floor", span=0.8)
-    return {**{k: v for k, v in attached.items() if k not in taken}, **m.out}
+    return {**{k: v for k, v in attached.items() if k not in taken}, **numbered(merged, m.out)}
+
+
+def natural(name: str) -> list:
+    """Sort key for names with numbers in them: top2 before top10."""
+    return [int(p) if p.isdigit() else p.lower() for p in re.split(r"(\d+)", name)]
+
+
+def name_order(fixtures: list[dict]):
+    """Sort key for fixture names: a family of names (top1, top2…) in the order the set lists it first, and within
+    a family by number (so top2 comes before top10, and the set's "top" heads before its "back" ones)."""
+    rank: dict[str, int] = {}
+    for f in fixtures:
+        rank.setdefault(re.sub(r"\d+$", "", f["id"]), len(rank))
+    return lambda fid: (rank.get(re.sub(r"\d+$", "", fid), len(rank)), natural(fid))
+
+
+def numbered(merged: dict, places: dict[str, dict]) -> dict[str, dict]:
+    """The same spots, the fixtures of each model on them in name order along the rig: the hang sheet's order
+    (each truss from its stage-left end, front truss first, then the towers and the floor). top1 hangs at the
+    first place, top2 at the next, so the names (and the addresses patched in name order) count along the truss
+    like the places do. Which spots a model has (its symmetry) doesn't change, only which of them gets which name."""
+    from amadeus.rig import hangsheet, store
+
+    if len(places) < 2:
+        return places
+    rig = {**merged, "fixtures": []}
+    for f in merged.get("fixtures", []):
+        if f["id"] in places:
+            f = {k: v for k, v in f.items() if k not in store.PLACEMENT_KEYS and k != store.UNPLACED}
+            f.update(places[f["id"]])
+        rig["fixtures"].append(f)
+    lay = hangsheet.layout(rig)
+    order = {r["id"]: i for i, r in enumerate([r for st in lay["structures"] for r in st["fixtures"]] + lay["floor"])}
+    model = {f["id"]: f["fixture"] for f in merged.get("fixtures", [])}
+    groups: dict[str, list[str]] = defaultdict(list)
+    for fid in places:
+        groups[model.get(fid, "")].append(fid)
+    out, key = dict(places), name_order(merged.get("fixtures", []))
+    for ids in groups.values():
+        spots = sorted(ids, key=lambda i: order.get(i, len(order)))
+        for name, spot in zip(sorted(ids, key=key), spots):
+            out[name] = places[spot]
+    return out
+
+
+def in_order(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
+    """The mounted fixtures (of `ids`, else all) put in name order on the spots they already take (`numbered`):
+    the placements that change. Nothing moves to a new spot."""
+    from amadeus.rig import store
+
+    places = {
+        f["id"]: {k: f[k] for k in store.PLACEMENT_KEYS if k in f}
+        for f in merged.get("fixtures", [])
+        if (ids is None or f["id"] in ids) and not f.get(store.UNPLACED)
+    }
+    return {fid: p for fid, p in numbered(merged, places).items() if p != places[fid]}
 
 
 TOWER_NEAR_M = 0.3  # fixtures this close across the floor, at different heights: on one tower

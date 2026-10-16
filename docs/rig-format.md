@@ -151,7 +151,10 @@ of the same name the first time the engine or the Mac app runs.
 3. **Strobes** on the front face of the front truss, in the middle; **blinders** on its outer ends.
 4. **Bars** on the floor along the front edge; **pars** on the floor at the back, uplighting.
 
-Every row is symmetric and each model is mirrored around the middle. Fixtures that are already mounted keep
+Every row is symmetric and each model is mirrored around the middle. Each model's fixtures take its spots in name
+order along the rig, the hang sheet's order (top1 at the first place from stage left, top2 at the next), so names
+count along a truss like the places do; *Auto-Mount › Put in Name Order* does the same for a rig mounted before,
+on the spots its fixtures already take. Fixtures that are already mounted keep
 their place, and their room on a truss is left free.
 
 ## Hang sheet

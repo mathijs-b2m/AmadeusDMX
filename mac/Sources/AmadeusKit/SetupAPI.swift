@@ -281,6 +281,14 @@ public struct SetupAPI: Sendable {
         return data
     }
 
+    /// The mounted fixtures of a layout put in name order on the spots they take (top1 at the first place along
+    /// the rig, top2 at the next): the placements that change. Nothing moves to a new spot.
+    public func inOrderPlacements(layout: [String: Any]) async throws -> [String: [String: JSONValue]] {
+        struct R: Decodable { var placements: [String: [String: JSONValue]] }
+        let r: R = try await post("api/automount", ["rig": layout, "order": true])
+        return r.placements
+    }
+
     /// Free start addresses for `count` fixtures of a mode: tightly packed, or on easy-to-dial numbers.
     public func suggest(key: String, mode: String, count: Int, universe: Int = 1) async throws -> [Int] {
         struct R: Decodable { var packed: [Int]?; var easy: [Int]? }
