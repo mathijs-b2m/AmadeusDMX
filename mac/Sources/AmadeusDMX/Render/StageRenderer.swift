@@ -20,6 +20,18 @@ struct StageInput {
     var zones: [Zone] = []           // drawn translucent (rig editor)
 }
 
+extension StageInput {
+    /// Where the trusses and fixtures are, for the key: a truss moved (same count) is a different rig to draw.
+    static func layout(_ fixtures: [FixtureInfo], _ trusses: [Truss]) -> Int {
+        var h = Hasher()
+        h.combine(trusses)
+        for f in fixtures {
+            h.combine(f.id); h.combine(f.pos); h.combine(f.rot); h.combine(f.mount); h.combine(f.up); h.combine(f.truss)
+        }
+        return h.finalize()
+    }
+}
+
 @MainActor
 final class StageRenderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
