@@ -129,3 +129,50 @@ def test_pars_on_a_full_ring_chase_round_it(show):
     fx = {f["id"]: f for f in e.rig["fixtures"]}
     pos = [fx[p["fixture"]]["truss_pos_m"] for p in e.pars]
     assert pos == sorted(pos) and ring["length_m"] > 0  # in order round the circle
+
+
+def test_automatic_aim_is_down_over_the_crowd():
+    assert T.light_aim(T.ring("r", 4.0, 5.0, 3.0, 5.0)) == "down"  # in front of the stage edge: over the crowd
+    assert T.light_aim(T.ring("r", 4.0, 5.0, -3.0, 5.0)) is None  # over the stage: wherever the director aims
+    assert T.light_aim({**T.ring("r", 4.0, 5.0, 3.0, 5.0), "aim": "audience"}) == "audience"  # the setting wins
+    assert T.light_aim({**T.ring("r", 4.0, 5.0, -3.0, 5.0), "aim": "down"}) == "down"
+
+
+def _aimed(aim: str):
+    rig = ring_rig()
+    rig["trusses"][0]["aim"] = aim
+    a = synthetic_analysis()
+    plan = direct(a, RuleDirector(), verbose=False)
+    k = next(i for i, d in enumerate(plan) if d.section == "groove")
+    return plan[k], Engine(a, plan, rig, real_output=False)
+
+
+def test_a_ring_set_down_plays_the_crowd_under_it():
+    d0, e = _aimed("down")
+    for aim in ("crowd", "stage"):
+        for f in ("sync", "fan", "focus"):
+            d = replace(d0, movement="circle", formation=f, aim=aim, grouping="unison")
+            ts = np.linspace(d.start + 1, d.start + 9, 40)
+            for j in range(len(e.heads)):
+                el = np.degrees(np.arcsin(e._head_dir_v(d, ts, j)[:, 2]))
+                assert el.max() < -40, (aim, f, j)  # steeply down, whatever the director aimed at
+    d = replace(d0, movement="still", formation="fan", aim="crowd", grouping="unison")
+    beams = np.array([e._head_dir_v(d, np.array([d.start + 1.0]), j)[0] for j in range(len(e.heads))])
+    assert beams[:, 1].min() < -0.1  # the whole crown, the back half too (it hangs over the crowd)
+    d = replace(d0, movement="tilt_wave", formation="sync", aim="crowd", grouping="unison")
+    ts = np.linspace(d.start + 1, d.start + 9, 200)
+    for j in range(len(e.heads)):  # the wave rolls round straight down, never over it
+        el = np.degrees(np.arcsin(e._head_dir_v(d, ts, j)[:, 2]))
+        assert el.min() > -89 and np.ptp(el) > 5
+    d = replace(d0, movement="sweep", formation="fan", aim="sky", grouping="unison")
+    up = e._head_dir_v(d, np.array([d.start + 1.0]), 0)[0]
+    assert up[2] > 0  # an aim at the sky still goes up
+
+
+def test_a_ring_set_towards_the_audience_never_plays_the_stage():
+    d0, e = _aimed("audience")
+    for f in ("sync", "fan"):
+        d = replace(d0, movement="sweep", formation=f, aim="stage", grouping="unison")
+        ts = np.linspace(d.start + 1, d.start + 9, 40)
+        for j in range(len(e.heads)):
+            assert (e._head_dir_v(d, ts, j)[:, 1] > 0).all(), (f, j)  # out towards the audience

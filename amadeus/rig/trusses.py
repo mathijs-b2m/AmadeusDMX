@@ -12,6 +12,10 @@ A round truss (`"shape": "circle"`) hangs flat: a full circle, or an arc of `arc
 `u` from the arc's middle, to the right seen from the audience); a fixture on it is turned with the arc, so
 its front (and the truss's "front" face) faces out of the circle and the "back" face into it.
 
+A truss's `aim` says where the heads on it play: `"audience"` (out towards the crowd, never back at the stage), or
+`"down"` (onto the crowd under it). Without one it is automatic: a truss hanging over the crowd (its centre at least
+OVER_CROWD_M in front of the stage edge) plays down, any other plays wherever the director aims.
+
 Truss coordinates are metres: `x_m` across the stage, `y_m` towards the audience (0 = the stage's front
 edge), `z_m` the height of its centre; `rot_deg` turns it counter-clockwise seen from above.
 """
@@ -29,6 +33,8 @@ TOWER_SIDES = ("front", "back", "left", "right", "top")
 DIAMETERS_M = (2.0, 3.0, 4.0, 5.0, 6.0, 8.0)  # round truss as it is sold (the usual sizes; any other works too)
 DEFAULT_DIAMETER_M = 4.0
 ARCS_DEG = (360.0, 180.0)  # a full circle or a half circle (any arc works)
+AIMS = ("audience", "down")  # where a truss's heads play (`aim`); none: automatic
+OVER_CROWD_M = 1.0  # a truss this far in front of the stage edge hangs over the crowd: automatic is down
 
 
 def is_ring(t: dict) -> bool:
@@ -46,6 +52,15 @@ def ring_arc(t: dict) -> float:
 
 def ring_radius(t: dict) -> float:
     return float(t.get("diameter_m", DEFAULT_DIAMETER_M)) / 2
+
+
+def light_aim(t: dict) -> str | None:
+    """Where the heads on this truss play: "audience", "down", or None (the director's aim as it is)."""
+    if t.get("aim") in AIMS:
+        return t["aim"]
+    if not t.get("vertical") and float(t.get("y_m", 0.0)) >= OVER_CROWD_M:
+        return "down"
+    return None
 
 
 def ring(tid: str, diameter: float, x: float, y: float, z: float, arc: float = 360.0, rot: float = 0.0) -> dict:

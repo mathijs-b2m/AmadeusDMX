@@ -310,10 +310,31 @@ struct TrussInspector: View {
                 ValueSlider(title: "Rotation", value: binding(\.rotDeg), range: -180...180, step: 15, unit: "°")
             }
         }
+        if !truss.vertical {
+            SwiftUI.Section("Lights") {
+                Picker("Aim", selection: Binding(get: { truss.aim ?? "" }, set: { v in
+                    editor.updateTruss(truss.id, "Change Aim") { $0.aim = v.isEmpty ? nil : v }
+                })) {
+                    Text(truss.yM >= Truss.overCrowdM ? "Automatic (down)" : "Automatic").tag("")
+                    Text("Towards the audience").tag("audience")
+                    Text("Down").tag("down")
+                }
+                .help("Where the heads on this truss play. Automatic: down when it hangs over the crowd, else wherever the show aims")
+                Text(aimNote).font(.caption).foregroundStyle(.secondary)
+            }
+        }
         SwiftUI.Section {
             LabeledContent("Fixtures on it", value: "\(editor.doc.fixtures.filter { $0.truss == id }.count)")
             Button("Duplicate", systemImage: "plus.square.on.square") { editor.duplicateSelection() }
             Button("Delete Truss", systemImage: "trash", role: .destructive) { editor.deleteSelection() }
+        }
+    }
+
+    private var aimNote: String {
+        switch truss.lightAim {
+        case "down": "The heads play down onto the crowd under it (they still go up for a build)."
+        case "audience": "The heads play out towards the audience, never back at the stage."
+        default: "The heads play wherever the show aims: the crowd, the stage or the sky."
         }
     }
 

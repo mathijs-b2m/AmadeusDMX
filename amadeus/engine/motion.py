@@ -16,6 +16,7 @@ from amadeus.engine.rings import RING_FORMATIONS
 from amadeus.engine.timing import _ease
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
+from amadeus.rig import trusses as T
 
 MOTION_FPS = 50
 
@@ -67,7 +68,14 @@ AIMS = {  # direction aims: centre azimuth/elevation and swing; point aims: (y c
     "crowd": {"az": 0, "el": -32, "az_amp": 60, "el_amp": 15, "plane": (2.2, 1.5, 0.0)},
     "stage": {"az": 180, "el": -35, "az_amp": 60, "el_amp": 18, "plane": (-2.2, 1.0, 0.0)},
     "sky": {"az": 0, "el": 60, "az_amp": 50, "el_amp": 20, "plane": (1.0, 2.0, "ceiling")},
+    "down": {"az": 0, "el": -70, "az_amp": 40, "el_amp": 12, "plane": (2.2, 1.5, 0.0)},  # a truss over the crowd
 }
+
+
+# a truss's `aim` (amadeus/rig/trusses.py) turns the director's aim for the heads on it: down plays the crowd under
+# it (an aim at the sky stays: a build still goes up), towards the audience never plays back at the stage
+TRUSS_AIMS = {"down": {"crowd": "down", "stage": "down"}, "audience": {"stage": "crowd"}}
+DOWN_LOWEST_DEG = -88.0  # a tilt wave played down stays this side of straight down (past it the beam flips over)
 
 
 LOW_HEAD_M = 1.0  # heads below this (on the floor) aim up and over the crowd instead of down onto it
@@ -209,6 +217,19 @@ class MotionMixin:
             DRIFT_V * math.sin(2 * math.pi * pos / DRIFT_BEATS_V + 2 * w),
         )
 
+    def _init_truss_aims(self, rig: dict, fixtures: dict):
+        """Per head: its truss's aim ("audience", "down" or None)."""
+        trusses = {t["id"]: t for t in rig.get("trusses", [])}
+        self.truss_aim = [
+            T.light_aim(trusses[t]) if (t := fixtures[e["fixture"]].get("truss")) in trusses else None
+            for e in self.heads
+        ]
+
+    def _aim_name(self, name: str, j: int) -> str:
+        """The director's aim for head j, turned by its truss's aim."""
+        mode = self.truss_aim[j] if getattr(self, "truss_aim", None) else None
+        return TRUSS_AIMS.get(mode, {}).get(name, name)
+
     def _fit_aim(self, name: str, head_pos) -> dict:
         """An aim for this head: floor heads aim up over the crowd; outdoors the sky aim reaches higher; an aim up
         into a low ceiling comes down
@@ -235,7 +256,8 @@ class MotionMixin:
             pos -= j  # one beat later per head
         seed = j if f in ("wave",) else 0  # ballyhoo: same random path unless the heads are offset anyway
         tempo = TEMPO[max(0, min(3, d.intensity))]
-        self._reach_uv = self.reach_uv[j].get(d.aim, (1.0, 1.0))
+        aim_name = self._aim_name(d.aim, j)
+        self._reach_uv = self.reach_uv[j].get(aim_name, (1.0, 1.0))
         self._move_beats = self.move_beats.get(j, (1, 1))
         self._move_travel = self.move_travel.get(j, (0.9, 0.9))
         if d.movement == "follow_lead":
@@ -248,7 +270,7 @@ class MotionMixin:
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
-        aim = self._fit_aim(d.aim, head_pos)
+        aim = self._fit_aim(aim_name, head_pos)
         W = self.stage["width_m"]
 
         az = aim["az"] + u * aim["az_amp"]
@@ -318,6 +340,7 @@ class MotionMixin:
                     self.rig["fixtures"],
                     self.stage,
                     self.rig.get("zones", []),
+                    self.rig.get("trusses", []),  # a ring's shape and a truss's aim
                     self.program,  # a program's head pictures depend on its hits
                     [len(self.cine_hits), float(self.cine_hits.t.sum()), self.CINE_VERSION] if self.program else None,
                     [(p.pickup_kind, round(p.pickup_start, 3)) for p in self.a.phrases if p.pickup_beats],
@@ -445,7 +468,8 @@ class MotionMixin:
         pos = pos + role["phase"]
         seed = role["seed"] if role["seed"] is not None else (idx if f in ("wave",) else 0)
         tempo = TEMPO[max(0, min(3, d.intensity))]
-        self._reach_uv = self.reach_uv[j].get(d.aim, (1.0, 1.0))
+        aim_name = self._aim_name(d.aim, j)
+        self._reach_uv = self.reach_uv[j].get(aim_name, (1.0, 1.0))
         u, v = self._shape_v(movement, pos, seed, tempo, j)
         if movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)
@@ -453,7 +477,7 @@ class MotionMixin:
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
-        aim = self._fit_aim(d.aim, head_pos)
+        aim = self._fit_aim(aim_name, head_pos)
         W = role["width"]
         az = aim["az"] + u * aim["az_amp"]
         el = aim["el"] + v * aim["el_amp"]
@@ -468,6 +492,9 @@ class MotionMixin:
                 across = ring["frac"]
             wave = np.sin(2 * math.pi * (beats / period - across * TILT_WAVE_SPAN))
             centre = aim["el"] - 8 if aim["el"] < 0 else aim["el"]  # over the crowd: room for the top of the wave
+            if aim_name == "down":  # straight down already: the wave rolls round it, never over it
+                centre = aim["el"]
+                amp = min(amp, centre - DOWN_LOWEST_DEG)
             az = np.full_like(ts, aim["az"] + side * (30 if f == "fan" else 15), dtype=float)
             if ring:
                 az = np.full_like(ts, self._crown_az(ring), dtype=float)
