@@ -274,6 +274,19 @@ def automount(req):
     return {"placements": places, "rig": show.load()}
 
 
+def hang_sheet(req):
+    """The hang sheet of the set on the rig (`?rig=…&set=…`): a printable HTML page. Posted
+    {"rig": <combined dict>, "names": [set, rig]}: of that layout (an editor's, saved or not)."""
+    from amadeus.rig import hangsheet
+
+    if req.command == "POST":
+        b = req.body()
+        set_name, rig_name = (list(b.get("names") or []) + ["", ""])[:2]
+        return hangsheet.html(b["rig"], set_name, rig_name)
+    show = req.show
+    return hangsheet.html(show.load(), show.set or show.label, show.rig)
+
+
 def autopatch(req):
     """Non-overlapping addresses and a stage layout for the posted fixtures."""
     from amadeus.dmx.discover import assign_addresses, layout, new_ids
@@ -461,6 +474,7 @@ GET = {
     "/api/sets": list_sets,
     "/api/rigs": list_sets,
     "/api/limiter": get_limiter,
+    "/api/hangsheet": hang_sheet,
 }
 POST = {
     "/api/rig": save_rig,
@@ -468,6 +482,7 @@ POST = {
     "/api/sets": change_sets,
     "/api/rigs": change_rigs,
     "/api/automount": automount,
+    "/api/hangsheet": hang_sheet,
     "/api/autopatch": autopatch,
     "/api/discover": discover,
     "/api/identify": identify,

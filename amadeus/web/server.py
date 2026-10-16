@@ -119,9 +119,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path not in QUIET:
             ms = (time.monotonic() - getattr(self, "_t0", time.monotonic())) * 1000
             event(f"{self.client} {self.command} {self.path[:80]} -> {status} ({ms:.0f} ms) {_summary(obj)}")
-        data = json.dumps(obj).encode()
+        page = isinstance(obj, str)  # a page (the hang sheet), not JSON
+        data = obj.encode() if page else json.dumps(obj).encode()
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "text/html; charset=utf-8" if page else "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -132,6 +133,8 @@ def _summary(obj) -> str:
         return obj.get("error") or ", ".join(list(obj)[:6])
     if isinstance(obj, list):
         return f"{len(obj)} items"
+    if isinstance(obj, str):
+        return f"{len(obj)} bytes of html"
     return ""
 
 
