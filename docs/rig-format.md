@@ -165,6 +165,13 @@ performer's left (x = 0); distances are to the clamp, and being 10–20 cm off d
 truss, the way round and the address do. In the Mac app: the printer button in the rig editor (it prints the layout
 as it is, saved or not); on the command line: `amadeus rig --hang-sheet [FILE]`.
 
+**The check after hanging** (the checklist button in the rig editor) lights the fixtures one by one in the sheet's
+order and selects each in the view. A moving head points its beam a known way: out in front of it and a little to
+its left, down when it hangs (`hangsheet.check_dir`). What the crew sees wrong is put right in the app instead of on
+the ladder: the light at another fixture's place swaps the two (their placements trade, their patch and calibration
+stay), a beam elsewhere says the head pans the other way (`pan_invert`) or is turned round (its `pan_home_deg` half a
+turn on; a head whose tilt is the wrong way round gives the same beam, and the same fix). Undo and Save as usual.
+
 ## Setup API
 
 The setup pages and the Mac app use these (all JSON; `?rig=…&set=…` picks a pair other than the active one):
@@ -176,4 +183,5 @@ The setup pages and the Mac app use these (all JSON; `?rig=…&set=…` picks a 
 | `POST /api/rigs` | `{"active"}` switch · `{"name", "template", "width", "height", "depth", "screen"\|"copy"}` create · `{"rename", "to"}` · `{"delete"}` |
 | `GET /api/rig`, `POST /api/rig` | the set on the rig, combined (see above) |
 | `GET /api/hangsheet`, `POST /api/hangsheet` | the hang sheet (HTML) of the pair; posted `{"rig": <combined dict>, "names": [set, rig]}`: of that layout |
+| `POST /api/hangcheck`, `POST /api/hangcheck/fix` | the check after hanging for `{"rig": <combined dict>}`, step by step; the calibration that puts a head right (`"fixture"`, `"fix"`: `mirrored`, `turned`, `both`) |
 | `POST /api/automount` | `{"ids"?, "all"?}` mount and save; with `"rig": <combined dict>` only compute the placements |

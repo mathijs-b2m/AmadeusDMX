@@ -485,6 +485,105 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    // MARK: - the check after hanging
+
+    /// The check after hanging: every fixture lit on its own in the hang sheet's order, a moving head pointing its
+    /// beam a known way. What the crew sees wrong is put right here: two fixtures swapped, a head mirrored or turned
+    /// round (its calibration). The changes are the editor's like any other: undo, Save.
+    struct HangCheck {
+        var steps: [HangCheckStep]
+        var index = 0
+        var output = ""             // where its DMX goes, in words
+        var fixed: [String: String] = [:]  // fixture id → what was put right
+        var step: HangCheckStep? { steps.indices.contains(index) ? steps[index] : nil }
+    }
+
+    var check: HangCheck?
+
+    private func layoutDict() throws -> [String: Any] {
+        (try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any]) ?? [:]
+    }
+
+    func startCheck(_ model: AppModel) async {
+        busy = true
+        defer { busy = false }
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            let steps = try await model.api.hangCheck(layout: try layoutDict())
+            guard !steps.isEmpty else { message = "Nothing to check: no fixture is mounted yet"; return }
+            check = HangCheck(steps: steps)
+            await lightCheck(model)
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    func stopCheck(_ model: AppModel) async {
+        guard let id = check?.step?.id else { check = nil; return }
+        check = nil
+        _ = try? await model.api.testLight(fixture: id, on: false, layout: try layoutDict(), point: false)
+    }
+
+    func moveCheck(_ model: AppModel, to index: Int) async {
+        guard let c = check, c.steps.indices.contains(index) else { return }
+        if let id = c.step?.id, id != c.steps[index].id {
+            _ = try? await model.api.testLight(fixture: id, on: false, layout: try layoutDict(), point: false)
+        }
+        check?.index = index
+        await lightCheck(model)
+    }
+
+    /// Light the step's fixture (with the layout as it is now, fixes and all) and select it in the view.
+    private func lightCheck(_ model: AppModel) async {
+        guard let step = check?.step else { return }
+        selection = .fixture(step.id)
+        group = []
+        guard step.dark.isEmpty else { check?.output = ""; return }
+        do {
+            let r = try await model.api.testLight(fixture: step.id, on: true, layout: try layoutDict(), point: step.moving)
+            check?.output = r.summary
+        } catch {
+            check?.output = error.localizedDescription
+        }
+    }
+
+    /// The head is hung wrong the way the crew saw: its calibration put right, and lit again to see.
+    func fixCheck(_ model: AppModel, _ fault: HangCheckStep.Fault) async {
+        guard let step = check?.step else { return }
+        do {
+            let fields = try await model.api.hangCheckFix(layout: try layoutDict(), fixture: step.id, fix: fault.fix)
+            change("Fix \(step.label)") { d in d.calibrate(step.id, fields) }
+            check?.fixed[step.id] = Self.fixText[fault.fix] ?? fault.fix
+            await relightCheck(model)
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    static let fixText = ["mirrored": "pans the other way now", "turned": "turned round now",
+                          "both": "turned round and pans the other way now"]
+
+    /// The fixture lit at another step's place: the two trade places in the layout. The step stays at its place,
+    /// now with the other fixture, lit to see.
+    func swapCheck(_ model: AppModel, with other: HangCheckStep) async {
+        guard let step = check?.step, step.id != other.id else { return }
+        change("Swap \(step.label) and \(other.label)") { d in d.swapPlacements(step.id, other.id) }
+        _ = try? await model.api.testLight(fixture: step.id, on: false, layout: try layoutDict(), point: false)
+        check?.fixed[other.id] = "swapped with \(step.id)"
+        check?.fixed[step.id] = "swapped with \(other.id)"
+        await relightCheck(model)
+    }
+
+    /// The steps again after a change (a swap changes which fixture is at a place), at the same place.
+    private func relightCheck(_ model: AppModel) async {
+        guard let c = check else { return }
+        if let steps = try? await model.api.hangCheck(layout: try layoutDict()), !steps.isEmpty {
+            check?.steps = steps
+            check?.index = min(c.index, steps.count - 1)
+        }
+        await lightCheck(model)
+    }
+
     /// Placements (fixture id → position fields, as in a rig file) onto the fixtures.
     func apply(_ places: [String: [String: JSONValue]], trusses: [Truss]? = nil, name: String) {
         change(name) { d in

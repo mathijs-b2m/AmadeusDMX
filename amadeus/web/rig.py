@@ -287,6 +287,25 @@ def hang_sheet(req):
     return hangsheet.html(show.load(), show.set or show.label, show.rig)
 
 
+def hang_check(req):
+    """{"rig": <combined dict>}: the check after hanging, step by step (rig/hangsheet.py check_steps)."""
+    from amadeus.rig import hangsheet
+
+    return {"steps": hangsheet.check_steps(req.body()["rig"])}
+
+
+def hang_check_fix(req):
+    """{"rig": <combined dict>, "fixture": id, "fix": "mirrored"|"turned"|"both"}: the calibration fields that put
+    that head right (they go into the set)."""
+    from amadeus.rig import hangsheet
+
+    b = req.body()
+    fx = next((f for f in b["rig"].get("fixtures", []) if f["id"] == b["fixture"]), None)
+    if fx is None:
+        return {"error": f"The set has no fixture called {b['fixture']}"}, 400
+    return {"fields": hangsheet.fix(fx, fxlib.get(fx["fixture"]), b["fix"])}
+
+
 def autopatch(req):
     """Non-overlapping addresses and a stage layout for the posted fixtures."""
     from amadeus.dmx.discover import assign_addresses, layout, new_ids
@@ -353,14 +372,15 @@ def _identify(rig: dict, fixture_id: str, seconds: float = 2.0):
 # switched off, or for TEST_SECONDS at most.
 TEST_SECONDS = 60.0
 _test_lock = threading.Lock()
-_test: dict = {"rig": None, "lit": {}, "raw": {}, "thread": None}
+_test: dict = {"rig": None, "lit": {}, "raw": {}, "aim": {}, "thread": None}
 
 
 def test_light(req):
     """{"fixture": id, "rig": {...}, "on": bool}: light that fixture (or stop), to see it is patched and
     connected. Says where its DMX goes. With "raw": [v, …] its channels get those values as they are (the DMX
     mapper: what does this channel do?); "light": [channel index, …] the ones it plays light on, kept under the
-    brightness limiter with the definition's own."""
+    brightness limiter with the definition's own. With "point": true a moving head points its beam the way the
+    check after hanging says (rig/hangsheet.py check_aim) instead of straight out."""
     from amadeus.dmx import outputs
     from amadeus.rig.loader import load_rig_dict
 
@@ -380,8 +400,14 @@ def test_light(req):
         _test["lit"] = {fid: until for fid, until in _test["lit"].items() if fid in ids}  # another set's: dark
         _test["rig"] = rig
         _test["raw"] = {fid: v for fid, v in _test["raw"].items() if fid in _test["lit"]}
+        _test["aim"] = {fid: v for fid, v in _test["aim"].items() if fid in _test["lit"]}
+        _test["aim"].pop(fixture_id, None)
         if on:
             _test["lit"][fixture_id] = time.monotonic() + TEST_SECONDS
+            if body.get("point") and fxlib.is_moving(defn):  # the check after hanging: its beam a known way
+                from amadeus.rig import hangsheet
+
+                _test["aim"][fixture_id] = hangsheet.check_aim(fx, defn)
             if raw is not None:
                 light = {int(i) for i in body.get("light", []) if isinstance(i, int)}
                 _test["raw"][fixture_id] = (raw[: fxlib.footprint(fx)], light)
@@ -416,7 +442,7 @@ def _test_loop():
                 for fid, until in list(_test["lit"].items()):
                     if until < now:
                         del _test["lit"][fid]
-                lit, raw = set(_test["lit"]), dict(_test["raw"])
+                lit, raw, aim = set(_test["lit"]), dict(_test["raw"]), dict(_test["aim"])
                 if _test["rig"] is not rig:
                     if sender:
                         sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
@@ -432,7 +458,7 @@ def _test_loop():
                 if f["id"] in raw:  # as they are: the mapper tries what a channel does
                     fxlib.test_raw(buf, f, *raw[f["id"]])
                 elif f["id"] in lit:
-                    fxlib.test_light(buf, f)
+                    fxlib.test_light(buf, f, aim=aim.get(f["id"]))
                 else:  # dark, and heads where a blackout leaves them (DMX 0): they don't move on every test
                     fxlib.patch(buf, f, {e["id"]: State(pan=0.0, tilt=0.0) for e in fxlib.expand(f)})
             sender.send(unis)
@@ -483,6 +509,8 @@ POST = {
     "/api/rigs": change_rigs,
     "/api/automount": automount,
     "/api/hangsheet": hang_sheet,
+    "/api/hangcheck": hang_check,
+    "/api/hangcheck/fix": hang_check_fix,
     "/api/autopatch": autopatch,
     "/api/discover": discover,
     "/api/identify": identify,

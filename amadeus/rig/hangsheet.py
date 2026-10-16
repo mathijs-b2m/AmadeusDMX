@@ -500,3 +500,95 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
         p.append("</div></section>")
     p.append("</body></html>")
     return "".join(p)
+
+
+# ---- the check after hanging -----------------------------------------------------------------------------------
+# Every fixture lit on its own, in the sheet's order: the crew sees whether the right one lights at its place. A
+# moving head points its beam a known way: out in front of it, a little to its left, down when it hangs and up when
+# it stands (CHECK_DIR, in the head's own frame). One that is turned round or mirrored puts its beam somewhere else,
+# which the check says in words, and is put right in the app instead of on the ladder: mirrored → pan the other way
+# (pan_invert), turned round → its pan home half a turn on. A head with its tilt the wrong way round looks like one
+# turned round (the same beam), and the same fix puts it right.
+
+CHECK_DIR = (0.45, 1.0, 0.8)  # to its left, in front of it, down (hanging) or up (standing)
+FIXES = ("mirrored", "turned", "both")
+
+
+def check_dir(fx: dict):
+    """Where a moving head points its beam for the check (a unit vector in the world)."""
+    import numpy as np
+
+    left, ahead, z = CHECK_DIR
+    fx_, fy = _front(fx)
+    x, y = fx_ * ahead - fy * left, fy * ahead + fx_ * left  # its front, and its left (the front turned a quarter)
+    d = np.array([x, y, -z if geometry.mount_up(fx)[2] < -0.5 else z])
+    return d / np.linalg.norm(d)
+
+
+def check_aim(fx: dict, defn: dict) -> tuple[float, float]:
+    """The check's pan and tilt (0..1, as DMX) for a moving head."""
+    phi, theta = geometry.ik(fx, defn, check_dir(fx), None)
+    return geometry.to_dmx(fx, defn, phi, theta)
+
+
+def beam_words(d) -> str:
+    return f"{'up' if d[2] > 0 else 'down'} towards {toward(float(d[0]), float(d[1]))}"
+
+
+def _hung_wrong(fx: dict, what: str) -> dict:
+    """The fixture as it really hangs when it is `what` (for saying where its beam goes then)."""
+    wrong = {}
+    if what in ("turned", "both"):
+        wrong["rot_deg"] = fx.get("rot_deg", 0.0) + 180
+    if what in ("mirrored", "both"):
+        wrong["pan_invert"] = not fx.get("pan_invert", False)
+    return {**fx, **wrong}
+
+
+def check_steps(merged: dict) -> list[dict]:
+    """The fixtures in the sheet's order (each truss from its reference end, then the floor), with what the crew
+    should see: where it is, which way round, and for a moving head where its beam points, and where it points
+    instead when the head is hung wrong (`faults`: the fix for each)."""
+    lay = layout(merged)
+    rows = [r for st in lay["structures"] for r in st["fixtures"]] + lay["floor"]
+    by_id = {f["id"]: f for f in merged.get("fixtures", [])}
+    steps = []
+    for r in rows:
+        f = by_id[r["id"]]
+        defn = _defn(f)
+        moving = fxlib.is_moving(defn)
+        try:
+            dark = fxlib.test_refusal(defn) or ""
+        except (Exception, SystemExit):  # noqa: BLE001
+            dark = "Its definition is missing."
+        expect, faults = "", []
+        if moving and not dark:
+            f = {**f, "mode": _mode(f, defn)}
+            aim = check_aim(f, defn)
+            expect = f"Its beam points {beam_words(geometry.fk(f, defn, *aim))}."
+            pans = bool(defn.get("physical", {}).get("pan_deg"))
+            for what in FIXES if pans else ("turned",):  # a moving bar only tilts
+                seen = beam_words(geometry.fk(_hung_wrong(f, what), defn, *aim))
+                if seen != expect[len("Its beam points ") : -1] and all(x["seen"] != seen for x in faults):
+                    faults.append({"fix": what, "seen": seen})
+        steps.append({"id": r["id"], "label": r["label"], "model": r["model"], "where": r["where"],
+                      "facing": r["facing"], "moving": moving, "expect": expect, "faults": faults, "dark": dark,
+                      "dmx": f"U{r['universe']} · {r['address']}"})  # fmt: skip
+    return steps
+
+
+def fix(fx: dict, defn: dict, what: str) -> dict:
+    """The calibration that puts a head right that the check found "mirrored" (its pan the other way), "turned"
+    (turned round, or its tilt the wrong way) or "both". Returns the set's fields to change on the fixture."""
+    if what not in FIXES:
+        raise ValueError(f"fix: one of {', '.join(FIXES)}")
+    P, _, ph, _ = geometry._ranges(fx, defn)
+    out: dict = {}
+    if what in ("mirrored", "both") and P:
+        out["pan_invert"] = not fx.get("pan_invert", False)
+    if what in ("turned", "both"):
+        if P >= 360:  # its pan home half a turn on, whichever way stays in range
+            out["pan_home_deg"] = round(ph + 180 if ph + 180 <= P else ph - 180, 1)
+        else:  # not enough pan for that (or a moving bar): tilt the other way gives the same beam
+            out["tilt_invert"] = not fx.get("tilt_invert", False)
+    return out
