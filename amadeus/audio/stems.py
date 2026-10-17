@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from amadeus import paths
+from amadeus import paths, system
 
 # Once the model is on disk, load it offline: no internet check at a gig (and no Hub warning). This must be
 # set before the Hugging Face library is imported (Demucs imports it), so it happens when this module loads.
@@ -244,9 +244,8 @@ def running(path: str | Path) -> int | None:
     """PID of a separation of this track that is still running (e.g. started by an earlier live session)."""
     lock = _lock(Path(path))
     try:
-        pid = int(lock.read_text())
-        os.kill(pid, 0)
-        return pid
+        pid = int(lock.read_text(encoding="utf-8"))
+        return pid if system.alive(pid) else None
     except (OSError, ValueError):
         return None
 
@@ -260,13 +259,14 @@ def start_background(path: str | Path):
     path = Path(path)
     proc = subprocess.Popen(
         [sys.executable, "-m", "amadeus.audio.stems", str(path)],
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
-        start_new_session=True,
         cwd=paths.ROOT,  # the package is importable from the project folder
+        **system.background_flags(),
     )
     STEMS_DIR.mkdir(parents=True, exist_ok=True)
-    _lock(path).write_text(str(proc.pid))
+    _lock(path).write_text(str(proc.pid), encoding="utf-8")
     return proc
 
 
@@ -274,7 +274,7 @@ if __name__ == "__main__":  # python -m amadeus.audio.stems TRACK: separate it (
     import sys
     import time
 
-    os.nice(5)  # be kind to a running show
+    system.lower_priority()  # be kind to a running show
     t0 = time.time()
     try:
         res = separate_and_save(sys.argv[1], verbose=False)

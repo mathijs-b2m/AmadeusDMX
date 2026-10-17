@@ -195,7 +195,7 @@ def test_any_rig_gets_an_orchestra(name):
 
 
 def test_a_rig_of_only_lasers_still_plays_the_impacts():
-    rig = json.loads(Path("tests/sets/fuze24.json").read_text())
+    rig = json.loads(Path("tests/sets/fuze24.json").read_text(encoding="utf-8"))
     rig["fixtures"] = [f for f in rig["fixtures"] if "laser" in f["fixture"]]
     a = cinematic_analysis(seed=11)
     e = Engine(a, direct(a, CinematicDirector(), verbose=False), load_rig_dict(rig), real_output=False)

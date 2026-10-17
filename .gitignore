@@ -15,6 +15,7 @@ config/
 # builds
 mac/.build/
 mac/build/
+windows/build/
 vdj/build/
 # the VirtualDJ SDK is not redistributable: vdj/build.sh downloads its headers
 vdj/sdk/

@@ -94,7 +94,7 @@ def run(name: str, opts: dict, seconds: float = 0.0, emit: str | None = None, re
         host, _, port = emit.rpartition(":")
         out = (socket.socket(socket.AF_INET, socket.SOCK_DGRAM), (host or "127.0.0.1", int(port)))
         print(f"Sending the decks to {out[1][0]}:{out[1][1]} in the AmadeusLink plugin's format")
-    rec = open(record, "w") if record else None  # noqa: SIM115  (closed below, with the source)
+    rec = open(record, "w", encoding="utf-8") if record else None  # noqa: SIM115  (closed below, with the source)
     stats, t0 = Stats(), time.monotonic()
     seen_packets, shown, next_emit, last_event = 0, 0.0, t0, 0
     try:

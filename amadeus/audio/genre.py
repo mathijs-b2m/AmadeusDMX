@@ -212,7 +212,7 @@ def _key(a: Analysis) -> str:
 
 def overrides() -> dict[str, str]:
     try:
-        return json.loads(OVERRIDES.read_text())
+        return json.loads(OVERRIDES.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 
@@ -228,7 +228,7 @@ def set_override(a: Analysis | str, genre: str | None):
     else:
         o[key] = genre
     OVERRIDES.parent.mkdir(parents=True, exist_ok=True)
-    OVERRIDES.write_text(json.dumps(o, indent=2, sort_keys=True) + "\n")
+    OVERRIDES.write_text(json.dumps(o, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def tags(path: str | Path) -> dict:
@@ -264,7 +264,7 @@ def from_model(artist: str, title: str) -> tuple[str, float] | None:
     key = hashlib.sha1(json.dumps([prompt, list(GENRES)]).encode()).hexdigest()[:16]
     cached = CACHE / f"{key}.json"
     if cached.exists():
-        c = json.loads(cached.read_text())
+        c = json.loads(cached.read_text(encoding="utf-8"))
         return c["genre"], c["confidence"]
     try:
         from openai import OpenAI
@@ -282,7 +282,9 @@ def from_model(artist: str, title: str) -> tuple[str, float] | None:
     if genre not in GENRES:
         return None
     CACHE.mkdir(parents=True, exist_ok=True)
-    cached.write_text(json.dumps({"genre": genre, "confidence": confidence, "artist": artist, "title": title}))
+    cached.write_text(
+        json.dumps({"genre": genre, "confidence": confidence, "artist": artist, "title": title}), encoding="utf-8"
+    )
     return genre, confidence
 
 

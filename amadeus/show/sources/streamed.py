@@ -19,8 +19,8 @@ read from the deck's clock (to the second): a guess (`guessed`). When djay then 
 and exact length, the guess's copy is checked against that: the same length, and it is kept (the show made
 from it plays on); another version, and the copy is fetched again by ISRC.
 
-Needs yt-dlp (`pip install -e '.[streamed]'`); copies are M4A, which macOS decodes itself (ffmpeg only for
-the WebM a few videos come in). Only fetch audio you are allowed to copy; the copy is
+Needs yt-dlp (`pip install -e '.[streamed]'`); copies are M4A, which macOS and Windows decode themselves (ffmpeg
+only for the WebM a few videos come in). Only fetch audio you are allowed to copy; the copy is
 for analysis on this computer, the music the audience hears is the DJ software's own stream.
 """
 
@@ -38,7 +38,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 from amadeus.show.sources.resolve import words
 
 FOLDER = paths.CACHE / "streamed"
@@ -49,7 +49,8 @@ DOWNLOADS = 2  # at most this many candidates downloaded per track
 GAP_S = 3.0  # at least this long between two requests to YouTube (search or download)
 OFFLINE_RETRY_S = 30.0  # a fetch that failed for want of a connection: tried again this much later
 WANTED_S = 10.0  # a queued track no deck has asked for in this long is skipped
-# M4A (AAC, ~128 kbps) first: macOS reads it without ffmpeg (afconvert); WebM/Opus needs ffmpeg to be analysed
+# M4A (AAC, ~128 kbps) first: macOS and Windows read it without ffmpeg (afconvert, Media Foundation); WebM/Opus
+# needs ffmpeg to be analysed
 QUALITY = "bestaudio[ext=m4a]/bestaudio[abr<=80]/worstaudio[abr>=40]/bestaudio"
 SEARCH = 8  # results to consider per search
 SHUNNED = {"live", "cover", "karaoke", "instrumental", "acapella", "slowed", "sped", "nightcore", "reverb",
@@ -179,7 +180,27 @@ class DjayStreams:
 
 NETSEARCH = re.compile(r"netsearch://([a-z]{2})([A-Za-z0-9]+)")
 SERVICES = {"sp": "spotify", "td": "tidal", "dz": "deezer", "sc": "soundcloud", "bp": "beatport", "bs": "beatsource"}
-VDJ_DATABASE = Path.home() / "Library/Application Support/VirtualDJ/database.xml"
+
+
+def vdj_homes(windows: bool = system.WINDOWS) -> list[Path]:
+    """Where VirtualDJ keeps its home folder (settings, database.xml): on macOS in Application Support; on Windows
+    in Documents (the Documents folder Windows knows: also when it moved into OneDrive), on some installations
+    in AppData."""
+    if not windows:
+        return [Path.home() / "Library/Application Support/VirtualDJ", Path.home() / "Documents/VirtualDJ"]
+    import os
+
+    appdata = [Path(os.environ[k]) / "VirtualDJ" for k in ("LOCALAPPDATA", "APPDATA") if os.environ.get(k)]
+    return [system.user_folder("Documents") / "VirtualDJ", *appdata]
+
+
+def vdj_database(windows: bool = system.WINDOWS) -> Path:
+    """VirtualDJ's database.xml: the first home folder that has one (else where it will be)."""
+    homes = vdj_homes(windows)
+    return next((h / "database.xml" for h in homes if (h / "database.xml").is_file()), homes[0] / "database.xml")
+
+
+VDJ_DATABASE = vdj_database()
 
 
 def vdj_length(text: str) -> float:
@@ -368,7 +389,7 @@ class Fetcher:
             return ""
         f = Path(f)
         try:
-            length = float(json.loads(f.with_suffix(".json").read_text()).get("length") or 0.0)
+            length = float(json.loads(f.with_suffix(".json").read_text(encoding="utf-8")).get("length") or 0.0)
         except (OSError, ValueError):
             length = 0.0
         if s.length and length and abs(length - s.length) > LENGTH_MATCH_S:
@@ -380,10 +401,10 @@ class Fetcher:
             return ""
         link = f.with_name(self._stem(s) + f.suffix)
         link.unlink(missing_ok=True)
-        link.symlink_to(f.name)
+        system.link_or_copy(f, link)
         meta = {"stream": s.__dict__, "copy_of": f.name, "length": length,
                 "fetched": time.strftime("%Y-%m-%d %H:%M:%S")}  # fmt: skip
-        link.with_suffix(".json").write_text(json.dumps(meta, indent=1))
+        link.with_suffix(".json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
         self.state[s.id] = "done"
         delta = f"{(length - s.length) * 1000:+.0f} ms vs {s.service.title()}" if s.length and length else "same"
         print(f"  ✓ {s.name}: the copy found by its title is the same recording ({delta})", flush=True)
@@ -431,7 +452,7 @@ class Fetcher:
                 raise LookupError("no download of the same length")
             off, f, hit, length = best
             keep = f.with_name(self._stem(s) + f.suffix)
-            f.rename(keep)
+            f.replace(keep)
             vs = "the deck's clock" if s.guess else s.service.title()
             delta = f"{(length - s.length) * 1000:+.0f} ms vs {vs}" if s.length else "length unknown"
             print(f"  ✓ {s.name}: copy from YouTube {hit['id']} ({delta}, {time.monotonic() - t0:.1f} s)", flush=True)
@@ -439,7 +460,7 @@ class Fetcher:
                 print("    (its length differs a little: a slightly different master; on SYNC the beat corrects it)")
             meta = {"stream": s.__dict__, "youtube": hit["id"], "channel": hit.get("channel"),
                     "length": length, "fetched": time.strftime("%Y-%m-%d %H:%M:%S")}  # fmt: skip
-            keep.with_suffix(".json").write_text(json.dumps(meta, indent=1))
+            keep.with_suffix(".json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
             self.state[s.id] = "done"
         except Exception as e:  # a failed fetch leaves the deck dark, as before; say why once
             self.state[s.id], self.why[s.id] = "failed", str(e)
@@ -504,20 +525,27 @@ def offline(e: Exception) -> bool:
 
 
 def _probe_length(f: Path) -> float | None:
-    """Length of a file soundfile can't read (WebM, M4A): ffprobe (next to ffmpeg), else macOS's afinfo."""
+    """Length of a file soundfile can't read (WebM, M4A): ffprobe (next to ffmpeg), else the system's own
+    (macOS's afinfo, Windows' Media Foundation)."""
     import subprocess
+    import sys
 
     from amadeus.audio.analysis import ffmpeg
 
     tool = ffmpeg()
     try:
         if tool:
+            probe = Path(tool).with_name("ffprobe" + Path(tool).suffix)  # ffprobe.exe on Windows
             out = subprocess.run(
-                [str(Path(tool).with_name("ffprobe")), "-v", "error", "-show_entries", "format=duration",
-                 "-of", "csv=p=0", str(f)],
-                capture_output=True, text=True, timeout=20,
+                [str(probe), "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(f)],
+                capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL,
+                **({"creationflags": 0x08000000} if sys.platform == "win32" else {}),  # no console window
             )  # fmt: skip
             return float(out.stdout.strip())
+        if sys.platform == "win32":
+            from amadeus.audio import winmf
+
+            return winmf.duration(f)
         out = subprocess.run(["/usr/bin/afinfo", str(f)], capture_output=True, text=True, timeout=20)
         m = re.search(r"estimated duration: ([\d.]+)", out.stdout)
         return float(m.group(1)) if m else None

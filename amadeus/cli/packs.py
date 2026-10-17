@@ -6,6 +6,7 @@ amadeus packs install NAME         install it (pip, from PyPI)
 In a checkout a pack goes into the engine's own environment (.venv). The Mac app's Python is signed and never
 written to: there a pack goes into an environment of its own in your data folder (DATA/python), on top of the
 app's Python and its packages, and the app runs the engine with that one from then on (mac Workspace.builtIn).
+The Windows app does the same (DATA\\python\\Scripts\\python.exe: Windows' layout of an environment).
 """
 
 from __future__ import annotations
@@ -20,9 +21,10 @@ import venv
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 
 ENV = paths.DATA / "python"
+HERE = "this PC" if system.WINDOWS else "this Mac"
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,7 @@ PACKS = {
     "instruments": Pack(
         title="Instrument analysis",
         about="Separates every track into drums, bass, vocals and the rest (Demucs) and recognises the instruments "
-        "in it, so accents follow the synth, the piano or the guitar. Runs on this Mac; a track takes about "
+        f"in it, so accents follow the synth, the piano or the guitar. Runs on {HERE}; a track takes about "
         "half a minute.",
         size="about 1 GB",
         requirements=("torch==2.14.1", "torchaudio==2.11.0", "demucs==4.1.0", "onnxruntime==1.31.0"),
@@ -101,8 +103,11 @@ def target_python() -> str:
     if sys.prefix != sys.base_prefix or paths.DATA == paths.ROOT:
         return sys.executable
     # upgrade: also when it exists, so it points at this Python again after the app moved
-    venv.EnvBuilder(system_site_packages=True, with_pip=False, symlinks=True, upgrade=ENV.exists()).create(ENV)
-    return str(ENV / "bin" / "python3")
+    # (Windows: copies, symlinks need rights there)
+    venv.EnvBuilder(
+        system_site_packages=True, with_pip=False, symlinks=not system.WINDOWS, upgrade=ENV.exists()
+    ).create(ENV)
+    return str(system.venv_python(ENV))
 
 
 def install(name: str):
@@ -111,7 +116,7 @@ def install(name: str):
     python = target_python()
     # what's already here stays as it is (the show's results depend on numpy and scipy)
     have = sorted({f"{d.metadata['Name']}=={d.version}" for d in importlib.metadata.distributions()})
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
         f.write("\n".join(have) + "\n")
         constraints = f.name
     cmd = [sys.executable, "-m", "pip"]

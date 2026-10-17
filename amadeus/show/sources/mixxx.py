@@ -1,7 +1,8 @@
 """Mixxx: its official controller scripting, through a MIDI port of our own.
 
 A controller script can't open a network socket, but it can talk MIDI. We create a virtual MIDI device,
-"Amadeus DMX"; in Mixxx (Preferences → Controllers) it gets the "Amadeus DMX" mapping
+"Amadeus DMX" (on Windows, which can't, we open the port of that name the Windows app made: winmidi.py); in
+Mixxx (Preferences → Controllers) it gets the "Amadeus DMX" mapping
 (mixxx/ in this repository, copied into Mixxx's controllers folder for you), whose script sends every deck's
 position, length, sample rate, speed, tempo, volume, loop state and the crossfader 50 times a second as
 SysEx (format in mixxx/Amadeus-DMX-scripts.js).
@@ -17,12 +18,14 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 from amadeus.show.sources.base import Deck, Source
 from amadeus.show.sources.resolve import Resolver
+from amadeus.show.sources.winmidi import matching
 
 NAME = "Amadeus DMX"
 HEADER = [0xF0, 0x7D, 0x44, 0x4C, 0x01]
@@ -32,8 +35,13 @@ SETTINGS = [  # where Mixxx keeps its settings: sandboxed (the macOS download), 
     Path.home() / "Library/Containers/org.mixxx.mixxx/Data/Library/Application Support/Mixxx",
     Path.home() / "Library/Application Support/Mixxx",
     Path.home() / ".mixxx",
-    Path.home() / "AppData/Local/Mixxx",
+    system.local_app_data() / "Mixxx",
 ]
+NO_PORT = (
+    "No MIDI port '{port}' on this computer. Windows can't make one for a program: the Amadeus DMX app makes it "
+    "(Windows MIDI Services, in Windows 11 24H2 and later), or make a port called "
+    "'{port}' in loopMIDI (tobias-erichsen.de); then start Mixxx and the show again."
+)
 
 
 def settings_dir() -> Path | None:
@@ -132,8 +140,6 @@ class Mixxx(Source):
     label = "Mixxx"
 
     def __init__(self, port: str = NAME, library: str = ""):
-        import rtmidi
-
         super().__init__()
         folder = settings_dir()
         self.library = Library(Path(library) if library else (folder / "mixxxdb.sqlite" if folder else None))
@@ -145,15 +151,20 @@ class Mixxx(Source):
         self.state: dict[int, dict] = {}
         self.lost = 0
         self.seq = -1
+        if sys.platform == "win32":
+            self._open_windows(port)
+            return
+        import rtmidi
+
         # Mixxx pairs a device's input and output by name: one of each. Mixxx only looks for MIDI devices
         # when it starts, so a device of our own means starting Mixxx after us; a port that is always there
         # (the IAC bus: --opt port="IAC Driver Bus 1") keeps working when we restart.
         self.inp = rtmidi.MidiIn()
         self.inp.ignore_types(sysex=False, timing=True, active_sense=True)
-        existing = [i for i, n in enumerate(self.inp.get_ports()) if n == port or n.endswith(" " + port)]
-        if existing:
+        existing = matching(self.inp.get_ports(), port, loose=False)
+        if existing is not None:
             self.out = None
-            self.inp.open_port(existing[0])
+            self.inp.open_port(existing)
             self.name = f"Mixxx (MIDI port '{port}')"
         else:
             self.out = rtmidi.MidiOut()
@@ -161,6 +172,17 @@ class Mixxx(Source):
             self.inp.open_virtual_port(port)
             self.name = f"Mixxx (MIDI device '{port}': start Mixxx after this)"
         self.inp.set_callback(self._midi)
+
+    def _open_windows(self, port: str):
+        """Windows: the input of the port Mixxx sends to (a loopback: what Mixxx sends comes back on it)."""
+        from amadeus.show.sources import winmidi
+
+        index = matching(winmidi.input_names(), port)
+        if index is None:
+            raise SystemExit(NO_PORT.format(port=port))
+        self.out = None
+        self.inp = winmidi.MidiIn(index, self._midi)
+        self.name = f"Mixxx (MIDI port '{winmidi.input_names()[index]}')"
 
     def _midi(self, event, _=None):
         now = time.monotonic()
@@ -204,6 +226,9 @@ class Mixxx(Source):
         return {**super().status(), "lost": self.lost}
 
     def close(self):
+        if sys.platform == "win32":
+            self.inp.close()
+            return
         self.inp.close_port()
         if self.out:
             self.out.close_port()

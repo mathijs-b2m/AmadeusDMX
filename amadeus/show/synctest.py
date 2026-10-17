@@ -110,7 +110,9 @@ def make(out_dir: Path) -> tuple[Path, Path]:
     wav = out_dir / f"{NAME}.wav"
     sf.write(wav, np.stack([x, x], axis=1).astype(np.float32), SR, subtype="PCM_16")
     side = out_dir / f"{NAME}.json"
-    side.write_text(json.dumps({"bpm": BPM, "first_beat": START_S, "beeps": beeps, "drops": drops}, indent=1))
+    side.write_text(
+        json.dumps({"bpm": BPM, "first_beat": START_S, "beeps": beeps, "drops": drops}, indent=1), encoding="utf-8"
+    )
     return wav, side
 
 
@@ -193,7 +195,7 @@ def _show_at(seen: list, when: float) -> float | None:
 
 
 def listen(sidecar: Path, seconds: float, ws_port: int, lead_s: float) -> dict:
-    beeps = np.array(json.loads(sidecar.read_text())["beeps"])
+    beeps = np.array(json.loads(sidecar.read_text(encoding="utf-8"))["beeps"])
     spacing = float(np.median(np.diff(beeps)))
     seen: list = []
     stop = threading.Event()

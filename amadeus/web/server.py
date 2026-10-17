@@ -42,6 +42,7 @@ import functools
 import http.server
 import json
 import socket
+import sys
 import threading
 import time
 from urllib.parse import parse_qs, urlsplit
@@ -60,6 +61,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     `req.body()`, `req.show` (the rig and set to work on), `req.fixed`, `req.client`, `req.headers`, `req.rfile`."""
 
     fixed = None  # a store.Selection: --rig/--set given (or a show is running); otherwise the active ones
+    # the types the pages need, whatever the system says (Windows takes them from the registry, where .js is
+    # often text/plain: then the browser refuses the visualiser's modules)
+    extensions_map = {
+        **http.server.SimpleHTTPRequestHandler.extensions_map,
+        ".html": "text/html",
+        ".js": "text/javascript",
+        ".mjs": "text/javascript",
+        ".css": "text/css",
+        ".json": "application/json",
+        ".svg": "image/svg+xml",
+        ".wasm": "application/wasm",
+        ".png": "image/png",
+    }
 
     @property
     def show(self):
@@ -138,6 +152,10 @@ def _summary(obj) -> str:
     return ""
 
 
+class Server(http.server.ThreadingHTTPServer):
+    allow_reuse_address = sys.platform != "win32"  # on Windows it would let a second server share the port
+
+
 def serve(port: int, show=None, host: str = "127.0.0.1"):
     """Start the web UI server in a background thread; returns the server (call .shutdown()).
 
@@ -152,7 +170,7 @@ def serve(port: int, show=None, host: str = "127.0.0.1"):
             )
     handler = functools.partial(type("H", (Handler,), {"fixed": show}), directory=str(paths.WEB))
     try:
-        httpd = http.server.ThreadingHTTPServer((host, port), handler)
+        httpd = Server((host, port), handler)
     except OSError as e:
         raise SystemExit(
             f"Port {port} is in use: another show is probably still running (it would also send DMX "

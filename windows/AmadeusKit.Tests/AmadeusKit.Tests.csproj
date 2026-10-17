@@ -1,0 +1,20 @@
+<!-- The kit's tests (ports of mac/Tests/AmadeusKitTests and more): `dotnet test`, on a Mac too. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <ProjectReference Include="..\AmadeusKit\AmadeusKit.csproj" />
+    <None Include="Samples\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- the stacks' arithmetic, from the app (pure C#: tested here) -->
+    <Compile Include="..\AmadeusDMX\Shared\StackLayout.cs" Link="App\StackLayout.cs" />
+  </ItemGroup>
+</Project>

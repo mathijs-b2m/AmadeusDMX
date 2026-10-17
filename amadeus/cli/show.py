@@ -6,7 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 from amadeus.cli.common import add_dmx_arg, add_set_args
 from amadeus.show.sources import parse_opts
 
@@ -90,7 +90,7 @@ def add_commands(sub) -> dict:
 
     p = sub.add_parser("synctest", help="a test track with beeps, and a listener: how far the show is from the music")
     p.add_argument("action", choices=["make", "listen"], help="make: write the track; listen: measure while it plays")
-    p.add_argument("--out", type=Path, default=Path.home() / "Music" / "Amadeus DMX", help="where make writes it")
+    p.add_argument("--out", type=Path, default=system.user_folder("Music") / "Amadeus DMX", help="where make writes it")
     p.add_argument("--seconds", type=float, default=200.0, help="listen this long (the track is three minutes)")
     p.add_argument("--ws-port", type=int, default=8765, help="the running show's feed")
     p.add_argument("--lead-ms", type=float, default=None, help="the show's light lead (default: the active rig's)")

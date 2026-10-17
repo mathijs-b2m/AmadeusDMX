@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import socket
 import struct
+import sys
 import time
 import uuid
 
@@ -163,7 +164,7 @@ class EnttecProOutput(Output):
         if not self.port:
             raise SystemExit(
                 "No ENTTEC DMX USB Pro-compatible interface found. Plug it in, or give its port "
-                "(ls /dev/cu.usbserial-*)."
+                + ("(COM3, …: Device Manager → Ports)." if sys.platform == "win32" else "(ls /dev/cu.usbserial-*).")
             )
         self.serial = serial.Serial(self.port, 57600, timeout=0, write_timeout=0.05)
         self._last = 0.0
@@ -317,7 +318,7 @@ def usb_ports() -> list[dict]:
         return []
     out = []
     for p in list_ports.comports():
-        if not p.device.startswith("/dev/cu.") or "Bluetooth" in p.device or "debug-console" in p.device:
+        if not candidate(p.device, p.description or "", p.vid):
             continue
         info = {
             "port": p.device,
@@ -328,10 +329,22 @@ def usb_ports() -> list[dict]:
             "pid": p.pid,
             "pro": False,
         }
-        if p.vid == 0x0403 or "usbserial" in p.device or "usbmodem" in p.device:
+        usb = p.vid is not None and sys.platform == "win32"  # every USB COM port (macOS: usbserial / usbmodem)
+        if p.vid == 0x0403 or "usbserial" in p.device or "usbmodem" in p.device or usb:
             info.update(probe(p.device))
         out.append(info)
     return out
+
+
+def candidate(device: str, description: str, vid: int | None, windows: bool = sys.platform == "win32") -> bool:
+    """A serial port that may be a DMX interface: on macOS its call-out device (/dev/cu.*, not Bluetooth or the
+    debug console); on Windows a USB COM port (a motherboard's COM1 or a Bluetooth link isn't one); elsewhere
+    (Linux) a USB serial device."""
+    if windows:
+        return device.upper().startswith("COM") and vid is not None and "bluetooth" not in description.lower()
+    if device.startswith("/dev/cu."):
+        return "Bluetooth" not in device and "debug-console" not in device
+    return device.startswith(("/dev/ttyUSB", "/dev/ttyACM"))
 
 
 def probe(port: str, timeout: float = 0.4) -> dict:

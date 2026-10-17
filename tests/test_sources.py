@@ -117,7 +117,7 @@ def test_replay_plays_a_recording(tmp_path):
         for i in range(10)
     ]
     f = tmp_path / "cap.jsonl"
-    f.write_text("\n".join(json.dumps(x) for x in lines))
+    f.write_text("\n".join(json.dumps(x) for x in lines), encoding="utf-8")
     src = open_source("replay", file=str(f))
     assert src.done.wait(2)
     assert src.packets == 10 and src.decks[1].title == "X" and abs(src.decks[1].pos - 3.18) < 1e-9
@@ -142,7 +142,7 @@ def test_a_reported_rate_beats_the_tempo_ratio():
 
 def test_latency_moves_positions_later(tmp_path):
     f = tmp_path / "cap.jsonl"
-    f.write_text(json.dumps({"t": 0, "decks": [{"deck": 1, "pos": 10.0, "play": 1}]}))
+    f.write_text(json.dumps({"t": 0, "decks": [{"deck": 1, "pos": 10.0, "play": 1}]}), encoding="utf-8")
     src = open_source("replay", file=str(f), latency="20")
     assert src.done.wait(2)
     d = src.decks[1]

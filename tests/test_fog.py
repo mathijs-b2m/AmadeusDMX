@@ -109,14 +109,14 @@ def test_a_smoke_machine_in_a_show(monkeypatch, tmp_path):
     lib.mkdir()
     for p in fxlib.LIB_DIR.glob("*/*.json"):
         (lib / p.parent.name).mkdir(exist_ok=True)
-        (lib / p.parent.name / p.name).write_text(p.read_text())
+        (lib / p.parent.name / p.name).write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
     (lib / "test").mkdir()
-    (lib / "test" / "fogger.json").write_text(json.dumps(SMOKE))
+    (lib / "test" / "fogger.json").write_text(json.dumps(SMOKE), encoding="utf-8")
     monkeypatch.setattr(fxlib, "LIB_DIR", lib)
     monkeypatch.setattr(motion, "TRAJ_CACHE", tmp_path / "traj")
     fxlib.library.cache_clear()
     try:
-        rig = json.loads((fxlib.paths.ROOT / "tests" / "sets" / "small.json").read_text())
+        rig = json.loads((fxlib.paths.ROOT / "tests" / "sets" / "small.json").read_text(encoding="utf-8"))
         used = max(f["address"] + fxlib.footprint(f) for f in rig["fixtures"])
         rig["fixtures"].append(
             {"id": "fog1", "fixture": "test/fogger", "mode": "3ch", "universe": 1, "address": used, "x": 0.95}

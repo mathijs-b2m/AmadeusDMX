@@ -107,7 +107,7 @@ class Decision:
 
 
 def save_plan(decisions: list[Decision], path: Path):
-    path.write_text(json.dumps([asdict(d) for d in decisions], indent=1))
+    path.write_text(json.dumps([asdict(d) for d in decisions], indent=1), encoding="utf-8")
 
 
 LAYER_DEFAULTS = {
@@ -130,7 +130,7 @@ def load_plan(path: Path) -> list[Decision]:
     names = {f.name for f in fields(Decision)}
     return [
         Decision(**{**LAYER_DEFAULTS, **{k: v for k, v in d.items() if k in names}})
-        for d in json.loads(path.read_text())
+        for d in json.loads(path.read_text(encoding="utf-8"))
     ]
 
 

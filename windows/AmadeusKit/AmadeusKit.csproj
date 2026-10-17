@@ -1,0 +1,13 @@
+<!-- The port of mac/Sources/AmadeusKit: protocol, live feed, engine supervisor, setup API, sets, palettes.
+     No WinUI; Windows APIs only behind OperatingSystem.IsWindows(), so it builds and tests on a Mac. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>AmadeusKit</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AmadeusKit.Tests" />
+  </ItemGroup>
+</Project>

@@ -229,14 +229,14 @@ def wire_universe(rig: dict, u: int) -> int:
 
 def save_profile(defn: dict, profile: dict[str, Axis], calibrated: bool = True):
     path = fxlib.LIB_DIR / f"{defn['key']}.json"
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     data["twin"] = {
         "_note": "How the real fixture moves, calibrated with tools/twin.py: what a full DMX sweep turns, top "
         "speed, acceleration, braking, the delay from DMX to motion. `motion` is the engine's model of it.",
         "calibrated": calibrated,
         **{a: {k: round(v, 3) for k, v in asdict(profile[a]).items()} for a in AXES},
     }
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     defn["twin"] = data["twin"]
     return path
 
@@ -246,7 +246,7 @@ def apply_to_engine(head: Head, profile: dict[str, Axis], selection, motion: dic
     did (home is a DMX value on the real fixture: its degrees scale with the range)."""
     defn = head.defn
     path = fxlib.LIB_DIR / f"{defn['key']}.json"
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     notes = []
     m = data.setdefault("motion", {})
     for a in AXES:
@@ -262,7 +262,7 @@ def apply_to_engine(head: Head, profile: dict[str, Axis], selection, motion: dic
     m["accel_dps2"] = min(m["pan_accel_dps2"], m["tilt_accel_dps2"])
     m["estimated"] = False
     m["_twin"] = "speed and acceleration from the calibrated twin (tools/twin.py)"
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     defn.update(data)
     if selection is not None:
         notes += _rescale_homes(selection, defn["key"], head.engine_range, profile)

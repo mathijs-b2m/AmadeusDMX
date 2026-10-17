@@ -37,7 +37,7 @@ EFFECT = {  # as a converter leaves an effect light it couldn't read: every chan
 def library(monkeypatch, tmp_path):
     shutil.copytree(ROOT / "fixtures", tmp_path, dirs_exist_ok=True)
     (tmp_path / "test").mkdir()
-    (tmp_path / "test" / "effect.json").write_text(json.dumps(EFFECT))
+    (tmp_path / "test" / "effect.json").write_text(json.dumps(EFFECT), encoding="utf-8")
     monkeypatch.setattr(fxlib, "LIB_DIR", tmp_path)
     monkeypatch.setattr(fxlib, "USER_DIR", None)
     fxlib.library.cache_clear()

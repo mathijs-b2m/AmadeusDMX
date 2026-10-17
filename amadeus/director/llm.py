@@ -57,7 +57,7 @@ class OpenAIDirector:
         self.client = OpenAI()
         self.model = model
         self.cache_file = cache_file
-        self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
+        self.cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
         self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
         self.fog, self.outdoor = fog, outdoor
         self.questions = questions_for(groups, lasers, screen, style, theme, fog)
@@ -73,7 +73,7 @@ class OpenAIDirector:
             decision = self.client.decisions.create(model=self.model, input=prompt, questions=self.questions)
             self.timings.append(time.perf_counter() - t0)
             self.cache[key] = {a.name: a.model_dump() for a in decision.answers}
-            self.cache_file.write_text(json.dumps(self.cache, indent=1))
+            self.cache_file.write_text(json.dumps(self.cache, indent=1), encoding="utf-8")
         return self.cache[key]
 
     def decide(self, a: Analysis, i: int, history: list[Decision]) -> Decision:
@@ -255,7 +255,7 @@ class OllamaDirector(OpenAIDirector):
         self.model, self.host = model, host or paths.ollama_host()
         self.name = f"ollama-{model.replace(':', '-').replace('/', '-')}"
         self.cache_file = cache_file
-        self.cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
+        self.cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
         self.groups, self.lasers, self.screen, self.style, self.theme = groups, lasers, screen, style, theme
         self.fog, self.outdoor = fog, outdoor
         self.questions = questions_for(groups, lasers, screen, style, theme, fog)
@@ -310,5 +310,5 @@ class OllamaDirector(OpenAIDirector):
                     "confidence": ans.get("confidence", 0.0),
                 }
         self.cache[key] = answers
-        self.cache_file.write_text(json.dumps(self.cache, indent=1))
+        self.cache_file.write_text(json.dumps(self.cache, indent=1), encoding="utf-8")
         return answers

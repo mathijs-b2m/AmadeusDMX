@@ -125,7 +125,7 @@ def library() -> dict[str, dict]:
     lib = {}
     for folder in [LIB_DIR] + ([USER_DIR] if USER_DIR else []):  # yours last: it replaces the shipped one
         for path in sorted(folder.glob("*/*.json")):
-            d = json.loads(path.read_text())
+            d = json.loads(path.read_text(encoding="utf-8"))
             d["key"] = f"{path.parent.name}/{path.stem}"
             lib[d["key"]] = d
     return lib
@@ -141,7 +141,7 @@ def save(key: str, data: dict) -> Path:
     """Writes a definition to your fixtures (the shipped library stays as it came)."""
     path = (USER_DIR or LIB_DIR) / f"{key}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2))
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     library.cache_clear()
     return path
 

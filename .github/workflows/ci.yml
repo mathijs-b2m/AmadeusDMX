@@ -28,6 +28,22 @@ jobs:
       - name: Test
         run: pytest -q
 
+  windows:  # the engine on Windows (the golden test skips itself: it was recorded on Apple Silicon)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install (pinned, as the Windows app ships them)
+        run: |
+          pip install -r requirements-app.txt
+          pip install -e ".[dev]"
+      - name: Test
+        env:
+          PYTHONUTF8: "0"  # as the app runs it: everything that reads or writes text must say UTF-8 itself
+        run: pytest -q
+
   mac-app:
     runs-on: macos-26
     steps:

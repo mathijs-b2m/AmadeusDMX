@@ -86,7 +86,7 @@ def run(show, fixture_id: str, axis: str = "tilt"):
     accel = 0.8 * 4 * best / period**2
     top = 0.8 * 2 * best / period  # peak speed of that profile
     path = fxlib.path_of(defn["key"])
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     m = data.setdefault("motion", {})
     m[f"{axis}_accel_dps2"] = round(accel)
     m["accel_dps2"] = min(m.get("pan_accel_dps2", accel), m.get("tilt_accel_dps2", accel))

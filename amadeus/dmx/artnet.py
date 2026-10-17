@@ -16,7 +16,7 @@ HOLD_FILE = paths.CACHE / "dmx-hold"
 def hold(seconds: float):
     try:
         HOLD_FILE.parent.mkdir(exist_ok=True)
-        HOLD_FILE.write_text(str(time.time() + seconds))
+        HOLD_FILE.write_text(str(time.time() + seconds), encoding="utf-8")
     except OSError:
         pass
 
@@ -27,7 +27,7 @@ def release():
 
 def held() -> bool:
     try:
-        return time.time() < float(HOLD_FILE.read_text())
+        return time.time() < float(HOLD_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
 

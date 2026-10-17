@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import socket
 import struct
+import sys
 import time
 
 from amadeus.dmx import rdm
@@ -130,7 +131,8 @@ class Client:
     def __init__(self, target: tuple[str, int] | None):
         """target=None → real network (broadcast on 6454); otherwise a specific node, e.g. the simulator."""
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if sys.platform != "win32":  # on Windows SO_REUSEADDR would take the port from an Art-Net app holding it
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if target is None:
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             try:

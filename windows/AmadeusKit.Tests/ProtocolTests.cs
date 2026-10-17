@@ -1,0 +1,213 @@
+// The feed as the engine sends it: real hello and frame messages (Samples/, made by the engine for the test sets
+// with the synthetic track) decode in full, and the decoders forgive exactly what the Swift ones forgive.
+using System.Text;
+using AmadeusKit;
+
+namespace AmadeusKit.Tests;
+
+public class ProtocolTests
+{
+    static string Sample(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", name));
+
+    static Hello DecodeHello(string json) =>
+        Assert.IsType<HelloMessage>(FeedMessage.Decode(json)).Hello;
+
+    static Frame DecodeFrame(string json) =>
+        Assert.IsType<FrameMessage>(FeedMessage.Decode(json)).Frame;
+
+    // ported from mac/Tests/AmadeusKitTests/ArcStatusTests.swift
+    [Fact]
+    public void ArcStatusDecodesFromAnEngineFrame()
+    {
+        var json = """
+            {"type": "frame", "lite": true, "t": 0, "phrase": 0, "arc": {"on": true, "length": 14400, "elapsed": 10.0,
+             "stage": "warmup", "stages": [["warmup", "Dinner & Drinks"], ["build", "Opening the Floor"], ["peak", "Party"],
+             ["deep", "Slow Dances"], ["finale", "Last Dances"], ["outro", "Goodnight"]], "event": "wedding",
+             "events": [["club", "DJ Set / Club Night"], ["wedding", "Wedding"]], "locked": false, "heat": 0.628,
+             "trend": 0.0, "bpm": 124.0, "base_bpm": 124.0, "values": {"groups": 0.4, "specials": 0.0, "response": 0.315,
+             "smoke": 0.2, "colour": 0.2, "intensity": 0.565, "flashes": 0.0}, "manual": ["smoke"], "groups": 8, "playing": 8}}
+            """;
+        var f = DecodeFrame(json);
+        var arc = Assert.IsType<ArcStatus>(f.Arc);
+        Assert.Equal("Dinner & Drinks", arc.StageName);
+        Assert.Equal(14390, arc.Remaining);
+        Assert.True(arc.BaseBpm == 124 && arc.Manual.SequenceEqual(["smoke"]) && arc.Values["intensity"] == 0.565);
+        Assert.True(f.Lite && f.Fx.Length == 0);
+    }
+
+    [Fact]
+    public void OutdoorStageRoundTrips()
+    {
+        var st = Stage.From(JSONValue.Parse("""{"width_m": 12, "outdoor": true}""").ToJson().Let(b => J.ParseElement(b)));
+        Assert.True(st.Outdoor);
+        Assert.Equal(true, st.ToJSON()["outdoor"]?.Bool);
+        var room = new Room(st, []);
+        Assert.Equal(Room.Surface.Air, room.Hit(new(0, 0, 2), new(0, 0, 1)).Surface);  // straight up: no ceiling
+    }
+
+    [Theory]
+    [InlineData("small", 6)]
+    [InlineData("laser-zones", 0)]
+    [InlineData("ring", 0)]
+    public void RealHellosDecode(string set, int expectFixtures)
+    {
+        var h = DecodeHello(Sample($"hello-{set}.json"));
+        Assert.Equal("synthetic", h.Title);
+        Assert.Equal(128, h.Bpm);
+        Assert.Equal("rules", h.Director);
+        Assert.NotEmpty(h.Fixtures);
+        if (expectFixtures > 0) Assert.Equal(expectFixtures, h.Fixtures.Count);
+        Assert.NotEmpty(h.Plan);
+        Assert.Equal(400, h.Energy.Count);
+        Assert.Equal(0, h.Plan[0].Phrase);
+        Assert.Equal(h.Plan[0].Section, h.Plan[0]["section"]);
+        Assert.Equal(1, h.PhraseIndex(h.Plan[1].Start + 0.01));
+        Assert.Null(h.PhraseIndex(-1));
+        foreach (var f in h.Fixtures) Assert.Equal(f.Id.Split('.')[0], f.Fixture);
+    }
+
+    [Fact]
+    public void AHelloCarriesTheDrawingFacts()
+    {
+        var h = DecodeHello(Sample("hello-small.json"));
+        var head = h.Fixtures.First(f => f.Id == "fuze1");
+        Assert.Equal(FixtureKind.Head, head.Kind);
+        Assert.Equal(new Vec3(0, 0, 1), head.Up);
+        Assert.Null(head.Truss);
+        Assert.Equal("moving_head", head.Body);
+        var bar = h.Fixtures.First(f => f.Id == "compar1.1");
+        Assert.Equal(4, bar.Cells);
+        Assert.Equal(1.2, bar.Length);
+        Assert.Equal(-5, bar.Rot);
+        Assert.NotNull(bar.Dir);
+    }
+
+    [Fact]
+    public void RealFramesDecode()
+    {
+        var f = DecodeFrame(Sample("frame-small.json"));
+        Assert.Equal(100, f.T);
+        Assert.Equal(3, f.Phrase);
+        Assert.Equal(213.4, f.Bp);
+        Assert.Equal(6, f.Fx.Length);
+        Assert.All(f.Fx, x => Assert.Equal(7, x.Length));
+        Assert.Equal("gobo_shake", f.Beam[0]);
+        Assert.Null(f.Beam[2]);
+        Assert.NotNull(f.Dirs[0]);
+        Assert.Null(f.Dirs[2]);
+        Assert.False(f.Lite);
+        Assert.Null(f.Decks);
+
+        var lasers = DecodeFrame(Sample("frame-laser-zones.json"));
+        var drawn = lasers.Lz.Where(l => l is { Length: > 0 }).ToList();
+        Assert.NotEmpty(drawn);
+        Assert.All(drawn[0]!, b => Assert.InRange(b.Bright, 0, 1));
+        var hello = DecodeHello(Sample("hello-laser-zones.json"));
+        Assert.Equal(hello.Fixtures.Count, lasers.Fx.Length);
+        Assert.Contains(hello.Zones, z => z.Kind == "laser_out" && z.Shape == "box");
+    }
+
+    [Fact]
+    public void ALiveFrameCarriesTheDecksAndTheLink()
+    {
+        var json = """
+            {"type": "frame", "lite": true, "t": 12.5, "phrase": 2, "bp": 24.5,
+             "decks": [{"deck": 1, "track": "one", "vol": 0.8, "play": true, "ready": true,
+                        "status": {"analysis": "done", "ai_done": 3, "ai_total": 9, "elapsed": 4}, "genre": "house", "style": "house"},
+                       {"deck": 2, "track": "two", "vol": 0, "play": false, "ready": false, "status": {"missing": true}}],
+             "link": {"name": "DJ laptop", "up": true, "offset_ms": 1.5, "jitter_ms": 0.4, "lost": 0, "packets": 120, "fetching": []},
+             "guard": {"laser1": "zone 'Audience'"}, "fog": {"smoke1": 0.4}, "limit": 0.7}
+            """;
+        var f = DecodeFrame(json);
+        Assert.Equal(2, f.Decks!.Count);
+        Assert.Equal(3, f.Decks[0].Status!.AiDone);
+        Assert.Null(f.Decks[1].Status!.Analysis);
+        Assert.Equal("DJ laptop", f.Link!.Name);
+        Assert.Equal("zone 'Audience'", f.LaserGuard!["laser1"]);
+        Assert.Equal(0.4f, f.Fog["smoke1"]);
+        Assert.Equal(f.Link, f.Link with { });  // equal by value (the feed only tells the UI when it changes)
+    }
+
+    [Fact]
+    public void ToleratesWhatSwiftTolerates()
+    {
+        // missing fields take their defaults
+        var h = DecodeHello("""{"type": "hello"}""");
+        Assert.Equal(120, h.Bpm);
+        Assert.Equal(6, h.Stage.WidthM);
+        Assert.Empty(h.Fixtures);
+        // the try? fields: wrong is left out, the message survives
+        h = DecodeHello("""{"type": "hello", "trusses": "nonsense", "zones": [{"no": "id"}], "genre": 3}""");
+        Assert.Empty(h.Trusses);
+        Assert.Empty(h.Zones);
+        Assert.Equal("", h.Genre);
+        var f = DecodeFrame("""{"type": "frame", "arc": {"on": true}, "link": 3, "guard": [], "fog": {"x": "y"}}""");
+        Assert.Null(f.Arc);
+        Assert.Null(f.Link);
+        Assert.Null(f.LaserGuard);
+        Assert.Empty(f.Fog);
+        // the strict fields: wrong fails the whole message, as JSONDecoder does
+        Assert.Null(FeedMessage.Decode("""{"type": "hello", "bpm": "fast"}"""));
+        Assert.Null(FeedMessage.Decode("""{"type": "frame", "decks": [{"deck": 1}]}"""));
+        Assert.Null(FeedMessage.Decode("""{"type": "frame", "phrase": 2.5}"""));
+        Assert.Null(FeedMessage.Decode("""{"type": "frame", "lite": 1}"""));
+        Assert.Null(FeedMessage.Decode("""{"type": "hello", "fixtures": [{"id": "x"}]}"""));  // a fixture needs pos
+        // an Int field takes a whole number written as a double
+        Assert.Equal(2, DecodeFrame("""{"type": "frame", "phrase": 2.0}""").Phrase);
+        // not ours
+        Assert.Null(FeedMessage.Decode("""{"type": "other"}"""));
+        Assert.Null(FeedMessage.Decode("""{"no": "type"}"""));
+        Assert.Null(FeedMessage.Decode("not json"));
+        Assert.Null(FeedMessage.Decode("[1, 2]"));
+        // short direction vectors and laser beams are dropped, not fatal
+        f = DecodeFrame("""{"type": "frame", "dirs": [[1, 0], null, [0, 1, 0]], "lz": [null, [[1, 2, 3], [0, 1, 0, 1, 1, 1, 0.5]]]}""");
+        Assert.Equal([false, false, true], f.Dirs.Select(d => d.HasValue));
+        Assert.Null(f.Lz[0]);
+        Assert.Single(f.Lz[1]!);
+    }
+
+    [Fact]
+    public void TitleDropsTheDeckAndTheExtension()
+    {
+        Assert.Equal("Track One", DecodeHello("""{"type": "hello", "track": "Deck A: Track One.mp3"}""").Title);
+        Assert.Equal("live set", DecodeHello("""{"type": "hello", "track": "live set"}""").Title);
+        Assert.Equal("v1.2 mix", DecodeHello("""{"type": "hello", "track": "Deck 2: v1.2 mix.flac"}""").Title);
+    }
+
+    [Fact]
+    public void JSONValueTextAndEquality()
+    {
+        Assert.Equal("3", JSONValue.Of(3.0).Text);
+        Assert.Equal("0.25", JSONValue.Of(0.25).Text);
+        Assert.Equal("0.33", JSONValue.Of(1.0 / 3).Text);
+        Assert.Equal("yes", JSONValue.True.Text);
+        Assert.Equal("–", JSONValue.Null.Text);
+        Assert.Equal("a, 2", JSONValue.Parse("""["a", 2]""").Text);
+        Assert.Equal("…", JSONValue.Parse("{}").Text);
+        Assert.Equal(JSONValue.Parse("""{"a": [1, {"b": null}]}"""), JSONValue.Parse("""{"a":[1.0,{"b":null}]}"""));
+        Assert.NotEqual(JSONValue.Parse("""{"a": 1}"""), JSONValue.Parse("""{"a": true}"""));
+        Assert.Equal("""{"a":1,"b":[0.5,"x/y"]}""", JSONValue.Parse("""{"b": [0.5, "x/y"], "a": 1.0}""").ToJson(sortKeys: true).Utf8());
+    }
+
+    [Fact]
+    public void DecisionKeepsEveryField()
+    {
+        var d = Decision.From(J.ParseElement(Encoding.UTF8.GetBytes("""
+            {"phrase": 4, "start": 1, "end": 9, "section": "drop", "movement": "sweep", "confidence": {"section": 0.9, "x": "no"},
+             "probabilities": {"palette": {"warm": 0.7}}, "intensity": 3}
+            """)));
+        Assert.Equal(4, d.Id);
+        Assert.Equal("sweep", d["movement"]);
+        Assert.Equal("–", d["missing"]);
+        Assert.Equal("cool", d.Palette);
+        Assert.Equal(0.9, d.Confidence["section"]);
+        Assert.False(d.Confidence.ContainsKey("x"));
+        Assert.Equal(0.7, d.Probabilities["palette"]["warm"]);
+    }
+}
+
+static class TestHelpers
+{
+    public static TOut Let<TIn, TOut>(this TIn x, Func<TIn, TOut> f) => f(x);
+    public static string Utf8(this byte[] b) => Encoding.UTF8.GetString(b);
+}

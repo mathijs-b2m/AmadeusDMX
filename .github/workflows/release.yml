@@ -1,16 +1,20 @@
 name: Release
 
-# Push a tag (git tag v0.2.0 && git push origin v0.2.0): the checks run, the Mac apps are built with the engine
-# inside, and a draft release with the disk images and the update feeds (appcast.xml for Amadeus DMX,
-# appcast-link.xml for Amadeus Link) is made on GitHub. You publish it there, after a look: from then on the apps
-# out there find it (Sparkle reads releases/latest/download/…, the newest published release, not a prerelease).
-# Run by hand (Actions › Release › Run workflow): the same build, the disk images as a workflow artifact only.
+# Push a tag (git tag v0.2.0 && git push origin v0.2.0): the checks run, the Mac apps and the Windows apps are built
+# with the engine inside, and a draft release with the disk images, the Windows installers and the update feeds
+# (appcast.xml / appcast-link.xml for the Mac apps, appcast-windows.xml / appcast-link-windows.xml for Windows) is
+# made on GitHub. You publish it there, after a look: from then on the apps out there find it (Sparkle and
+# NetSparkle read releases/latest/download/…, the newest published release, not a prerelease).
+# Run by hand (Actions › Release › Run workflow): the same builds, as workflow artifacts only.
 #
 # Secrets (mac/release-keys.sh makes them): SIGNING_P12_BASE64 + SIGNING_P12_PASSWORD (the signing certificate)
-# and SPARKLE_PRIVATE_KEY (signs the updates). Without them the apps are signed ad hoc and don't update.
+# and SPARKLE_PRIVATE_KEY (signs the updates, on both systems). Without them the apps are signed ad hoc and don't update.
 # With DEVELOPER_ID_P12_BASE64 + DEVELOPER_ID_P12_PASSWORD (Apple's Developer ID Application certificate) the apps
 # are signed with that instead, and notarized with NOTARY_KEY_P8 + NOTARY_KEY_ID (+ NOTARY_ISSUER_ID for a team
 # key), an App Store Connect API key: Gatekeeper then opens them without asking (mac/README.md).
+# Windows (windows/README.md): Azure Trusted Signing with WINDOWS_SIGN_ENDPOINT, WINDOWS_SIGN_ACCOUNT,
+# WINDOWS_SIGN_PROFILE, WINDOWS_SIGN_TENANT_ID, WINDOWS_SIGN_CLIENT_ID, WINDOWS_SIGN_CLIENT_SECRET, or a
+# certificate: WINDOWS_PFX_BASE64 + WINDOWS_PFX_PASSWORD. Without either the Windows apps are unsigned.
 
 on:
   push:
@@ -105,11 +109,158 @@ jobs:
           path: |
             mac/build/*.dmg
             mac/build/SHA256SUMS.txt
+            mac/build/appcast*.xml
+
+  windows:
+    needs: checks
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the build number is the commit count
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Version
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $v = $env:GITHUB_REF_NAME.Substring(1) } else { $v = "0.0.0-dev.$(git rev-list --count HEAD)" }
+          "VERSION=$v" >> $env:GITHUB_ENV
+      - name: Release keys
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          SIGN_ENDPOINT: ${{ secrets.WINDOWS_SIGN_ENDPOINT }}
+          PFX: ${{ secrets.WINDOWS_PFX_BASE64 }}
+        run: |
+          # code signing: Azure Trusted Signing, else a certificate of our own (.pfx), else none
+          if ($env:SIGN_ENDPOINT) {
+            "SIGNING=azure" >> $env:GITHUB_ENV
+          } elseif ($env:PFX) {
+            $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX))
+            "SIGNING=pfx" >> $env:GITHUB_ENV
+            "WINDOWS_PFX=$pfx" >> $env:GITHUB_ENV
+          } else {
+            "::warning::No Windows signing secrets (WINDOWS_SIGN_* or WINDOWS_PFX_BASE64): unsigned, SmartScreen warns when people run the installer"
+          }
+          # updates: signed with the same key as the Mac apps'
+          if ($env:SPARKLE_KEY) {
+            "FEED_URL=https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/appcast-windows.xml" >> $env:GITHUB_ENV
+          } else {
+            "::warning::No SPARKLE_PRIVATE_KEY in the secrets: the Windows apps don't update"
+          }
+      - name: Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: VirtualDJ plugin
+        run: |
+          if (Test-Path vdj/build.ps1) { ./vdj/build.ps1 } else { "::warning::No vdj/build.ps1: built without the VirtualDJ plugin" }
+      - name: Build (engine inside)
+        run: ./windows/build.ps1 -Release -Version $env:VERSION
+      - name: What to sign
+        if: env.SIGNING != ''
+        run: |
+          # the apps and the engine's Python (and the launchers the optional packs' environment copies)
+          $files = @('AmadeusDMX\AmadeusDMX.exe', 'AmadeusLink\AmadeusLink.exe', 'AmadeusDMX\runtime\python.exe',
+            'AmadeusDMX\runtime\pythonw.exe', 'AmadeusDMX\runtime\Lib\venv\scripts\nt\venvlauncher.exe',
+            'AmadeusDMX\runtime\Lib\venv\scripts\nt\venvwlauncher.exe') |
+            ForEach-Object { Join-Path $env:GITHUB_WORKSPACE "windows\build\$_" } | Where-Object { Test-Path $_ }
+          "SIGN_FILES=$($files -join ',')" >> $env:GITHUB_ENV
+      - name: Sign the apps (Azure Trusted Signing)
+        if: env.SIGNING == 'azure'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.WINDOWS_SIGN_TENANT_ID }}
+          azure-client-id: ${{ secrets.WINDOWS_SIGN_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.WINDOWS_SIGN_CLIENT_SECRET }}
+          endpoint: ${{ secrets.WINDOWS_SIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.WINDOWS_SIGN_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.WINDOWS_SIGN_PROFILE }}
+          files: ${{ env.SIGN_FILES }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Sign the apps (certificate)
+        if: env.SIGNING == 'pfx'
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+        run: ./windows/installer/sign.ps1 -Pfx $env:WINDOWS_PFX -Password $env:PFX_PASSWORD ($env:SIGN_FILES -split ',')
+      - name: Installers
+        run: |
+          ./windows/build.ps1 -Installer -NoBuild -Version $env:VERSION
+          $files = Get-ChildItem windows/build/*-Setup-*.exe | ForEach-Object FullName
+          "INSTALLERS=$($files -join ',')" >> $env:GITHUB_ENV
+      - name: Sign the installers (Azure Trusted Signing)
+        if: env.SIGNING == 'azure'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.WINDOWS_SIGN_TENANT_ID }}
+          azure-client-id: ${{ secrets.WINDOWS_SIGN_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.WINDOWS_SIGN_CLIENT_SECRET }}
+          endpoint: ${{ secrets.WINDOWS_SIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.WINDOWS_SIGN_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.WINDOWS_SIGN_PROFILE }}
+          files: ${{ env.INSTALLERS }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Sign the installers (certificate)
+        if: env.SIGNING == 'pfx'
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+        run: ./windows/installer/sign.ps1 -Pfx $env:WINDOWS_PFX -Password $env:PFX_PASSWORD ($env:INSTALLERS -split ',')
+      - name: Checksums
+        working-directory: windows/build
+        run: |
+          $sums = Get-ChildItem *-Setup-*.exe | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path -Leaf $_.Path)" }
+          [IO.File]::WriteAllText("$PWD/SHA256SUMS-windows.txt", ($sums -join "`n") + "`n")
+      - name: Update feeds
+        if: startsWith(github.ref, 'refs/tags/v') && env.FEED_URL != ''
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # one feed per app, each with its .signature: appcast-windows.xml (Amadeus DMX), appcast-link-windows.xml (Amadeus Link)
+          $build = git rev-list --count HEAD
+          $prefix = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/"
+          $notes = "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$env:GITHUB_REF_NAME"
+          foreach ($f in @(@('AmadeusDMX', 'appcast-windows.xml', 'Amadeus DMX'), @('AmadeusLink', 'appcast-link-windows.xml', 'Amadeus Link'))) {
+            uv run windows/installer/appcast.py feed "windows/build/$($f[0])-Setup-$env:VERSION.exe" -o "windows/build/$($f[1])" `
+              --version $env:VERSION --build $build --url-prefix $prefix --notes-url $notes --title $f[2]
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amadeus-dmx-windows-${{ env.VERSION }}
+          path: |
+            windows/build/*-Setup-*.exe
+            windows/build/SHA256SUMS-windows.txt
+            windows/build/appcast*.xml
+            windows/build/appcast*.xml.signature
+
+  release:
+    needs: [mac, windows]
+    # a Windows build that fails doesn't hold back the Mac release: the draft then has the Mac apps only
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.mac.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: amadeus-dmx-*
+          path: dist
+          merge-multiple: true
       - name: Draft release
-        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: dist
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # one checksum file for everything
+          if [ -f SHA256SUMS-windows.txt ]; then cat SHA256SUMS-windows.txt >> SHA256SUMS.txt && rm SHA256SUMS-windows.txt
+          else echo "::warning::No Windows build: the draft release has the Mac apps only"; fi
           gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Amadeus DMX $VERSION" \
             $([[ "$VERSION" == *-* ]] && echo --prerelease) \
-            mac/build/*.dmg mac/build/SHA256SUMS.txt $(ls mac/build/appcast*.xml 2>/dev/null)
+            *.dmg $(ls *.exe 2>/dev/null) SHA256SUMS.txt $(ls appcast*.xml appcast*.xml.signature 2>/dev/null)

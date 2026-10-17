@@ -1,0 +1,6 @@
+# .NET builds (the root .gitignore covers the rest)
+bin/
+obj/
+*.user
+.vs/
+TestResults/

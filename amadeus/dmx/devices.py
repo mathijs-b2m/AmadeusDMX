@@ -40,7 +40,7 @@ def load() -> list[dict]:
     p = path()
     if not p.exists():
         return []
-    return list(json.loads(p.read_text()).get("devices", []))
+    return list(json.loads(p.read_text(encoding="utf-8")).get("devices", []))
 
 
 def save(devices: list[dict]) -> list[str]:
@@ -48,7 +48,7 @@ def save(devices: list[dict]) -> list[str]:
     problems = validate(devices)
     if not problems:
         path().parent.mkdir(parents=True, exist_ok=True)
-        path().write_text(json.dumps({"devices": devices}, indent=2) + "\n")
+        path().write_text(json.dumps({"devices": devices}, indent=2) + "\n", encoding="utf-8")
     return problems
 
 

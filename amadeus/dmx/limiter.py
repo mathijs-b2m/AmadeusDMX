@@ -14,7 +14,7 @@ import json
 import time
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 
 FILE = paths.CONFIG / "limiter.json"
 MIN_LEVEL = 0.05  # never fully dark: a limiter at 0 would look like a broken rig
@@ -41,7 +41,7 @@ def use(path) -> None:
 def read() -> float:
     """The level on disk, 0.05..1 (1: off)."""
     try:
-        return _clamp(json.loads(FILE.read_text()).get("level", 1.0))
+        return _clamp(json.loads(FILE.read_text(encoding="utf-8")).get("level", 1.0))
     except (OSError, ValueError, AttributeError):
         return 1.0
 
@@ -58,7 +58,7 @@ def save(value: float) -> float:
     v = _clamp(value)
     FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"level": round(v, 3)}) + "\n")
-    tmp.replace(FILE)
+    tmp.write_text(json.dumps({"level": round(v, 3)}) + "\n", encoding="utf-8")
+    system.replace(tmp, FILE)  # other engines read it meanwhile
     _cached["at"], _cached["level"] = time.monotonic(), v
     return v

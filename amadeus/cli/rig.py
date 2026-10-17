@@ -154,7 +154,7 @@ def rigs_command(args):
 
         show = store.current()
         out = Path(args.hang_sheet or f"hang-sheet-{show.set}-{show.rig}.html")
-        out.write_text(hangsheet.html(show.load(), show.set, show.rig))
+        out.write_text(hangsheet.html(show.load(), show.set, show.rig), encoding="utf-8")
         print(f"Hang sheet of the set '{show.set}' on the rig '{show.rig}': {out} (open it in a browser to print)")
 
 

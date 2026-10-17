@@ -74,7 +74,7 @@ def _session(name: str):
 
 @cache
 def classes(name: str) -> list[str]:
-    return json.loads((MODELS / f"{Path(FILES[name]).name}.json").read_text())["classes"]
+    return json.loads((MODELS / f"{Path(FILES[name]).name}.json").read_text(encoding="utf-8"))["classes"]
 
 
 def _hz_to_mel(f):  # Slaney: linear below 1 kHz, logarithmic above

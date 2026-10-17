@@ -2,7 +2,8 @@
 
     python -m amadeus monitor            one line every 2 s, warnings at once, CSV in .cache/monitor/
 
-Uses only macOS tools that need no admin rights (ps, sysctl, ioreg). Together with `live --health`
+Uses only what needs no admin rights: on macOS ps, sysctl and ioreg, on Windows the system's own process and
+memory counters (amadeus/system.py; no GPU load there). Together with `live --health`
 (packets from VirtualDJ, deck positions, light-loop timing) this tells apart a VirtualDJ stall, one of
 ours, a crash and a machine that is simply out of breath.
 """
@@ -16,10 +17,15 @@ import subprocess
 import time
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 
 WATCH = {"vdj": ["VirtualDJ"], "live": ["amadeus live", "amadeus play"]}
-REPORT_DIRS = [Path.home() / "Library/Logs/DiagnosticReports", Path("/Library/Logs/DiagnosticReports")]
+if system.WINDOWS:  # Windows Error Reporting keeps a folder per crash or hang
+    _wer = [os.environ.get("LOCALAPPDATA", ""), os.environ.get("PROGRAMDATA", "")]
+    REPORT_DIRS = [Path(d) / "Microsoft/Windows/WER/ReportArchive" for d in _wer if d]
+else:
+    REPORT_DIRS = [Path.home() / "Library/Logs/DiagnosticReports", Path("/Library/Logs/DiagnosticReports")]
+_cpu: dict = {}  # Windows: the last CPU times read (per pid, and the system's), for a percentage between two
 
 
 def _fmt(p: dict | None, name: str) -> str:
@@ -36,18 +42,24 @@ def _run(*cmd: str) -> str:
 
 
 def _pid(patterns: list[str]) -> int | None:
-    for line in _run("ps", "-axo", "pid=,command=").splitlines():
-        pid, _, cmd = line.strip().partition(" ")
+    for pid, cmd in system.processes():
         if any(p in cmd for p in patterns) and "amadeus monitor" not in cmd and "grep" not in cmd:
-            if patterns == WATCH["vdj"] and "/VirtualDJ.app/" not in cmd:
+            if patterns == WATCH["vdj"] and not is_virtualdj(cmd):
                 continue
             return int(pid)
     return None
 
 
+def is_virtualdj(cmd: str) -> bool:
+    """VirtualDJ itself (not a file or folder named after it): its app on macOS, virtualdj.exe on Windows."""
+    return "/VirtualDJ.app/" in cmd or re.search(r'(^|[\\/"])virtualdj\w*\.exe\b', cmd, re.I) is not None
+
+
 def _proc(pid: int | None) -> dict:
     if pid is None:
         return {}
+    if system.WINDOWS:
+        return _proc_windows(pid)
     out = _run("ps", "-o", "pcpu=,rss=,state=", "-p", str(pid)).split()
     if len(out) < 3:
         return {}
@@ -55,8 +67,25 @@ def _proc(pid: int | None) -> dict:
     return {"cpu": float(out[0]), "mem_mb": int(out[1]) / 1024, "state": out[2], "threads": threads}
 
 
+def _proc_windows(pid: int) -> dict:
+    st = system.process_stats(pid)
+    if not st:
+        return {}
+    now = time.monotonic()
+    then, cpu_then = _cpu.get(pid, (now, st["cpu_s"]))
+    _cpu[pid] = (now, st["cpu_s"])
+    cpu = 100 * (st["cpu_s"] - cpu_then) / (now - then) if now > then else 0.0  # like ps: 100 = one core
+    return {"cpu": cpu, "mem_mb": st["mem_mb"], "state": "", "threads": st["threads"]}
+
+
 def _system() -> dict:
     ncpu = os.cpu_count() or 1
+    if system.WINDOWS:
+        st = system.system_stats()
+        busy, total = _cpu.get("system", (st["busy_s"], st["total_s"]))
+        _cpu["system"] = (st["busy_s"], st["total_s"])
+        share = 100 * (st["busy_s"] - busy) / (st["total_s"] - total) if st["total_s"] > total else 0.0
+        return {"cpu_total": share, "load1": 0.0, "mem_free_pct": st["mem_free_pct"], "gpu": -1}
     total = sum(float(x) for x in _run("ps", "-Ao", "pcpu=").split() if x.replace(".", "", 1).isdigit())
     load = _run("sysctl", "-n", "vm.loadavg").strip("{} \n").split()
     free = _run("sysctl", "-n", "kern.memorystatus_level").strip()
@@ -73,7 +102,7 @@ def _reports() -> set[Path]:
     out = set()
     for d in REPORT_DIRS:
         try:
-            out |= {p for p in d.iterdir() if p.is_file()}
+            out |= {p for p in d.iterdir() if p.is_file() or system.WINDOWS}
         except OSError:
             pass
     return out
@@ -106,7 +135,7 @@ def run(interval: float = 1.0, print_every: int = 2):
         "gpu",
     ]
     print(f"Monitoring VirtualDJ + Amadeus DMX every {interval:g} s → {path}   (Ctrl+C to stop)", flush=True)
-    with open(path, "w", newline="") as f:
+    with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         n = 0

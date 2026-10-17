@@ -4,7 +4,7 @@ import pytest
 
 from tests.golden_tool import GOLDEN, SETS, platform_tag, render_hash
 
-RECORDED = json.loads(GOLDEN.read_text())
+RECORDED = json.loads(GOLDEN.read_text(encoding="utf-8"))
 
 pytestmark = pytest.mark.skipif(
     RECORDED["_platform"] != platform_tag(),

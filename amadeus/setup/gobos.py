@@ -72,7 +72,7 @@ def run(show, fixture_id: str, level: float = 0.8):
         sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
 
     path = fxlib.path_of(defn["key"])
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     data["gobo_names"] = names
     path = fxlib.save(defn["key"], data)
     named = sum(1 for n in names if n)

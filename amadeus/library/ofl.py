@@ -251,11 +251,11 @@ def _expand_mode(d: dict, mode: dict) -> list[tuple[str | None, int]]:
 def convert(manufacturer_key: str, fixture_key: str) -> dict:
     """OFL fixture → our fixture definition (not yet saved)."""
     base = ensure_downloaded()
-    d = json.loads((base / manufacturer_key / f"{fixture_key}.json").read_text())
+    d = json.loads((base / manufacturer_key / f"{fixture_key}.json").read_text(encoding="utf-8"))
     if "redirectTo" in d:  # an alias (renamed, or sold under another brand): the fixture it points to
         target = convert(*d["redirectTo"].split("/", 1))
         return {**target, "model": d.get("name", target["model"])}
-    mans = json.loads((base / "manufacturers.json").read_text())
+    mans = json.loads((base / "manufacturers.json").read_text(encoding="utf-8"))
     cats = d.get("categories", [])
     kind = (
         "laser"
@@ -397,16 +397,16 @@ def _tokens(s: str) -> list[str]:
 def index() -> list[dict]:
     """Searchable list of all OFL fixtures (built once, cached on disk)."""
     if INDEX.exists():
-        data = json.loads(INDEX.read_text())
+        data = json.loads(INDEX.read_text(encoding="utf-8"))
         if data.get("version") == CONVERTER_VERSION:
             return data["fixtures"]
     base = ensure_downloaded()
-    mans = json.loads((base / "manufacturers.json").read_text())
+    mans = json.loads((base / "manufacturers.json").read_text(encoding="utf-8"))
     items = []
     for path in sorted(base.glob("*/*.json")):
         mk, fk = path.parent.name, path.stem
         try:
-            d = json.loads(path.read_text())
+            d = json.loads(path.read_text(encoding="utf-8"))
             modes = {}
             for mode in d.get("modes", []):
                 modes[mode.get("shortName") or mode.get("name")] = len(_expand_mode(d, mode))
@@ -421,7 +421,7 @@ def index() -> list[dict]:
                 "modes": modes,
             }
         )
-    INDEX.write_text(json.dumps({"version": CONVERTER_VERSION, "fixtures": items}))
+    INDEX.write_text(json.dumps({"version": CONVERTER_VERSION, "fixtures": items}), encoding="utf-8")
     return items
 
 

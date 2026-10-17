@@ -1,0 +1,25 @@
+<!-- Shared by every project: the language settings and the version (build.ps1 passes AppVersion and BuildNumber). -->
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <!-- the apps target Windows; this lets them build on a Mac too (check.sh) -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Company>Amadeus DMX</Company>
+    <Product>Amadeus DMX</Product>
+    <Copyright>Amadeus DMX contributors</Copyright>
+
+    <!-- AppVersion: "0.3.0" or "0.3.0-beta.1" (the tag without the v); BuildNumber: the CI run -->
+    <AppVersion Condition="'$(AppVersion)' == ''">0.0.0</AppVersion>
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    <_NumericVersion>$([System.Text.RegularExpressions.Regex]::Match($(AppVersion), '^\d+(\.\d+){0,2}').Value)</_NumericVersion>
+    <_NumericVersion Condition="'$(_NumericVersion)' == ''">0.0.0</_NumericVersion>
+    <Version>$(AppVersion)</Version>
+    <AssemblyVersion>$(_NumericVersion).$(BuildNumber)</AssemblyVersion>
+    <FileVersion>$(_NumericVersion).$(BuildNumber)</FileVersion>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+</Project>

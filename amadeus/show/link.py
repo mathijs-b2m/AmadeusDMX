@@ -1,8 +1,9 @@
 """Amadeus Link: VirtualDJ on another computer (the DJ's laptop) drives the show over the network.
 
 The DJ runs the small "Amadeus Link" app next to VirtualDJ (with the AmadeusLink plugin as before). It
-advertises itself with Bonjour (_amadeuslink._tcp) and shows a 4-digit pairing code. The lighting computer
-connects with that code (`amadeus live --remote HOST:PORT --code 1234`, or "Nearby DJs" in the Mac app).
+advertises itself with Bonjour (_amadeuslink._tcp: found with macOS's dns-sd, on Windows with zeroconf, no
+Bonjour service needed) and shows a 4-digit pairing code. The lighting computer connects with that code
+(`amadeus live --remote HOST:PORT --code 1234`, or "Nearby DJs" in the app).
 
 Protocol v1 (all JSON lines over TCP, then UDP datagrams):
 
@@ -35,6 +36,7 @@ import json
 import os
 import random
 import secrets
+import shutil
 import socket
 import subprocess
 import threading
@@ -92,10 +94,13 @@ def _send(sock: socket.socket, obj: dict):
 
 
 def browse(timeout: float = 3.0) -> list[tuple[str, str, int]]:
-    """Amadeus Link services on the network: [(name, host, port)] (macOS dns-sd)."""
+    """Amadeus Link services on the network: [(name, host, port)] (macOS dns-sd; elsewhere the zeroconf
+    package, which needs no Bonjour service: Windows)."""
+    if not shutil.which("dns-sd"):
+        return _zeroconf(timeout)
     found: list[tuple[str, str, int]] = []
     try:
-        p = subprocess.Popen(["dns-sd", "-B", SERVICE, "local."], stdout=subprocess.PIPE, text=True)
+        p = subprocess.Popen(["dns-sd", "-B", SERVICE, "local."], stdout=subprocess.PIPE, text=True, encoding="utf-8")
         time.sleep(timeout)
         p.terminate()
         names = []
@@ -104,7 +109,9 @@ def browse(timeout: float = 3.0) -> list[tuple[str, str, int]]:
             if len(parts) >= 7 and parts[1] == "Add" and SERVICE.split(".")[0] in line:
                 names.append(" ".join(parts[6:]))
         for name in dict.fromkeys(names):
-            q = subprocess.Popen(["dns-sd", "-L", name, SERVICE, "local."], stdout=subprocess.PIPE, text=True)
+            q = subprocess.Popen(
+                ["dns-sd", "-L", name, SERVICE, "local."], stdout=subprocess.PIPE, text=True, encoding="utf-8"
+            )
             time.sleep(1.0)
             q.terminate()
             for line in (q.stdout.read() if q.stdout else "").splitlines():
@@ -120,8 +127,13 @@ def browse(timeout: float = 3.0) -> list[tuple[str, str, int]]:
 
 def resolve(name: str, timeout: float = 3.0) -> tuple[str, int] | None:
     """An Amadeus Link service by its name (as Bonjour shows it) → (host, port)."""
+    if not shutil.which("dns-sd"):
+        hit = _zeroconf(timeout, name)
+        return (hit[0][1], hit[0][2]) if hit else None
     try:
-        q = subprocess.Popen(["dns-sd", "-L", name, SERVICE, "local."], stdout=subprocess.PIPE, text=True)
+        q = subprocess.Popen(
+            ["dns-sd", "-L", name, SERVICE, "local."], stdout=subprocess.PIPE, text=True, encoding="utf-8"
+        )
         time.sleep(timeout)
         q.terminate()
         for line in (q.stdout.read() if q.stdout else "").splitlines():
@@ -131,6 +143,42 @@ def resolve(name: str, timeout: float = 3.0) -> tuple[str, int] | None:
     except FileNotFoundError:
         pass
     return None
+
+
+def _zeroconf(timeout: float, name: str | None = None) -> list[tuple[str, str, int]]:
+    """Browse (or, given a name, resolve that one) with python-zeroconf: [(name, address, port)], IPv4 first."""
+    try:
+        from zeroconf import IPVersion, ServiceBrowser, Zeroconf
+    except ImportError:
+        print("  Amadeus Link: can't look on the network without the zeroconf package (pip install zeroconf)")
+        return []
+    kind = SERVICE + ".local."
+    zc = Zeroconf()
+    try:
+        names: list[str] = [f"{name}.{kind}"] if name else []
+        if not name:
+
+            class Found:
+                def add_service(self, zc, type_, full):
+                    names.append(full)
+
+                def update_service(self, zc, type_, full):
+                    pass
+
+                def remove_service(self, zc, type_, full):
+                    pass
+
+            ServiceBrowser(zc, kind, Found())
+            time.sleep(timeout)
+        found = []
+        for full in dict.fromkeys(names):
+            info = zc.get_service_info(kind, full, timeout=int(timeout * 1000) if name else 1000)
+            addrs = (info.parsed_addresses(IPVersion.V4Only) or info.parsed_addresses()) if info else []
+            if info and info.port and addrs:
+                found.append((full.removesuffix("." + kind), addrs[0], int(info.port)))
+        return found
+    finally:
+        zc.close()
 
 
 class RemoteListener:
@@ -398,7 +446,7 @@ class RemoteListener:
                     if h.hexdigest() != head["sha256"]:
                         tmp.unlink(missing_ok=True)
                         raise OSError("checksum mismatch")
-                    tmp.rename(path)
+                    tmp.replace(path)
                     os.utime(path, (head["mtime"], head["mtime"]))  # a stable analysis cache key
                 self.local[remote] = str(path)
                 self.transfers[remote] = "done"

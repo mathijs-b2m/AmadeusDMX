@@ -32,7 +32,7 @@ def config(tmp_path, monkeypatch):
 
 def old_style(config, name: str) -> dict:
     """Put an old combined set file (as sets were before rigs existed) into the config."""
-    doc = json.loads((SETS / f"{name}.json").read_text())
+    doc = json.loads((SETS / f"{name}.json").read_text(encoding="utf-8"))
     shutil.copy(SETS / f"{name}.json", config / "sets" / f"{name}.json")
     return doc
 
@@ -53,9 +53,9 @@ def test_saving_the_combined_view_changes_nothing(config):
     old_style(config, "showcase")
     show = store.Selection(rig="showcase", set="showcase")
     show.save(show.load())  # (once: tower fixtures from before tower faces get theirs)
-    before = [p.read_text() for p in show.paths]
+    before = [p.read_text(encoding="utf-8") for p in show.paths]
     show.save(show.load())
-    assert [p.read_text() for p in show.paths] == before
+    assert [p.read_text(encoding="utf-8") for p in show.paths] == before
 
 
 def test_a_set_on_a_new_rig_waits_until_mounted(config):
@@ -172,7 +172,9 @@ def test_a_fixture_standing_on_a_tower_from_before_hangs_off_its_front():
 def test_auto_mount_reads_the_structure_of_a_rig_without_trusses():
     from amadeus.rig import automount as am
 
-    merged = json.loads(Path("tests/sets/concert60.json").read_text())  # fixtures at fixed positions, no trusses
+    merged = json.loads(
+        Path("tests/sets/concert60.json").read_text(encoding="utf-8")
+    )  # fixtures at fixed positions, no trusses
     merged.pop("trusses", None)
     for f in merged["fixtures"]:
         f[store.UNPLACED] = True
@@ -186,7 +188,7 @@ def test_auto_mount_reads_the_structure_of_a_rig_without_trusses():
 def test_auto_mount_in_an_empty_room_builds_a_structure_first():
     from amadeus.rig import automount as am
 
-    merged = json.loads(Path("tests/sets/showcase.json").read_text())
+    merged = json.loads(Path("tests/sets/showcase.json").read_text(encoding="utf-8"))
     merged.pop("trusses", None)
     for f in merged["fixtures"]:
         f.update(mount="floor", z_m=0.25, y_m=-0.3)
