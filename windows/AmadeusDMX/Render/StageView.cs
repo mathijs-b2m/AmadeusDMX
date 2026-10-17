@@ -63,7 +63,7 @@ public sealed partial class StageView : SwapChainPanel
     public StageView(StageController controller)
     {
         _controller = controller;
-        Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);   // hit-testable everywhere
+        // no Background: a SwapChainPanel takes none (it is hit-tested over its whole area anyway)
         IsTabStop = true;
         AllowDrop = true;
         Loaded += OnLoaded;
