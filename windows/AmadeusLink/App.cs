@@ -17,9 +17,20 @@ public sealed partial class App : Application
     public App()
     {
         RequestedTheme = ApplicationTheme.Dark;
+        UnhandledException += (_, e) => CrashLog.Write("Amadeus Link", e.Exception, "unhandled");
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        try { Launch(); }
+        catch (Exception e)
+        {
+            CrashLog.Write("Amadeus Link", e, "launch");
+            throw;
+        }
+    }
+
+    void Launch()
     {
         Resources.MergedDictionaries.Add(new XamlControlsResources());
         Defaults.Standard = new Defaults(Defaults.FileFor("Amadeus Link"), Environment.GetCommandLineArgs());

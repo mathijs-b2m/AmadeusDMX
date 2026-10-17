@@ -17,12 +17,23 @@ public sealed partial class App : Application
         UnhandledException += (_, e) =>
         {
             // whatever went wrong, never leave the lights on: stop the engine cleanly first
+            CrashLog.Write("Amadeus DMX", e.Exception, "unhandled");
             _model?.Shutdown();
             e.Handled = false;
         };
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        try { Launch(); }
+        catch (Exception e)
+        {
+            CrashLog.Write("Amadeus DMX", e, "launch");
+            throw;
+        }
+    }
+
+    void Launch()
     {
         Resources.MergedDictionaries.Add(new XamlControlsResources());
         Defaults.Standard = new Defaults(Defaults.FileFor("Amadeus DMX"), Environment.GetCommandLineArgs());
