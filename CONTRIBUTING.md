@@ -11,7 +11,7 @@ For code, a few things make reviews quick.
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev,openai]"
-.venv/bin/pytest -q            # ~1 minute
+.venv/bin/pytest -q -n auto    # one worker per core (pytest-xdist): a few minutes; without -n, a lot longer
 .venv/bin/ruff check amadeus tests && .venv/bin/ruff format amadeus tests
 ```
 

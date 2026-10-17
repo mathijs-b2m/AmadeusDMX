@@ -31,7 +31,7 @@ streamed = ["yt-dlp[default]>=2026.8.19"]  # streamed tracks (Spotify in djay): 
 link = ["aalink>=0.2"]  # Ableton Link: beat phase from DJ software synced to it
 remote = ["zeroconf>=0.130; sys_platform == 'win32'"]  # Amadeus Link by name without Bonjour (macOS: dns-sd)
 ml = ["beat-this>=1.1", "demucs>=4.1", "torch>=2.6", "torchaudio>=2.6", "onnxruntime>=1.24"]
-dev = ["pytest>=8", "ruff>=0.9"]
+dev = ["pytest>=8", "pytest-xdist>=3.8", "ruff>=0.9"]
 
 [project.scripts]
 amadeus = "amadeus.cli:main"
