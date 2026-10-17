@@ -170,15 +170,21 @@ Using a separate lighting laptop? Put **Amadeus Link** (on the same download pag
 
 Updates install themselves when you allow them, never in the middle of a show.
 
-### What you need
+### System requirements
 
-| | |
-|---|---|
-| **Computer** | A Mac with Apple Silicon (macOS 26+), or a Windows 10 22H2 / 11 PC (x64) |
-| **Lights** | Any DMX fixture: about 2,400 are built in (QLC+ and Open Fixture Library), others mapped by hand |
-| **DMX out** | An Art-Net or sACN node, or a USB DMX interface |
-| **DJ software** (optional) | VirtualDJ, djay Pro or Mixxx; or just play tracks in the app |
-| **AI** (optional) | An OpenAI key, or a free local model with Ollama; the rule-based director needs nothing |
+| | Mac | Windows |
+|---|---|---|
+| **Minimum** | Apple Silicon (M1 or later), macOS 26, 8 GB memory | x64, 4 cores, Windows 10 22H2 or 11, 8 GB memory, DirectX 10 graphics |
+| **Recommended** | M1 Pro / M2 or later, 16 GB memory, wired Ethernet to the DMX node | 6+ cores, 16 GB memory, an NVIDIA GeForce GTX 16 / RTX 20 or newer, wired Ethernet to the DMX node |
+| **Big rigs** (50+ heads, lasers, in 3D) | a Pro or Max chip | a recent NVIDIA card |
+
+You'll also need:
+- **a way to send DMX**: an Art-Net or sACN node, or a USB DMX interface;
+- **any DMX fixtures**: about 2,400 are built in, and others can be mapped by hand;
+- **optionally**, VirtualDJ, djay Pro or Mixxx, and an OpenAI key for the AI director (or a free local
+  model with Ollama).
+
+What each part uses, measured, and the details per system: [system requirements](docs/system-requirements.md).
 
 ## Beta testing and feedback
 
@@ -260,6 +266,7 @@ python3 -m venv .venv
 | | |
 |---|---|
 | [Mac setup guide](docs/mac-setup.md) | Installing and switching on every feature, step by step with screenshots |
+| [System requirements](docs/system-requirements.md) | Minimum and recommended hardware for Mac and Windows, and what each part uses |
 | [How it works](docs/how-it-works.md) | The analysis, the director and decision models, genres and house styles, the show arc, the engine |
 | [Command line](docs/command-line.md) | Every `amadeus` command, VirtualDJ live mode, the sync test, sets and rigs, the hardware checklist |
 | [Architecture](docs/architecture.md) | The code map: which package does what, and which way the dependencies go |

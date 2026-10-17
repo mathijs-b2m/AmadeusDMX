@@ -16,7 +16,8 @@ marked ⭐ are what turns it into the full experience, so please don't skip them
 | 8 | [Connect the lights](#8-connect-the-lights) | DMX to the real fixtures | 5 min |
 | 9 | [Run the night](#9-run-the-night-the-show-arc) | The show arc and its live knobs | |
 
-You'll need a Mac with **Apple Silicon** and **macOS 26** or later, and an internet connection for steps 1–5.
+You'll need a Mac with **Apple Silicon** and **macOS 26** or later (16 GB of memory recommended with instrument
+analysis; see the [system requirements](system-requirements.md)), and an internet connection for steps 1–5.
 
 ---
 
