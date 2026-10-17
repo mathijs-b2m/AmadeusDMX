@@ -53,6 +53,8 @@ public static class Symbols
         ["circle.dashed"] = "", ["circle.dotted"] = "", ["circle.fill"] = "", ["largecircle.fill.circle"] = "",
         ["circle.hexagongrid"] = "", ["line.diagonal"] = "", ["thermometer.medium"] = "", ["id.1"] = "",
         ["id.2"] = "",
+        // the Set page, the wizard
+        ["rays"] = "", ["bolt"] = "", ["lightbulb"] = "", ["circle"] = "",
     };
 
     public static string Glyph(string symbol) =>
