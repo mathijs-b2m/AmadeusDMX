@@ -6,7 +6,7 @@
 #define AppExe "AmadeusLink.exe"
 #define AppGuid "{{8DA99DBD-2AAD-47DA-936D-DAD6BEA45396}"
 #define AppMutexName "AmadeusLink.SingleInstance"
-#define IconFile "..\AmadeusLink\Assets\AppIcon.ico"
+#define IconFile "..\AmadeusLink\Assets\AmadeusLink.ico"
 #define FirewallRule "Amadeus Link"
 #include "common.iss"
 

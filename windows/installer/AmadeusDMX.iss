@@ -5,7 +5,7 @@
 #define AppExe "AmadeusDMX.exe"
 #define AppGuid "{{C78A06CF-5E91-403C-BD0A-8D286EE31474}"
 #define AppMutexName "AmadeusDMX.SingleInstance"
-#define IconFile "..\AmadeusDMX\Assets\AppIcon.ico"
+#define IconFile "..\AmadeusDMX\Assets\AmadeusDMX.ico"
 #define FirewallRule "Amadeus DMX engine"
 #include "common.iss"
 
