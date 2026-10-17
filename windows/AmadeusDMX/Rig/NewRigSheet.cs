@@ -1,3 +1,4 @@
+using AmadeusKit;
 // A new rig (a venue): start from the structure that's there (an empty room, two stands, a truss over the
 // booth, a club, a concert stage, a round truss), size it, and then mount your set on it: automatically or by hand.
 // The port of mac/Sources/AmadeusDMX/Rig/NewRigSheet.swift: the sheets are ContentDialogs.
@@ -8,46 +9,6 @@ using Microsoft.UI.Xaml.Shapes;
 using Windows.Foundation;
 
 namespace AmadeusDMX;
-
-public enum RigTemplate { Floor, Stands, Booth, Club, Stage, Ring }   // amadeus/rig/templates.py
-
-public static class RigTemplates
-{
-    public static readonly RigTemplate[] All = Enum.GetValues<RigTemplate>();
-
-    public static string RawValue(this RigTemplate t) => t.ToString().ToLowerInvariant();
-
-    public static string Title(this RigTemplate t) => t switch
-    {
-        RigTemplate.Floor => "Empty Room",
-        RigTemplate.Stands => "Two Stands",
-        RigTemplate.Booth => "Truss over the Booth",
-        RigTemplate.Club => "Club",
-        RigTemplate.Stage => "Concert Stage",
-        _ => "Round Truss",
-    };
-
-    public static string Detail(this RigTemplate t) => t switch
-    {
-        RigTemplate.Floor => "Fixtures on the floor and on tripods.",
-        RigTemplate.Stands => "A mobile DJ: a lighting stand left and right of the booth.",
-        RigTemplate.Booth => "One truss over the DJ.",
-        RigTemplate.Club => "Two trusses over the booth, front and back.",
-        RigTemplate.Stage => "Two overhead trusses, a low one at the back, a tower each side.",
-        _ => "A circle over the booth, a half circle behind it: heads play crowns, cones and twisters.",
-    };
-
-    /// width, truss height, room depth (m)
-    public static (double Width, double Height, double Depth) Size(this RigTemplate t) => t switch
-    {
-        RigTemplate.Floor => (4, 2.5, 8),
-        RigTemplate.Stands => (5, 2.5, 10),
-        RigTemplate.Booth => (6, 3.5, 12),
-        RigTemplate.Club => (10, 4.5, 15),
-        RigTemplate.Stage => (16, 7, 25),
-        _ => (10, 4.5, 15),
-    };
-}
 
 /// The rig seen from the audience: the floor, the booth, trusses, towers.
 public static class RigSketch

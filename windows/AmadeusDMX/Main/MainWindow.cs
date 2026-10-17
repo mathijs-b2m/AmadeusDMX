@@ -155,7 +155,7 @@ public sealed partial class MainWindow : Window
             {
                 Section.Show => new ShowView(_model).Build(),
                 Section.Rig => new RigView(_model).Build(),
-                Section.Set => new SetView(_model).Build(),
+                Section.Set => new SetView(_model, this).Build(),
                 Section.Engine => new EngineView(_model).Build(),
                 _ => new SettingsView(_model).Build(),
             };

@@ -56,6 +56,8 @@ public static class Symbols
         // the show page (knobs, genres, camera presets, LED wall)
         ["tv"] = "\uE7F4", ["paintpalette"] = "\uE790", ["bolt"] = "\uE945", ["cloud"] = "\uE753", ["guitars"] = "\uE8D6",
         ["airplane"] = "\uE709", ["headphones"] = "\uE7F6", ["gamecontroller"] = "\uE7FC", ["circle"] = "\uEA3A",
+        // the Set page, the wizard
+        ["rays"] = "\uE945", ["lightbulb"] = "\uEA80",
     };
 
     public static string Glyph(string symbol) =>
