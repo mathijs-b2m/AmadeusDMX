@@ -1,7 +1,7 @@
 // Windows MIDI Services (the new MIDI stack of Windows 11): a "basic loopback" endpoint called "Amadeus DMX",
 // which programs using WinMM (Mixxx, through PortMidi, and Amadeus Link's own WinMidiIn) see as one MIDI 1.0 input
 // and one output of that name; what Mixxx sends to the output comes back on the input. The Mac's CoreMIDI virtual
-// device, as near as Windows has one. Findings and what it needs: windows/README.md, "Amadeus Link and Mixxx".
+// device, as near as Windows has one. Findings and what it needs: windows/README.md, "Windows MIDI Services".
 //
 // Called through WinRT's ABI by hand (Com.cs): the API (Windows.Devices.Midi2, metadata locked in In-box Preview
 // 11, October 2026) has no .NET projection on NuGet; the interface ids and slots below are from its
