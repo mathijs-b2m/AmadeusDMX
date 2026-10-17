@@ -93,6 +93,42 @@ uv run windows/installer/appcast.py --key-file ~/.amadeus-release/sparkle-privat
 uv run windows/installer/appcast.py verify build/appcast-windows.xml build/appcast-windows.xml.signature
 ```
 
+## Amadeus Link and the DJ software
+
+Link passes VirtualDJ on through its plugin (UDP 127.0.0.1:9123; *Install* in Link's window copies
+`vdj\AmadeusLink.dll` into `Documents\VirtualDJ\Plugins64\SoundEffect`), and reads djay Pro and Mixxx itself.
+What they read becomes the plugin's packets (`AmadeusKit/DJ`, tested on a Mac against the engine's values and its
+receiver); the Windows parts are in `AmadeusLink/DJ`.
+
+- **djay Pro for Windows:** its window through UI Automation (`UiaWindow.cs`), read-only: djay's own top-level
+  window (by its program's name, or a Store frame titled "djay…"), the deck controls by the engine's Narrator
+  labels ("Elapsed time, Deck 1", …), their values through UI Automation's get calls only. No permission needed.
+  Its library: `Music\djay\djay Media Library\MediaLibrary.db` (or the macOS bundle name), read only.
+  **Not verified on Windows yet:** that djay for Windows labels its controls exactly as on macOS.
+- **Mixxx:** Link copies the mapping (`mixxx\` beside the exe) into `%LOCALAPPDATA%\Mixxx\controllers` and reads
+  the script's SysEx from a MIDI port called **Amadeus DMX** with WinMM. Windows has no CoreMIDI-style virtual
+  ports, so Link uses, in this order: a port of that name that is already there (`Amadeus DMX`,
+  `Amadeus DMX 1`, `… group 1`); else a **Windows MIDI Services basic loopback** it makes itself; else it says to
+  make one in loopMIDI (with a link to it). Start Mixxx after the port exists.
+
+### Windows MIDI Services (findings, October 2026)
+
+- The API is `Windows.Devices.Midi2`. Its metadata was locked in *In-box Preview 11*; Windows carries it from
+  Windows 11 25H2 (24H2 is not supported). There is no package on nuget.org and no prebuilt .NET projection:
+  the preview NuGet (GitHub releases) has only the `.winmd` and an app-local DLL under a go-live licence. Link calls it through WinRT's ABI by hand
+  (`MidiServices.cs`, interface ids from that `.winmd`) and uses only the copy Windows itself has.
+- A **basic loopback** (`MidiBasicLoopbackManager.CreateTransientLoopback`) is one MIDI 1.0-style endpoint:
+  Microsoft's sample says it "shows up in the MIDI 1.0 port list that older applications see", so WinMM programs
+  (Mixxx through PortMidi, and Link) see an input and an output of its name, and several programs can open it
+  at once. It is *transient*: it lasts until the MIDI service or Windows restarts, so Link leaves it there (Mixxx
+  keeps its port when Link restarts) and makes it again only when `DoesLoopbackExist` says it's gone.
+- **But the basic loopback transport isn't in the box yet:** it comes with the separate preview *Windows MIDI
+  Services Transports* installer (with the RTP-MIDI, Network MIDI 2.0 and BLE transports). Without it,
+  `IsTransportAvailable` is false and Link falls back to loopMIDI. (A MIDI 2.0 loopback *pair*, A/B, would need
+  Mixxx on one side and Link on the other; Link doesn't make those.)
+- **Not verified on Windows yet:** the WinMM names a basic loopback gets ("new style" names: the endpoint's name,
+  " group N" only when ports would share one, at most 31 characters), and that its loopback reaches WinMM inputs.
+
 ## Your data
 
 Sets, rigs, settings, `.env`, fixtures you added or calibrated, the packs and the cache live in

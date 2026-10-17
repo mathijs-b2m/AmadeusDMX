@@ -88,7 +88,13 @@ public sealed class LinkMenu(LinkServer link, Action quit)
                 .Foreground(connected ? Tint.Brush(Tint.Green) : Theme.Brush("TextFillColorSecondaryBrush")),
         };
         if (!connected && link.Current == LinkServer.Software.VirtualDJ) rows.Add(new PluginRow().Build());
-        if (link.ReaderNote.Length > 0) rows.Add(UI.Text(link.ReaderNote, Font.Caption).Foreground(Tint.Orange).Wrap());
+        if (link.ReaderNote.Length > 0)
+        {
+            rows.Add(UI.Text(link.ReaderNote, Font.Caption).Foreground(Tint.Orange).Wrap());
+            // Mixxx without a MIDI port Link could make: loopMIDI makes one (the Mac's "Open Accessibility Settings")
+            if (link.Current == LinkServer.Software.Mixxx && link.ReaderNote.Contains("loopMIDI", StringComparison.Ordinal))
+                rows.Add(UI.Link("Get loopMIDI", () => _ = Launcher.LaunchUriAsync(new Uri(Readers.LoopMidiUrl))).Font(Font.Callout));
+        }
         if (connected && link.DeckSummary.Length > 0) rows.Add(UI.Text(link.DeckSummary, Font.MonoCaption).Secondary().Wrap(4));
         return UI.VStack(8, [.. rows]);
     }

@@ -8,6 +8,10 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Amadeus Link's readers: djay's and Mixxx's libraries, read only (DJ/) -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="AmadeusKit.Tests" />
   </ItemGroup>
 </Project>
