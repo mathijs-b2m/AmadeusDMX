@@ -53,6 +53,9 @@ public static class Symbols
         ["circle.dashed"] = "", ["circle.dotted"] = "", ["circle.fill"] = "", ["largecircle.fill.circle"] = "",
         ["circle.hexagongrid"] = "", ["line.diagonal"] = "", ["thermometer.medium"] = "", ["id.1"] = "",
         ["id.2"] = "",
+        // the show page (knobs, genres, camera presets, LED wall)
+        ["tv"] = "\uE7F4", ["paintpalette"] = "\uE790", ["bolt"] = "\uE945", ["cloud"] = "\uE753", ["guitars"] = "\uE8D6",
+        ["airplane"] = "\uE709", ["headphones"] = "\uE7F6", ["gamecontroller"] = "\uE7FC", ["circle"] = "\uEA3A",
     };
 
     public static string Glyph(string symbol) =>
