@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -73,6 +74,32 @@ def replace(tmp: Path, dest: Path, tries: int = 20):
             if not WINDOWS or i == tries - 1:
                 raise
             time.sleep(0.025)
+
+
+def save_npz(path: Path, compressed: bool = True, **arrays):
+    """np.savez(_compressed) as one step: written under a name of its own, then put in place, so another
+    process (a second engine, a test worker) never reads a half-written cache file."""
+    import numpy as np
+
+    path = Path(path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with open(tmp, "wb") as f:
+            (np.savez_compressed if compressed else np.savez)(f, **arrays)
+        replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def write_text(path: Path, text: str):
+    """Path.write_text (UTF-8) as one step, like save_npz."""
+    path = Path(path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def link_or_copy(target: Path, link: Path):

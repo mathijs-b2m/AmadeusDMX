@@ -484,3 +484,14 @@ def test_an_empty_decode_is_not_kept(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         analysis.readable_audio(track, tmp_path)
     assert not stale.exists()
+
+
+def test_cache_files_appear_whole_or_not_at_all(tmp_path):
+    """A second engine or test worker never reads a half-written cache file: it is written under a name of its
+    own and put in place in one step."""
+    f = tmp_path / "x.traj.npz"
+    system.save_npz(f, a=np.arange(1000))
+    system.save_npz(f, compressed=False, a=np.arange(5))  # replaced as a whole
+    assert list(np.load(f)["a"]) == [0, 1, 2, 3, 4]
+    system.write_text(tmp_path / "x.json", "{}")
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["x.json", "x.traj.npz"]  # nothing left behind

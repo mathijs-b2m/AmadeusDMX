@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from amadeus import paths
+from amadeus import paths, system
 from amadeus.audio.beats import (
     attack_offset,
     beat_kicks,
@@ -359,7 +359,7 @@ def _split_on_melody(a: Analysis) -> None:
 def _save(a: Analysis, npz_path: Path, json_path: Path):
     arrays = {f"band_{k}": v for k, v in a.bands_db.items()}
     arrays |= {f"on_{k}_t": v[0] for k, v in a.onsets.items()} | {f"on_{k}_s": v[1] for k, v in a.onsets.items()}
-    np.savez_compressed(
+    system.save_npz(
         npz_path,
         rms=a.rms_db,
         beats=a.beats,
@@ -381,7 +381,7 @@ def _save(a: Analysis, npz_path: Path, json_path: Path):
         ),
     )
     meta = dict(path=a.path, duration=a.duration, sr=a.sr, fps=a.fps, bpm=a.bpm, phrases=[asdict(p) for p in a.phrases])
-    json_path.write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    system.write_text(json_path, json.dumps(meta, indent=1))
 
 
 def _load(npz_path: Path, json_path: Path) -> Analysis:
