@@ -352,6 +352,81 @@ def test_set_names_windows_keeps_for_devices_get_a_number(monkeypatch):
     assert store.safe_name("aux") == "aux"
 
 
+def test_the_instrument_pack_picks_pytorch_for_the_nvidia_card():
+    from amadeus.cli import packs
+
+    assert packs.build_for(None) == "cpu"
+    assert packs.build_for((581.57, 8.6)) == "cu130"  # a recent driver, an RTX 30
+    assert packs.build_for((560.94, 6.1)) == "cu126"  # an older driver, a GTX 10
+    assert packs.build_for((572.16, 12.0)) == "cpu"  # an RTX 50 before driver 580: CUDA 12.6 can't run on it
+    assert packs.build_for((470.0, 8.6)) == "cpu"  # too old a driver for either
+    cuda = packs.pack("instruments", "cu130")
+    assert cuda.requirements[:2] == (f"torch=={packs.TORCH}+cu130", f"torchaudio=={packs.TORCHAUDIO}+cu130")
+    assert cuda.requirements[2:] == packs.PACKS["instruments"].requirements[2:]
+    assert cuda.extra["index"] == "https://download.pytorch.org/whl/cu130" and "graphics card" in cuda.about
+    assert packs.pack("instruments", "cpu") is packs.PACKS["instruments"]
+    assert packs.pack("streamed", "cu130") is packs.PACKS["streamed"]
+
+
+def test_without_the_cards_pytorch_the_pack_installs_the_processors(monkeypatch, capsys):
+    from amadeus.cli import packs
+
+    runs, pins = [], set()
+
+    def run(cmd, check):
+        runs.append(cmd)
+        pins.update(Path(cmd[cmd.index("-c") + 1]).read_text(encoding="utf-8").split())
+        if "--extra-index-url" in cmd:
+            raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(packs, "target_python", lambda: sys.executable)
+    monkeypatch.setattr(packs.subprocess, "run", run)
+    monkeypatch.setitem(packs.PACKS, "instruments", packs.replace(packs.PACKS["instruments"], after=""))  # no models
+    packs.install("instruments", "cu130")
+    assert len(runs) == 2 and runs[0][-4] == f"torch=={packs.TORCH}+cu130"
+    assert runs[1][-4:] == list(packs.PACKS["instruments"].requirements)
+    assert "for the processor instead" in capsys.readouterr().out
+    # what's here stays (numpy), but not the pack's own packages: an installed torch+cpu would keep out +cu130
+    assert f"numpy=={np.__version__}" in pins and not any(p.startswith(("torch==", "demucs==")) for p in pins)
+
+
+def test_demucs_runs_on_the_graphics_card_and_falls_back_to_the_processor(tmp_path, monkeypatch):
+    torch = pytest.importorskip("torch")
+    from types import SimpleNamespace as NS
+
+    from amadeus.audio import stems
+
+    def fake(mps=False, cuda=False, xpu=None):
+        return NS(backends=NS(mps=NS(is_available=lambda: mps)), cuda=NS(is_available=lambda: cuda),
+                  **({} if xpu is None else {"xpu": NS(is_available=lambda: xpu)}))  # fmt: skip
+
+    assert stems.device(fake(mps=True, cuda=True)) == "mps"  # the Mac as before
+    assert stems.device(fake(cuda=True)) == "cuda" and stems.device(fake(xpu=True)) == "xpu"
+    assert stems.device(fake()) == "cpu" and stems.device(fake(xpu=False)) == "cpu"
+
+    class Separator:  # Demucs' API: the card runs out of memory, the processor separates
+        samplerate = 44100
+        _device = "cuda"
+
+        def update_parameter(self, device):
+            self._device = device
+
+        def separate_tensor(self, wav, sr):
+            if self._device == "cuda":
+                raise torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 2.00 GiB")
+            return wav, {n: wav for n in stems.NAMES}
+
+    track = tmp_path / "t.wav"
+    with wave.open(str(track), "wb") as w:
+        w.setnchannels(2), w.setsampwidth(2), w.setframerate(44100)
+        w.writeframes(np.zeros((44100, 2), np.int16).tobytes())
+    monkeypatch.setattr(stems, "STEMS_DIR", tmp_path / "stems")
+    monkeypatch.setattr(stems, "available", lambda: True)
+    monkeypatch.setattr(stems, "_separator", Separator())
+    parts = stems.stems(track, verbose=False)
+    assert stems._separator._device == "cpu" and set(parts) == set(stems.NAMES)
+
+
 def test_the_packs_environment_is_only_remade_when_the_app_moved(tmp_path, monkeypatch):
     from amadeus.cli import packs
 

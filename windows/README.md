@@ -42,6 +42,21 @@ written to). `$env:FFMPEG_EXE` adds that ffmpeg as `engine\bin\ffmpeg.exe`. The 
 analysis, streamed tracks) are not inside: as on the Mac they go into an environment of their own in your data
 folder.
 
+**Instrument analysis and the graphics card.** PyTorch from PyPI runs on the processor on Windows: Demucs takes
+one to a few minutes a track (a 3:25 track: 3.5 minutes on 4 emulated x64 cores), beside the show. With an NVIDIA
+card (seen with `nvidia-smi`, which comes with the driver) the pack installs PyTorch's CUDA build from
+download.pytorch.org instead: `cu130` with driver 580 or newer and a GeForce 16/20 or later, else `cu126` (driver
+528+, older cards; not RTX 50, which needs the newer driver). The CUDA libraries are inside it, so the pack grows
+from about 1 GB to about 4–5 GB (a 1.9–2.5 GB download). Settings › General › Optional packs says which one it
+will install. When the card can't separate a track (out of memory, a driver too old for the build) that track
+goes to the processor, and the background process's last line names the device it ran on. Not used:
+torch-directml (any DirectX 12 card) has no wheels past Python 3.12 / torch 2.4; AMD has no Windows build of
+PyTorch for Python 3.14 on PyPI or PyTorch's index; Intel's XPU build (Arc, Core Ultra; 1.4 GB with its
+runtime) is untried, so only on request: `amadeus packs install instruments --torch xpu`. The instrument models
+(ONNX) stay on the processor: a track takes about a second there, and onnxruntime-directml (1.24) would replace
+onnxruntime 1.31. **Unverified:** the CUDA and XPU builds on real hardware, and how long a track takes on them
+(the VM has no GPU).
+
 The installer puts the app in `C:\Program Files\Amadeus DMX` for everyone (asks for admin), or, chosen in its
 first dialog, in `%LOCALAPPDATA%\Programs\Amadeus DMX` for you alone. It adds a Start menu entry and, if you
 like, a desktop icon, closes a running app before an upgrade, and replaces `engine\` and `runtime\` whole.
