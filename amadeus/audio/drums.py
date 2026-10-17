@@ -24,6 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
+from amadeus import system
+
 VERSION = 5
 HOP = 128  # ~6 ms at the stems' 22 kHz
 LOW, BODY, CRACK = (35, 120), (150, 400), (1000, 6000)  # Hz
@@ -162,7 +164,7 @@ def _cached(path: Path) -> Kit | None:
     if drums is None:
         return None
     kit = detect(drums, stems.STEM_SR)
-    np.savez_compressed(f, version=VERSION, kick_t=kit.kick_t, kick_s=kit.kick_s, snare_t=kit.snare_t,
+    system.save_npz(f, version=VERSION, kick_t=kit.kick_t, kick_s=kit.kick_s, snare_t=kit.snare_t,
                         snare_s=kit.snare_s, snare_ring=kit.snare_ring)  # fmt: skip
     return kit
 

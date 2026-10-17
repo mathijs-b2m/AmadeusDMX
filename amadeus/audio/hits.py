@@ -26,7 +26,7 @@ import soundfile as sf
 from scipy import signal
 from scipy.ndimage import maximum_filter1d, median_filter
 
-from amadeus import paths
+from amadeus import paths, system
 
 VERSION = 4
 N_FFT, HOP = 2048, 512
@@ -176,6 +176,6 @@ def load_or_detect(path: str | Path, cache_dir: Path = paths.CACHE) -> Hits:
         z = np.load(cached)
         return Hits(z["t"], z["strength"], z["decay"], z["voice"], z["impact"], z["pitch"], z["low"], float(z["fps"]))
     h = detect(path)
-    np.savez_compressed(cached, t=h.t, strength=h.strength, decay=h.decay, voice=h.voice, impact=h.impact,
+    system.save_npz(cached, t=h.t, strength=h.strength, decay=h.decay, voice=h.voice, impact=h.impact,
                         pitch=h.pitch, low=h.low, fps=h.fps)  # fmt: skip
     return h

@@ -171,7 +171,7 @@ def vocal_envelope(path: str | Path) -> tuple[np.ndarray, float] | None:
     frames = v[: n * VOCAL_ENV_HOP].reshape(n, VOCAL_ENV_HOP)
     env = (10 * np.log10((frames**2).mean(axis=1) + 1e-10)).astype(np.float32)
     fps = STEM_SR / VOCAL_ENV_HOP
-    np.savez_compressed(f, env=env, fps=fps)
+    system.save_npz(f, env=env, fps=fps)
     return env, fps
 
 
@@ -203,7 +203,7 @@ def vocal_presence(path: str | Path) -> tuple[np.ndarray, np.ndarray, float] | N
     sung = voice - mix > VOCAL_LEAD_DB
     alive = mix > np.percentile(mix, 95) - VOCAL_ALIVE_DB
     fps = STEM_SR / VOCAL_ENV_HOP
-    np.savez_compressed(f, sung=sung, alive=alive, fps=fps)
+    system.save_npz(f, sung=sung, alive=alive, fps=fps)
     return sung, alive, fps
 
 
@@ -241,7 +241,7 @@ def load_instruments(path: str | Path) -> dict | None:
     out = {"t": judged["t"].astype(np.float32), "probs": instruments.family_probs(judged).astype(np.float32),
            "names": list(instruments.FAMILIES), "note_family": fam.astype(np.int8),
            "sound": judged["embeddings"].astype(np.float16)}  # fmt: skip
-    np.savez_compressed(f, version=INSTRUMENTS_VERSION, **{k: np.asarray(v) for k, v in out.items()})
+    system.save_npz(f, version=INSTRUMENTS_VERSION, **{k: np.asarray(v) for k, v in out.items()})
     return out
 
 
@@ -252,7 +252,7 @@ def separate_and_save(path: str | Path, verbose: bool = True) -> tuple | None:
     if parts is None:
         return None
     t, s, p = notes(parts["other"])
-    np.savez(_dir(path) / "notes.npz", t=t, s=s, p=p)
+    system.save_npz(_dir(path) / "notes.npz", compressed=False, t=t, s=s, p=p)
     return t, s, p
 
 

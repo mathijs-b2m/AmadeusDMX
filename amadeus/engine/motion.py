@@ -5,11 +5,12 @@ from __future__ import annotations
 import bisect
 import json
 import math
+import zipfile
 from pathlib import Path
 
 import numpy as np
 
-from amadeus import paths
+from amadeus import paths, system
 from amadeus.director import Decision
 from amadeus.engine.looks import PREDROP_BEATS, XFADE
 from amadeus.engine.rings import RING_FORMATIONS
@@ -359,7 +360,7 @@ class MotionMixin:
                 ids = [e["id"] for e in self.heads]
                 self.goals = {eid: (z[f"gp:{eid}"], z[f"gt:{eid}"]) for eid in ids}
                 return {eid: (z[f"p:{eid}"], z[f"t:{eid}"]) for eid in ids}
-            except (OSError, KeyError, ValueError):
+            except (OSError, KeyError, ValueError, zipfile.BadZipFile):  # damaged (an older crash): made again
                 pass
         traj = self._trajectories_fast()
         try:
@@ -368,7 +369,7 @@ class MotionMixin:
             for eid, (p, t) in traj.items():
                 arrays[f"p:{eid}"], arrays[f"t:{eid}"] = p.astype(np.float32), t.astype(np.float32)
                 arrays[f"gp:{eid}"], arrays[f"gt:{eid}"] = (g.astype(np.float32) for g in self.goals[eid])
-            np.savez_compressed(path, **arrays)
+            system.save_npz(path, **arrays)
             for old in sorted(TRAJ_CACHE.glob("*.traj.npz"), key=lambda p: p.stat().st_mtime)[:-40]:
                 old.unlink()  # keep the 40 most recent
         except OSError:
