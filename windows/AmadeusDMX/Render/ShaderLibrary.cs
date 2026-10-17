@@ -63,6 +63,9 @@ public static class ShaderLibrary
     public static byte[] Compile(string source, string name, string entry, string profile)
     {
         Blob? code = null, errors = null;
+        // ASCII only: the source goes in as UTF-8 bytes but counted in characters, so a "·" or "–" in a comment
+        // cut the end of every shader off ("unexpected end of file"); HLSL itself is ASCII
+        source = string.Create(source.Length, source, (span, s) => { for (var i = 0; i < s.Length; i++) span[i] = s[i] < 128 ? s[i] : ' '; });
         try
         {
             var r = Compiler.Compile(source, null!, null!, entry, name, profile, Flags, EffectFlags.None, out code, out errors);
