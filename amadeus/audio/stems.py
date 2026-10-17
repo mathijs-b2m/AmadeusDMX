@@ -39,6 +39,19 @@ def available() -> bool:
         return False
 
 
+def device(torch) -> str:
+    """Where Demucs runs: the Mac's GPU (MPS), an NVIDIA card (CUDA) or Intel graphics (XPU) when this torch
+    build can use one (Windows: the instrument pack installs the build for the card, amadeus/cli/packs.py),
+    else the processor."""
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    if getattr(torch, "xpu", None) is not None and torch.xpu.is_available():
+        return "xpu"
+    return "cpu"
+
+
 def _key(path: Path) -> str:
     st = path.stat()
     return hashlib.sha1(f"{path.resolve()}|{st.st_size}|{st.st_mtime}|htdemucs".encode()).hexdigest()[:12]
@@ -60,8 +73,7 @@ def stems(path: str | Path, verbose: bool = True) -> dict[str, np.ndarray] | Non
     if _separator is None:
         from demucs.api import Separator
 
-        device = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
-        _separator = Separator(model="htdemucs", device=device, progress=False)
+        _separator = Separator(model="htdemucs", device=device(torch), progress=False)
     if verbose:
         print(f"  separating instruments of {path.name} …", flush=True)
     wav, sr = sf.read(str(path), dtype="float32", always_2d=True)
@@ -69,7 +81,15 @@ def stems(path: str | Path, verbose: bool = True) -> dict[str, np.ndarray] | Non
         wav = np.repeat(wav, 2, axis=1)
     if sr != _separator.samplerate:
         wav = resample_poly(wav, _separator.samplerate, sr, axis=0).astype(np.float32)
-    _, parts = _separator.separate_tensor(torch.from_numpy(wav.T.copy()), _separator.samplerate)
+    wav = torch.from_numpy(wav.T.copy())
+    try:
+        _, parts = _separator.separate_tensor(wav, _separator.samplerate)
+    except Exception as e:  # the graphics card ran out of memory, or its driver can't run this build: the processor
+        if _separator._device == "cpu":
+            raise
+        print(f"  separating on {_separator._device} failed ({str(e).splitlines()[0]}); on the processor", flush=True)
+        _separator.update_parameter(device="cpu")
+        _, parts = _separator.separate_tensor(wav, _separator.samplerate)
     out.mkdir(parents=True, exist_ok=True)
     result = {}
     for name in NAMES:
@@ -280,4 +300,5 @@ if __name__ == "__main__":  # python -m amadeus.audio.stems TRACK: separate it (
         res = separate_and_save(sys.argv[1], verbose=False)
     finally:
         _lock(Path(sys.argv[1])).unlink(missing_ok=True)
-    print(f"{'separated' if res else 'not available'} in {time.time() - t0:.0f} s", flush=True)
+    on = f" on {_separator._device}" if _separator is not None else ""  # None: separated before, or no Demucs
+    print(f"{'separated' if res else 'not available'}{on} in {time.time() - t0:.0f} s", flush=True)
