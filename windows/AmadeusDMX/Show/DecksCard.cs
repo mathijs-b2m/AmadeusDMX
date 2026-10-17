@@ -75,8 +75,8 @@ public sealed class DecksCard(AppModel model)
         };
         if (deck.Status is { } s)
         {
-            var steps = UI.HStack(6, [.. Decks.Steps(s).Select(StepChip)]);
-            steps.Children.Add(UI.Spacer());
+            // the steps go on in a second line where they don't fit (Segoe UI is wider than the Mac's font)
+            var steps = UI.Flow(6, [.. Decks.Steps(s).Select(StepChip)]);
             if (s.Lights is { } l) steps.Children.Add(UI.Text(Decks.Lights(l), Font.Caption2).Secondary());
             rows.Add(steps);
         }

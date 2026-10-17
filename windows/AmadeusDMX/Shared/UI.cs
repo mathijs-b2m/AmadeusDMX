@@ -27,7 +27,7 @@ namespace AmadeusDMX;
 /// SwiftUI's text styles, on Windows's type ramp (Body is 14 px).
 public enum Font { LargeTitle, Title, Title2, Title3, Headline, Body, Callout, Subheadline, Footnote, Caption, Caption2, Mono, MonoCaption }
 
-public static class UI
+public static partial class UI
 {
     // MARK: layout
 
