@@ -30,7 +30,7 @@ the Music folder Windows knows, and `;` between folders). For Windows, see [On W
 
 ## VirtualDJ
 
-See the README ("Live in VirtualDJ") and [protocols.md](protocols.md), sections 1 and 3.
+See [command-line.md](command-line.md#live-in-virtualdj), the [Mac setup guide](mac-setup.md#6-connect-your-dj-software) and [protocols.md](protocols.md), sections 1 and 3.
 
 ## Mixxx
 

@@ -246,6 +246,9 @@ jobs:
     if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.mac.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4  # the release notes (.github/release-notes.md)
+        with:
+          sparse-checkout: .github
       - uses: actions/download-artifact@v4
         with:
           pattern: amadeus-dmx-*
@@ -261,6 +264,6 @@ jobs:
           # one checksum file for everything
           if [ -f SHA256SUMS-windows.txt ]; then cat SHA256SUMS-windows.txt >> SHA256SUMS.txt && rm SHA256SUMS-windows.txt
           else echo "::warning::No Windows build: the draft release has the Mac apps only"; fi
-          gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Amadeus DMX $VERSION" \
+          gh release create "$GITHUB_REF_NAME" --draft --generate-notes --notes-file ../.github/release-notes.md --title "Amadeus DMX $VERSION" \
             $([[ "$VERSION" == *-* ]] && echo --prerelease) \
             *.dmg $(ls *.exe 2>/dev/null) SHA256SUMS.txt $(ls appcast*.xml appcast*.xml.signature 2>/dev/null)

@@ -1,0 +1,16 @@
+name: 💡 Idea
+description: Something you'd love Amadeus DMX to do.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like, and at what moment of a gig would it help?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Your situation
+      description: "Your rig, the events you play, the DJ software you use: whatever makes the idea clearer."

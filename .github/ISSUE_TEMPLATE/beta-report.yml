@@ -1,0 +1,99 @@
+name: 🎛️ Beta report
+description: You ran Amadeus DMX on a real rig. Tell us what you saw.
+title: "Beta report: "
+labels: ["beta report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing on real lights! Every rig is different, and this is how we find out what the 3D stage can't show us.
+        A rehearsal in your living room counts. Short answers are fine; a phone video is gold.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings › General
+      placeholder: "0.3.0 (120)"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Computer
+      options:
+        - Mac (Apple Silicon)
+        - Windows 11
+        - Windows 10
+        - Mac and Windows (Amadeus Link on the other one)
+    validations:
+      required: true
+  - type: textarea
+    id: rig
+    attributes:
+      label: Your rig
+      description: The fixtures (brand, model, DMX mode, how many), and how DMX gets to them.
+      placeholder: |
+        4× moving head spot (14ch), 8× RGBW par (8ch), 2 LED bars, 1 smoke machine
+        Art-Net node with 2 universes, or a USB DMX interface
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Music source
+      multiple: true
+      options:
+        - Tracks played in the app
+        - VirtualDJ
+        - djay Pro
+        - Mixxx
+        - Spotify (through djay Pro or VirtualDJ)
+        - A DJ laptop with Amadeus Link
+  - type: dropdown
+    id: event
+    attributes:
+      label: Where did you use it?
+      options:
+        - Rehearsal / at home
+        - Club night
+        - Wedding
+        - Party / birthday
+        - Latin night
+        - Band / live music
+        - Other
+  - type: input
+    id: genres
+    attributes:
+      label: Genres played
+      placeholder: "house, techno, a bit of pop"
+  - type: textarea
+    id: worked
+    attributes:
+      label: What worked well
+  - type: textarea
+    id: didnt
+    attributes:
+      label: What didn't work, or looked wrong
+      description: A fixture doing the wrong thing, lights off the beat, a moment that felt wrong for the music…
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setting up
+      description: Anything confusing or slow while adding fixtures, building the rig, hanging, or connecting DMX?
+  - type: dropdown
+    id: feel
+    attributes:
+      label: How did the show feel overall?
+      options:
+        - "5: like a real lighting designer"
+        - "4: good, a few odd moments"
+        - "3: OK"
+        - "2: often wrong for the music"
+        - "1: didn't work"
+  - type: textarea
+    id: files
+    attributes:
+      label: Videos and files
+      description: |
+        Drag in a short video (lights and music audible), and if it helps: your set and rig (`config/sets/`, `config/rigs/`) and `.cache/live.log`
+        from the data folder (Mac: `~/Library/Application Support/Amadeus DMX`, Windows: `%LOCALAPPDATA%\Amadeus DMX`).

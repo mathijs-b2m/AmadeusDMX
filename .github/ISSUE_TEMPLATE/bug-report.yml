@@ -1,0 +1,51 @@
+name: 🐞 Bug report
+description: "Something is broken: a crash, a fixture doing the wrong thing, lights out of sync."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Anything that could hurt someone (a strobe faster than it should be, a laser beam where it shouldn't be): start the title with **Safety**.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings › General
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Computer
+      options:
+        - Mac (Apple Silicon)
+        - Windows 11
+        - Windows 10
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Open the Rigs page
+        2. Drag a fixture onto the round truss
+        3. …
+  - type: textarea
+    id: rig
+    attributes:
+      label: Fixtures, DMX interface and DJ software involved
+  - type: textarea
+    id: files
+    attributes:
+      label: Videos, screenshots and files
+      description: |
+        A video or screenshot, and if it helps: your set and rig (`config/sets/`, `config/rigs/`) and `.cache/live.log`
+        from the data folder (Mac: `~/Library/Application Support/Amadeus DMX`, Windows: `%LOCALAPPDATA%\Amadeus DMX`).
