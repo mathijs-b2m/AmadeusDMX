@@ -1,6 +1,10 @@
 # Contributing
 
-Thanks for helping. A few things make reviews quick.
+Thanks for helping. You don't need to write code to help: testing on a real rig is the most valuable
+contribution right now. See [Beta testing and feedback](README.md#beta-testing-and-feedback) for how to send a
+beta report, a bug or an idea through GitHub Issues.
+
+For code, a few things make reviews quick.
 
 ## Set up
 
@@ -13,9 +17,13 @@ python3 -m venv .venv
 
 The Mac app: `cd mac && swift build` (Xcode 26, macOS 26). See `mac/README.md`.
 
+The Windows app: `cd windows && ./build.ps1` (Windows 10 22H2 or 11, .NET 10 SDK). Its views are built in C#
+without XAML, so it also compiles on a Mac; see `windows/README.md` and `windows/PORTING.md`. The Swift code is
+the spec: a change to what an app shows belongs in both.
+
 ## How the code is laid out
 
-`docs/architecture.md` has the map: which package does what, and which way the dependencies go
+`docs/architecture.md` has the map, and `docs/how-it-works.md` the musical and technical story behind it: which package does what, and which way the dependencies go
 (`cli → show → engine → rig/library`, never back). Put new code where its neighbours are; a module
 that grows past a few hundred lines usually wants to be split by concern.
 
@@ -43,6 +51,6 @@ Anything touching flashes and strobes (`engine/looks.py`, `safety.max_flash_hz`)
 - Code that reads like its neighbours: small functions, names that say what things are, comments that
   explain *why* (the musical or physical reason), not what the next line does.
 - Python: ruff (config in `pyproject.toml`), type hints on public functions.
-- Swift: one view per file, grouped by feature.
+- Swift: one view per file, grouped by feature. C# on Windows: the same files and names as the Swift it ports.
 - Fixture definitions: say where the DMX table came from in `"source"`, and mark guessed values as
   unverified.

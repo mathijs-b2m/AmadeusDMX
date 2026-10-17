@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📥 Download Amadeus DMX
+    url: https://github.com/mathijs-b2m/AmadeusDMX/releases/latest
+    about: The Mac and Windows installers.
