@@ -32,6 +32,15 @@ public sealed class VirtualDJStreams(string? path = null)
         return homes;
     }
 
+    /// The home folder VirtualDJ really uses: the first with its settings or database in it. Documents is its
+    /// default, but where Documents is on a network share (a VM's, a company's) VirtualDJ moves to %LOCALAPPDATA%.
+    public static string Home()
+    {
+        var homes = Homes();
+        return homes.FirstOrDefault(h => File.Exists(Path.Combine(h, "settings.xml")) || File.Exists(Path.Combine(h, "database.xml")))
+            ?? homes.FirstOrDefault(Directory.Exists) ?? homes[0];
+    }
+
     /// VirtualDJ's database.xml: the first home folder that has one (else where it will be).
     public static string Database()
     {

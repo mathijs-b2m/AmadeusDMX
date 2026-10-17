@@ -45,8 +45,11 @@ if ($exports -notmatch 'DllGetClassObject') { throw "$out doesn't export DllGetC
 Write-Host "Built vdj\$out (exports DllGetClassObject)"
 
 if ($Install) {
-    # the Documents folder Windows knows (also when it moved, e.g. into OneDrive): VirtualDJ's home is in it
-    $dest = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'VirtualDJ\Plugins64\SoundEffect'
+    # VirtualDJ's home: Documents\VirtualDJ, or %LOCALAPPDATA%\VirtualDJ where Documents is on a network share
+    $homes = @((Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'VirtualDJ'), (Join-Path $env:LOCALAPPDATA 'VirtualDJ'))
+    $vdj = ($homes | Where-Object { (Test-Path "$_\settings.xml") -or (Test-Path "$_\database.xml") } | Select-Object -First 1) ??
+        ($homes | Where-Object { Test-Path $_ } | Select-Object -First 1) ?? $homes[0]
+    $dest = Join-Path $vdj 'Plugins64\SoundEffect'
     New-Item -ItemType Directory -Force $dest | Out-Null
     Copy-Item $out (Join-Path $dest 'AmadeusLink.dll') -Force
     Write-Host "Installed to $dest - restart VirtualDJ, then enable 'AmadeusLink' as a master effect."

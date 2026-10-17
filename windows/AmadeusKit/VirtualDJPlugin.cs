@@ -7,11 +7,9 @@ public static class VirtualDJPlugin
 {
     public enum Status { NotInstalled, UpToDate, Outdated }
 
-    /// Where VirtualDJ (64-bit, Windows) loads sound effects from: Documents\VirtualDJ\Plugins64\SoundEffect
-    /// (the Documents folder Windows knows, also when it moved, e.g. into OneDrive: VirtualDJ follows it too).
-    public static string Installed =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VirtualDJ", "Plugins64", "SoundEffect",
-                     "AmadeusLink.dll");
+    /// Where VirtualDJ (64-bit, Windows) loads sound effects from: Plugins64\SoundEffect in its home folder
+    /// (Documents\VirtualDJ, or %LOCALAPPDATA%\VirtualDJ where Documents is on a network share).
+    public static string Installed => Path.Combine(DJ.VirtualDJStreams.Home(), "Plugins64", "SoundEffect", "AmadeusLink.dll");
 
     /// The installed plugin against the one this app would install.
     public static Status StatusComparedTo(string? bundled, string? installed = null)
