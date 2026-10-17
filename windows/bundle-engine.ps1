@@ -25,7 +25,8 @@ function Remove-Here([string[]]$Paths) {
 }
 
 # the runtime: a standalone CPython, without what the engine never uses
-uv python install $Py --install-dir $Cache --no-bin --no-registry | Out-Null
+# the x64 build by name: uv would otherwise pick this machine's own (ARM64 on a Snapdragon or a Mac's VM)
+uv python install "cpython-$Py-windows-x86_64-none" --install-dir $Cache --no-bin --no-registry | Out-Null
 $Src = Get-ChildItem $Cache -Directory -Filter "cpython-$Py*-windows-x86_64-none" | Where-Object Name -NotMatch '\+' |
     Sort-Object { [version](($_.Name -split '-')[1] -replace '[^0-9.].*$', '') } | Select-Object -Last 1
 if (-not $Src) { throw "No Python $Py in $Cache" }
