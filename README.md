@@ -21,9 +21,9 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 
 <br><br>
 
-<img src="docs/screenshots/show-drop.png" alt="Amadeus DMX on the drop: lasers, an LED wall and 60 moving heads on a concert stage, with the AI director's choices for this phrase on the right" width="100%">
+<img src="docs/screenshots/show-drop.png" alt="Amadeus DMX on the drop, seen from the side of the stage: 60 moving heads fire over the crowd, the lasers fan out and the LED wall reads DROP!, with the AI director's choices for this phrase on the right" width="100%">
 
-<sub>The drop, live in the app: 60 moving heads, 10 lasers and an LED wall. On the right, what the AI director chose for this phrase.</sub>
+<sub>The drop, live in the app: 60 moving heads, 10 lasers and an LED wall that counted it in. On the right, what the AI director chose for this phrase.</sub>
 
 </div>
 
@@ -129,11 +129,17 @@ out over Art-Net, sACN or a USB DMX interface.
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/screenshots/show-buildup.png" alt="The build-up before the drop: warm beams and a wave across the moving heads">
-<p align="center"><sub>The build-up, one second before the drop</sub></p>
+<img src="docs/screenshots/show-buildup.png" alt="The build-up: warm beams sweep over the crowd while the LED wall counts down 3 to the drop">
+<p align="center"><sub>The build-up: the LED wall counts down to the drop</sub></p>
 </td>
 <td width="50%" valign="top">
-<img src="docs/screenshots/rig-editor.png" alt="The rig editor: a concert stage with three trusses and two towers, 70 fixtures mounted">
+<img src="docs/screenshots/show-crowd.png" alt="The drop from the dance floor: rows of moving heads and rainbow lasers overhead, the LED wall behind the DJ">
+<p align="center"><sub>The same drop from the dance floor</sub></p>
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+<img src="docs/screenshots/rig-editor.png" alt="The rig editor: a concert stage with three trusses and two towers, all 70 fixtures mounted, with the venue settings on the right">
 <p align="center"><sub>The rig editor: your venue, with every fixture where it hangs</sub></p>
 </td>
 </tr>
