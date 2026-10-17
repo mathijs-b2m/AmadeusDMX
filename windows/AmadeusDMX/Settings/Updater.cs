@@ -67,6 +67,7 @@ public sealed class Updater : IUpdater
         // the installer is about to run (it waits for this app to quit): quit
         _sparkle.CloseApplicationAsync += () =>
         {
+            if (_quitting) return Task.CompletedTask;  // installing at quit: the app is closing already (and its UI thread waits)
             var done = new TaskCompletionSource();
             Post(() => { if (!_quitting) { _quitting = true; _quit(); } done.TrySetResult(); });
             return done.Task;
@@ -162,7 +163,7 @@ public sealed class Updater : IUpdater
         {
             UpdateInfo info;
             try { info = await _sparkle.CheckForUpdatesQuietly(ignoreSkippedVersions: !inBackground); }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException or NetSparkleException)
+            catch (Exception e)  // whatever the network or the feed did: the app goes on
             {
                 if (!inBackground) await Dialogs.Alert(_root(), "Update Error!", $"Amadeus DMX couldn’t check for updates: {e.Message}");
                 return;
@@ -259,7 +260,7 @@ public sealed class Updater : IUpdater
         {
             if (await Download(item) is { } path) _downloaded = (item, path);
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or InvalidDataException or TaskCanceledException or NetSparkleException) { }
+        catch (Exception) { }  // tried again at the next check
     }
 
     /// Installing quits the app: while a show runs it waits until the show stops (the rules keep it).
