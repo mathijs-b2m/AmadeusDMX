@@ -439,3 +439,16 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
         }
     }
 }
+
+public class DJSourceWindowsTests
+{
+    [Fact]
+    public void WindowsBlockOverridesOnWindowsOnly()
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(
+            """{"name":"vdj","app":"VirtualDJ","position":"exact","verified":"macOS","waiting":"Load a track.","windows":{"verified":"not yet on Windows"}}""");
+        Assert.Equal("not yet on Windows", DJSource.From(doc.RootElement, windows: true).Verified);
+        Assert.Equal("macOS", DJSource.From(doc.RootElement, windows: false).Verified);
+        Assert.Equal("Load a track.", DJSource.From(doc.RootElement, windows: true).Waiting);
+    }
+}

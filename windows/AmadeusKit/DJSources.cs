@@ -14,11 +14,21 @@ public sealed record DJSource
     public string? Waiting { get; init; }            // what to do while the show waits for it
     public string Id => Name;
 
-    public static DJSource From(JsonElement c) => new()
+    public static DJSource From(JsonElement c) => From(c, OperatingSystem.IsWindows());
+
+    /// On Windows an entry's "windows" block overrides its fields, as the engine does (sources/__init__.py).
+    public static DJSource From(JsonElement c, bool windows)
     {
-        Name = J.Req(c, "name", J.String), App = J.Req(c, "app", J.String), Position = J.Req(c, "position", J.String),
-        Verified = J.Req(c, "verified", J.String), Menu = J.Val(c, "menu", J.Bool), Waiting = J.Ref(c, "waiting", J.String),
-    };
+        var w = windows && c.TryGetProperty("windows", out var b) && b.ValueKind == JsonValueKind.Object ? b : (JsonElement?)null;
+        string? Over(string key) => w is { } o && o.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+        return new()
+        {
+            Name = J.Req(c, "name", J.String), App = J.Req(c, "app", J.String),
+            Position = Over("position") ?? J.Req(c, "position", J.String),
+            Verified = Over("verified") ?? J.Req(c, "verified", J.String), Menu = J.Val(c, "menu", J.Bool),
+            Waiting = Over("waiting") ?? J.Ref(c, "waiting", J.String),
+        };
+    }
 }
 
 public sealed partial record Workspace
