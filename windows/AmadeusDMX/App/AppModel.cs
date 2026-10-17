@@ -233,11 +233,15 @@ public sealed class AppModel : Observable
     public async Task<bool> InstallPack(string name)
     {
         if (Workspace is not { } ws || PackInstall.IsRunning) return false;
+        // the setup service first: it may run the packs' own python.exe, which Windows won't let the install
+        // replace while it runs (started again when needed, with the new packages)
+        if (Setup.IsRunning) { Setup.StopAndWait(); SetupReady = false; }
         PackInstall.ClearLog();
         PackInstall.Start(ws, ["packs", "install", name], EngineEnvironment);
         while (PackInstall.IsRunning) await Task.Delay(250);
+        // kept: an install that went wrong can be looked into after the window is gone
+        CrashLog.Save("Amadeus DMX", "packs.log", PackInstall.Log.Select(l => $"{l.Date:HH:mm:ss} {l.Text}"));
         if (ws.IsBuiltIn && Workspace.BuiltIn is { } fresh) Workspace = fresh;
-        if (Setup.IsRunning) { Setup.Stop(); SetupReady = false; }  // started again when needed, with the new packages
         return PackInstall.State == EngineState.Stopped;
     }
 

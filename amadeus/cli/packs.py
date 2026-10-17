@@ -102,12 +102,25 @@ def target_python() -> str:
     environment), else (the app's Python, which is never written to) the packs' environment on top of it."""
     if sys.prefix != sys.base_prefix or paths.DATA == paths.ROOT:
         return sys.executable
-    # upgrade: also when it exists, so it points at this Python again after the app moved
-    # (Windows: copies, symlinks need rights there)
-    venv.EnvBuilder(
-        system_site_packages=True, with_pip=False, symlinks=not system.WINDOWS, upgrade=ENV.exists()
-    ).create(ENV)
+    # made, or upgraded so it points at this Python again after the app moved (Windows: copies, symlinks need
+    # rights there); not otherwise: on Windows its python.exe can't be replaced while an engine runs from it
+    if not ENV.exists() or _home(ENV) != Path(sys.executable).resolve().parent:
+        venv.EnvBuilder(
+            system_site_packages=True, with_pip=False, symlinks=not system.WINDOWS, upgrade=ENV.exists()
+        ).create(ENV)
     return str(system.venv_python(ENV))
+
+
+def _home(env: Path) -> Path | None:
+    """The Python an environment was made on (`home` in its pyvenv.cfg)."""
+    try:
+        for line in (env / "pyvenv.cfg").read_text(encoding="utf-8").splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() == "home":
+                return Path(value.strip()).resolve()
+    except OSError:
+        pass
+    return None
 
 
 def install(name: str):

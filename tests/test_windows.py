@@ -349,3 +349,23 @@ def test_set_names_windows_keeps_for_devices_get_a_number(monkeypatch):
     )
     monkeypatch.setattr(system, "WINDOWS", False)
     assert store.safe_name("aux") == "aux"
+
+
+def test_the_packs_environment_is_only_remade_when_the_app_moved(tmp_path, monkeypatch):
+    from amadeus.cli import packs
+
+    env = tmp_path / "python"
+    env.mkdir()
+    here = Path(sys.executable).resolve().parent
+    (env / "pyvenv.cfg").write_text(f"home = {here}\ninclude-system-site-packages = true\n", encoding="utf-8")
+    made = []
+    monkeypatch.setattr(packs, "ENV", env)
+    monkeypatch.setattr(packs.paths, "DATA", tmp_path)
+    monkeypatch.setattr(packs.sys, "prefix", packs.sys.base_prefix)  # the app's own Python, no environment
+    builder = type("Builder", (), {"create": lambda self, d: made.append(d)})
+    monkeypatch.setattr(packs.venv, "EnvBuilder", lambda **kw: builder())
+    packs.target_python()
+    assert made == []  # on this Python already: its python.exe is left alone
+    (env / "pyvenv.cfg").write_text("home = C:\\\\elsewhere\\\\runtime\n", encoding="utf-8")
+    packs.target_python()
+    assert made == [env]
