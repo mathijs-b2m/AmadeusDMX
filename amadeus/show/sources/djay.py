@@ -305,24 +305,37 @@ class UiaWindow(Controls):
     Only reads, and only djay's window; no permission to ask for (djay runs as the same user)."""
 
     def __init__(self):
+        super().__init__()
+        self.said = False
+        # on a thread of its own: COM may be set up single-threaded on the caller's thread already (audio does),
+        # and importing comtypes there would fail; the reader threads join the multithreaded apartment
+        failed = []
+        t = threading.Thread(target=self._setup, args=(failed,), name="djay-uia-setup")
+        t.start()
+        t.join()
+        if failed:
+            raise failed[0]
+
+    def _setup(self, failed):
         import sys
 
-        if "comtypes" not in sys.modules:
-            sys.coinit_flags = 0  # COINIT_MULTITHREADED: the reader threads share the UI Automation objects
         try:
-            import comtypes
-            import comtypes.client
-        except ImportError:
-            raise SystemExit("djay on Windows needs comtypes (pip install comtypes)") from None
-        super().__init__()
-        self.comtypes = comtypes
-        self.attach()
-        self.ui = comtypes.client.GetModule("UIAutomationCore.dll")
-        self.uia = comtypes.CoCreateInstance(
-            self.ui.CUIAutomation._reg_clsid_, interface=self.ui.IUIAutomation, clsctx=comtypes.CLSCTX_INPROC_SERVER
-        )
-        self.everything = self.uia.CreateTrueCondition()
-        self.said = False
+            if "comtypes" not in sys.modules:
+                sys.coinit_flags = 0  # COINIT_MULTITHREADED: the reader threads share the UI Automation objects
+            try:
+                import comtypes
+                import comtypes.client
+            except ImportError:
+                raise SystemExit("djay on Windows needs comtypes (pip install comtypes)") from None
+            self.comtypes = comtypes
+            self.attach()
+            self.ui = comtypes.client.GetModule("UIAutomationCore.dll")
+            self.uia = comtypes.CoCreateInstance(
+                self.ui.CUIAutomation._reg_clsid_, interface=self.ui.IUIAutomation, clsctx=comtypes.CLSCTX_INPROC_SERVER
+            )
+            self.everything = self.uia.CreateTrueCondition()
+        except BaseException as e:  # noqa: BLE001 - raised again on the caller's thread
+            failed.append(e)
 
     def attach(self):
         try:
