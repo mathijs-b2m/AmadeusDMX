@@ -11,6 +11,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using SkiaSharp;
 
+using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
 namespace AmadeusDMX;
 
 public enum WallScene { Auto, Off, Ambient, Runner, Dancer, Crowd, Pong, Words, Equalizer, Psychedelic }

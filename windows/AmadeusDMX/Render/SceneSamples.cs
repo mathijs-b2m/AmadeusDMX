@@ -3,6 +3,7 @@
 // (`AmadeusDMX.exe -renderSelfTest`, RenderSelfTest.cs) and the tests build it on a Mac (RenderTests).
 using System.Numerics;
 
+using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
 namespace AmadeusDMX;
 
 public static class SceneSamples

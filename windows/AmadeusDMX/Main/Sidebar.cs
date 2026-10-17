@@ -34,7 +34,8 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
 
     void Meter(bool running)
     {
-        // contract: the 3D stage adds its frames' GPU time to Power.GpuSeconds when the renderer measures it
+        // the 3D stage adds its frames' GPU time (Direct3D timestamp queries) to the meter
+        StageRenderer.OnGPUTime ??= s => model.Power.GpuSeconds += s;
         if (running) model.Power.Start(() => model.Engine.Pid); else model.Power.Stop();
     }
 

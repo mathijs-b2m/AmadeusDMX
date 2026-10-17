@@ -2,6 +2,7 @@
 // (mac/Sources/AmadeusDMX/Render/StageRenderer+Lights.swift).
 using System.Numerics;
 
+using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
 namespace AmadeusDMX;
 
 public sealed partial class StageRenderer

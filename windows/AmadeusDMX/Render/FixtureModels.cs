@@ -7,6 +7,7 @@
 // lenses are built every frame from the show's frame (beam directions, colours).
 using System.Numerics;
 
+using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
 namespace AmadeusDMX;
 
 /// An orthonormal frame: x across, y the other way across, z "up" (the part's own axis).

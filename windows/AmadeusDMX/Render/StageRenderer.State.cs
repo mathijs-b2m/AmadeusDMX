@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
+using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
 namespace AmadeusDMX;
 
 /// What one frame draws, worked out on the CPU (reused frame to frame: the lists are cleared, not reallocated).
