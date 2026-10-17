@@ -88,8 +88,16 @@ public sealed class PowerMeter : Observable
         Changed(nameof(StageIsHeavy));
     }
 
-    /// CPU seconds a process has used so far; nil if it's gone (or not ours).
+    /// CPU seconds a process has used so far, with its children's on Windows (a venv's python.exe only launches
+    /// the real one, as its child); nil if it's gone (or not ours).
     internal static double? Usage(int pid)
+    {
+        var own = CpuSeconds(pid);
+        if (own is null || !OperatingSystem.IsWindows()) return own;
+        return own + ChildrenOf(pid).Sum(c => CpuSeconds(c) ?? 0);
+    }
+
+    static double? CpuSeconds(int pid)
     {
         try
         {
@@ -99,6 +107,37 @@ public sealed class PowerMeter : Observable
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception
                                        or NotSupportedException) { return null; }
     }
+
+    static List<int> ChildrenOf(int pid)
+    {
+        var children = new List<int>();
+        var snap = CreateToolhelp32Snapshot(2 /* TH32CS_SNAPPROCESS */, 0);
+        if (snap == -1) return children;
+        try
+        {
+            var e = new ProcessEntry32 { Size = (uint)Marshal.SizeOf<ProcessEntry32>() };
+            for (var ok = Process32FirstW(snap, ref e); ok; ok = Process32NextW(snap, ref e))
+                if (e.ParentProcessId == pid) children.Add((int)e.ProcessId);
+        }
+        finally { CloseHandle(snap); }
+        return children;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct ProcessEntry32
+    {
+        public uint Size, Usage, ProcessId;
+        public nint DefaultHeapId;
+        public uint ModuleId, Threads, ParentProcessId;
+        public int PriClassBase;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string ExeFile;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)] static extern nint CreateToolhelp32Snapshot(uint flags, uint pid);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool Process32FirstW(nint snap, ref ProcessEntry32 e);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool Process32NextW(nint snap, ref ProcessEntry32 e);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(nint h);
 
     [StructLayout(LayoutKind.Sequential)]
     struct SystemPowerStatus
