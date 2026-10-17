@@ -26,9 +26,11 @@ public sealed partial class App : Application
     {
         Resources.MergedDictionaries.Add(new XamlControlsResources());
         Defaults.Standard = new Defaults(Defaults.FileFor("Amadeus DMX"), Environment.GetCommandLineArgs());
-        _model = new AppModel(updater: null);  // contract: the NetSparkle updater, for a release with a feed (Updates.cs)
+        var updater = Updater.Create();  // NetSparkle, for a release with a feed (Settings/Updater.cs); nil in a development build
+        _model = new AppModel(updater);
         _window = new MainWindow(_model);
         _window.Closed += (_, _) => _model.Shutdown();  // the last window: the app quits, the lights black out
+        updater?.Attach(_model, _window);  // after Shutdown: a background download installs once the engine is stopped
         // ended from outside (logoff, a terminal's Ctrl+C): stop the engine first, like a normal quit
         AppDomain.CurrentDomain.ProcessExit += (_, _) => _model.Shutdown();
         _model.PropertyChanged += (_, e) =>
