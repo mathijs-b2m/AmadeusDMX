@@ -12,6 +12,8 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 [![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_Silicon-7c5cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/mathijs-b2m/AmadeusDMX/releases/latest)
 &nbsp;
 [![Download for Windows](https://img.shields.io/badge/Download_for_Windows-x64-0078d4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/mathijs-b2m/AmadeusDMX/releases/latest)
+&nbsp;
+[![Setup guide](https://img.shields.io/badge/Setup_guide-step_by_step-2ea44f?style=for-the-badge&logo=bookstack&logoColor=white)](docs/mac-setup.md)
 
 ![macOS 26](https://img.shields.io/badge/macOS-26%2B-555?style=flat-square)
 ![Windows 10 22H2 · 11](https://img.shields.io/badge/Windows-10_22H2_·_11-555?style=flat-square)
@@ -147,20 +149,26 @@ out over Art-Net, sACN or a USB DMX interface.
 
 ## Get started
 
+> [!TIP]
+> **Switch everything on.** The **[Mac setup guide](docs/mac-setup.md)** walks you through every step with
+> screenshots: the AI director's OpenAI key, the instrument analysis models, lighting Spotify tracks, your DJ
+> software, your rig and your lights. Fifteen minutes that make the difference.
+
 1. **[Download Amadeus DMX](https://github.com/mathijs-b2m/AmadeusDMX/releases/latest)** from the latest release.
    - **Mac** (Apple Silicon, macOS 26 or later): open the disk image and drag the app to Applications. It's
      signed and notarized by Apple, so it opens like any other app.
    - **Windows** (Windows 10 22H2 or 11, x64): run the installer. Until our Windows certificate is in place,
      SmartScreen may say *Windows protected your PC*: click *More info* › *Run anyway*. You only do this once.
-2. **Follow the set-up assistant:** your fixtures, your venue, done. No lights yet? Start with one of the
+2. **Switch on the extras** in Settings: your OpenAI key for the AI director, the optional packs
+   (instrument analysis and streamed tracks) and *Light streamed tracks*. See the
+   [setup guide](docs/mac-setup.md).
+3. **Follow the set-up assistant:** your fixtures, your venue, done. No lights yet? Start with one of the
    example rigs and watch the 3D stage.
-3. **Press play.** Play a track, or start a live show and DJ as usual.
+4. **Press play.** Play a track, or start a live show and DJ as usual.
 
 Using a separate lighting laptop? Put **Amadeus Link** (on the same download page) on the DJ laptop.
 
-Updates install themselves when you allow them, never in the middle of a show. Optional, from Settings:
-instrument analysis (the accents follow the synth, the piano or the guitar; rock plays the drum kit) and
-streamed tracks.
+Updates install themselves when you allow them, never in the middle of a show.
 
 ### What you need
 
@@ -251,6 +259,7 @@ python3 -m venv .venv
 
 | | |
 |---|---|
+| [Mac setup guide](docs/mac-setup.md) | Installing and switching on every feature, step by step with screenshots |
 | [How it works](docs/how-it-works.md) | The analysis, the director and decision models, genres and house styles, the show arc, the engine |
 | [Command line](docs/command-line.md) | Every `amadeus` command, VirtualDJ live mode, the sync test, sets and rigs, the hardware checklist |
 | [Architecture](docs/architecture.md) | The code map: which package does what, and which way the dependencies go |

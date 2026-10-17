@@ -14,11 +14,13 @@ struct SettingsView: View {
         }
     }
 
+    @State private var tab = UserDefaults.standard.string(forKey: "settingsTab") ?? "general"  // -settingsTab director (screenshots)
+
     private var tabs: some View {
-        TabView {
-            Tab("General", systemImage: "gearshape") { GeneralSettings() }
-            Tab("Director", systemImage: "wand.and.stars") { DirectorSettings() }
-            Tab("Integrations", systemImage: "dot.radiowaves.left.and.right") { IntegrationSettings() }
+        TabView(selection: $tab) {
+            Tab("General", systemImage: "gearshape", value: "general") { GeneralSettings() }
+            Tab("Director", systemImage: "wand.and.stars", value: "director") { DirectorSettings() }
+            Tab("Integrations", systemImage: "dot.radiowaves.left.and.right", value: "integrations") { IntegrationSettings() }
         }
     }
 }
