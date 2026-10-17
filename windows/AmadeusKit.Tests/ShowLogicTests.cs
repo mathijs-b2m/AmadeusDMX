@@ -42,6 +42,24 @@ public class ShowLogicTests
     }
 
     [Fact]
+    public void ARealNightBeforeTheMusic()
+    {
+        // the arc of `amadeus live` before the first track (a lite frame's "arc", captured from the engine)
+        var arc = Arc(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "arc-club.json")));
+        Assert.Equal("Warm-Up", Night.Title(arc));
+        Assert.Equal("starts with the music · 4:00", Night.Clock(arc));
+        Assert.Null(Night.Countdown(arc));
+        Knob K(string id) => Knob.All.Single(k => k.Id == id);
+        Assert.Equal("calm", Night.KnobValue(K("movement"), arc, Night.KnobLevel(K("movement"), arc)));
+        Assert.Equal("÷8", Night.KnobValue(K("changes"), arc, Night.KnobLevel(K("changes"), arc)));
+        Assert.Equal("box", Night.KnobValue(K("specials"), arc, Night.KnobLevel(K("specials"), arc)));
+        Assert.Equal("100", Night.KnobValue(K("intensity"), arc, Night.KnobLevel(K("intensity"), arc)));
+        // every knob the card shows is one the engine reports
+        Assert.All(Knob.All, k => Assert.True(arc.Values.ContainsKey(k.Id), k.Id));
+        Assert.Equal(4, arc.Events.Count);
+    }
+
+    [Fact]
     public void KnobsSayWhatTheirLevelMeans()
     {
         var arc = Arc(ArcJson);
