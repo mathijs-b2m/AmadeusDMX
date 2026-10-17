@@ -9,9 +9,11 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="SkiaSharp" Version="3.116.1" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="AmadeusKit" />
     <ProjectReference Include="..\AmadeusKit\AmadeusKit.csproj" />
     <None Include="Samples\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- the stacks' arithmetic, from the app (pure C#: tested here) -->
@@ -27,5 +29,20 @@
     <Compile Include="..\AmadeusDMX\Rig\Editor\RigEditorHost.cs" Link="App\Rig\RigEditorHost.cs" />
     <Compile Include="..\AmadeusDMX\Rig\Editor\RigEditorModel.cs" Link="App\Rig\RigEditorModel.cs" />
     <Compile Include="..\AmadeusDMX\Rig\Editor\EditorSelfTest.cs" Link="App\Rig\EditorSelfTest.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- the 3D stage's pure half (camera, packing, scenery, models, lights, pacing, the LED wall's picture): RenderTests -->
+    <Compile Include="..\AmadeusDMX\Render\StageInput.cs" Link="Render\StageInput.cs" />
+    <Compile Include="..\AmadeusDMX\Render\Camera.cs" Link="Render\Camera.cs" />
+    <Compile Include="..\AmadeusDMX\Render\GPUTypes.cs" Link="Render\GPUTypes.cs" />
+    <Compile Include="..\AmadeusDMX\Render\Scenery.cs" Link="Render\Scenery.cs" />
+    <Compile Include="..\AmadeusDMX\Render\FixtureModels.cs" Link="Render\FixtureModels.cs" />
+    <Compile Include="..\AmadeusDMX\Render\FramePacer.cs" Link="Render\FramePacer.cs" />
+    <Compile Include="..\AmadeusDMX\Render\WallRenderer.cs" Link="Render\WallRenderer.cs" />
+    <Compile Include="..\AmadeusDMX\Render\StageRenderer.State.cs" Link="Render\StageRenderer.State.cs" />
+    <Compile Include="..\AmadeusDMX\Render\StageRenderer.Lights.cs" Link="Render\StageRenderer.Lights.cs" />
+    <Compile Include="..\AmadeusDMX\Render\StageRenderer.Diagnostics.cs" Link="Render\StageRenderer.Diagnostics.cs" />
+    <Compile Include="..\AmadeusDMX\Render\SceneSamples.cs" Link="Render\SceneSamples.cs" />
+    <EmbeddedResource Include="..\AmadeusDMX\Render\Shaders\*.hlsl*" Link="Render\Shaders\%(Filename)%(Extension)" LogicalName="AmadeusDMX.Render.Shaders.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

@@ -12,6 +12,7 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        if (RenderSelfTest.Requested(args)) return RenderSelfTest.Run();   // the 3D stage, offscreen, into PNGs in %TEMP%
         WinRT.ComWrappersSupport.InitializeComWrappers();
         var main = AppInstance.FindOrRegisterForKey("main");
         if (!main.IsCurrent)
