@@ -5,6 +5,8 @@ import io
 import os
 import subprocess
 import sys
+import threading
+import time
 import wave
 from pathlib import Path
 
@@ -221,6 +223,20 @@ def test_closing_stdin_stops_the_engine():
     stopped = []
     shutdown.watch(io.BytesIO(b"anything the app writes is ignored\n"), lambda: stopped.append(1))
     assert stopped == [1]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PeekNamedPipe: Windows only")
+def test_a_pipe_is_watched_without_a_read_waiting_on_it():
+    r, w = os.pipe()
+    stopped = threading.Event()
+    t = threading.Thread(target=shutdown.watch_pipe, args=(r, stopped.set, 0.01), daemon=True)
+    t.start()
+    os.write(w, b"anything the app writes is ignored\n")
+    time.sleep(0.2)
+    assert not stopped.is_set()
+    os.close(w)
+    assert stopped.wait(5)
+    os.close(r)
 
 
 def test_stdin_is_watched_on_windows_when_it_is_a_pipe(monkeypatch):

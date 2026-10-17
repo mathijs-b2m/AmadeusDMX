@@ -37,7 +37,10 @@ def install(env=None):
     if hasattr(signal, "SIGBREAK") and main:  # Windows; Python's default would end the process at once
         signal.signal(signal.SIGBREAK, _as_ctrl_c)
     if watches_stdin(env) and sys.stdin is not None:
-        threading.Thread(target=watch, args=(sys.stdin.buffer,), name="stop-on-eof", daemon=True).start()
+        # Windows: a read waiting on the pipe blocks the main thread's imports (numpy's DLLs wait for it), so
+        # the pipe is looked at instead, 10 times a second
+        target, args = (watch_pipe, (0,)) if sys.platform == "win32" else (watch, (sys.stdin.buffer,))
+        threading.Thread(target=target, args=args, name="stop-on-eof", daemon=True).start()
 
 
 def watches_stdin(env, windows: bool = sys.platform == "win32") -> bool:
@@ -59,6 +62,36 @@ def watch(stream, stop=None):
     except (OSError, ValueError):  # closed under us: also the end
         pass
     (stop or stop_now)()
+
+
+def watch_pipe(fd: int, stop=None, interval: float = 0.1):
+    """Windows: wait for the pipe on `fd` to close without a read waiting on it (PeekNamedPipe), then stop. What
+    the app writes to it is read and ignored, only when it is there (so the read never waits)."""
+    import ctypes
+    import msvcrt
+    import time
+    from ctypes import wintypes
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.PeekNamedPipe.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.DWORD),
+        ctypes.c_void_p,
+    ]
+    try:
+        handle = msvcrt.get_osfhandle(fd)
+    except OSError:
+        handle = None
+    available = wintypes.DWORD()
+    while handle is not None and k32.PeekNamedPipe(handle, None, 0, None, ctypes.byref(available), None):
+        if available.value:
+            os.read(fd, available.value)
+        else:
+            time.sleep(interval)
+    (stop or stop_now)()  # broken pipe: the app closed it, or the app is gone
 
 
 _stopping = threading.Event()
