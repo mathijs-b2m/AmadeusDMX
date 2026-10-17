@@ -45,8 +45,7 @@ public sealed class LinkServer : Observable, IDisposable
     /// What the DJ should know or do for the chosen DJ software ("" when all is well).
     public string ReaderNote { get => _readerNote; private set => Set(ref _readerNote, value); }
 
-    IDJReader? _reader;
-    CancellationTokenSource? _pump;
+    CancellationTokenSource? _pump;  // the reader's: its loop owns the reader
     readonly LinkNet _net = new();
     readonly UIThread _ui = UIThread.Current();
 
@@ -68,6 +67,8 @@ public sealed class LinkServer : Observable, IDisposable
         _net.OnPluginError = e => _ui.Post(() => PluginError = e);
         _net.OnServed = () => _ui.Post(() => TracksServed++);
         _net.Code = Code;
+        var streams = new VirtualDJStreams();  // VirtualDJ's streamed tracks, named from its database
+        _net.Enrich = streams.Enrich;
         var pluginPort = d.Integer("pluginPort");  // -pluginPort 9124 (tests)
         _net.StartPlugin(pluginPort > 0 ? pluginPort : LinkProtocol.PluginPort);
         if (d.BoolIfSet("linkOn") ?? true) SetOn(true);
@@ -89,42 +90,43 @@ public sealed class LinkServer : Observable, IDisposable
         Current = s;
         _pump?.Cancel();
         _pump = null;
-        _reader?.Stop();
-        _reader = null;
         ReaderNote = "";
         _net.PluginOn = s == Software.VirtualDJ;
         if (s == Software.VirtualDJ) return;
-        if (Readers.Make(s) is not { } r)
-        {
-            ReaderNote = $"Amadeus Link for Windows can't read {Title(s)} yet: use VirtualDJ with the AmadeusLink plugin.";
-            return;
-        }
-        _reader = r;
         var cts = _pump = new CancellationTokenSource();
         _ = Task.Run(async () =>
         {
+            IDJReader r;
+            try { r = Readers.Make(s); }  // off the UI thread: a MIDI port may take a moment
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                _ui.Post(() => { if (_pump == cts) ReaderNote = $"{Title(s)} can't be read: {e.Message}"; });
+                return;
+            }
             var start = Clock.Monotonic();
             var noted = 0.0;
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(20));
             try
             {
-                while (await timer.WaitForNextTickAsync(cts.Token))
+                do
                 {
                     var now = Clock.Monotonic();
                     var decks = r.Decks(now);
-                    if (decks.Count > 0 && Packet.Make(r.App, decks, now, start) is { } packet) _net.Send(packet);
+                    if (decks.Count > 0) _net.Send(Packet.Make(r.App, decks, now, start));
                     if (now - noted <= 0.5) continue;
                     noted = now;
                     var (note, summary) = (r.Note, r.Summary(now));
                     _ui.Post(() =>
                     {
-                        if (!ReferenceEquals(_reader, r)) return;
+                        if (_pump != cts) return;
                         ReaderNote = note;
                         DeckSummary = summary;  // every deck, also those not passed on
                     });
                 }
+                while (await timer.WaitForNextTickAsync(cts.Token));
             }
             catch (OperationCanceledException) { }
+            finally { r.Stop(); }
         });
     }
 
@@ -157,13 +159,6 @@ public sealed class LinkServer : Observable, IDisposable
     public void Dispose()
     {
         _pump?.Cancel();
-        _reader?.Stop();
         _net.Dispose();
     }
-}
-
-/// The DJ software Amadeus Link reads itself (djay Pro: UI Automation; Mixxx: a MIDI port), once ported (DJ/).
-static class Readers
-{
-    public static IDJReader? Make(LinkServer.Software s) => null;
 }
