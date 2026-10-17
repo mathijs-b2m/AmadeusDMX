@@ -56,15 +56,17 @@ public sealed class StatusPill(AppModel model)
                     Padding = new Thickness(7, 2, 7, 2),
                     Child = UI.Text(Capitalized(d.Section), Font.Caption).Bold().Foreground(Tint.White),
                 };
-                if (time.Parent is Panel old) old.Children.Remove(time);
-                return UI.HStack(8, dot, UI.Text(h.Title, Font.Callout).MaxWidth(260), section, time);
+                return UI.HStack(8, dot, UI.Text(h.Title, Font.Callout).MaxWidth(260), section);
             }
             return UI.HStack(8, dot, UI.Text(model.ShowTitle, Font.Callout).Secondary());
         }
-        // rebuilt when the state, the track or the phrase changes; the time alone follows the feed 5 times a second
-        return UI.Live(model, Content, nameof(AppModel.ShowState), nameof(AppModel.ShowTitle))
-            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase)], c => c.Content = Content())
-            .Padding(12, 0);
+        // rebuilt when the state, the track or the phrase changes; the time alone follows the feed 5 times a second,
+        // beside it (one element can't move into each new rebuild: WinUI refuses an element with a parent still)
+        var live = UI.Live(model, Content, nameof(AppModel.ShowState), nameof(AppModel.ShowTitle))
+            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase)], c => c.Content = Content());
+        time.Bind(model, [nameof(AppModel.ShowState)], t => t.Visible(model.Feed.Hello is not null && model.ShowState.IsActive))
+            .Bind(model.Feed, [nameof(LiveFeed.Hello)], t => t.Visible(model.Feed.Hello is not null && model.ShowState.IsActive));
+        return UI.HStack(8, live, time).Padding(12, 0);
     }
 }
 
