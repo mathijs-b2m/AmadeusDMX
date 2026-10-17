@@ -47,6 +47,7 @@ struct MainView: View {
         .navigationSubtitle(subtitle)
         .onAppear {
             if model.needsSetup || model.sets.isEmpty || UserDefaults.standard.bool(forKey: "wizard") { openWindow(id: "wizard") }
+            if let id = UserDefaults.standard.string(forKey: "openWindow") { openWindow(id: id) }  // -openWindow dmx (screenshots)
         }
     }
 

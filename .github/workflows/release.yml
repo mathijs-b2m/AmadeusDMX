@@ -110,6 +110,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Amadeus DMX $VERSION" \
+          gh release create "$GITHUB_REF_NAME" --draft --generate-notes --notes-file .github/release-notes.md --title "Amadeus DMX $VERSION" \
             $([[ "$VERSION" == *-* ]] && echo --prerelease) \
             mac/build/*.dmg mac/build/SHA256SUMS.txt $(ls mac/build/appcast*.xml 2>/dev/null)
