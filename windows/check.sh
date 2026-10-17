@@ -19,3 +19,4 @@ fi
 "$DOTNET" build AmadeusWindows.sln -c Debug -p:Platform=x64 -nologo -clp:"Summary;ErrorsOnly;WarningsOnly" \
   -p:WindowsAppSDKSelfContained=false -p:EnableCoreMrtTooling=false -p:AppxGeneratePriEnabled=false
 "$DOTNET" test AmadeusKit.Tests/AmadeusKit.Tests.csproj -c Debug --no-build -nologo
+bash AmadeusDMX/Render/Shaders/check/check-hlsl.sh   # the 3D stage's HLSL, checked by clang (D3DCompiler is Windows-only)

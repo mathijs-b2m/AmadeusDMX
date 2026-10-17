@@ -11,7 +11,19 @@
 // GPU reset) is made again on the spot.
 //
 // The pages embed it like the Mac's StageView(controller:): `new StageView(controller)`; it is a Grid, so overlays
-// (toolbars, cards) can go in its Children on top of the picture.
+// (toolbars, cards) can go in its Children on top of the picture. The controller outlives the view (the Mac's
+// MainView keeps the show's StageController; the rig editor makes its own); the view makes its renderer when it
+// is loaded and lets it go when it is unloaded.
+//
+//   Show page (ShowView.swift):
+//     var stage = new StageView(model.Stage);                  // a StageController the app keeps
+//     model.Stage.Input = () => (model.StageInput(), model.Feed.LatestFullFrame);
+//     controls: model.Stage.Preset / Fly / WallScene / Haze / Exposure / AutoOrbit (observable: UI.Bind),
+//     CameraPresets.AllCases with .RawValue() / .Symbol(), WallScenes.AllCases with .Title() / .Symbol()
+//   Rig editor (RigEditorView.swift):
+//     var stage = new StageController { WorkLight = 1, Editor = editor, Preset = CameraPreset.Drone };
+//     stage.Input = () => (editor.StageInput(), null);       // editor : StageEditing (Pick/Drag/EndDrag/…/Key)
+//   Set page (SetView.swift): WorkLight = 1, Input = a preview, Highlight = the selected elements' ids.
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
@@ -103,6 +115,7 @@ public sealed partial class StageView : SwapChainPanel
 
     void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        if (IsLoaded) return;   // moved to another parent (WinUI can send the new Loaded before the old Unloaded)
         _loaded = false;
         if (XamlRoot is { } root) root.Changed -= OnRootChanged;
         StopLoop();
