@@ -8,6 +8,9 @@ name: Release
 #
 # Secrets (mac/release-keys.sh makes them): SIGNING_P12_BASE64 + SIGNING_P12_PASSWORD (the signing certificate)
 # and SPARKLE_PRIVATE_KEY (signs the updates). Without them the apps are signed ad hoc and don't update.
+# With DEVELOPER_ID_P12_BASE64 + DEVELOPER_ID_P12_PASSWORD (Apple's Developer ID Application certificate) the apps
+# are signed with that instead, and notarized with NOTARY_KEY_P8 + NOTARY_KEY_ID (+ NOTARY_ISSUER_ID for a team
+# key), an App Store Connect API key: Gatekeeper then opens them without asking (mac/README.md).
 
 on:
   push:
@@ -38,8 +41,27 @@ jobs:
           P12: ${{ secrets.SIGNING_P12_BASE64 }}
           P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
           SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          DEVID_P12: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           keys="$RUNNER_TEMP/keys"; mkdir -p "$keys"; chmod 700 "$keys"
+          # Developer ID: signed so Gatekeeper knows us, notarized when the API key is there too
+          if [ -n "$DEVID_P12" ]; then
+            echo "$DEVID_P12" | base64 --decode > "$keys/developer-id.p12"
+            printf %s "$DEVID_P12_PASSWORD" > "$keys/developer-id-password.txt"
+            echo "DEVID_P12=$keys/developer-id.p12" >> "$GITHUB_ENV"
+            echo "DEVID_PASSWORD_FILE=$keys/developer-id-password.txt" >> "$GITHUB_ENV"
+            if [ -n "$NOTARY_P8" ]; then
+              printf '%s\n' "$NOTARY_P8" > "$keys/notary-key.p8"
+              { echo "NOTARY_KEY_FILE=$keys/notary-key.p8"; echo "NOTARY_KEY_ID=$NOTARY_ID"
+                echo "NOTARY_ISSUER=$NOTARY_ISSUER_ID"; } >> "$GITHUB_ENV"
+            else
+              echo "::warning::No NOTARY_KEY_P8 in the secrets: signed with Developer ID, not notarized"
+            fi
+          fi
           # updates need both: the same signature on every release, and updates signed with the key
           if [ -z "$P12" ] || [ -z "$SPARKLE_KEY" ]; then
             echo "::warning::No release keys in the secrets: signed ad hoc, without updates"

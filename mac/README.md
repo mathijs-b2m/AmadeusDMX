@@ -58,10 +58,15 @@ through `AMADEUS_ROOT` and `AMADEUS_DATA` (`amadeus/paths.py`).
 the checks, builds both apps and makes a **draft** release with the disk images and their SHA-256 sums; you
 publish it on GitHub. Actions › Release › *Run workflow* makes the same build as a workflow artifact only.
 
-The apps are signed with a certificate of our own (`release-keys.sh` makes it), not an Apple Developer ID, so
-macOS stops the first launch of a downloaded copy: open it once, then System Settings › Privacy & Security ›
-*Open Anyway*. Because every release carries the same signature, macOS keeps the permissions you gave it
-(Accessibility for djay, the local network) across updates.
+The apps are signed with an Apple **Developer ID** and notarized by Apple, so macOS opens a downloaded copy
+without asking. Builds without that certificate fall back to a certificate of our own (`release-keys.sh`):
+then macOS stops the first launch (System Settings › Privacy & Security › *Open Anyway*). Every release carries
+the same signature, so macOS keeps the permissions you gave it (Accessibility for djay, the local network) across
+updates; the one switch from our own certificate to Developer ID asks for them once more.
+
+Under Developer ID the apps run with the hardened runtime. The engine's Python has entitlements of its own
+(`python.entitlements`): it loads the optional packs, whose libraries we don't sign, and torch writes code into
+memory.
 
 ## Updates
 
@@ -74,7 +79,8 @@ Both apps update themselves with [Sparkle](https://sparkle-project.org) (`Source
   connected); an update you install then waits until that's over. One downloaded by itself is installed when
   you quit.
 - **Only ours.** The app installs an update only if it is signed with the release key (its public half is
-  `Resources/sparkle-public-key.txt`) and carries the same code signature as the app itself.
+  `Resources/sparkle-public-key.txt`); a release may change its code signature (as the switch to Developer ID
+  did) only while that key stays the same.
 - **The feeds** are `appcast.xml` (Amadeus DMX) and `appcast-link.xml` (Amadeus Link) on the newest published
   GitHub release (`releases/latest/download/…`); release.yml makes them. Publishing the draft release is what makes an
   update reach people. Prereleases (`v0.3.0-beta.1`) don't reach them.
@@ -95,8 +101,20 @@ download the next version by hand, once). For GitHub, put them in Settings › S
 | `SIGNING_P12_PASSWORD` | `~/.amadeus-release/signing-password.txt` |
 | `SPARKLE_PRIVATE_KEY` | `~/.amadeus-release/sparkle-private-key.txt` |
 
+| `DEVELOPER_ID_P12_BASE64` | `base64 < ~/.amadeus-release/developer-id.p12` |
+| `DEVELOPER_ID_P12_PASSWORD` | `~/.amadeus-release/developer-id-password.txt` |
+| `NOTARY_KEY_P8` | `~/.amadeus-release/notary-key.p8` (the App Store Connect API key) |
+| `NOTARY_KEY_ID` | its key ID (`~/.amadeus-release/notary.env`) |
+| `NOTARY_ISSUER_ID` | its issuer ID, for a team key (`~/.amadeus-release/notary.env`) |
+
+The Developer ID certificate comes from developer.apple.com › Certificates (*Developer ID Application*, G2), made
+from a key of our own (`developer-id.key`); the API key from App Store Connect › Users and Access › Integrations
+(role Developer is enough for notarization). The certificate runs out after a while: make a new one from the same
+key (`openssl req -new -key developer-id.key`), then the `.p12` again; Sparkle keeps updating across it, because
+updates are checked with the update key.
+
 Without them a release is signed ad hoc and has no feed. A local `./build-app.sh --release` signs with the
-certificate in `~/.amadeus-release` when it's there; `FEED_URL=…` gives it a feed (for testing updates).
+best certificate in `~/.amadeus-release` (`--dmg` also notarizes with `notary-key.p8` and `notary.env`); `FEED_URL=…` gives it a feed (for testing updates).
 
 ## How it works
 
