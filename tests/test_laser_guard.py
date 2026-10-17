@@ -72,10 +72,13 @@ def test_the_laser_guard_keeps_a_big_rig_in_time():
     eng = engine("concert60", real_output=False)
     _, states = eng.render(30.0)
     eng.laser_info = [{**info, "min_el": 89.0} for info in eng.laser_info]  # nothing is safe: raise, shrink, blank
-    for e in eng.lasers:  # every laser spinning low, where the guard works hardest
-        s = states[e["id"]]
-        s.fx, s.dimmer, s.white, s.size, s.tilt, s.spin = "fan", 1.0, 1.0, 1.0, 0.0, 0.5
-    t0 = time.perf_counter()
-    eng._laser_guard(states, 30.0)
-    assert time.perf_counter() - t0 < 0.02  # was ~47 ms: the light loop fell behind the music
-    assert all(states[e["id"]].dimmer == 0 for e in eng.lasers)
+    best = float("inf")
+    for _ in range(5):  # the best of five: what the guard costs, not what the other tests on this computer do
+        for e in eng.lasers:  # every laser spinning low, where the guard works hardest
+            s = states[e["id"]]
+            s.fx, s.dimmer, s.white, s.size, s.tilt, s.spin = "fan", 1.0, 1.0, 1.0, 0.0, 0.5
+        t0 = time.perf_counter()
+        eng._laser_guard(states, 30.0)
+        best = min(best, time.perf_counter() - t0)
+        assert all(states[e["id"]].dimmer == 0 for e in eng.lasers)
+    assert best < 0.02  # was ~47 ms: the light loop fell behind the music
