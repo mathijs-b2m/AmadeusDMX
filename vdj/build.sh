@@ -1,5 +1,6 @@
 #!/bin/bash
 # Build the AmadeusLink VirtualDJ plugin for Apple Silicon and (with --install) copy it into VirtualDJ.
+# (Windows: build.ps1, the same source as a 64-bit DLL.)
 # The SDK headers are downloaded from virtualdj.com (not stored in this repository).
 set -euo pipefail
 cd "$(dirname "$0")"

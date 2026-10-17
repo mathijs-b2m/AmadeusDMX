@@ -219,7 +219,7 @@ def _ofl_channels(manufacturer: str, fixture: str, mode: str) -> list[dict] | No
     base = ofl.OFL_DIR / "fixtures"
     if not base.exists():
         return None
-    d = json.loads((base / manufacturer / f"{fixture}.json").read_text())
+    d = json.loads((base / manufacturer / f"{fixture}.json").read_text(encoding="utf-8"))
     if "redirectTo" in d:
         return _ofl_channels(*d["redirectTo"].split("/", 1), mode)
     for m in d.get("modes", []):

@@ -161,7 +161,8 @@ def test_a_track_just_loaded_is_found_by_title_and_kept_once_the_library_knows_i
     assert fetcher.file(TOXIC) == copy  # played: djay knows it now, and the copy is the same recording
     assert [c for c in calls if c[0] == "search"] == [("search", guess.id)]  # not fetched again
     link = fetcher.folder / "Britney Spears - Toxic [spotify-6I9].webm"
-    assert link.is_symlink() and link.resolve() == Path(copy).resolve()  # found by its own name next time
+    assert link.read_bytes() == Path(copy).read_bytes()  # found by its own name next time
+    assert link.is_symlink() or sys.platform == "win32"  # (Windows without the right: a hard link or a copy)
     assert fetcher.file(TOXIC) == str(link)
 
 
@@ -184,9 +185,9 @@ def test_saved_settings_and_the_command_line(tmp_path):
 
     f = tmp_path / "integrations.json"
     assert settings("djay", f) == {}  # no file: everything at its default (streamed tracks off)
-    f.write_text('{"djay": {"streamed": true, "poll": 100}, "mixxx": {"port": "IAC"}}')
+    f.write_text('{"djay": {"streamed": true, "poll": 100}, "mixxx": {"port": "IAC"}}', encoding="utf-8")
     assert settings("djay", f) == {"streamed": 1, "poll": 100}
-    f.write_text("not json")
+    f.write_text("not json", encoding="utf-8")
     assert settings("djay", f) == {}
 
 
@@ -230,9 +231,9 @@ def test_one_switch_for_streamed_tracks(tmp_path, monkeypatch):
     f = tmp_path / "integrations.json"
     monkeypatch.setattr(sources, "SETTINGS", f)
     assert not streamed.enabled()  # off unless switched on
-    f.write_text('{"streamed": {"on": true}}')
+    f.write_text('{"streamed": {"on": true}}', encoding="utf-8")
     assert streamed.enabled()
-    f.write_text('{"djay": {"streamed": true}}')  # the switch as djay's own, from before
+    f.write_text('{"djay": {"streamed": true}}', encoding="utf-8")  # the switch as djay's own, from before
     assert streamed.enabled()
 
 
@@ -253,7 +254,7 @@ VDJ_DB = """<?xml version="1.0" encoding="UTF-8"?>
 
 def test_virtualdj_database(tmp_path):
     db = tmp_path / "database.xml"
-    db.write_text(VDJ_DB)
+    db.write_text(VDJ_DB, encoding="utf-8")
     v = streamed.VdjStreams(db)
     s = v.find("netsearch://sp1fI4E7jeOiyfa3LmwNnD0o")
     assert (s.service, s.id, s.artist, s.title, round(s.length, 3)) == (
@@ -279,7 +280,7 @@ def test_virtualdj_streamed_deck(tmp_path, monkeypatch):
     from amadeus.show.sources.base import Deck
 
     db = tmp_path / "database.xml"
-    db.write_text(VDJ_DB)
+    db.write_text(VDJ_DB, encoding="utf-8")
     lst = vdj.Listener.__new__(vdj.Listener)  # no socket: only the stream handling
     lst.streams, lst.fetcher, lst.said, lst.copies = streamed.VdjStreams(db), None, set(), {}
     monkeypatch.setattr(vdj, "enabled", lambda: False)
@@ -339,7 +340,8 @@ def test_virtualdj_database_beat_grid(tmp_path):
         '<?xml version="1.0" encoding="UTF-8"?>\n<VirtualDJ_Database Version="2026">\n'
         ' <Song FilePath="netsearch://sp3k3NWokhRRkEPhCzPmV8TW" Flag="256">\n'
         '  <Tags Author="Bad Bunny" Title="Ojitos Lindos" />\n  <Infos SongLength="258.2980" />\n'
-        '  <Scan Version="801" Bpm="0.75" Phase="12.345" />\n </Song>\n</VirtualDJ_Database>\n'
+        '  <Scan Version="801" Bpm="0.75" Phase="12.345" />\n </Song>\n</VirtualDJ_Database>\n',
+        encoding="utf-8",
     )
     s = streamed.vdj_streams(db)["netsearch://sp3k3NWokhRRkEPhCzPmV8TW"]
     assert s.grid == (12.345, 0.75)

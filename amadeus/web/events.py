@@ -16,7 +16,7 @@ def event(text: str):
     line = f"{time.strftime('%H:%M:%S')} {text}"
     print(line, flush=True)
     try:
-        with EVENT_LOG.open("a") as f:
+        with EVENT_LOG.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
     except OSError:
         pass

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -56,16 +57,21 @@ AFCONVERT = "/usr/bin/afconvert"  # macOS's own: MP4/AAC, ALAC, CAF, … (not We
 
 
 def ffmpeg() -> str | None:
-    """ffmpeg, also where Homebrew puts it: an engine the Mac app starts doesn't have Homebrew on its PATH."""
+    """ffmpeg: AMADEUS_FFMPEG, else the one the app ships next to the engine (bin/ffmpeg.exe on Windows), else on
+    the PATH, else where Homebrew puts it (an engine the Mac app starts doesn't have Homebrew on its PATH)."""
     import os
     import shutil
 
-    return shutil.which("ffmpeg") or next((p for p in FFMPEG_PLACES if os.access(p, os.X_OK)), None)
+    exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    given = os.environ.get("AMADEUS_FFMPEG", "")
+    places = (given, str(paths.ROOT / "bin" / exe), shutil.which("ffmpeg") or "", *FFMPEG_PLACES)
+    return next((p for p in places if p and os.path.isfile(p) and os.access(p, os.X_OK)), None)
 
 
 def readable_audio(path: str | Path, cache_dir: str | Path = paths.CACHE) -> Path:
     """The file itself if soundfile can read it (WAV, MP3, FLAC, OGG, AIFF); otherwise (e.g. M4A/AAC, WebM) a WAV
-    copy decoded once into the cache: with ffmpeg, else with macOS's afconvert (no ffmpeg needed for M4A)."""
+    copy decoded once into the cache: with ffmpeg, else with the system's own decoders (macOS's afconvert,
+    Windows' Media Foundation: no ffmpeg needed for M4A)."""
     import os
     import subprocess
 
@@ -78,20 +84,39 @@ def readable_audio(path: str | Path, cache_dir: str | Path = paths.CACHE) -> Pat
     st = path.stat()
     key = hashlib.sha1(f"{path.resolve()}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:8]
     out = Path(cache_dir) / f"{path.stem}.{key}.decoded.wav"
-    if out.exists():
+    if out.exists() and out.stat().st_size > 44:  # more than a WAV header: a decode that went wrong isn't kept
         return out
+    out.unlink(missing_ok=True)
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     tool = ffmpeg()
     if tool:
         print(f"Decoding {path.name} with ffmpeg …")
-        subprocess.run([tool, "-loglevel", "error", "-y", "-i", str(path), str(out)], check=True)
+        subprocess.run([tool, "-loglevel", "error", "-y", "-i", str(path), str(out)], check=True,
+                       stdin=subprocess.DEVNULL, **_no_window())  # fmt: skip
         return out
+    if sys.platform == "win32":
+        from amadeus.audio import winmf
+
+        print(f"Decoding {path.name} with Windows' decoders …")
+        part = out.with_suffix(".part")
+        try:
+            winmf.decode(path, part)
+            part.replace(out)
+            return out
+        except OSError as e:
+            part.unlink(missing_ok=True)
+            raise SystemExit(f"Can't read {path.name} ({e}): Windows can't decode it; ffmpeg can.") from None
     if os.access(AFCONVERT, os.X_OK):
         r = subprocess.run([AFCONVERT, "-f", "WAVE", "-d", "LEI16", str(path), str(out)], capture_output=True)
         if r.returncode == 0:
             return out
         out.unlink(missing_ok=True)
     raise SystemExit(f"Can't read {path.name}: it needs ffmpeg (brew install ffmpeg).")
+
+
+def _no_window() -> dict:
+    """Windows: a console program run from the engine opens no window of its own."""
+    return {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
 
 
 def analyze(
@@ -356,12 +381,12 @@ def _save(a: Analysis, npz_path: Path, json_path: Path):
         ),
     )
     meta = dict(path=a.path, duration=a.duration, sr=a.sr, fps=a.fps, bpm=a.bpm, phrases=[asdict(p) for p in a.phrases])
-    json_path.write_text(json.dumps(meta, indent=1))
+    json_path.write_text(json.dumps(meta, indent=1), encoding="utf-8")
 
 
 def _load(npz_path: Path, json_path: Path) -> Analysis:
     z = np.load(npz_path)
-    meta = json.loads(json_path.read_text())
+    meta = json.loads(json_path.read_text(encoding="utf-8"))
     return Analysis(
         path=meta["path"],
         duration=meta["duration"],

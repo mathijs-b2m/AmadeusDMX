@@ -31,7 +31,7 @@ import math
 import time
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 from amadeus.engine.fog import machine
 from amadeus.library import fixtures as fxlib
 from amadeus.rig.groups import head_groups
@@ -761,14 +761,14 @@ class ShowArc:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(data, indent=1))
-            tmp.replace(self.path)
+            tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
+            system.replace(tmp, self.path)
         except OSError:
             pass
 
     def _load(self, now: float):
         try:
-            d = json.loads(self.path.read_text())
+            d = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return
         self.enabled = bool(d.get("enabled", True))

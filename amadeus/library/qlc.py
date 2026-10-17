@@ -120,13 +120,13 @@ def index() -> list[dict]:
     """All QLC+ fixtures with brand, model and type (read from the files), cached on disk."""
     path = QLC_DIR / "index.json"
     if path.exists():
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("version") == CONVERTER_VERSION:
             return data["fixtures"]
     base = ensure_downloaded()
     items = []
     for f in sorted(base.glob("*/*.qxf")):
-        xml = f.read_text(errors="replace")
+        xml = f.read_text(errors="replace", encoding="utf-8")
         get = functools.partial(_tag, xml)
         ftype = TYPES.get(get("Type"), "other")
         item = {
@@ -139,7 +139,7 @@ def index() -> list[dict]:
             item["look"] = _look(item["model"], xml)
         items.append(item)
     QLC_DIR.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"version": CONVERTER_VERSION, "fixtures": items}))
+    path.write_text(json.dumps({"version": CONVERTER_VERSION, "fixtures": items}), encoding="utf-8")
     return items
 
 

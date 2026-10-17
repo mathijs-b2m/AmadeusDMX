@@ -16,7 +16,7 @@ SETS = sorted(Path("tests/sets").glob("*.json"))
 
 def mounted(path: Path) -> dict:
     """A test set, auto-mounted the way the Mac app's Auto-Mount does it."""
-    merged = json.loads(path.read_text())
+    merged = json.loads(path.read_text(encoding="utf-8"))
     places = automount.automount(merged, [f["id"] for f in merged["fixtures"]])
     for f in merged["fixtures"]:
         if f["id"] in places:

@@ -21,10 +21,15 @@ dependencies = [
 [project.optional-dependencies]
 openai = ["openai>=2"]
 usb = ["pyserial>=3.5"]
-mixxx = ["python-rtmidi>=1.5"]  # Mixxx: its controller script talks MIDI
-djay = ["pyobjc-framework-ApplicationServices>=10", "aalink>=0.2"]  # djay: its window, and Ableton Link
+mixxx = ["python-rtmidi>=1.5; sys_platform != 'win32'"]  # Mixxx: its controller script talks MIDI (Windows: WinMM)
+djay = [  # djay: its window (Accessibility / UI Automation), and Ableton Link
+    "pyobjc-framework-ApplicationServices>=10; sys_platform == 'darwin'",
+    "comtypes>=1.4; sys_platform == 'win32'",
+    "aalink>=0.2",
+]
 streamed = ["yt-dlp[default]>=2026.8.19"]  # streamed tracks (Spotify in djay): a local copy to analyse
 link = ["aalink>=0.2"]  # Ableton Link: beat phase from DJ software synced to it
+remote = ["zeroconf>=0.130; sys_platform == 'win32'"]  # Amadeus Link by name without Bonjour (macOS: dns-sd)
 ml = ["beat-this>=1.1", "demucs>=4.1", "torch>=2.6", "torchaudio>=2.6", "onnxruntime>=1.24"]
 dev = ["pytest>=8", "ruff>=0.9"]
 

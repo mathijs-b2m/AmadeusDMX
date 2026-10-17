@@ -1,0 +1,61 @@
+// The DMX mapper's editing (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift): a fixture mode channel by channel, each
+// channel played (a role, optionally for one cell of a bar) or held at a value, and the values to try on the
+// lights. FixtureMapping is immutable; this keeps the edited copy.
+namespace AmadeusKit;
+
+public sealed class MapperModel : Observable
+{
+    FixtureMapping? _mapping;
+    public FixtureMapping? Mapping { get => _mapping; set => Set(ref _mapping, value); }
+
+    /// Can it be edited here (a mode the mapper takes)?
+    public bool Editable => Mapping is { Refusal.Length: 0 };
+
+    public void SetKind(string kind)
+    {
+        if (Mapping is { } m) Mapping = m with { Kind = kind };
+    }
+
+    public void SetChannel(int index, Func<FixtureMapping.Channel, FixtureMapping.Channel> change)
+    {
+        if (Mapping is not { } m || index < 0 || index >= m.Channels.Count) return;
+        var list = m.Channels.ToList();
+        list[index] = change(list[index]);
+        Mapping = m with { Channels = list };
+    }
+
+    public void SetRole(int index, string role) => SetChannel(index, c => c with { Role = role });
+    public void SetCell(int index, int cell) => SetChannel(index, c => c with { Cell = Math.Clamp(cell, 0, 64) });
+    public void SetValue(int index, int value) => SetChannel(index, c => c with { Value = Math.Clamp(value, 0, 255) });
+
+    /// The kinds to choose from, by label; the fixture's own first when the list doesn't have it.
+    public static IReadOnlyList<(string Kind, string Label)> KindChoices(FixtureMapping m)
+    {
+        var o = m.Kinds.OrderBy(p => p.Value, StringComparer.Ordinal).Select(p => (p.Key, p.Value)).ToList();
+        if (!m.Kinds.ContainsKey(m.Kind)) o.Insert(0, (m.Kind, Formatting(m.Kind)));
+        return o;
+    }
+
+    /// "moving_head" → "Moving Head"
+    static string Formatting(string s) =>
+        string.Join(' ', s.Replace('_', ' ').Split(' ').Select(w => w.Length == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..].ToLowerInvariant()));
+
+    /// The role groups, sorted, and their roles (the channel's picker).
+    public static IReadOnlyList<(string Group, IReadOnlyList<FixtureMapping.Role> Roles)> Groups(FixtureMapping m) =>
+        m.Roles.Select(r => r.Group).Distinct().Order(StringComparer.Ordinal)
+            .Select(g => (g, (IReadOnlyList<FixtureMapping.Role>)m.Roles.Where(r => r.Group == g).ToList())).ToList();
+
+    /// The values as they are, channel by channel (what "Try on the Lights" sends).
+    public IReadOnlyList<int> Raw => Mapping?.Channels.Select(c => c.Value).ToList() ?? [];
+
+    /// The channels given a light role (not a position): the engine keeps them under the brightness limiter.
+    public IReadOnlyList<int> Light
+    {
+        get
+        {
+            if (Mapping is not { } m) return [];
+            var roles = m.Roles.Where(r => r.Group != "Position").Select(r => r.RoleName).ToHashSet();
+            return m.Channels.Select((c, i) => (c, i)).Where(p => roles.Contains(p.c.Role)).Select(p => p.i).ToList();
+        }
+    }
+}

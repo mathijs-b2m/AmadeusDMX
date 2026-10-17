@@ -24,7 +24,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import paths, system
 
 SETS_DIR = paths.CONFIG / "sets"
 RIGS_DIR = paths.CONFIG / "rigs"
@@ -44,11 +44,15 @@ PLACEMENT_KEYS = (
 UNPLACED = "_unplaced"  # a fixture not mounted on this rig yet: the waiting spot it was given
 
 
+# names Windows keeps for devices: no file may be called that, whatever its extension
+RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(10)), *(f"lpt{i}" for i in range(10))}
+
+
 def safe_name(name: str) -> str:
     n = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower()).strip("-")
     if not n:
         raise ValueError("empty name")
-    return n
+    return f"{n}-1" if n in RESERVED and system.WINDOWS else n
 
 
 # ---------------------------------------------------------------- files
@@ -70,7 +74,7 @@ class _Kind:
 
     def active(self) -> str:
         _prepare()
-        name = self.active_file.read_text().strip() if self.active_file.exists() else ""
+        name = self.active_file.read_text(encoding="utf-8").strip() if self.active_file.exists() else ""
         available = self.names()
         if name not in available:
             name = FIRST if FIRST in available else (available[0] if available else FIRST)
@@ -79,16 +83,16 @@ class _Kind:
     def switch(self, name: str):
         if name not in self.names():
             raise SystemExit(f"No {self.noun} '{name}'. {self.noun.capitalize()}s: {', '.join(self.names())}")
-        self.active_file.write_text(name + "\n")
+        self.active_file.write_text(name + "\n", encoding="utf-8")
 
     def load(self, name: str | None = None) -> dict:
         p = self.path(name)
-        return json.loads(p.read_text()) if p.exists() else {}
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
     def save(self, name: str, doc: dict) -> Path:
         self.folder.mkdir(parents=True, exist_ok=True)
         p = self.path(safe_name(name))
-        p.write_text(json.dumps(doc, indent=2) + "\n")
+        p.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
         return p
 
     def delete(self, name: str):
@@ -103,8 +107,8 @@ class _Kind:
         if new in self.names():
             raise SystemExit(f"A {self.noun} '{new}' already exists")
         self.path(old).rename(self.path(new))
-        if self.active_file.exists() and self.active_file.read_text().strip() == old:
-            self.active_file.write_text(new + "\n")
+        if self.active_file.exists() and self.active_file.read_text(encoding="utf-8").strip() == old:
+            self.active_file.write_text(new + "\n", encoding="utf-8")
         return new
 
 
@@ -206,12 +210,12 @@ class Selection:
     def load(self) -> dict:
         """The combined dict (raw: not yet expanded into elements; see rig.loader)."""
         if self.file:
-            return json.loads(self.file.read_text())
+            return json.loads(self.file.read_text(encoding="utf-8"))
         return compose(sets.load(self.set), rigs.load(self.rig), self.set)
 
     def save(self, merged: dict):
         if self.file:
-            self.file.write_text(json.dumps(merged, indent=2) + "\n")
+            self.file.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
             return
         set_doc, rig_doc = split(merged, self.set, rigs.load(self.rig))
         sets.save(self.set, set_doc)
@@ -301,7 +305,7 @@ def _prepare():
     if not SETS_DIR.exists() and LEGACY_RIG_FILE.exists():  # the very first format: one config/rig.json
         SETS_DIR.mkdir(parents=True)
         shutil.move(str(LEGACY_RIG_FILE), SETS_DIR / "home.json")
-        ACTIVE_SET.write_text("home\n")
+        ACTIVE_SET.write_text("home\n", encoding="utf-8")
     for p in sorted(SETS_DIR.glob("*.json")):
         migrate_set_file(p)
     for kind, folder in ((sets, "sets"), (rigs, "rigs")):
@@ -311,11 +315,11 @@ def _prepare():
                 if not (kind.folder / example.name).exists():
                     shutil.copy(example, kind.folder / example.name)
             if not kind.active_file.exists() and (kind.folder / f"{FIRST}.json").exists():
-                kind.active_file.write_text(FIRST + "\n")
+                kind.active_file.write_text(FIRST + "\n", encoding="utf-8")
     if not ACTIVE_RIG.exists() and ACTIVE_SET.exists():  # migrated: the rig that came out of the active set
-        name = ACTIVE_SET.read_text().strip()
+        name = ACTIVE_SET.read_text(encoding="utf-8").strip()
         if (RIGS_DIR / f"{name}.json").exists():
-            ACTIVE_RIG.write_text(name + "\n")
+            ACTIVE_RIG.write_text(name + "\n", encoding="utf-8")
 
 
 def is_combined(doc: dict) -> bool:
@@ -327,18 +331,22 @@ def migrate_set_file(p: Path) -> bool:
     """Split an old combined set file into a set and a rig of the same name (the rig keeps where the set's
     fixtures were). An existing rig of that name gets the placements added."""
     try:
-        doc = json.loads(p.read_text())
+        doc = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     if not is_combined(doc):
         return False
     rig_path = RIGS_DIR / p.name
-    rig_doc = json.loads(rig_path.read_text()) if rig_path.exists() else {"description": doc.get("description", "")}
+    rig_doc = (
+        json.loads(rig_path.read_text(encoding="utf-8"))
+        if rig_path.exists()
+        else {"description": doc.get("description", "")}
+    )
     for f in doc.get("fixtures", []):
         f.pop(UNPLACED, None)
     set_doc, rig_doc = split(doc, p.stem, rig_doc)
     RIGS_DIR.mkdir(parents=True, exist_ok=True)
-    rig_path.write_text(json.dumps(rig_doc, indent=2) + "\n")
-    p.write_text(json.dumps(set_doc, indent=2) + "\n")
+    rig_path.write_text(json.dumps(rig_doc, indent=2) + "\n", encoding="utf-8")
+    p.write_text(json.dumps(set_doc, indent=2) + "\n", encoding="utf-8")
     print(f"  ⇢ set '{p.stem}' split into the set (fixtures, patch) and the rig '{p.stem}' (stage, trusses, positions)")
     return True

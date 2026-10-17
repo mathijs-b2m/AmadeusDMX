@@ -59,7 +59,7 @@ def facts(path: str | Path) -> dict:
     cached = _cached(path)
     if cached.exists():
         try:
-            return json.loads(cached.read_text())
+            return json.loads(cached.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             pass
     import soundfile as sf
@@ -70,5 +70,5 @@ def facts(path: str | Path) -> dict:
         return {}
     out = judge(instruments.judge(y.mean(axis=1), sr)["styles"], instruments.classes("effnet"))
     CACHE.mkdir(parents=True, exist_ok=True)
-    cached.write_text(json.dumps(out))
+    cached.write_text(json.dumps(out), encoding="utf-8")
     return out

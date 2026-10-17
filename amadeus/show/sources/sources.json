@@ -7,7 +7,11 @@
     "about": "VirtualDJ on this computer: the AmadeusLink plugin (UDP 9123)",
     "position": "exact",
     "verified": "VirtualDJ 8.5 (macOS), live on a real rig",
-    "waiting": "Load a track in VirtualDJ with AmadeusLink as master effect."
+    "waiting": "Load a track in VirtualDJ with AmadeusLink as master effect.",
+    "windows": {
+      "about": "VirtualDJ on this computer: the AmadeusLink plugin (Plugins64\\SoundEffect\\AmadeusLink.dll, UDP 9123)",
+      "verified": "built, not yet verified on Windows"
+    }
   },
   {
     "name": "mixxx",
@@ -17,7 +21,12 @@
     "about": "Mixxx: its controller scripting, over a virtual MIDI device (needs python-rtmidi); opts port, library",
     "position": "exact",
     "verified": "Mixxx 2.5.6 (macOS): 51 readings/s; engine vs Mixxx's playhead over Amadeus Link p95 10 ms, max 13 ms",
-    "waiting": "Play a track in Mixxx with the Amadeus DMX controller enabled (start Mixxx after the show)."
+    "waiting": "Play a track in Mixxx with the Amadeus DMX controller enabled (start Mixxx after the show).",
+    "windows": {
+      "about": "Mixxx: its controller scripting, over the MIDI port 'Amadeus DMX' (a Windows MIDI Services loopback the app makes, or loopMIDI); opts port, library",
+      "verified": "built, not yet verified on Windows",
+      "waiting": "Play a track in Mixxx with the Amadeus DMX controller enabled (the 'Amadeus DMX' MIDI port must exist before Mixxx starts)."
+    }
   },
   {
     "name": "djay",
@@ -27,7 +36,12 @@
     "about": "djay Pro (macOS): its window read through Accessibility (needs pyobjc-framework-ApplicationServices and the Accessibility permission); opt streamed=1: Spotify tracks lit from a local copy (needs yt-dlp; off by default)",
     "position": "exact",
     "verified": "djay Pro 5.6.8 (macOS): on SYNC with Ableton Link, within 6 ms (sd) of Link's beat; without SYNC, the label alone: sd 12-17 ms, up to ~70 ms",
-    "waiting": "Load a track in djay Pro (Amadeus DMX reads its window: Accessibility permission)."
+    "waiting": "Load a track in djay Pro (Amadeus DMX reads its window: Accessibility permission).",
+    "windows": {
+      "about": "djay Pro for Windows: its window read through UI Automation (needs comtypes; no permission to give); opt streamed=1: Spotify tracks lit from a local copy (needs yt-dlp; off by default)",
+      "verified": "built, not yet verified on Windows",
+      "waiting": "Load a track in djay Pro (Amadeus DMX reads its window through UI Automation)."
+    }
   },
   {
     "name": "replay",
@@ -38,6 +52,9 @@
     "position": "exact",
     "verified": "unit tests",
     "menu": false,
-    "waiting": "Replaying a recording."
+    "waiting": "Replaying a recording.",
+    "windows": {
+      "verified": "unit tests (also on Windows, in CI)"
+    }
   }
 ]

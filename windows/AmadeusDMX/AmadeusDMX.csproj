@@ -1,0 +1,48 @@
+<!-- Amadeus DMX for Windows: the port of mac/Sources/AmadeusDMX. WinUI 3 built in code (no XAML files), unpackaged,
+     the Windows App SDK inside (self-contained). Builds on a Mac with check.sh (the packaging steps skipped). -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>AmadeusDMX</RootNamespace>
+    <AssemblyName>AmadeusDMX</AssemblyName>
+    <Product>Amadeus DMX</Product>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained Condition="'$(WindowsAppSDKSelfContained)' == ''">true</WindowsAppSDKSelfContained>
+    <Platforms>x64</Platforms>
+    <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <ApplicationIcon>Assets\AmadeusDMX.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- a development build runs the engine from this checkout (its .venv), like the Mac app's AmadeusEngineRoot -->
+    <AmadeusEngineRoot Condition="'$(AmadeusEngineRoot)' == '' And '$(Configuration)' == 'Debug'">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</AmadeusEngineRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="AmadeusEngineRoot" Value="$(AmadeusEngineRoot)" Condition="'$(AmadeusEngineRoot)' != ''" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <!-- the LED wall's picture (Core Graphics on the Mac) -->
+    <PackageReference Include="SkiaSharp" Version="3.116.1" />
+    <PackageReference Include="NetSparkleUpdater.SparkleUpdater" Version="3.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AmadeusKit\AmadeusKit.csproj" />
+    <Content Include="Assets\AmadeusDMX.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- the 3D stage's shaders, compiled at startup (Render/ShaderLibrary.cs) -->
+    <EmbeddedResource Include="Render\Shaders\*.hlsl*" LogicalName="AmadeusDMX.Render.Shaders.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- WinUI's own resources (its themes) are merged into <app>.pri, which publishing leaves behind: an
+       unpackaged app without it stops at start ("Cannot locate resource … themeresources.xaml") -->
+  <Target Name="PublishPri" AfterTargets="Publish" Condition="Exists('$(OutDir)$(AssemblyName).pri')">
+    <Copy SourceFiles="$(OutDir)$(AssemblyName).pri" DestinationFolder="$(PublishDir)" />
+  </Target>
+</Project>

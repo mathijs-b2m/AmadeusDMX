@@ -47,8 +47,8 @@ def library(monkeypatch):
         lib = Path(tmp)
         shutil.copytree(ROOT / "fixtures", lib, dirs_exist_ok=True)
         (lib / "test").mkdir()
-        (lib / "test" / "laser.json").write_text(json.dumps(LASER))
-        (lib / "test" / "fogger.json").write_text(json.dumps(SMOKE))
+        (lib / "test" / "laser.json").write_text(json.dumps(LASER), encoding="utf-8")
+        (lib / "test" / "fogger.json").write_text(json.dumps(SMOKE), encoding="utf-8")
         monkeypatch.setattr(fxlib, "LIB_DIR", lib)
         fxlib.library.cache_clear()
         yield lib
@@ -56,7 +56,7 @@ def library(monkeypatch):
 
 
 def test_inert_fixtures_never_leave_their_off_values(library, monkeypatch, tmp_path):
-    rig = json.loads((ROOT / "tests" / "sets" / "small.json").read_text())
+    rig = json.loads((ROOT / "tests" / "sets" / "small.json").read_text(encoding="utf-8"))
     used = max(f["address"] + fxlib.footprint(f) for f in rig["fixtures"] if f["universe"] == 1)
     rig["fixtures"] += [
         {"id": "laser1", "fixture": "test/laser", "mode": "4ch", "universe": 1, "address": used, "x": 0.5},

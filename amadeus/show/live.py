@@ -40,19 +40,16 @@ DJ_LOOKUP_TRIES = 5  # × 3 s: how long to look for a DJ laptop by name before g
 
 
 def port_in_use_message() -> str:
-    """Why the plugin's port is taken, and what to do: the Amadeus Link app on this Mac, or another engine."""
-    import subprocess
+    """Why the plugin's port is taken, and what to do: the Amadeus Link app on this computer, or another engine."""
+    from amadeus.system import running
 
-    def running(name: str) -> bool:
-        return subprocess.run(["pgrep", "-f", name], capture_output=True).returncode == 0
-
-    if running("AmadeusLink.app") or running("Amadeus Link.app"):
+    if running("AmadeusLink.app", "Amadeus Link.app", "AmadeusLink.exe"):
         return (
-            f"VirtualDJ's port ({UDP_PORT}) is taken by the Amadeus Link app on this Mac. Amadeus Link is for a DJ "
-            "laptop that isn't this computer: quit it here and start the live show again. (If VirtualDJ runs on "
+            f"VirtualDJ's port ({UDP_PORT}) is taken by the Amadeus Link app on this computer. Amadeus Link is for "
+            "a DJ laptop that isn't this computer: quit it here and start the live show again. (If VirtualDJ runs on "
             "another laptop, start with that laptop instead: --remote auto --code NNNN.)"
         )
-    if running("amadeus live") or running("-m amadeus live"):
+    if running("amadeus live", "-m amadeus live"):
         return f"VirtualDJ's port ({UDP_PORT}) is taken by another live show already running: stop that one first."
     return f"VirtualDJ's port ({UDP_PORT}) is taken by another program on this computer: close it and try again."
 
@@ -69,7 +66,7 @@ def open_listener(remote: str | None, code: str | None, cache: Path, source: str
         try:
             return Listener()
         except OSError as e:
-            if e.errno != errno.EADDRINUSE:
+            if e.errno not in (errno.EADDRINUSE, getattr(errno, "WSAEADDRINUSE", errno.EADDRINUSE)):  # (Windows)
                 raise
             raise SystemExit(port_in_use_message()) from None
     from amadeus.show.link import RemoteListener, browse, resolve
@@ -155,7 +152,7 @@ def _copy_offset(a, deck) -> float:
 
 def _health_line(hs: dict, listener: Listener, shows: TrackShows):
     """One line of vital signs (live --health)."""
-    import resource
+    from amadeus.system import peak_memory_mb
 
     now = time.monotonic()
     dt = now - hs["t0"]
@@ -164,7 +161,7 @@ def _health_line(hs: dict, listener: Listener, shows: TrackShows):
         f"{d.deck}:{'▶' if d.play else '■'}{d.pos:.1f}s" for d in sorted(listener.decks.values(), key=lambda d: d.deck)
     )
     silent = now - listener.last if listener.last else float("inf")
-    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6  # bytes on macOS → MB (peak)
+    rss = peak_memory_mb()
     dj = getattr(listener, "label", "VirtualDJ")
     flag = f"  ⚠ {dj} sends nothing" if pkts == 0 else ("  ⚠ light loop late" if hs["worst"] > 0.1 else "")
     print(
@@ -183,7 +180,7 @@ class _Tee:
     millisecond): what happened when, to look back at after a show (the app only keeps it on screen)."""
 
     def __init__(self, out, path: Path):
-        self.out, self.file, self.fresh = out, open(path, "w", buffering=1), True  # noqa: SIM115 (open for the run)
+        self.out, self.file, self.fresh = out, open(path, "w", buffering=1, encoding="utf-8"), True  # noqa: SIM115 (open for the run)
 
     def write(self, text: str) -> int:
         self.out.write(text)

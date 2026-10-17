@@ -4,7 +4,8 @@
     open_source("replay", file="cap.jsonl")  a recording made with `amadeus probe NAME --record`
 
 Each integration lives in its own module and is listed in sources.json: its module, its class, what it needs
-and how good its position is (see Source.position). The Mac app reads the same list for its Start menu.
+and how good its position is (see Source.position). The Mac and Windows apps read the same list for their Start
+menu; an entry's "windows" block says what differs there (about, verified, waiting), applied here on Windows.
 Options come from the command line as `--opt key=value` and are passed to the class as keyword arguments,
 except `latency` (ms, every source): how much later than reported the DJ software is heard (its audio buffer).
 Settings kept per integration in config/integrations.json (the Mac app's Settings ▸ Integrations writes them)
@@ -15,7 +16,8 @@ from __future__ import annotations
 
 import importlib
 import json
-from dataclasses import dataclass
+import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from amadeus import paths
@@ -37,19 +39,27 @@ class Entry:
     verified: str  # what has been tested for real, and on what
     menu: bool = True  # offered in the Mac app's Start menu
     waiting: str = ""  # what to do while the show waits for it (the Mac app shows it)
+    windows: dict = field(default_factory=dict)  # what differs on Windows: about, verified, waiting
 
 
-# sources.json: the one list of integrations, read by the engine and the Mac app alike
-SOURCES: dict[str, Entry] = {
-    e["name"]: Entry(**{"cls" if k == "class" else k: v for k, v in e.items()})
-    for e in json.loads((Path(__file__).parent / "sources.json").read_text())
-}
+def load(path: Path = Path(__file__).parent / "sources.json", windows: bool = sys.platform == "win32") -> dict:
+    """sources.json: the one list of integrations, read by the engine and the apps alike."""
+    out = {}
+    for e in json.loads(path.read_text(encoding="utf-8")):
+        fields = {"cls" if k == "class" else k: v for k, v in e.items()}
+        if windows:
+            fields.update(e.get("windows", {}))
+        out[e["name"]] = Entry(**fields)
+    return out
+
+
+SOURCES: dict[str, Entry] = load()
 
 
 def settings(name: str, path: Path | None = None) -> dict:
     """One integration's saved settings ({"djay": {"streamed": true}} → {"streamed": 1}); {} when none."""
     try:
-        saved = json.loads((path or SETTINGS).read_text()).get(name) or {}
+        saved = json.loads((path or SETTINGS).read_text(encoding="utf-8")).get(name) or {}
     except (OSError, ValueError, AttributeError):
         return {}
     plain = {k: v for k, v in saved.items() if isinstance(v, bool | int | float | str)}

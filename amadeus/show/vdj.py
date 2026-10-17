@@ -39,6 +39,8 @@ class Listener(Source):
         self.said: set[str] = set()
         self.copies: dict[str, str] = {}  # "netsearch://…" → its copy, once there (not looked up 50× a second)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows: no other program can bind it over ours
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         self.sock.bind((host, port))
         threading.Thread(target=self._loop, daemon=True).start()
 
@@ -51,7 +53,7 @@ class Listener(Source):
             now = time.monotonic()
             try:
                 msg = json.loads(data)
-            except json.JSONDecodeError:
+            except ValueError:  # not JSON, or not UTF-8
                 continue
             decks = plugin_decks(msg, now)
             for d in decks:

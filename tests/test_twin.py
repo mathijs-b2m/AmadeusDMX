@@ -96,13 +96,15 @@ def test_apply_writes_the_range_and_keeps_home_on_the_same_dmx_value(tmp_path, m
 
     lib = tmp_path / "fixtures"
     (lib / "beamz").mkdir(parents=True)
-    (lib / "beamz" / "fuze75b-beam.json").write_text((ROOT / "fixtures/beamz/fuze75b-beam.json").read_text())
+    (lib / "beamz" / "fuze75b-beam.json").write_text(
+        (ROOT / "fixtures/beamz/fuze75b-beam.json").read_text(encoding="utf-8"), encoding="utf-8"
+    )
     monkeypatch.setattr(twin.fxlib, "LIB_DIR", lib)
     rig_file = tmp_path / "rig.json"
-    rig_file.write_text(RIG.read_text())
-    doc = json.loads(rig_file.read_text())
+    rig_file.write_text(RIG.read_text(encoding="utf-8"), encoding="utf-8")
+    doc = json.loads(rig_file.read_text(encoding="utf-8"))
     doc["fixtures"][0]["pan_home_deg"] = 360  # like a set whose front is at 2/3 of the pan range
-    rig_file.write_text(json.dumps(doc))
+    rig_file.write_text(json.dumps(doc), encoding="utf-8")
 
     head = twin.Head(load_rig(rig_file), doc["fixtures"][0]["id"])
     head.defn = copy.deepcopy(head.defn)  # the library's cache stays untouched
@@ -111,10 +113,12 @@ def test_apply_writes_the_range_and_keeps_home_on_the_same_dmx_value(tmp_path, m
     profile["tilt"].vmax_dps = 120
     notes = twin.apply_to_engine(head, profile, Selection(file=rig_file))
 
-    saved = json.loads((lib / "beamz" / "fuze75b-beam.json").read_text())
-    tilt_deg = json.loads((ROOT / "fixtures/beamz/fuze75b-beam.json").read_text())["physical"]["tilt_deg"]
+    saved = json.loads((lib / "beamz" / "fuze75b-beam.json").read_text(encoding="utf-8"))
+    tilt_deg = json.loads((ROOT / "fixtures/beamz/fuze75b-beam.json").read_text(encoding="utf-8"))["physical"][
+        "tilt_deg"
+    ]
     assert saved["physical"]["pan_deg"] == 600 and saved["physical"]["tilt_deg"] == tilt_deg
     assert saved["motion"]["tilt_speed_dps"] == 120
-    fx = json.loads(rig_file.read_text())["fixtures"][0]
+    fx = json.loads(rig_file.read_text(encoding="utf-8"))["fixtures"][0]
     assert fx["pan_home_deg"] == 400  # 360 of 540 is the same DMX value as 400 of 600
     assert any("pan range" in n for n in notes)

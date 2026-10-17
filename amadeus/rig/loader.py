@@ -14,7 +14,7 @@ def load_rig(source) -> dict:
     """`source`: a store.Selection (a set on a rig), or the path of a combined file."""
     if hasattr(source, "load"):
         return load_rig_dict(source.load())
-    return load_rig_dict(json.loads(Path(source).read_text()))
+    return load_rig_dict(json.loads(Path(source).read_text(encoding="utf-8")))
 
 
 def load_rig_dict(rig: dict) -> dict:

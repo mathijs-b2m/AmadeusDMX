@@ -4,7 +4,8 @@
 In a checkout both are the project folder, so commands work from any directory. `AMADEUS_ROOT` points the shipped
 part elsewhere (`DECISIVE_ROOT`, its name before the rename to Amadeus DMX, still works); `AMADEUS_DATA` puts your
 data in a folder of its own: the Mac app ships the engine read-only inside the app and keeps your data in
-~/Library/Application Support/Amadeus DMX, so an update never touches it.
+~/Library/Application Support/Amadeus DMX, so an update never touches it; the Windows app ships it in the program
+folder and keeps your data in %LOCALAPPDATA%\\Amadeus DMX. Paths are pathlib's: either system's separators work.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ def load_dotenv(path: Path = ENV_FILE) -> None:
     """KEY=value lines from .env (if present) for variables not already set in the shell."""
     if not path.exists():
         return
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)

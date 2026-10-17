@@ -72,7 +72,7 @@ def test_the_endpoint_keeps_it_lit_until_switched_off(uv_bar, monkeypatch, tmp_p
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("127.0.0.1", 0))
     sock.settimeout(1.0)
-    rig = json.loads((ROOT / "tests" / "sets" / "small.json").read_text())
+    rig = json.loads((ROOT / "tests" / "sets" / "small.json").read_text(encoding="utf-8"))
     rig["artnet"] = {"ip": "127.0.0.1", "port": sock.getsockname()[1], "fps": 40}
     rig.pop("output", None)
     rig.pop("dmx", None)

@@ -13,7 +13,8 @@ amadeus live --source mixxx --dmx     # follow it (the Mac app: Start ▸ Start 
 
 Accurate position matters most: every deck plays its own pre-analysed show at the position the DJ software
 reports, so the lights can only be as precise as that position. A track the DJ software names but whose file
-isn't on this computer is looked up in the music folders (`AMADEUS_MUSIC`, default `~/Music`).
+isn't on this computer is looked up in the music folders (`AMADEUS_MUSIC`, default `~/Music`; on Windows
+the Music folder Windows knows, and `;` between folders). For Windows, see [On Windows](#on-windows).
 
 ## At a glance
 
@@ -131,6 +132,60 @@ next live show with djay says the permission is missing; everything else works a
 An Amadeus DMX you built yourself (`mac/build-app.sh`) is signed ad hoc, and macOS may see each new
 build as a new app: if djay stops being followed after a rebuild, switch the app off and on again in that
 list (or remove it with − and start the show again).
+
+## On Windows
+
+The same three integrations, built for Windows and **not yet verified on Windows** (`sources.json` says so in
+each entry's `"windows"` block, which the engine applies there and the Windows app can show).
+
+| DJ software | How on Windows | Where it reads |
+|---|---|---|
+| **VirtualDJ** | the same plugin as a 64-bit DLL: `vdj\build.ps1` (Visual Studio's C++ tools) builds `vdj\build\AmadeusLink.dll`; `-Install` copies it into `Documents\VirtualDJ\Plugins64\SoundEffect` | streamed tracks: `database.xml` in VirtualDJ's home, `Documents\VirtualDJ` (also when Documents moved into OneDrive), else `%LOCALAPPDATA%\VirtualDJ` or `%APPDATA%\VirtualDJ` |
+| **Mixxx** | the same mapping and script, over an existing MIDI port called **Amadeus DMX** (WinMM, through ctypes) | the mapping is copied into `%LOCALAPPDATA%\Mixxx\controllers`; the library is `%LOCALAPPDATA%\Mixxx\mixxxdb.sqlite` |
+| **djay Pro for Windows** | its window through UI Automation (what Narrator reads), `comtypes`; plus Ableton Link (`aalink`) | `Music\djay\djay Media Library\MediaLibrary.db` (or the macOS bundle name), read only |
+
+### Mixxx's MIDI port
+
+Windows has no way for a program to make a MIDI port of its own on the fly (python-rtmidi's virtual ports
+are macOS and Linux only), so the engine opens a port that is already there, by its name, and says how to get
+one when there is none:
+
+- **Windows MIDI Services** (in the box from Windows 11 24H2, with the service and its SDK runtime): a *basic
+  loopback* endpoint (`MidiBasicLoopbackManager` in the SDK, or MIDI Settings ▸ loopbacks) named
+  `Amadeus DMX` gives one input and one output port of that name; what Mixxx sends to the output arrives on
+  the input. Its WinMM names are the "new style" names: the endpoint's name, with ` group N` added only when
+  ports would otherwise share a name, at most 31 characters. Programs using WinMM (Mixxx through PortMidi,
+  and this integration) see these ports, and several programs can open the same port at once. A *paired*
+  loopback (A/B) works too, Mixxx on one side and `--opt port="…"` naming the other.
+- **loopMIDI** (Tobias Erichsen, free): make a port called `Amadeus DMX`; it loops back the same way.
+
+The engine matches the name exactly or with what Windows adds at the end (`Amadeus DMX 1`, `Amadeus DMX
+group 1`). The port must exist before Mixxx starts (Mixxx looks for devices only then); unlike on macOS, the
+engine can start after Mixxx. Not verified yet: whether every WinMM name variant of a basic loopback is as
+above on a given Windows build.
+
+### djay Pro for Windows and UI Automation
+
+djay Pro for Windows is built from the same code as the Mac version; its controls carry Narrator labels, and
+the integration looks for the same words (shared constants in `djay.py`: "Elapsed time, Deck 1", "Play /
+Pause, Deck 1", "Crossfader", …). A value comes from the control's Value pattern (the text, as on macOS),
+else its Toggle pattern (play and sync: `Active`), its RangeValue pattern (faders as a percentage) or its
+text. Whether djay for Windows labels every control exactly as on macOS is not verified yet; if it doesn't,
+the show says that djay's window shows no deck controls it knows, and nothing else happens.
+
+The same promise as on macOS, with three kinds of calls, all read-only: find djay's top-level window (by its
+title, or its program's name), find its deck controls by their labels (inside the "Decks" group when there
+is one), read their values. Nothing is clicked, typed or changed, no other window is read, and no permission
+is asked for: UI Automation needs none for a program running as the same user (it can't read a program
+running as administrator). Settings and caches of djay itself (`%LOCALAPPDATA%\Packages\…algoriddim…`) are
+not read.
+
+### Decoding
+
+M4A copies (and any file libsndfile can't read) are decoded with ffmpeg when there is one (`AMADEUS_FFMPEG`,
+then `bin\ffmpeg.exe` next to the engine, which the Windows app may ship, then the PATH), else with Windows'
+own Media Foundation (AAC, ALAC, WMA, …; WebM/Opus only with Microsoft's Web Media Extensions). No package to
+install for either.
 
 ## Serato DJ Pro
 

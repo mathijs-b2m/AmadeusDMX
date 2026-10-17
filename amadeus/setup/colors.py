@@ -123,7 +123,7 @@ def run(show, fixture_id: str, level: float = 0.8):
 
     if changed:
         path = fxlib.path_of(defn["key"])
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         data["color_wheel"]["slots"] = slots
         data["color_wheel"]["verified"] = all("seen" in s for s in slots[1:])
         data["color_wheel"]["_note"] = "Slot colours as seen on the real fixture (amadeus colors)."

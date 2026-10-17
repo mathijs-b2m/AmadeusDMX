@@ -4,7 +4,7 @@ Most DJ software reports a path; some only an artist, a title and a length (or a
 computer). The show needs the audio itself, so we look for it: the path as given, then a file of that name,
 then a file whose name holds the artist and the title, its length deciding between look-alikes.
 
-Where to look: AMADEUS_MUSIC (folders separated by ':'), else ~/Music.
+Where to look: AMADEUS_MUSIC (folders separated by ':', on Windows by ';'), else the Music folder.
 """
 
 from __future__ import annotations
@@ -15,13 +15,17 @@ import threading
 import unicodedata
 from pathlib import Path
 
+from amadeus import system
+
 AUDIO = {".mp3", ".wav", ".flac", ".aiff", ".aif", ".m4a", ".aac", ".ogg", ".opus", ".alac"}
 LENGTH_TOLERANCE_S = 2.5
 
 
 def roots() -> list[Path]:
     env = os.environ.get("AMADEUS_MUSIC") or os.environ.get("DECISIVE_MUSIC")  # DECISIVE_: before the rename
-    return [Path(p).expanduser() for p in env.split(":") if p] if env else [Path.home() / "Music"]
+    if env:
+        return [Path(p).expanduser() for p in env.split(os.pathsep) if p]
+    return [system.user_folder("Music")]
 
 
 def words(s: str) -> list[str]:

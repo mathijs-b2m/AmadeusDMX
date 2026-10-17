@@ -1,8 +1,15 @@
-# What the Mac app ships with its built-in Python (mac/bundle-engine.sh): the engine pinned as in CI, plus the
-# OpenAI director, USB DMX and the DJ software integrations. Not the instrument separation (requirements-ml.txt,
-# ~2 GB) and not streamed tracks (yt-dlp): those are opt-in.
+# What the Mac and Windows apps ship with their built-in Python (mac/bundle-engine.sh, windows/bundle-engine.ps1):
+# the engine pinned as in CI, plus the OpenAI director, USB DMX and the DJ software integrations. Not the
+# instrument separation (requirements-ml.txt, ~2 GB) and not streamed tracks (yt-dlp): those are opt-in.
 -r requirements.txt
-python-rtmidi==1.5.8
-pyobjc-core==12.2.2
-pyobjc-framework-ApplicationServices==12.2.2
+# Mixxx: a virtual MIDI port (macOS); on Windows WinMM through ctypes instead (no virtual ports there, and no
+# python-rtmidi wheels for this Python)
+python-rtmidi==1.5.8; sys_platform != "win32"
+# djay: its window (macOS Accessibility; Windows UI Automation)
+pyobjc-core==12.2.2; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices==12.2.2; sys_platform == "darwin"
+comtypes==1.4.17; sys_platform == "win32"
+# Amadeus Link found by its Bonjour name without Apple's Bonjour service (Windows; macOS has dns-sd)
+zeroconf==0.151.5; sys_platform == "win32"
+ifaddr==0.2.0; sys_platform == "win32"
 aalink==0.2.3

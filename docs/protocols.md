@@ -26,6 +26,9 @@ times a second it sends one UDP datagram to `127.0.0.1:9123`:
 | `phase` | beat phase 0..1 from Ableton Link, for a deck synced to it (`amadeus probe --emit`) |
 | `sync` | 1: the deck is synced to Ableton Link but carries no phase (Amadeus Link has no Link code): the lighting computer joins the Link session on the network and reads the beat itself (`amadeus/show/link.py`) |
 
+On Windows the plugin is a DLL built from the same source (`vdj/build.ps1`), sending the same packets; `file`
+is then a Windows path (`C:\\Music\\track.mp3`, JSON-escaped), in UTF-8 like everything here.
+
 The receiver (`amadeus/show/vdj.py`) extrapolates each deck's position between packets, drops mirrored
 decks (VirtualDJ reports copies of real decks to master effects) and treats a deck whose position stops
 moving as stopped.
@@ -84,10 +87,11 @@ The full frames are only built while a full client is connected.
 
 ## 3. DJ laptop → lighting computer: Amadeus Link (v1)
 
-The Amadeus Link app (`mac/Sources/AmadeusLink/`) on the DJ's laptop receives the plugin's packets
-(as the engine would), advertises itself with Bonjour (`_amadeuslink._tcp`, TCP port 7123) and shows a
-4-digit code. The engine (`amadeus live --remote dj:NAME --code 1234`, `amadeus/show/link.py`) pairs
-with it.
+The Amadeus Link app (`mac/Sources/AmadeusLink/`, on Windows `windows/AmadeusLink/`) on the DJ's laptop
+receives the plugin's packets (as the engine would), advertises itself with Bonjour (`_amadeuslink._tcp`,
+TCP port 7123) and shows a 4-digit code. The engine (`amadeus live --remote dj:NAME --code 1234`,
+`amadeus/show/link.py`) pairs with it. It finds the DJ laptop with macOS's `dns-sd`; where there is none
+(Windows without Apple's Bonjour service), with the `zeroconf` package, which speaks multicast DNS itself.
 
 **Pairing** (JSON lines over TCP):
 
@@ -136,4 +140,30 @@ the DJ software's own position picks the beat, Link gives the exact moment, and 
 the two is learnt as it plays.
 
 A track that the DJ software only names (artist, title, length) or reports with a path from another
-computer is looked up in the music folders (`AMADEUS_MUSIC`, folders separated by `:`, default `~/Music`).
+computer is looked up in the music folders (`AMADEUS_MUSIC`, folders separated by `:`, on Windows by `;`,
+default the Music folder).
+
+## 5. App → engine: starting and stopping
+
+An app runs the engine as a child process, `python -m amadeus live …` (or `play`, `setup`, …), in the engine
+folder, with:
+
+| Variable | Meaning |
+|---|---|
+| `AMADEUS_ROOT` | the engine folder (package, web UI, fixtures; read only) |
+| `AMADEUS_DATA` | your data: sets, rigs, settings, packs, the cache (macOS `~/Library/Application Support/Amadeus DMX`, Windows `%LOCALAPPDATA%\Amadeus DMX`) |
+| `PYTHONUNBUFFERED=1`, `PYTHONIOENCODING=utf-8` | its output line by line, in UTF-8 (on Windows the engine switches a pipe to UTF-8 itself as well) |
+| `AMADEUS_FFMPEG` | optional: the ffmpeg to decode with (the Windows app may ship `bin\ffmpeg.exe` in the engine folder instead) |
+| `AMADEUS_STOP_ON_EOF` | `1`: stop when stdin closes (the default on Windows when stdin is a pipe); `0`: never |
+
+**Stopping** always ends in the engine's Ctrl+C path: the show blacks out, ends its sACN streams and closes its
+ports before the process exits (`amadeus/shutdown.py`). macOS: SIGINT (the Mac app's `Process.interrupt`).
+Windows: close the engine's stdin (the app keeps it a pipe while the engine runs; if the app dies, the pipe
+closes too), or `CTRL_BREAK_EVENT` to an engine started with `CREATE_NEW_PROCESS_GROUP`. Only the first
+request is acted on. Wait a few seconds before ending the process the hard way: that skips the blackout.
+
+**Ports**, all on this computer unless said: UDP 9123 (the VirtualDJ plugin, 127.0.0.1), HTTP 8080 (the web
+UI; `amadeus setup --lan` on every interface), WebSocket 8765 (the feed, 127.0.0.1), and out to the network:
+Art-Net UDP 6454, sACN UDP 5568 (multicast 239.255.x.y), Amadeus Link TCP 7123 + a UDP port of the engine's
+own, Bonjour UDP 5353. Windows Defender Firewall asks the first time a program listens on the network (`setup
+--lan`, Amadeus Link's UDP, discovering Art-Net nodes on 6454): allow it on private networks.

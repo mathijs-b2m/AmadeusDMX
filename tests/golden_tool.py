@@ -67,9 +67,9 @@ if __name__ == "__main__":
     os.chdir(ROOT)
     got = all_hashes()
     if "--update" in sys.argv:
-        GOLDEN.write_text(json.dumps({"_platform": platform_tag(), **got}, indent=1) + "\n")
+        GOLDEN.write_text(json.dumps({"_platform": platform_tag(), **got}, indent=1) + "\n", encoding="utf-8")
         print("golden hashes recorded:", ", ".join(got))
     else:
-        want = json.loads(GOLDEN.read_text())
+        want = json.loads(GOLDEN.read_text(encoding="utf-8"))
         for k, v in got.items():
             print(f"{'ok  ' if want.get(k) == v else 'DIFF'} {k}")

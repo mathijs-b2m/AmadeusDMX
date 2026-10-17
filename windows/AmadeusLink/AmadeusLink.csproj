@@ -1,0 +1,39 @@
+<!-- Amadeus Link for Windows: the DJ laptop's companion, the port of mac/Sources/AmadeusLink.
+     WinUI 3 built in code (no XAML files), unpackaged, the Windows App SDK inside (self-contained). Builds on a Mac with check.sh (the packaging steps skipped). -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>AmadeusLink</RootNamespace>
+    <AssemblyName>AmadeusLink</AssemblyName>
+    <Product>Amadeus Link</Product>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained Condition="'$(WindowsAppSDKSelfContained)' == ''">true</WindowsAppSDKSelfContained>
+    <Platforms>x64</Platforms>
+    <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <ApplicationIcon>Assets\AmadeusLink.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="NetSparkleUpdater.SparkleUpdater" Version="3.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AmadeusKit\AmadeusKit.csproj" />
+    <Content Include="Assets\AmadeusLink.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- the view helpers are Amadeus DMX's (one copy of them) -->
+    <Compile Include="..\AmadeusDMX\Shared\UI.cs;..\AmadeusDMX\Shared\Stack.cs;..\AmadeusDMX\Shared\StackLayout.cs;..\AmadeusDMX\Shared\Theme.cs;..\AmadeusDMX\Shared\Symbols.cs;..\AmadeusDMX\Shared\Formatting.cs"
+             LinkBase="Shared" />
+  </ItemGroup>
+  <!-- WinUI's own resources (its themes) are merged into <app>.pri, which publishing leaves behind: an
+       unpackaged app without it stops at start ("Cannot locate resource … themeresources.xaml") -->
+  <Target Name="PublishPri" AfterTargets="Publish" Condition="Exists('$(OutDir)$(AssemblyName).pri')">
+    <Copy SourceFiles="$(OutDir)$(AssemblyName).pri" DestinationFolder="$(PublishDir)" />
+  </Target>
+</Project>

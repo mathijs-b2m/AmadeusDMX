@@ -15,7 +15,7 @@ from amadeus.show import synctest
 def test_the_analysis_gets_the_sync_track_exactly(tmp_path, monkeypatch):
     monkeypatch.setattr(genre, "from_model", lambda *a, **k: None)  # (no AI call for the genre)
     wav, side = synctest.make(tmp_path / "music")
-    truth = json.loads(side.read_text())
+    truth = json.loads(side.read_text(encoding="utf-8"))
     with contextlib.redirect_stdout(io.StringIO()):
         a = analysis.analyze(wav, cache_dir=tmp_path / "cache")
     assert abs(a.bpm - synctest.BPM) < 0.05

@@ -29,7 +29,7 @@ def in_sheet_order(merged: dict) -> list[str]:
 
 @pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
 def test_names_count_along_the_rig_like_the_places(path):
-    merged = mount(json.loads(path.read_text()))
+    merged = mount(json.loads(path.read_text(encoding="utf-8")))
     key = automount.name_order(merged["fixtures"])
     model = {f["id"]: f["fixture"] for f in merged["fixtures"]}
     seen = in_sheet_order(merged)
@@ -41,7 +41,7 @@ def test_names_count_along_the_rig_like_the_places(path):
 
 @pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
 def test_in_order_puts_a_mixed_up_rig_right_without_moving_a_spot(path):
-    merged = mount(json.loads(path.read_text()))
+    merged = mount(json.loads(path.read_text(encoding="utf-8")))
     want = {f["id"]: {k: f[k] for k in store.PLACEMENT_KEYS if k in f} for f in merged["fixtures"]}
     by_model: dict[str, list[dict]] = {}
     for f in merged["fixtures"]:

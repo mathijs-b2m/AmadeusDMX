@@ -40,7 +40,7 @@ class Replay(Source):
 
     def __init__(self, file: str, loop: int = 0):
         super().__init__()
-        self.lines = [json.loads(x) for x in Path(file).read_text().splitlines() if x.strip()]
+        self.lines = [json.loads(x) for x in Path(file).read_text(encoding="utf-8").splitlines() if x.strip()]
         self.name = f"replay of {Path(file).name}"
         self.loop = bool(loop)
         self.done = threading.Event()

@@ -13,22 +13,45 @@
 // original BPM) twice per second. The receiver extrapolates the position between packets.
 //
 // The VirtualDJ SDK headers (vdjPlugin8.h, vdjDsp8.h) are not included in this repository;
-// build.sh downloads them from virtualdj.com.
+// build.sh (macOS) and build.ps1 (Windows) download them from virtualdj.com.
+//
+// One source for both systems: a bundle for macOS (PluginsMacArm/SoundEffect/AmadeusLink.bundle), a DLL for
+// 64-bit Windows (Plugins64\SoundEffect\AmadeusLink.dll). Only the socket calls differ (Winsock on Windows).
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN  // as vdjPlugin8.h has it: windows.h without the COM headers (DllGetClassObject)
+#include <winsock2.h>        // before windows.h, which vdjPlugin8.h includes
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#endif
 
 #include "vdjDsp8.h"
 
-#include <arpa/inet.h>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <netinet/in.h>
 #include <string>
-#include <sys/socket.h>
 #include <thread>
+
+#ifndef _WIN32
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
+#endif
 
 namespace {
+#ifdef _WIN32
+using Socket = SOCKET;
+const Socket kNoSocket = INVALID_SOCKET;
+void CloseSocket(Socket s) { closesocket(s); }
+#else
+using Socket = int;
+const Socket kNoSocket = -1;
+void CloseSocket(Socket s) { close(s); }
+#endif
+
 constexpr int kPort = 9123;
 constexpr int kPollMs = 40;       // 25 packets per second
 constexpr int kSlowEvery = 12;    // file/length/original BPM every 12th poll (~0.5 s)
@@ -62,6 +85,10 @@ public:
 
     HRESULT VDJ_API OnStart() override {
         if (running_.exchange(true)) return S_OK;
+#ifdef _WIN32
+        WSADATA wsa;
+        winsock_ = WSAStartup(MAKEWORD(2, 2), &wsa) == 0;
+#endif
         sock_ = socket(AF_INET, SOCK_DGRAM, 0);
         memset(&dest_, 0, sizeof dest_);
         dest_.sin_family = AF_INET;
@@ -132,7 +159,9 @@ private:
                 first = false;
             }
             msg += "]}";
-            sendto(sock_, msg.data(), msg.size(), 0, reinterpret_cast<sockaddr*>(&dest_), sizeof dest_);
+            if (sock_ != kNoSocket)
+                sendto(sock_, msg.data(), static_cast<int>(msg.size()), 0, reinterpret_cast<sockaddr*>(&dest_),
+                       sizeof dest_);
             std::this_thread::sleep_until(tick + std::chrono::milliseconds(kPollMs));
         }
     }
@@ -140,13 +169,20 @@ private:
     void Shutdown() {
         if (!running_.exchange(false)) return;
         if (worker_.joinable()) worker_.join();
-        if (sock_ >= 0) close(sock_);
-        sock_ = -1;
+        if (sock_ != kNoSocket) CloseSocket(sock_);
+        sock_ = kNoSocket;
+#ifdef _WIN32
+        if (winsock_) WSACleanup();
+        winsock_ = false;
+#endif
     }
 
     std::atomic<bool> running_{false};
     std::thread worker_;
-    int sock_ = -1;
+    Socket sock_ = kNoSocket;
+#ifdef _WIN32
+    bool winsock_ = false;
+#endif
     sockaddr_in dest_{};
     std::chrono::steady_clock::time_point start_;
 };

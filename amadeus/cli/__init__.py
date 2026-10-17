@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import argparse
 
-from amadeus import paths
+from amadeus import paths, shutdown, system
 from amadeus.cli import hardware, packs, rig, show
 
 GROUPS = (show, rig, hardware, packs)
@@ -32,6 +32,8 @@ ANNOUNCE_SET = {"play", "live", "setup", "test", "discover", "patch"}
 
 
 def main(argv: list[str] | None = None):
+    system.utf8_output()
+    shutdown.install()  # how an app stops the engine cleanly (amadeus/shutdown.py)
     paths.load_dotenv()
     ap = argparse.ArgumentParser(prog="amadeus", description="AI-directed sound-to-light for DJ sets")
     sub = ap.add_subparsers(dest="cmd", required=True)
