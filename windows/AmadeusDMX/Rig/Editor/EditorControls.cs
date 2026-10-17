@@ -45,17 +45,25 @@ public static class EditorUI
         var value = UI.Text(Text(get())).Secondary();
         value.TextAlignment = TextAlignment.Right;
         value.Width = 62;
+        var following = false;  // the range and value set from the model: a value the slider coerces isn't the user's
         var slider = UI.Slider(Clamp(get()), min(), Math.Max(min(), max()), v =>
         {
+            if (following) return;
             var snapped = Math.Round(v / step, MidpointRounding.AwayFromZero) * step;
             if (Math.Abs(snapped - get()) > 1e-9) set(snapped);
         }, step).MinWidth(120);
         var row = UI.HStack(8, UI.Text(title), UI.Spacer(), slider.Grow(), value);
         return row.Bind(editor, Follow, _ =>
         {
-            slider.Minimum = min();
-            slider.Maximum = Math.Max(min(), max());
-            slider.SetValueQuietly(Clamp(get()));
+            following = true;
+            try
+            {
+                slider.Minimum = Math.Min(min(), slider.Maximum);
+                slider.Maximum = Math.Max(min(), max());
+                slider.Minimum = min();
+                slider.SetValueQuietly(Clamp(get()));
+            }
+            finally { following = false; }
             value.Text = Text(get());
         });
     }

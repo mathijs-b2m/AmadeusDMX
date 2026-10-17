@@ -563,17 +563,27 @@ public class RigEditorTests(ITestOutputHelper output)
         Assert.Equal("undo a", log[^1]);
     }
 
-    /// The app's `-editorSelfTest showcase`, step for step, against the engine's setup service (port 8199) on a
+    static int FreePort()
+    {
+        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        l.Start();
+        var port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return port;
+    }
+
+    /// The app's `-editorSelfTest showcase`, step for step, against the engine's setup service (on a free port) on a
     /// copy of the examples: picking, dragging, groups, auto-mount and save through the real API.
     [Fact]
     public async Task TheEditorSelfTestPassesAgainstTheEngine()
     {
         if (LinkTests.EnginePython() is not { } python) { output.WriteLine("no engine Python: skipped"); return; }
         using var w = new EditorWorkspace();
+        var port = FreePort();
         var psi = new ProcessStartInfo(python)
         {
             WorkingDirectory = EditorWorkspace.RepoRoot, RedirectStandardOutput = true, RedirectStandardError = true,
-            ArgumentList = { "-m", "amadeus", "setup", "--port", "8199" },
+            ArgumentList = { "-m", "amadeus", "setup", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture) },
         };
         psi.Environment["AMADEUS_ROOT"] = EditorWorkspace.RepoRoot;
         psi.Environment["AMADEUS_DATA"] = w.Data;
@@ -584,7 +594,7 @@ public class RigEditorTests(ITestOutputHelper output)
         p.BeginErrorReadLine();
         try
         {
-            var api = new SetupAPI(8199);
+            var api = new SetupAPI(port);
             var up = false;
             for (var i = 0; i < 120 && !up && !p.HasExited; i++)
             {
