@@ -88,6 +88,29 @@ public class RenderTests
         Assert.True(up.Z > d.Z);
     }
 
+    [Fact]
+    public void ThePresetsFrameTheRig()
+    {
+        // end to end: the uniforms' matrix (as the shaders get it) puts every fixture on screen from the audience
+        var inp = SceneSamples.Club();
+        foreach (var preset in new[] { CameraPreset.FrontOfHouse, CameraPreset.Drone, CameraPreset.Plan })
+        {
+            var r = new StageRenderer { Input = () => (inp, null) };
+            var f = new StageFrame();
+            r.PrepareFrame(f, StageRenderer.Now(), new(1280, 720));
+            r.SetPreset(preset, animated: false);
+            r.PrepareFrame(f, StageRenderer.Now(), new(1280, 720));
+            foreach (var fx in inp.Fixtures)
+            {
+                var c = Clip(f.U.ViewProj, fx.Pos.ToFloat());
+                Assert.True(c.W > 0, $"{preset}: {fx.Id} behind the camera");
+                Assert.InRange(c.X / c.W, -1, 1);
+                Assert.InRange(c.Y / c.W, -1, 1);
+                Assert.InRange(c.Z / c.W, 0, 1);
+            }
+        }
+    }
+
     // MARK: packing: the C# structs against the HLSL declarations
 
     [Fact]
