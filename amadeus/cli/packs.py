@@ -43,8 +43,12 @@ PACKS = {
     "instruments": Pack(
         title="Instrument analysis",
         about="Separates every track into drums, bass, vocals and the rest (Demucs) and recognises the instruments "
-        f"in it, so accents follow the synth, the piano or the guitar. Runs on {HERE}; a track takes about "
-        "half a minute.",
+        f"in it, so accents follow the synth, the piano or the guitar. Runs on {HERE}; a track takes "
+        + (
+            "one to a few minutes (on the processor; it runs beside the show, and a track is only done once)."
+            if system.WINDOWS
+            else "about half a minute."
+        ),
         size="about 1 GB",
         requirements=("torch==2.14.1", "torchaudio==2.11.0", "demucs==4.1.0", "onnxruntime==1.31.0"),
         modules=("torch", "demucs", "onnxruntime"),
