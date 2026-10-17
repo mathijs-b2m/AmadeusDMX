@@ -1,6 +1,7 @@
 """The engine on Windows: the platform's own paths, processes, MIDI, djay's window, decoders and the way an app
 stops it. Most of it runs everywhere (Windows' rules tested on a Mac too); what needs Windows itself is marked."""
 
+import importlib.util
 import io
 import os
 import subprocess
@@ -325,7 +326,8 @@ def test_winmm_lists_its_midi_inputs():
 
 @windows_only
 def test_djays_window_is_looked_for_with_ui_automation():
-    pytest.importorskip("comtypes")
+    if importlib.util.find_spec("comtypes") is None:  # not imported here: COM may be single-threaded on this thread
+        pytest.skip("needs comtypes")
     from amadeus.show.sources import djay
 
     w = djay.UiaWindow()
