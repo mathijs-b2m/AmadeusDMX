@@ -16,5 +16,8 @@
     <None Include="Samples\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- the stacks' arithmetic, from the app (pure C#: tested here) -->
     <Compile Include="..\AmadeusDMX\Shared\StackLayout.cs" Link="App\StackLayout.cs" />
+    <!-- the Show and Engine pages' words, numbers and messages (pure C#) -->
+    <Compile Include="..\AmadeusDMX\Show\ShowLogic.cs" Link="App\ShowLogic.cs" />
+    <Compile Include="..\AmadeusDMX\Shared\Formatting.cs" Link="App\Formatting.cs" />
   </ItemGroup>
 </Project>
