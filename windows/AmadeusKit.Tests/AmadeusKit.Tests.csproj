@@ -19,5 +19,13 @@
     <!-- the Show and Engine pages' words, numbers and messages (pure C#) -->
     <Compile Include="..\AmadeusDMX\Show\ShowLogic.cs" Link="App\ShowLogic.cs" />
     <Compile Include="..\AmadeusDMX\Shared\Formatting.cs" Link="App\Formatting.cs" />
+    <!-- the rig editor's model, undo and self test, from the app (no WinUI: tested here), with the stage's input -->
+    <Using Include="AmadeusKit" />
+    <Compile Include="..\AmadeusDMX\Render\StageInput.cs" Link="App\StageInput.cs" />
+    <Compile Include="..\AmadeusDMX\Rig\Editor\StageEditing.cs" Link="App\Rig\StageEditing.cs" />
+    <Compile Include="..\AmadeusDMX\Rig\Editor\UndoManager.cs" Link="App\Rig\UndoManager.cs" />
+    <Compile Include="..\AmadeusDMX\Rig\Editor\RigEditorHost.cs" Link="App\Rig\RigEditorHost.cs" />
+    <Compile Include="..\AmadeusDMX\Rig\Editor\RigEditorModel.cs" Link="App\Rig\RigEditorModel.cs" />
+    <Compile Include="..\AmadeusDMX\Rig\Editor\EditorSelfTest.cs" Link="App\Rig\EditorSelfTest.cs" />
   </ItemGroup>
 </Project>
