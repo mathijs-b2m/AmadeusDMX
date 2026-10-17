@@ -1,11 +1,11 @@
 // What Amadeus Link reads from a DJ software other than VirtualDJ (djay Pro, Mixxx) and how it passes it on:
 // as the AmadeusLink plugin's packets, so the lighting computer can't tell them apart (the same format as
 // amadeus/show/probe.py plugin_packet). VirtualDJ's own plugin sends these packets itself.
-// The readers themselves (djay Pro through UI Automation, Mixxx through MIDI) are ported next to this file.
+// (mac/Sources/AmadeusLink/DJ/Reading.swift; here in the kit so it is tested on any computer.)
 using System.Diagnostics;
 using System.Text.Json;
 
-namespace AmadeusLink;
+namespace AmadeusKit.DJ;
 
 /// One deck as the DJ software reports it.
 public sealed record DeckReading
@@ -35,8 +35,8 @@ public sealed record DeckReading
     {
         get
         {
-            var what = Title.Length == 0 ? Path.GetFileName(File) : (Artist.Length == 0 ? Title : $"{Artist} – {Title}");
-            var why = Stream is { } s ? $"  ({Formatting.Capitalized(s.Service)}: the lighting computer fetches a copy)"
+            var what = Title.Length == 0 ? Paths.LastComponent(File) : (Artist.Length == 0 ? Title : $"{Artist} – {Title}");
+            var why = Stream is { } s ? $"  ({Text.Capitalized(s.Service)}: the lighting computer fetches a copy)"
                 : File.Length == 0 && Title.Length > 0 ? "  (no file on this laptop: not sent)" : "";
             return $"{Deck}: {(Play ? "▶" : "■")} {(what.Length == 0 ? "no track" : what)}{why}";
         }
@@ -65,7 +65,7 @@ public static class Packet
     /// The decks as the AmadeusLink plugin sends them, positions brought to `now`. Decks with neither a file nor a
     /// stream stay out: the lighting computer can only light a track it can get. A streamed deck has no file
     /// ("file": "") and says which recording it is ("stream"); the lighting computer fetches a copy (streamed.py).
-    public static byte[]? Make(string app, IReadOnlyList<DeckReading> decks, double now, double start)
+    public static byte[] Make(string app, IReadOnlyList<DeckReading> decks, double now, double start)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms))
@@ -113,4 +113,44 @@ public static class Clock
 {
     /// Monotonic seconds (the readers' clock).
     public static double Monotonic() => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+}
+
+static class Text
+{
+    /// Swift's `capitalized`: every word with a capital first letter, the rest lower case.
+    public static string Capitalized(string s) =>
+        string.Join(' ', s.Split(' ').Select(w => w.Length == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..].ToLowerInvariant()));
+}
+
+public static class Paths
+{
+    /// The last part of a path, with either kind of slash ("C:\Music\a.mp3", "/Music/a.mp3" → "a.mp3").
+    public static string LastComponent(string path)
+    {
+        var i = path.TrimEnd('/', '\\').LastIndexOfAny(['/', '\\']);
+        return i < 0 ? path : path[(i + 1)..].TrimEnd('/', '\\');
+    }
+
+    /// "file:///Users/me/a%20b.mp3" → "/Users/me/a b.mp3"; on Windows "file:///C:/Music/a.mp3" → "C:\Music\a.mp3"
+    /// and "file://server/share/a.mp3" → "\\server\share\a.mp3" (amadeus/system.py file_url_path).
+    public static string? FromFileUrl(string url, bool windows)
+    {
+        // by hand: Uri treats "file:///C:/…" differently on each system
+        if (!url.StartsWith("file://", StringComparison.OrdinalIgnoreCase)) return null;
+        var rest = url[7..];
+        var slash = rest.IndexOf('/');
+        var host = slash < 0 ? rest : rest[..slash];
+        var path = Uri.UnescapeDataString(slash < 0 ? "" : rest[slash..].Split('?', '#')[0]);
+        if (!windows) return path;
+        if (host.Length > 0 && host != "localhost") return @"\\" + host + path.Replace('/', '\\');
+        if (path.Length > 2 && path[0] == '/' && path[2] is ':' or '|') path = path[1] + ":" + path[3..];
+        return path.Replace('/', '\\');
+    }
+
+    /// A folder Windows knows (Music, Documents: also when it moved, e.g. into OneDrive), else ~/name.
+    public static string UserFolder(Environment.SpecialFolder folder, string name)
+    {
+        var p = Environment.GetFolderPath(folder);
+        return p.Length > 0 && OperatingSystem.IsWindows() ? p : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), name);
+    }
 }

@@ -3,3 +3,4 @@ global using AmadeusDMX;
 global using AmadeusKit;
 global using Microsoft.UI.Xaml;
 global using Microsoft.UI.Xaml.Controls;
+global using AmadeusKit.DJ;
