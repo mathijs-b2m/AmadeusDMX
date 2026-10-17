@@ -40,4 +40,9 @@
     <!-- the 3D stage's shaders, compiled at startup (Render/ShaderLibrary.cs) -->
     <EmbeddedResource Include="Render\Shaders\*.hlsl*" LogicalName="AmadeusDMX.Render.Shaders.%(Filename)%(Extension)" />
   </ItemGroup>
+  <!-- WinUI's own resources (its themes) are merged into <app>.pri, which publishing leaves behind: an
+       unpackaged app without it stops at start ("Cannot locate resource … themeresources.xaml") -->
+  <Target Name="PublishPri" AfterTargets="Publish" Condition="Exists('$(OutDir)$(AssemblyName).pri')">
+    <Copy SourceFiles="$(OutDir)$(AssemblyName).pri" DestinationFolder="$(PublishDir)" />
+  </Target>
 </Project>
