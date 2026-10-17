@@ -212,6 +212,7 @@ public sealed class AppModel : Observable
             Later(() => Play(file, from));
         }
         Feed.Start();
+        Later(() => EditorSelfTest.RunIfRequested(this));  // -editorSelfTest SET (development; it saves into the set and rig SET)
         if (Workspace is { } ws && ws.LimiterLevel() < 1) ws.SetLimiterLevel(1);
         WatchLimiter();
     }
