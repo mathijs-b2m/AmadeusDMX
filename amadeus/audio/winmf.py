@@ -8,6 +8,7 @@ Through ctypes only: the Source Reader decodes to 16-bit PCM at the file's own r
 from __future__ import annotations
 
 import ctypes
+import struct
 import uuid
 import wave
 from ctypes import wintypes
@@ -17,6 +18,7 @@ MF_VERSION = 0x00020070
 FIRST_AUDIO_STREAM = 0xFFFFFFFD
 MEDIA_SOURCE = 0xFFFFFFFF
 END_OF_STREAM = 0x2
+READ_ERROR = 0x1
 
 # IMFSourceReader, IMFAttributes / IMFMediaType, IMFSample, IMFMediaBuffer: their methods' places in the vtable
 SET_STREAM_SELECTION, GET_CURRENT_TYPE, SET_CURRENT_TYPE, READ_SAMPLE, GET_PRESENTATION_ATTR = 4, 6, 7, 9, 12
@@ -146,6 +148,8 @@ class _Reader:
                     _release(sample)
             if flags.value & END_OF_STREAM:
                 return
+            if flags.value & READ_ERROR:  # no sample will ever come: don't wait for the end
+                raise OSError("Media Foundation couldn't read the stream")
 
     def __enter__(self):
         return self
@@ -156,15 +160,91 @@ class _Reader:
 
 
 def decode(path: str | Path, out: str | Path):
-    """`path` decoded into a 16-bit WAV at `out`. Raises OSError when Windows can't decode it."""
-    with _Reader(Path(path)) as r:
+    """`path` decoded into a 16-bit WAV at `out`. Raises OSError when Windows can't decode it.
+
+    A fragmented MP4 with an edit list (YouTube's DASH M4A often has one: skip the encoder's first 1600 samples)
+    comes out of Media Foundation empty: then a copy without the edit list is decoded and its lead-in skipped
+    here, so the audio starts on the very sample it does everywhere else."""
+    path, out = Path(path), Path(out)
+    if _decode(path, out):
+        return
+    fixed = without_edit_list(path.read_bytes())
+    if fixed is not None:
+        data, skip = fixed
+        copy = out.with_name(out.stem + ".noedit" + path.suffix)
+        try:
+            copy.write_bytes(data)
+            if _decode(copy, out, skip):
+                return
+        finally:
+            copy.unlink(missing_ok=True)
+    raise OSError("Media Foundation decoded no audio")
+
+
+def _decode(path: Path, out: Path, skip: float = 0.0) -> int:
+    """Decode into `out`, leaving out the first `skip` seconds; → the frames written."""
+    frames = 0
+    with _Reader(path) as r:
         channels, rate = r.to_pcm()
+        drop = round(skip * rate) * channels * 2  # bytes of the lead-in still to leave out
         with wave.open(str(out), "wb") as w:
             w.setnchannels(channels)
             w.setsampwidth(2)
             w.setframerate(rate)
             for chunk in r.chunks():
+                if drop:
+                    cut = min(drop, len(chunk))
+                    chunk, drop = chunk[cut:], drop - cut
                 w.writeframes(chunk)
+                frames += len(chunk) // (channels * 2)
+    return frames
+
+
+def _boxes(d: bytes, start: int, end: int):
+    """The MP4 boxes in d[start:end]: (offset, size, type)."""
+    i = start
+    while i + 8 <= end:
+        size, typ = struct.unpack(">I4s", d[i : i + 8])
+        if size == 1:
+            size = struct.unpack(">Q", d[i + 8 : i + 16])[0]
+        elif size == 0:
+            size = end - i
+        if size < 8:
+            return
+        yield i, size, typ
+        i += size
+
+
+def without_edit_list(data: bytes) -> tuple[bytes, float] | None:
+    """The file with its audio track's edit list made a free box (same size: nothing else moves), and the
+    seconds of lead-in that edit list skipped; None if it has none."""
+    moov = next(((o, n) for o, n, t in _boxes(data, 0, len(data)) if t == b"moov"), None)
+    if moov is None:
+        return None
+    out, skip = bytearray(data), None
+    for o, n, t in _boxes(data, moov[0] + 8, moov[0] + moov[1]):
+        if t != b"trak":
+            continue
+        inner = {typ: (off, size) for off, size, typ in _boxes(data, o + 8, o + n)}
+        if b"edts" not in inner or b"mdia" not in inner:
+            continue
+        mo, mn = inner[b"mdia"]
+        hdlr = next((off for off, _, typ in _boxes(data, mo + 8, mo + mn) if typ == b"hdlr"), None)
+        if hdlr is None or data[hdlr + 16 : hdlr + 20] != b"soun":
+            continue
+        mdhd = next(off for off, _, typ in _boxes(data, mo + 8, mo + mn) if typ == b"mdhd")
+        v = data[mdhd + 8]
+        scale = struct.unpack(">I", data[mdhd + (28 if v == 1 else 20) : mdhd + (32 if v == 1 else 24)])[0]
+        eo, en = inner[b"edts"]
+        elst = next((off for off, _, typ in _boxes(data, eo + 8, eo + en) if typ == b"elst"), None)
+        if elst is not None and struct.unpack(">I", data[elst + 12 : elst + 16])[0]:
+            # the first entry: segment duration, then media time (where it starts in the track; -1: empty)
+            at, fmt = (elst + 24, ">q") if data[elst + 8] == 1 else (elst + 20, ">i")
+            media_time = struct.unpack_from(fmt, data, at)[0]
+            skip = max(0, media_time) / scale if scale else 0.0
+        out[eo + 4 : eo + 8] = b"free"
+        break
+    return None if skip is None else (bytes(out), skip)
 
 
 def duration(path: str | Path) -> float | None:

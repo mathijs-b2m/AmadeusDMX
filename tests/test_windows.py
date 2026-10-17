@@ -4,6 +4,7 @@ stops it. Most of it runs everywhere (Windows' rules tested on a Mac too); what 
 import importlib.util
 import io
 import os
+import struct
 import subprocess
 import sys
 import threading
@@ -369,3 +370,42 @@ def test_the_packs_environment_is_only_remade_when_the_app_moved(tmp_path, monke
     (env / "pyvenv.cfg").write_text("home = C:\\\\elsewhere\\\\runtime\n", encoding="utf-8")
     packs.target_python()
     assert made == [env]
+
+
+def _box(typ: bytes, body: bytes) -> bytes:
+    return struct.pack(">I", 8 + len(body)) + typ + body
+
+
+def test_an_edit_list_is_taken_out_and_its_lead_in_kept():
+    """YouTube's DASH M4A often skips the encoder's first 1600 samples with an edit list, which Media Foundation
+    can't read in a fragmented file (it decodes nothing): the copy without it starts 1600 samples early."""
+    from amadeus.audio import winmf
+
+    mdhd = _box(b"mdhd", bytes(4) + bytes(8) + struct.pack(">II", 44100, 0) + bytes(4))
+    hdlr = _box(b"hdlr", bytes(8) + b"soun" + bytes(12))
+    elst = _box(b"elst", bytes(4) + struct.pack(">IIiI", 1, 11699648, 1600, 0x00010000))
+    trak = _box(b"trak", _box(b"tkhd", bytes(84)) + _box(b"edts", elst) + _box(b"mdia", mdhd + hdlr))
+    data = _box(b"ftyp", b"dash" + bytes(12)) + _box(b"moov", _box(b"mvhd", bytes(100)) + trak) + _box(b"mdat", b"x")
+    out, skip = winmf.without_edit_list(data)
+    assert len(out) == len(data) and b"edts" not in out and out.count(b"free") == 1
+    assert skip * 44100 == pytest.approx(1600)
+    assert winmf.without_edit_list(out) is None  # nothing left to take out
+
+
+def test_an_empty_decode_is_not_kept(tmp_path, monkeypatch):
+    from amadeus.audio import analysis
+
+    track = tmp_path / "a.m4a"
+    track.write_bytes(b"not audio soundfile reads")
+    st = track.stat()
+    import hashlib
+
+    key = hashlib.sha1(f"{track.resolve()}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:8]
+    stale = tmp_path / f"a.{key}.decoded.wav"
+    stale.write_bytes(b"RIFF" + bytes(40))  # a header and nothing else, from a decode that went wrong
+    monkeypatch.setattr(analysis, "ffmpeg", lambda: None)
+    monkeypatch.setattr(analysis.sys, "platform", "linux")
+    monkeypatch.setattr(analysis, "AFCONVERT", str(tmp_path / "no-afconvert"))
+    with pytest.raises(SystemExit):
+        analysis.readable_audio(track, tmp_path)
+    assert not stale.exists()

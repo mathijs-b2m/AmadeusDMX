@@ -84,8 +84,9 @@ def readable_audio(path: str | Path, cache_dir: str | Path = paths.CACHE) -> Pat
     st = path.stat()
     key = hashlib.sha1(f"{path.resolve()}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:8]
     out = Path(cache_dir) / f"{path.stem}.{key}.decoded.wav"
-    if out.exists():
+    if out.exists() and out.stat().st_size > 44:  # more than a WAV header: a decode that went wrong isn't kept
         return out
+    out.unlink(missing_ok=True)
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     tool = ffmpeg()
     if tool:
