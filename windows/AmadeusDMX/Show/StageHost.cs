@@ -1,10 +1,8 @@
 // Where the Show page puts the 3D stage, and the stage's controls (the camera, flying, the LED wall scene, haze,
 // exposure) that StageControls turns.
 //
-// The stage itself (Render/StageView, Render/StageController: the Direct3D port of mac/Sources/AmadeusDMX/Render)
-// is written alongside this page; until it is wired in, StageHost.Create returns a placeholder. StageSettings
-// holds what Swift's StageController publishes, under the same names, so StageControls works now and the lead
-// only has to hand the values on (see Create).
+// The stage itself is Render/StageView with its StageController (the Direct3D port of mac/Sources/AmadeusDMX/Render).
+// StageSettings holds what Swift's StageController publishes, under the same names; Create hands them on.
 namespace AmadeusDMX;
 
 /// What the Show page sets on the stage (Swift's StageController's @Published properties).
@@ -51,24 +49,26 @@ public static class StageHost
     /// the page switches back from Perform Only (no stage at all meanwhile: nothing drawn 60 times a second).
     public static FrameworkElement Create(AppModel model, StageSettings stage)
     {
-        // lead: swap for new Render.StageView(...). What the Swift does with it, call for call:
-        //
-        //   var controller = new StageController();                      // MainView's @StateObject (one per window)
-        //   controller.Input = () => (model.StageInput(), model.Feed.LatestFullFrame);   // ShowView's .onAppear
-        //   void Apply() {                                               // StageControls' bindings
-        //       controller.Preset = CameraPreset(rawValue: stage.Preset);   // renderer.setPreset(preset)
-        //       controller.Haze = stage.Haze;  controller.Exposure = stage.Exposure;
-        //       controller.AutoOrbit = stage.AutoOrbit;  controller.Fly = stage.Fly;   // fly: the stage takes the keys (focus it)
-        //       controller.WallScene = WallScene(rawValue: stage.WallScene);
-        //   }
-        //   Apply(); stage.PropertyChanged += (_, _) => Apply();         // (and back: the stage's F / Esc set stage.Fly)
-        //   return new StageView(controller);                            // .ignoresSafeArea(): edge to edge, under the cards
-        //
-        // The stage adds its GPU time to model.Power (Sidebar's power meter), as on the Mac.
-        _ = model;
-        _ = stage;
-        var placeholder = new Grid { Background = Theme.Brush("SolidBackgroundFillColorBaseBrush") };
-        placeholder.Children.Add(UI.Text("3D stage", Font.Title3).Secondary().Center().Opacity(0.4));
-        return placeholder;
+        var controller = new StageController { Input = () => (model.StageInput(), model.Feed.LatestFullFrame) };
+        bool applying = false;
+        void Apply()   // StageControls' bindings
+        {
+            applying = true;
+            if (CameraPresets.FromRawValue(stage.Preset) is { } p) controller.Preset = p;
+            controller.Haze = stage.Haze;
+            controller.Exposure = stage.Exposure;
+            controller.AutoOrbit = stage.AutoOrbit;
+            controller.Fly = stage.Fly;
+            if (WallScenes.FromRawValue(stage.WallScene) is { } w) controller.WallScene = w;
+            applying = false;
+        }
+        Apply();
+        stage.PropertyChanged += (_, _) => Apply();
+        // and back: the stage's own F / Esc fly and land
+        controller.PropertyChanged += (_, e) =>
+        {
+            if (!applying && e.PropertyName == nameof(StageController.Fly)) stage.Fly = controller.Fly;
+        };
+        return new StageView(controller);
     }
 }

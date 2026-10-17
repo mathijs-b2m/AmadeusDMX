@@ -36,6 +36,12 @@ public sealed partial class MainWindow : Window
         Content = Build(out var dragRegion);
         SetTitleBar(dragRegion);
         Activated += (_, _) => FirstShown();
+        // a new rig, or a set placed on one: ask how the set goes on it (Swift: MainView's .sheet(item: mountPrompt))
+        model.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AppModel.MountPrompt) && model.MountPrompt is { } m)
+                MountPromptSheet.Present(model, this, m.Rig, m.Set);
+        };
     }
 
     FrameworkElement Build(out UIElement dragRegion)

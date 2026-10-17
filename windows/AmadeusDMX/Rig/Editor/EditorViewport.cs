@@ -5,10 +5,9 @@ namespace AmadeusDMX;
 
 public sealed class EditorViewport
 {
-    /// Makes the editor's stage. The 3D one once Render.StageView implements IEditorStage (the lead sets
-    /// `EditorViewport.MakeStage = () => new StageView()` at start-up, or makes this the default); the plan view until
-    /// then, and whenever the 3D stage can't be made (no Direct3D 11).
-    public static Func<IEditorStage> MakeStage { get; set; } = () => new PlaceholderStage();
+    /// Makes the editor's stage: the 3D one, or the plan view when the 3D stage can't be made (no Direct3D 11).
+    public static Func<IEditorStage> MakeStage { get; set; } =
+        () => D3DEditorStage.Available ? new D3DEditorStage() : new PlaceholderStage();
 
     /// The camera buttons under the stage (Swift: CameraPreset .plan, .drone, .frontOfHouse, .side and their symbols).
     public static readonly (string Preset, string Symbol)[] CameraPresets =
