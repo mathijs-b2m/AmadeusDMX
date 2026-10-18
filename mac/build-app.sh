@@ -86,14 +86,15 @@ if [ -z "${NOTARY_KEY_ID:-}" ] && [ -s "$KEYS/notary.env" ]; then source "$KEYS/
 NOTARY_WAIT="${NOTARY_WAIT:-15m}" NOTARY_PENDING=0
 notary() { xcrun notarytool "$@" --key "$NOTARY_KEY_FILE" --key-id "$NOTARY_KEY_ID" ${NOTARY_ISSUER:+--issuer "$NOTARY_ISSUER"}; }
 notarize() {  # notarize FILE: 0 accepted (staple it), 1 still pending at Apple; a rejection stops the build
-  local out="$OUT/notary.plist" status id
-  if [ "$NOTARY_PENDING" = 1 ]; then
-    notary submit "$1" --output-format plist > "$out" || true
-  else
-    notary submit "$1" --wait --timeout "$NOTARY_WAIT" --output-format plist > "$out" || true
+  local out="$OUT/notary.plist" status="" id=""
+  # submit first, for the submission's id; then wait for it (a timed-out wait prints nothing)
+  notary submit "$1" --output-format plist > "$out" || true
+  id="$(/usr/libexec/PlistBuddy -c "Print :id" "$out" 2>/dev/null)" || id=""
+  [ -n "$id" ] || { echo "Notarization of $(basename "$1"): not submitted" >&2; exit 1; }
+  if [ "$NOTARY_PENDING" = 0 ]; then
+    notary wait "$id" --timeout "$NOTARY_WAIT" --output-format plist > "$out" || true
+    status="$(/usr/libexec/PlistBuddy -c "Print :status" "$out" 2>/dev/null)" || status=""
   fi
-  status="$(/usr/libexec/PlistBuddy -c "Print :status" "$out" 2>/dev/null || echo "no answer")"
-  id="$(/usr/libexec/PlistBuddy -c "Print :id" "$out" 2>/dev/null || true)"
   rm -f "$out"
   case "$status" in
     Accepted) echo "Notarized $(basename "$1")"; return 0 ;;
@@ -102,7 +103,6 @@ notarize() {  # notarize FILE: 0 accepted (staple it), 1 still pending at Apple;
       notary log "$id" >&2
       exit 1 ;;
   esac
-  [ -n "$id" ] || { echo "Notarization of $(basename "$1"): not submitted" >&2; exit 1; }
   echo "Notarization of $(basename "$1") still pending at Apple ($id): not stapled" >&2
   [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning::$(basename "$1") not notarized yet ($id): signed, not stapled"
   NOTARY_PENDING=1
