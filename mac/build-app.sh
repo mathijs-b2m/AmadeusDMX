@@ -80,21 +80,33 @@ fi
 # NOTARY_KEY_ID and NOTARY_ISSUER (none for an individual key); on this Mac from ~/.amadeus-release/notary.env
 NOTARY_KEY_FILE="${NOTARY_KEY_FILE:-$KEYS/notary-key.p8}"
 if [ -z "${NOTARY_KEY_ID:-}" ] && [ -s "$KEYS/notary.env" ]; then source "$KEYS/notary.env"; fi
-notarize() {  # submit, wait for Apple's verdict, show why when it's no
-  local out="$OUT/notary.plist"
-  xcrun notarytool submit "$1" --key "$NOTARY_KEY_FILE" --key-id "$NOTARY_KEY_ID" \
-    ${NOTARY_ISSUER:+--issuer "$NOTARY_ISSUER"} --wait --timeout 1h --output-format plist > "$out" || true
-  local status id
+# Apple's verdict can take days for a new Developer ID: wait NOTARY_WAIT (default 15m) at most. Still pending
+# then, the release goes out signed but not stapled (Gatekeeper fetches the ticket online once Apple accepts),
+# and the remaining uploads are only submitted, not waited for.
+NOTARY_WAIT="${NOTARY_WAIT:-15m}" NOTARY_PENDING=0
+notary() { xcrun notarytool "$@" --key "$NOTARY_KEY_FILE" --key-id "$NOTARY_KEY_ID" ${NOTARY_ISSUER:+--issuer "$NOTARY_ISSUER"}; }
+notarize() {  # notarize FILE: 0 accepted (staple it), 1 still pending at Apple; a rejection stops the build
+  local out="$OUT/notary.plist" status id
+  if [ "$NOTARY_PENDING" = 1 ]; then
+    notary submit "$1" --output-format plist > "$out" || true
+  else
+    notary submit "$1" --wait --timeout "$NOTARY_WAIT" --output-format plist > "$out" || true
+  fi
   status="$(/usr/libexec/PlistBuddy -c "Print :status" "$out" 2>/dev/null || echo "no answer")"
   id="$(/usr/libexec/PlistBuddy -c "Print :id" "$out" 2>/dev/null || true)"
   rm -f "$out"
-  if [ "$status" != Accepted ]; then
-    echo "Notarization of $(basename "$1"): $status" >&2
-    [ -n "$id" ] && xcrun notarytool log "$id" --key "$NOTARY_KEY_FILE" --key-id "$NOTARY_KEY_ID" \
-      ${NOTARY_ISSUER:+--issuer "$NOTARY_ISSUER"} >&2
-    exit 1
-  fi
-  echo "Notarized $(basename "$1")"
+  case "$status" in
+    Accepted) echo "Notarized $(basename "$1")"; return 0 ;;
+    Invalid|Rejected)
+      echo "Notarization of $(basename "$1"): $status" >&2
+      notary log "$id" >&2
+      exit 1 ;;
+  esac
+  [ -n "$id" ] || { echo "Notarization of $(basename "$1"): not submitted" >&2; exit 1; }
+  echo "Notarization of $(basename "$1") still pending at Apple ($id): not stapled" >&2
+  [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning::$(basename "$1") not notarized yet ($id): signed, not stapled"
+  NOTARY_PENDING=1
+  return 1
 }
 
 # Sparkle, the updater: in the app's Frameworks, where its executable looks for it
@@ -217,8 +229,8 @@ if [ "$DMG" = 1 ]; then
   dmg() {  # dmg APP NAME VOLUME
     if [ "$NOTARIZE" = 1 ]; then
       ditto -c -k --keepParent "$1" "$OUT/notarize.zip"
-      notarize "$OUT/notarize.zip"; rm -f "$OUT/notarize.zip"
-      xcrun stapler staple -q "$1"
+      if notarize "$OUT/notarize.zip"; then xcrun stapler staple -q "$1"; fi
+      rm -f "$OUT/notarize.zip"
     fi
     rm -rf "$OUT/dmg" "$OUT/$2.dmg"
     mkdir -p "$OUT/dmg"
@@ -227,10 +239,10 @@ if [ "$DMG" = 1 ]; then
     hdiutil create -volname "$3" -srcfolder "$OUT/dmg" -ov -format UDZO "$OUT/$2.dmg" >/dev/null
     rm -rf "$OUT/dmg"
     if [ "$SIGN" != - ]; then sign "$OUT/$2.dmg"; fi
-    if [ "$NOTARIZE" = 1 ]; then notarize "$OUT/$2.dmg"; xcrun stapler staple -q "$OUT/$2.dmg"; fi
+    if [ "$NOTARIZE" = 1 ] && notarize "$OUT/$2.dmg"; then xcrun stapler staple -q "$OUT/$2.dmg"; fi
   }
   dmg "$APP" AmadeusDMX "Amadeus DMX"
-  echo "Disk image: $OUT/AmadeusDMX.dmg$([ "$NOTARIZE" = 1 ] && echo ", notarized")"
+  echo "Disk image: $OUT/AmadeusDMX.dmg$([ "$NOTARIZE" = 1 ] && [ "$NOTARY_PENDING" = 0 ] && echo ", notarized")"
   dmg "$LINK" AmadeusLink "Amadeus Link"
-  echo "Disk image for the DJ: $OUT/AmadeusLink.dmg$([ "$NOTARIZE" = 1 ] && echo ", notarized")"
+  echo "Disk image for the DJ: $OUT/AmadeusLink.dmg$([ "$NOTARIZE" = 1 ] && [ "$NOTARY_PENDING" = 0 ] && echo ", notarized")"
 fi
