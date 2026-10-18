@@ -72,13 +72,29 @@ def test_the_laser_guard_keeps_a_big_rig_in_time():
     eng = engine("concert60", real_output=False)
     _, states = eng.render(30.0)
     eng.laser_info = [{**info, "min_el": 89.0} for info in eng.laser_info]  # nothing is safe: raise, shrink, blank
-    best = float("inf")
-    for _ in range(5):  # the best of five: what the guard costs, not what the other tests on this computer do
+
+    def guard():
         for e in eng.lasers:  # every laser spinning low, where the guard works hardest
             s = states[e["id"]]
             s.fx, s.dimmer, s.white, s.size, s.tilt, s.spin = "fan", 1.0, 1.0, 1.0, 0.0, 0.5
-        t0 = time.perf_counter()
         eng._laser_guard(states, 30.0)
-        best = min(best, time.perf_counter() - t0)
         assert all(states[e["id"]].dimmer == 0 for e in eng.lasers)
-    assert best < 0.02  # was ~47 ms: the light loop fell behind the music
+
+    def reference():  # a fixed mix of numpy and plain Python, about as much work as the guard on an M3 Mac (~6 ms)
+        a = np.random.default_rng(1).random((200, 200))
+        for _ in range(3):
+            np.sort(np.sin(a), axis=None).sum()  # one core, like the guard (no BLAS threads)
+            sorted(range(20000), key=lambda x: -x)
+
+    def best(f):  # the best of five: what the work costs, not what the other tests on this computer do
+        times = []
+        for _ in range(5):
+            t0 = time.perf_counter()
+            f()
+            times.append(time.perf_counter() - t0)
+        return min(times)
+
+    # against the reference on the same computer, not in milliseconds: a CI runner is several times slower than
+    # a show laptop. The guard takes ~1x the reference on an M3 Mac, ~1.8x under Windows' x64 emulation; at 8x
+    # (~47 ms on the Mac) the light loop fell behind the music.
+    assert best(guard) < 4 * best(reference)
