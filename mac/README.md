@@ -64,6 +64,11 @@ then macOS stops the first launch (System Settings › Privacy & Security › *O
 the same signature, so macOS keeps the permissions you gave it (Accessibility for djay, the local network) across
 updates; the one switch from our own certificate to Developer ID asks for them once more.
 
+Apple can take days to notarize the first uploads of a new Developer ID. A release waits 15 minutes at most
+(`NOTARY_WAIT`) per upload; still pending then, it goes out signed but without the ticket stapled (a warning in
+the Actions run), and Gatekeeper fetches the ticket online once Apple accepts. A rejection stops the release
+with Apple's log.
+
 Under Developer ID the apps run with the hardened runtime. The engine's Python has entitlements of its own
 (`python.entitlements`): it loads the optional packs, whose libraries we don't sign, and torch writes code into
 memory.
