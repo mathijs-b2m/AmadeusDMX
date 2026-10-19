@@ -502,13 +502,16 @@ class MotionMixin:
         W = role["width"]
         az = aim["az"] + u * aim["az_amp"]
         el = aim["el"] + v * aim["el_amp"]
-        if movement == "tilt_wave":
+        cp = self._cell_place(j)  # a cell of a bar whose cells tilt on their own: its waves roll along the bar
+        if movement == "tilt_wave" or (f == "wave" and cp is not None and not ring):
             # A row of heads tilting up and down in a wave that rolls over the row: each head a step behind its
             # neighbour by where it hangs (left to right; mirrored: from the centre out). One wave per bar, every
             # two beats at the peaks. The beams fan out a little so the row reads as a row.
             period = 2.0 if d.intensity >= 3 else 4.0
             amp = TILT_WAVE_DEG * (0.8 if period < 4 else 1.0)
             across = abs(side) if f == "mirror" else (side + 1) / 2
+            if cp is not None:  # the whole wave on each bar, its cells one after the other
+                across = abs(cp) if f == "mirror" else (cp + 1) / 2
             if ring:  # round the ring, the beams out of it
                 across = ring["frac"]
             wave = np.sin(2 * math.pi * (beats / period - across * TILT_WAVE_SPAN))
@@ -537,7 +540,7 @@ class MotionMixin:
             elif f == "fan":
                 az = az + side * 30
                 el = el + role["vside"] * 12  # a tower fans out in height
-                if (cp := self._cell_place(j)) is not None:  # cells with their own motors: the bar bends into a curve
+                if cp is not None:  # cells with their own motors: the bar bends into a curve
                     el = el + CURVE_DEG * (2 * cp * cp - 1)
             elif f == "wave" and role["vside"]:
                 el = el + role["vside"] * 6

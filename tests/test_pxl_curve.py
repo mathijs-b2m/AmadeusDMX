@@ -130,3 +130,17 @@ def test_the_visualisers_draw_cells_that_tilt_on_their_own():
     assert info["curveL.1"]["body"] == "curve_bar" and info["curveL.1"]["cells"] == 12
     assert info["katana.1"]["body"] == "moving_bar"
     assert element_info(_rig("20ch"), _rig("20ch")["elements"][0])["body"] == "moving_bar"
+
+
+def test_a_wave_rolls_along_each_bar(show):
+    a, plan, k, _ = show
+    plan = list(plan)
+    plan[k] = replace(plan[k], movement="circle", formation="wave", aim="crowd", intensity=2)
+    e = Engine(a, plan, _rig(), real_output=False)
+    d = plan[k]
+    lo, hi = int((d.start + 1) * 50), int((d.end - 1) * 50)
+    for bar in ("curveL", "curveR"):
+        tilts = np.array([e.traj[f"{bar}.{h}"][1][lo:hi] for h in range(1, 13)]) * 200  # degrees
+        assert np.max(np.ptp(tilts, axis=0)) > 30  # the whole wave on every bar…
+        tops = [int(np.argmax(np.correlate(t - t.mean(), tilts[0] - tilts[0].mean(), "full"))) for t in tilts[:6]]
+        assert len(set(tops)) > 1  # …rolling: its cells one after the other
