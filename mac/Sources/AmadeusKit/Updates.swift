@@ -44,6 +44,8 @@ public final class Updates: NSObject, SPUUpdaterDelegate {
     public private(set) var canCheck = false
     /// An update waits until the app is idle.
     public private(set) var waitingForIdle = false
+    /// The app quits to install an update (Sparkle's relaunch): on purpose, so nothing asks the user to confirm.
+    @ObservationIgnored public private(set) var quitsToInstall = false
     public private(set) var state = UpdateState.unknown
 
     /// The version people see (1.0.5) and the build number Sparkle compares (the commit count).
@@ -151,6 +153,14 @@ public final class Updates: NSObject, SPUUpdaterDelegate {
             // a one click that stopped before installing (cancelled, failed to download): offer it again
             if case .downloading(let v, _) = state { state = .available(version: v) }
         }
+    }
+
+    nonisolated public func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
+        MainActor.assumeIsolated { quitsToInstall = true }
+    }
+
+    nonisolated public func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        MainActor.assumeIsolated { quitsToInstall = true }
     }
 
     nonisolated public func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem,

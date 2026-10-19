@@ -4,7 +4,8 @@ import SwiftUI
 
 @main
 struct AmadeusLinkApp: App {
-    @State private var link = LinkServer()
+    @NSApplicationDelegateAdaptor(LinkDelegate.self) private var delegate
+    private var link: LinkServer { delegate.link }
 
     var body: some Scene {
         // a window as well as the menu bar icon: a full menu bar (or the notch) can hide the icon
@@ -23,6 +24,30 @@ struct AmadeusLinkApp: App {
                   : link.peers.isEmpty ? "dot.radiowaves.left.and.right" : "link.circle.fill")
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+/// Owns the link, so quitting (the Quit button, ⌘Q, the Dock, logging out) can ask first while it's in use.
+@MainActor
+final class LinkDelegate: NSObject, NSApplicationDelegate {
+    let link = LinkServer()
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // an update relaunches on purpose (and only once no lighting computer is connected)
+        guard !link.peers.isEmpty, !link.updates.quitsToInstall else { return .terminateNow }
+        let who = link.peers.map(\.address).joined(separator: ", ")
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Quit Amadeus Link during the show?"
+        alert.informativeText = "A lighting computer is connected (\(who)). If you quit, it loses the mix: "
+            + "the lights stop following the music until Amadeus Link is back."
+        let quit = alert.addButton(withTitle: "Quit Anyway")
+        quit.hasDestructiveAction = true
+        quit.keyEquivalent = ""
+        let cancel = alert.addButton(withTitle: "Cancel")
+        cancel.keyEquivalent = "\r"  // Return keeps the show going
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 }
 
