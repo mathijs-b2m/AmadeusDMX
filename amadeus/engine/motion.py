@@ -490,13 +490,15 @@ class MotionMixin:
                 return {eid: (z[f"p:{eid}"], z[f"t:{eid}"]) for eid in ids}
             except (OSError, KeyError, ValueError, zipfile.BadZipFile):  # damaged (an older crash): made again
                 pass
-        traj = self._trajectories_fast()
+        # kept as the cache keeps them (float32): a track's first show moves exactly as every later one
+        traj = {eid: (p.astype(np.float32), t.astype(np.float32)) for eid, (p, t) in self._trajectories_fast().items()}
+        self.goals = {eid: tuple(g.astype(np.float32) for g in gs) for eid, gs in self.goals.items()}
         try:
             TRAJ_CACHE.mkdir(parents=True, exist_ok=True)
             arrays = {}
             for eid, (p, t) in traj.items():
-                arrays[f"p:{eid}"], arrays[f"t:{eid}"] = p.astype(np.float32), t.astype(np.float32)
-                arrays[f"gp:{eid}"], arrays[f"gt:{eid}"] = (g.astype(np.float32) for g in self.goals[eid])
+                arrays[f"p:{eid}"], arrays[f"t:{eid}"] = p, t
+                arrays[f"gp:{eid}"], arrays[f"gt:{eid}"] = self.goals[eid]
             system.save_npz(path, **arrays)
             for old in sorted(TRAJ_CACHE.glob("*.traj.npz"), key=lambda p: p.stat().st_mtime)[:-40]:
                 old.unlink()  # keep the 40 most recent
