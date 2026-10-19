@@ -63,7 +63,7 @@ public sealed class StatusPill(AppModel model)
         // rebuilt when the state, the track or the phrase changes; the time alone follows the feed 5 times a second,
         // beside it (one element can't move into each new rebuild: WinUI refuses an element with a parent still)
         var live = UI.Live(model, Content, nameof(AppModel.ShowState), nameof(AppModel.ShowTitle))
-            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase)], c => c.Content = Content());
+            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase)], c => c.Rebuild(Content));
         time.Bind(model, [nameof(AppModel.ShowState)], t => t.Visible(model.Feed.Hello is not null && model.ShowState.IsActive))
             .Bind(model.Feed, [nameof(LiveFeed.Hello)], t => t.Visible(model.Feed.Hello is not null && model.ShowState.IsActive));
         return UI.HStack(8, live, time).Padding(12, 0);

@@ -83,7 +83,7 @@ public sealed class NightCard(AppModel model)
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
         _countdown.Text = left ?? "";
-        _countdown.Foreground = Night.Over(arc) ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorPrimaryBrush");
+        _countdown.Foreground(Night.Over(arc) ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorPrimaryBrush"));
         _countdown.Tooltip(Night.Over(arc) ? "Over the night's length" : "Left of the night");
     }
 
@@ -156,7 +156,7 @@ public sealed class NightCard(AppModel model)
             var manual = arc.Manual.Contains(knob.Id);
             auto.IsEnabled = manual;
             auto.FontWeight = manual ? FontWeights.Normal : FontWeights.SemiBold;
-            auto.Foreground = manual ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Accent);
+            auto.Foreground(manual ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Accent));
             auto.Tooltip(manual ? "Give this knob back to the show arc" : "The show arc turns this knob");
             row.Tooltip(Night.KnobHelp(knob, arc));
         });
@@ -188,7 +188,7 @@ public sealed class NightCard(AppModel model)
             {
                 var now = key == a.Stage;
                 label.FontWeight = now ? FontWeights.Bold : FontWeights.Normal;
-                b.Background = now ? Tint.Brush(Tint.Accent, 0.35) : ShowUI.Brush(Tone.Secondary, 0.12);
+                b.Background(now ? Tint.Brush(Tint.Accent, 0.35) : ShowUI.Brush(Tone.Secondary, 0.12));  // the same colour: left alone (UI.Background)
                 b.Tooltip(now ? "The music is here" : "Go to this stage now (the arc carries on from there)");
             });
         }

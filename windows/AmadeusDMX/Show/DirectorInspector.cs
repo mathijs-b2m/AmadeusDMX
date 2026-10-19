@@ -28,7 +28,7 @@ public sealed class DirectorInspector(AppModel model)
         var key = running ? $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(h)}|{i}|{_pinned is not null}|{note}" : "none";
         if (key == _shown && !force) return;
         _shown = key;
-        _host.Content = running ? Content(h!, i, note) : NoShow();
+        _host.Rebuild(() => running ? Content(h!, i, note) : NoShow());
     }
 
     static FrameworkElement NoShow() =>

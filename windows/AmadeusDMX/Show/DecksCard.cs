@@ -17,7 +17,7 @@ public sealed class DecksCard(AppModel model)
             if (shape != _shape || c.Content is null)
             {
                 _shape = shape;
-                c.Content = Content();
+                c.Rebuild(Content);
             }
             Update();
         });

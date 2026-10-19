@@ -24,9 +24,16 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
     public FrameworkElement Build()
     {
         // rebuilt when the app's state or the power meter changes, and when the feed's link or kind changes (not
-        // with every frame's time: a button rebuilt 5 times a second can't be clicked)
+        // with every frame's time: a button rebuilt 5 times a second can't be clicked). The link comes with every
+        // feed update: its jitter moves in place, only another DJ laptop or the link going up or down rebuilds.
         var live = UI.Live([model, model.Power], Content)
-            .Bind(model.Feed, [nameof(LiveFeed.Link), nameof(LiveFeed.Lite), nameof(LiveFeed.State)], c => c.Content = Content());
+            .Bind(model.Feed, [nameof(LiveFeed.Link), nameof(LiveFeed.Lite), nameof(LiveFeed.State)], c =>
+            {
+                var feed = model.Feed;
+                var shape = $"{feed.Link?.Name}|{feed.Link?.Up}|{feed.Lite}|{feed.State}";
+                if (shape != _shape) c.Rebuild(Content);
+                else if (_linkLine is not null && feed.Link is { } link) _linkLine.Text = LinkLine(link);
+            });
         var card = UI.Card(live, padding: 12, corner: 14);
         // the power meter runs while the show does
         return card.Bind(model, nameof(AppModel.EngineRunning), _ => Meter(model.EngineRunning));
@@ -39,8 +46,15 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
         if (running) model.Power.Start(() => model.Engine.Pid); else model.Power.Stop();
     }
 
+    string? _shape;
+    TextBlock? _linkLine;
+
+    static string LinkLine(LinkStatus link) => link.Up ? $"{link.Name} · {link.JitterMs:F0} ms jitter" : $"{link.Name}: link down";
+
     UIElement Content()
     {
+        _shape = $"{model.Feed.Link?.Name}|{model.Feed.Link?.Up}|{model.Feed.Lite}|{model.Feed.State}";
+        _linkLine = null;
         var state = model.ShowState;
         var fps = model.Feed.State == FeedState.Connected && state.IsActive && !model.Feed.Lite
             ? UI.Text("", Font.Caption).Secondary().Bind(model.Feed, nameof(LiveFeed.Fps),
@@ -60,9 +74,10 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
             rows.Add(UI.Text(state.Reason, Font.Caption).Secondary().Wrap(3));
         else if (model.Feed.Link is { } link && model.EngineRunning)
         {
-            rows.Add(UI.Label(link.Up ? "laptopcomputer" : "exclamationmark.triangle.fill",
-                              link.Up ? $"{link.Name} · {link.JitterMs:F0} ms jitter" : $"{link.Name}: link down", Font.Caption)
-                .Foreground(link.Up ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Orange)));
+            var line = UI.Label(link.Up ? "laptopcomputer" : "exclamationmark.triangle.fill", LinkLine(link), Font.Caption)
+                .Foreground(link.Up ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Orange));
+            _linkLine = line.Children.OfType<TextBlock>().FirstOrDefault();
+            rows.Add(line);
             if (model.EngineFirewall is { BlockedOn: { } profile } fw) rows.Add(FirewallRows(fw, profile, link.Name));
         }
         else if (state.Kind == ShowStateKind.WaitingForDJ)
