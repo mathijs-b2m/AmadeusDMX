@@ -48,3 +48,49 @@ def test_streamed_deck_stays_dark_unless_switched_on(monkeypatch):
 
     rl.fetcher = FakeFetcher()
     assert rl._stream_copy(s).endswith("[spotify-abc].opus")
+
+
+def test_zeroconf_lookup_works_from_inside_the_event_loop(monkeypatch):
+    # live mode looks for a DJ laptop by name from inside its event loop; zeroconf's blocking calls refuse to run
+    # there (Windows, where there's no dns-sd)
+    import asyncio
+    import sys
+    import types
+
+    class Info:
+        port = 7123
+
+        def parsed_addresses(self, version=None):
+            return ["10.0.0.7"]
+
+    class Zeroconf:
+        def get_service_info(self, kind, full, timeout):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return Info()
+            raise RuntimeError("Use AsyncServiceInfo.async_request from the event loop")
+
+        def close(self):
+            pass
+
+    fake = types.SimpleNamespace(Zeroconf=Zeroconf, ServiceBrowser=None, IPVersion=types.SimpleNamespace(V4Only=1))
+    monkeypatch.setitem(sys.modules, "zeroconf", fake)
+    monkeypatch.setattr(link.shutil, "which", lambda name: None)
+
+    async def look():
+        return link.resolve("DJ laptop")
+
+    assert asyncio.run(look()) == ("10.0.0.7", 7123)
+
+
+def test_an_unreachable_dj_laptop_says_what_to_check(tmp_path):
+    import socket
+
+    import pytest
+
+    with socket.socket() as s:  # a port nobody listens on
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    with pytest.raises(SystemExit, match="Windows Firewall"):
+        link.RemoteListener("127.0.0.1", port, "1234", tmp_path)
