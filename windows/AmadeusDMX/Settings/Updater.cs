@@ -16,8 +16,10 @@ namespace AmadeusDMX;
 
 public sealed class Updater : IUpdater
 {
-    /// The installer's switches (Inno Setup): no questions, no restart; the app is started again afterwards.
+    /// The installer's switches (Inno Setup): no questions, no restart; /RELAUNCH: it starts the app it installed
+    /// afterwards (not NetSparkle, which would start this exe again, wherever it ran from).
     public const string InstallerArguments = "/SILENT /SP- /SUPPRESSMSGBOXES /NORESTART";
+    const string Relaunch = " /RELAUNCH";
     const string ChecksKey = "updatesCheckAutomatically", InstallsKey = "updatesInstallAutomatically", LastKey = "updatesLastChecked";
     static readonly TimeSpan Interval = TimeSpan.FromHours(24);
 
@@ -47,8 +49,8 @@ public sealed class Updater : IUpdater
         {
             UIFactory = null,
             UserInteractionMode = UserInteractionMode.NotSilent,  // no UI factory: nothing is shown or downloaded by itself
-            CustomInstallerArguments = InstallerArguments,
-            RelaunchAfterUpdate = true,
+            CustomInstallerArguments = InstallerArguments + Relaunch,
+            RelaunchAfterUpdate = false,  // the installer starts the app (Relaunch)
             // the installer waits for this app to quit by itself (it stops the engine and blacks out first)
             ShouldKillParentProcessWhenStartingInstaller = false,
         };
@@ -325,7 +327,7 @@ public sealed class Updater : IUpdater
         _quitting = true;
         if (_downloaded is not { } d) return;
         _downloaded = null;
-        _sparkle.RelaunchAfterUpdate = false;
+        _sparkle.CustomInstallerArguments = InstallerArguments;  // not started again
         // the installer waits for this process to end; launch it before the app is gone
         try { Task.Run(() => _sparkle.InstallUpdate(d.Item, d.Path)).Wait(TimeSpan.FromSeconds(10)); }
         catch (AggregateException) { }

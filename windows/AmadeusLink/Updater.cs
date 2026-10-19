@@ -59,8 +59,8 @@ public sealed class Updater : IUpdater, IDisposable
         {
             UIFactory = null,
             UserInteractionMode = UserInteractionMode.NotSilent,  // nothing happens without us: we ask, then install
-            CustomInstallerArguments = InstallerArguments,
-            RelaunchAfterUpdate = true,
+            CustomInstallerArguments = InstallerArguments + " /RELAUNCH",
+            RelaunchAfterUpdate = false,  // the installer starts the app it installed, not this exe wherever it ran from
             ClearOldInstallers = null,
         };
         _sparkle.Configuration = new BuildConfiguration(new BuildAccessor(appName));
