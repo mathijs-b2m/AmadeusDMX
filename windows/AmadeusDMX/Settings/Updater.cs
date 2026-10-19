@@ -57,9 +57,13 @@ public sealed class Updater : IUpdater
         _sparkle.Configuration = new NetSparkleUpdater.Configurations.JSONConfiguration(
             new BuildAccessor(_build, _version), Path.Combine(Workspace.DefaultDataFolder, "updates.json"));
         _sparkle.LogWriter = new LogWriter(LogWriterOutputMode.Debug);
+        // NetSparkle reports every chunk (thousands a second on a fast network): only each whole percent reaches the UI
+        var lastPercent = -1;
         _sparkle.DownloadMadeProgress += (_, _, e) =>
         {
             var share = e.TotalBytesToReceive > 0 ? (double)e.BytesReceived / e.TotalBytesToReceive : 0;
+            var percent = (int)(share * 100);
+            if (Interlocked.Exchange(ref lastPercent, percent) == percent) return;
             Post(() => _progress?.Invoke(share));
         };
         _sparkle.DownloadFinished += (_, path) => Post(() => _download?.TrySetResult(path));

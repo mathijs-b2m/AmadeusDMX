@@ -217,9 +217,14 @@ public sealed class Updater : IUpdater, IDisposable
         void Bad(AppCastItem i, string path) => finished.TrySetResult(null);
         void Error(AppCastItem i, string? path, Exception e) => finished.TrySetResult(null);
         void Cancelled(AppCastItem i, string path) { cancelled = true; finished.TrySetResult(null); }
+        // NetSparkle reports every chunk (thousands a second on a fast network): only each whole percent reaches the UI
+        var lastPercent = -1;
         void Progress(object sender, AppCastItem i, NetSparkleUpdater.Events.ItemDownloadProgressEventArgs e)
         {
-            if (quiet) Report(UpdateState.Downloading, Name(item), e.TotalBytesToReceive > 0 ? (double)e.BytesReceived / e.TotalBytesToReceive : null);
+            if (!quiet || e.TotalBytesToReceive <= 0) return;
+            var share = (double)e.BytesReceived / e.TotalBytesToReceive;
+            if (Interlocked.Exchange(ref lastPercent, (int)(share * 100)) == (int)(share * 100)) return;
+            Report(UpdateState.Downloading, Name(item), share);
         }
         _sparkle.DownloadFinished += Done;
         _sparkle.DownloadedFileIsCorrupt += Bad;

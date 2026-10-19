@@ -122,6 +122,14 @@ public class SettingsTests
         Assert.Equal("1.0.6", u.Newest);
         u.Refresh(force: true);  // never while it downloads
         Assert.Equal(2, backend.Refreshes);
+        var redraws = 0;
+        u.PropertyChanged += (_, _) => redraws++;
+        u.Report(UpdateState.Downloading, "1.0.6", 0.500);
+        u.Report(UpdateState.Downloading, "1.0.6", 0.503);  // a chunk: not worth a redraw
+        Assert.Equal(0.5, u.Progress);
+        u.Report(UpdateState.Downloading, "1.0.6", 0.51);
+        Assert.Equal(0.51, u.Progress);
+        Assert.True(redraws <= 2);
         u.CancelInstall();
         Assert.Equal(1, backend.Cancels);
 

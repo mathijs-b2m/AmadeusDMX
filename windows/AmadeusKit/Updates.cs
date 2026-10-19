@@ -122,6 +122,8 @@ public sealed class Updates : Observable
     /// What the IUpdater found or is doing (on the UI thread).
     public void Report(UpdateState state, string? newest = null, double? progress = null, string? problem = null)
     {
+        // the same state with under a percent more done: nothing to redraw
+        if (state == State && newest == Newest && problem == Problem && progress is { } p && Progress is { } q && Math.Abs(p - q) < 0.01) return;
         State = state;
         Newest = newest;
         Progress = progress;

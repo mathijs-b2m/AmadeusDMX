@@ -234,7 +234,11 @@ final class OneClickDriver: NSObject, SPUUserDriver {
     func showDownloadDidReceiveData(ofLength length: UInt64) {
         guard oneClick else { return standard.showDownloadDidReceiveData(ofLength: length) }
         received += length
-        updates?.set(.downloading(version: version, share: expected > 0 ? min(1, Double(received) / Double(expected)) : nil))
+        guard expected > 0 else { return }
+        // every chunk arrives here: only each whole percent is redrawn
+        let share = min(1, Double(received) / Double(expected))
+        if case .downloading(_, let shown?) = updates?.state, Int(shown * 100) == Int(share * 100) { return }
+        updates?.set(.downloading(version: version, share: share))
     }
 
     func showDownloadDidStartExtractingUpdate() {
