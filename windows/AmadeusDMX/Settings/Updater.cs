@@ -51,8 +51,9 @@ public sealed class Updater : IUpdater
             UserInteractionMode = UserInteractionMode.NotSilent,  // no UI factory: nothing is shown or downloaded by itself
             CustomInstallerArguments = InstallerArguments + Relaunch,
             RelaunchAfterUpdate = false,  // the installer starts the app (Relaunch)
-            // the installer waits for this app to quit by itself (it stops the engine and blacks out first)
-            ShouldKillParentProcessWhenStartingInstaller = false,
+            // NetSparkle asks the app to quit (CloseApplicationAsync: it stops the engine and blacks out first) and the
+            // installer waits until it has; off, it neither asks nor waits and installs beside the running app
+            ShouldKillParentProcessWhenStartingInstaller = true,
         };
         _sparkle.Configuration = new NetSparkleUpdater.Configurations.JSONConfiguration(
             new BuildAccessor(_build, _version), Path.Combine(Workspace.DefaultDataFolder, "updates.json"));
