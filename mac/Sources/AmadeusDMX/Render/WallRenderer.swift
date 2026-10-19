@@ -94,10 +94,10 @@ final class WallRenderer {
         if wall < 0.03 { want = ("off", .off) } else if wall < 0.5, want.0 != "off" { want = ("ambient", .ambient) }
         let next = h.plan.indices.contains(f.phrase + 1) ? h.plan[f.phrase + 1] : nil
         let spb = 60 / max(h.bpm, 60)
-        let nextDrop = next?.section == "drop" && d?.section != "drop"
+        let nextDrop = h.countdown == f.phrase + 1 && next?.section == "drop" && d?.section != "drop"  // the rare one
         let beatsLeft = nextDrop ? (next!.start - f.t) / spb : 99
         if want.0 == "off" && beatsLeft <= 4.5 && force == .auto && wall >= 0.5 { want = ("words", .words) }  // a dark wall counts in
-        let shout = wall >= 0.5 && d?.section == "drop" && cur.mode != "off" && cur.mode != "psychedelic" && (f.t - d!.start) / spb < 2
+        let shout = wall >= 0.5 && h.countdown == f.phrase && d?.section == "drop" && cur.mode != "off" && cur.mode != "psychedelic" && (f.t - d!.start) / spb < 2
         if shout { fade = 1 }
         else if want.1 != cur.scene {
             fade = max(0, fade - dt * 5)
@@ -363,15 +363,15 @@ final class WallRenderer {
         }
     }
 
-    /// 3-2-1 into a drop, then DROP!
+    /// 3-2-1 into the drop the engine picked (hello.countdown: once or twice a night), then DROP!
     private func countdown(_ f: Frame, _ d: Decision?, _ h: Hello, _ cols: [SIMD3<Float>]) -> Bool {
         let spb = 60 / max(h.bpm, 60)
         var label: String?, u = 0.0
-        if h.plan.indices.contains(f.phrase + 1), h.plan[f.phrase + 1].section == "drop", d?.section != "drop" {
+        if h.countdown == f.phrase + 1, h.plan.indices.contains(f.phrase + 1), h.plan[f.phrase + 1].section == "drop", d?.section != "drop" {
             let left = (h.plan[f.phrase + 1].start - f.t) / spb
             if left > 0 && left <= 4 { label = String(Int(ceil(left))); u = 1 - (left.truncatingRemainder(dividingBy: 1) == 0 ? 1 : left.truncatingRemainder(dividingBy: 1)) }
         }
-        if let d, d.section == "drop", f.t - d.start < spb * 2 { label = "DROP!"; u = (f.t - d.start) / (spb * 2) }
+        if let d, h.countdown == f.phrase, d.section == "drop", f.t - d.start < spb * 2 { label = "DROP!"; u = (f.t - d.start) / (spb * 2) }
         guard let label else { return false }
         g.setShadow(offset: .zero, blur: 0, color: nil)
         g.setFillColor(CGColor(gray: 0, alpha: 0.85))

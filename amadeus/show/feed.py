@@ -71,8 +71,11 @@ def energy_curve(a: Analysis, n: int = 400) -> list[float]:
     return [round(float(y), 3) for y in np.clip((v - lo) / max(hi - lo, 1e-6), 0, 1)]
 
 
-def hello(a: Analysis, plan: list[Decision], rig: dict, real, *, title: str, director: str) -> str:
-    """The rig and the track: sent once to every client, and again when the track changes."""
+def hello(
+    a: Analysis, plan: list[Decision], rig: dict, real, *, title: str, director: str, countdown: int | None = None
+) -> str:
+    """The rig and the track: sent once to every client, and again when the track changes. `countdown`: the
+    phrase of the drop the LED wall counts into (3-2-1 DROP!), a rare moment (show/arc.py); None: none."""
     return json.dumps(
         {
             "type": "hello",
@@ -88,6 +91,7 @@ def hello(a: Analysis, plan: list[Decision], rig: dict, real, *, title: str, dir
             "max_flash_hz": rig["safety"]["max_flash_hz"],
             "energy": energy_curve(a),
             "screen": bool(rig.get("screen")),
+            "countdown": countdown,
             # what kind of music, where that came from, and the program it gets (if any: e.g. cinematic)
             "genre": getattr(a, "genre", ""),
             "genre_source": getattr(a, "genre_source", ""),

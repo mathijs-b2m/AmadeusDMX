@@ -368,6 +368,8 @@ public sealed partial class Hello
     public double MaxFlashHz { get; init; } = 3;
     public IReadOnlyList<double> Energy { get; init; } = [];
     public bool Screen { get; init; }
+    /// The phrase of the drop the LED wall counts into (3-2-1 DROP!): a rare moment, once or twice a night.
+    public int? Countdown { get; init; }
     public IReadOnlyList<Truss> Trusses { get; init; } = [];
     public IReadOnlyList<Zone> Zones { get; init; } = [];
     /// What kind of music (one word), where that came from (you, ai, tag, audio), and the program it gets.
@@ -389,6 +391,7 @@ public sealed partial class Hello
         MaxFlashHz = J.Val(c, "max_flash_hz", J.Double) ?? 3,
         Energy = J.Ref(c, "energy", J.ArrayOf(J.Double)) ?? [],
         Screen = J.Val(c, "screen", J.Bool) ?? false,
+        Countdown = J.Try(() => J.Val(c, "countdown", J.Int)),
         Trusses = J.Try(() => J.Ref(c, "trusses", J.ArrayOf(Truss.From))) ?? [],
         Genre = J.Try(() => J.Ref(c, "genre", J.String)) ?? "",
         GenreSource = J.Try(() => J.Ref(c, "genre_source", J.String)) ?? "",

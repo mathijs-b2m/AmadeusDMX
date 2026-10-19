@@ -363,3 +363,34 @@ def test_warmup_ambience_plays_gobo_heads(tmp_path):
     assert lit() == gobo
     arc.control({"knob": {"movement": 0.9}}, now=1.0)
     assert not lit()  # livelier heads: no ambient look, the knob's groups only
+
+
+def test_the_wall_counts_down_once_or_twice_a_night(tmp_path, monkeypatch):
+    import amadeus.show.arc as arclib
+
+    monkeypatch.setattr(arclib, "countdown_drop", lambda a, plan: 5)
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.started, arc.stage, arc.stage_since = 0.0, STAGE_KEYS.index("warmup"), 0.0
+    assert arc.countdown("warm.wav", None, [], 600.0) is None  # the warm-up: no countdown
+    arc.stage, arc.stage_since = STAGE_KEYS.index("peak"), 3600.0
+    assert arc.countdown("early.wav", None, [], 3660.0) is None  # the peak has only just begun
+    assert arc.countdown("big.wav", None, [], 4000.0) == 5
+    assert arc.countdown("big.wav", None, [], 4100.0) == 5  # the same track (a new plan): still that drop
+    assert arc.countdown("next.wav", None, [], 4400.0) is None  # too soon after the last one
+    assert arc.countdown("later.wav", None, [], 4000.0 + 0.2 * arc.length) == 5
+    assert arc.countdown("last.wav", None, [], 4000.0 + 0.5 * arc.length) is None  # twice a night is enough
+    arc.seen = 4000.0 + 0.5 * arc.length
+    arc.save(arc.seen)
+    again = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=arc.seen + 60)  # an engine restart: still tonight
+    assert len(again.countdowns) == 2
+
+
+def test_a_countdown_needs_a_build_into_the_main_drop(monkeypatch):
+    import amadeus.show.arc as arclib
+
+    roles = ["early", "gentle_drop", "early", "into_main", "main_drop", "peak"]
+    monkeypatch.setattr(arclib, "song_arc", lambda a: [{"role": r} for r in roles])
+    plan = [SimpleNamespace(section=s) for s in ("intro", "drop", "groove", "buildup", "drop", "drop")]
+    assert arclib.countdown_drop(None, plan) == 4
+    plan[3].section = "groove"  # no tension before it: no countdown
+    assert arclib.countdown_drop(None, plan) is None
