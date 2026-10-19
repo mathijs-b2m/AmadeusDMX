@@ -59,9 +59,12 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
         if (state.Kind == ShowStateKind.Failed)
             rows.Add(UI.Text(state.Reason, Font.Caption).Secondary().Wrap(3));
         else if (model.Feed.Link is { } link && model.EngineRunning)
+        {
             rows.Add(UI.Label(link.Up ? "laptopcomputer" : "exclamationmark.triangle.fill",
                               link.Up ? $"{link.Name} · {link.JitterMs:F0} ms jitter" : $"{link.Name}: link down", Font.Caption)
                 .Foreground(link.Up ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Orange)));
+            if (model.EngineFirewall is { BlockedOn: { } profile } fw) rows.Add(FirewallRows(fw, profile, link.Name));
+        }
         else if (state.Kind == ShowStateKind.WaitingForDJ)
             rows.Add(UI.Text(model.DjWaiting, Font.Caption).Secondary().Wrap());
         else if (state.Kind == ShowStateKind.Attached)
@@ -78,6 +81,15 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
         }
         return UI.VStack(6, [.. rows]);
     }
+
+    /// Windows Firewall keeps the DJ laptop's decks from the engine: say so, and let them in.
+    static UIElement FirewallRows(FirewallWatch fw, NetProfile profile, string dj) =>
+        UI.VStack(4,
+            UI.Text($"Windows Firewall keeps {dj}'s decks out on this network (a {Firewall.Name(profile)} network to Windows).",
+                    Font.Caption).Foreground(Tint.Orange).Wrap(3),
+            UI.Button(fw.Allowing ? "Allowing…" : "Allow the Engine…", () => _ = fw.Allow()).Disabled(fw.Allowing).Font(Font.Caption)
+                .Tooltip("Windows asks for an administrator."),
+            fw.Note is { } note ? UI.Text(note, Font.Caption).Secondary().Wrap() : null);
 }
 
 /// What the show costs the computer: the lights against the 3D stage.

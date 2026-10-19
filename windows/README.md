@@ -162,7 +162,11 @@ removed by the uninstaller:
 
 The visualiser feed (8765) and the setup service (8181) listen on 127.0.0.1 only and need no rule. An install
 for you alone can't add rules: Windows asks the first time the engine or Link listens (allow *Private
-networks*, and *Public* too if the gig network is one).
+networks*, and *Public* too if the gig network is one). Cancel that prompt, or allow Private only on a network
+Windows calls Public, and Windows writes inbound *Block* rules for the program. Both apps look for those
+(`AmadeusKit/Firewall.cs`, through HNetCfg.FwPolicy2): Amadeus Link says lighting computers can't pair, and
+Amadeus DMX, paired with a DJ laptop, says the decks are kept out. Each offers *Allow…*: after Windows's
+administrator prompt it replaces the program's inbound rules with the rules above.
 
 ## Uninstall
 
