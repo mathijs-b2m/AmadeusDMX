@@ -45,6 +45,7 @@ public sealed class Updater : IUpdater, IDisposable
     bool _busy;
     string? _downloaded;  // an installer downloaded in the background, installed when the app quits
     AppCastItem? _downloadedItem;
+    AppCastItem? _newest;  // what the last check found newer than this build
 
     Updater(string appName, string feed, string publicKey, Func<Updates?> rules, Func<string, string, string, Task<bool>> ask,
             Action<string, string> tell, Action quit)
@@ -96,6 +97,14 @@ public sealed class Updater : IUpdater, IDisposable
     }
 
     public void CheckForUpdates() => _ = Check(inBackground: false);
+    public void Refresh() => _ = Check(inBackground: false, quiet: true);
+    public void InstallNewest() => _ = InstallNewestQuietly();
+    public void CancelInstall() => _sparkle.CancelFileDownload();
+
+    void Report(UpdateState state, string? newest = null, double? progress = null, string? problem = null) =>
+        Post(() => _rules()?.Report(state, newest, progress, problem));
+
+    static string Name(AppCastItem item) => item.ShortVersion ?? item.Version ?? "";
 
     // MARK: checking
 
@@ -127,16 +136,27 @@ public sealed class Updater : IUpdater, IDisposable
         catch (OperationCanceledException) { }
     }
 
-    async Task Check(bool inBackground)
+    /// quiet: nothing shown but what Updates reports (the status in the window).
+    async Task Check(bool inBackground, bool quiet = false)
     {
         var rules = _rules();
-        if (_busy || rules is null || !rules.MayCheck(inBackground)) return;
+        if (_busy || rules is null || !rules.MayCheck(inBackground))
+        {
+            if (quiet && rules is not null) Report(rules.State == UpdateState.Checking ? UpdateState.Unknown : rules.State, rules.Newest);
+            return;
+        }
         SetBusy(true);
         try
         {
             var info = await _sparkle.CheckForUpdatesQuietly(ignoreSkippedVersions: !inBackground);
             _defaults.Set("SULastCheckTime", (double)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             var item = info.Updates?.OrderByDescending(i => BuildOf(i)).FirstOrDefault();
+            _newest = info.Status == UpdateStatus.UpdateAvailable ? item : null;
+            if (_newest is { } n) Report(UpdateState.Available, Name(n));
+            else if (info.Status == UpdateStatus.CouldNotDetermine)
+                Report(UpdateState.Failed, problem: "The update feed can't be reached or isn't signed with the release key.");
+            else Report(UpdateState.UpToDate, Version);
+            if (quiet) return;
             if (info.Status != UpdateStatus.UpdateAvailable || item is null)
             {
                 if (!inBackground)
@@ -156,7 +176,8 @@ public sealed class Updater : IUpdater, IDisposable
         }
         catch (Exception e) when (e is HttpRequestException or IOException or TaskCanceledException or InvalidOperationException)
         {
-            if (!inBackground) Post(() => _tell("Can’t check for updates", e.Message));
+            Report(UpdateState.Failed, problem: e.Message);
+            if (!inBackground && !quiet) Post(() => _tell("Can’t check for updates", e.Message));
         }
         finally { SetBusy(false); }
     }
@@ -174,22 +195,51 @@ public sealed class Updater : IUpdater, IDisposable
         return done.Task;
     }
 
-    async Task Download(AppCastItem item, bool installNow)
+    /// The one click in the window: downloads with the progress in the status, then installs (once no lighting
+    /// computer is connected).
+    async Task InstallNewestQuietly()
+    {
+        if (_newest is not { } item || _busy) return;
+        SetBusy(true);
+        try { await Download(item, installNow: true, quiet: true); }
+        catch (Exception e) when (e is HttpRequestException or IOException or TaskCanceledException or InvalidOperationException or TimeoutException)
+        {
+            Report(UpdateState.Failed, Name(item), problem: e.Message);
+        }
+        finally { SetBusy(false); }
+    }
+
+    async Task Download(AppCastItem item, bool installNow, bool quiet = false)
     {
         var finished = new TaskCompletionSource<string?>();
+        var cancelled = false;
         void Done(AppCastItem i, string path) => finished.TrySetResult(path);
         void Bad(AppCastItem i, string path) => finished.TrySetResult(null);
         void Error(AppCastItem i, string? path, Exception e) => finished.TrySetResult(null);
+        void Cancelled(AppCastItem i, string path) { cancelled = true; finished.TrySetResult(null); }
+        void Progress(object sender, AppCastItem i, NetSparkleUpdater.Events.ItemDownloadProgressEventArgs e)
+        {
+            if (quiet) Report(UpdateState.Downloading, Name(item), e.TotalBytesToReceive > 0 ? (double)e.BytesReceived / e.TotalBytesToReceive : null);
+        }
         _sparkle.DownloadFinished += Done;
         _sparkle.DownloadedFileIsCorrupt += Bad;
         _sparkle.DownloadedFileThrewWhileCheckingSignature += Bad;
         _sparkle.DownloadHadError += Error;
+        _sparkle.DownloadCanceled += Cancelled;
+        _sparkle.DownloadMadeProgress += Progress;
         try
         {
+            if (quiet) Report(UpdateState.Downloading, Name(item));
             await _sparkle.InitAndBeginDownload(item);
             var path = await finished.Task.WaitAsync(TimeSpan.FromMinutes(30));
             if (path is null)
             {
+                if (quiet)
+                {
+                    Report(cancelled ? UpdateState.Available : UpdateState.Failed, Name(item),
+                           problem: cancelled ? null : "Its download failed, or it isn't signed with the release key.");
+                    return;
+                }
                 if (installNow) Post(() => _tell("The update can't be installed", "Its download failed, or it isn't signed with the release key."));
                 return;
             }
@@ -198,10 +248,13 @@ public sealed class Updater : IUpdater, IDisposable
                 (_downloaded, _downloadedItem) = (path, item);
                 return;
             }
+            if (quiet) Report(UpdateState.Installing, Name(item));
             Post(() => Install(item, path));
         }
         finally
         {
+            _sparkle.DownloadCanceled -= Cancelled;
+            _sparkle.DownloadMadeProgress -= Progress;
             _sparkle.DownloadFinished -= Done;
             _sparkle.DownloadedFileIsCorrupt -= Bad;
             _sparkle.DownloadedFileThrewWhileCheckingSignature -= Bad;

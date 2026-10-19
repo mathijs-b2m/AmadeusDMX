@@ -112,6 +112,10 @@ public static class AppCommands
         bar.Items.Add(view);
 
         var help = new MenuBarItem { Title = "Help" };
+        help.Items.Add(Command("Amadeus DMX Help", () => Dialogs.OpenURL(HelpLinks.Documentation), VirtualKey.F1, VirtualKeyModifiers.None));
+        help.Items.Add(Command("System Requirements", () => Dialogs.OpenURL(HelpLinks.SystemRequirements)));
+        help.Items.Add(Command("Release Notes", () => Dialogs.OpenURL(HelpLinks.ReleaseNotes)));
+        help.Items.Add(new MenuFlyoutSeparator());
         if (model.Updates.IsAvailable)
             help.Items.Add(Command("Check for Updates…", model.Updates.CheckForUpdates)
                 .Follow(model.Updates, [nameof(Updates.CanCheck)], i => i.IsEnabled = model.Updates.CanCheck));

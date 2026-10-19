@@ -100,14 +100,11 @@ struct UpdatesSection: View {
                     updates.installsAutomatically = $0; installs = $0
                 }))
                 .disabled(!checks)
-                LabeledContent("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")") {
-                    Button("Check Now") { updates.checkForUpdates() }.disabled(!updates.canCheck)
-                }
-                if updates.waitingForIdle {
-                    Label("An update installs when the show stops", systemImage: "clock").foregroundStyle(.secondary)
-                }
+                UpdateStatusView(updates: updates, appName: "Amadeus DMX", whenIdle: "when the show stops")
             } else {
-                Text("A development build: it updates with the code, not by itself.").foregroundStyle(.secondary)
+                LabeledContent("Amadeus DMX \(updates.version)") {
+                    Text("A development build: it updates with the code, not by itself.").foregroundStyle(.secondary)
+                }
             }
         } header: {
             Text("Updates")

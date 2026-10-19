@@ -122,16 +122,13 @@ struct LinkMenu: View {
             }
             Divider()
             if updates.isAvailable {
-                HStack {
-                    Toggle("Check for updates", isOn: Binding(get: { updates.checksAutomatically },
-                                                              set: { updates.checksAutomatically = $0 }))
-                        .toggleStyle(.checkbox).font(.callout)
-                    Spacer()
-                    Button("Check Now") { updates.checkForUpdates() }.disabled(!updates.canCheck).font(.callout)
-                }
-                if updates.waitingForIdle {
-                    Text("An update installs when the lighting computer disconnects.").font(.caption).foregroundStyle(.secondary)
-                }
+                UpdateStatusView(updates: updates, appName: "Amadeus Link", whenIdle: "when the lighting computer disconnects",
+                                 compact: true)
+                Toggle("Check for updates automatically", isOn: Binding(get: { updates.checksAutomatically },
+                                                                        set: { updates.checksAutomatically = $0 }))
+                    .toggleStyle(.checkbox).font(.callout)
+            } else {
+                Text("Amadeus Link \(updates.version) (a development build)").font(.caption).foregroundStyle(.secondary)
             }
             Button("Quit Amadeus Link") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")

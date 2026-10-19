@@ -28,7 +28,7 @@
     <ProjectReference Include="..\AmadeusKit\AmadeusKit.csproj" />
     <Content Include="Assets\AmadeusLink.ico" CopyToOutputDirectory="PreserveNewest" />
     <!-- the view helpers are Amadeus DMX's (one copy of them) -->
-    <Compile Include="..\AmadeusDMX\Shared\UI.cs;..\AmadeusDMX\Shared\Stack.cs;..\AmadeusDMX\Shared\StackLayout.cs;..\AmadeusDMX\Shared\Theme.cs;..\AmadeusDMX\Shared\Symbols.cs;..\AmadeusDMX\Shared\Formatting.cs"
+    <Compile Include="..\AmadeusDMX\Shared\UI.cs;..\AmadeusDMX\Shared\Stack.cs;..\AmadeusDMX\Shared\StackLayout.cs;..\AmadeusDMX\Shared\Theme.cs;..\AmadeusDMX\Shared\Symbols.cs;..\AmadeusDMX\Shared\Formatting.cs;..\AmadeusDMX\Shared\UpdateStatusView.cs"
              LinkBase="Shared" />
   </ItemGroup>
   <!-- WinUI's own resources (its themes) are merged into <app>.pri, which publishing leaves behind: an

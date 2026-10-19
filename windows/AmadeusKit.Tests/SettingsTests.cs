@@ -46,6 +46,10 @@ public class SettingsTests
         public DateTimeOffset? LastChecked => null;
         public int Checks;
         public void CheckForUpdates() => Checks++;
+        public int Refreshes, Installs, Cancels;
+        public void Refresh() => Refreshes++;
+        public void InstallNewest() => Installs++;
+        public void CancelInstall() => Cancels++;
         public event Action? CanCheckChanged;
         public void Change(bool can) { CanCheck = can; CanCheckChanged?.Invoke(); }
     }
@@ -86,5 +90,52 @@ public class SettingsTests
         Assert.True(backend.ChecksAutomatically);
         Assert.False(new Updates(backend, defaults).ShouldAskToCheckAutomatically());
         Assert.False(new Updates(null, new Defaults(null, [])).ShouldAskToCheckAutomatically());
+    }
+
+    [Fact]
+    public void UpdatesShowTheNewestAndInstallItWithOneClick()
+    {
+        var now = DateTimeOffset.UnixEpoch;
+        var backend = new FakeUpdater();
+        var u = new Updates(backend, new Defaults(null, []), () => now);
+        Assert.Equal(UpdateState.Unknown, u.State);
+        u.Refresh();
+        Assert.Equal(UpdateState.Checking, u.State);
+        Assert.Equal(1, backend.Refreshes);
+        u.Refresh(force: true);  // one at a time
+        Assert.Equal(1, backend.Refreshes);
+        u.InstallNewest();  // nothing found yet: nothing to install
+        Assert.Equal(0, backend.Installs);
+
+        u.Report(UpdateState.UpToDate, "1.0.5");
+        Assert.Equal("1.0.5", u.Newest);
+        u.Refresh();  // checked a moment ago
+        Assert.Equal(1, backend.Refreshes);
+        now += TimeSpan.FromMinutes(6);
+        u.Refresh();
+        Assert.Equal(2, backend.Refreshes);
+
+        u.Report(UpdateState.Available, "1.0.6");
+        u.InstallNewest();
+        Assert.Equal(1, backend.Installs);
+        Assert.Equal(UpdateState.Downloading, u.State);
+        Assert.Equal("1.0.6", u.Newest);
+        u.Refresh(force: true);  // never while it downloads
+        Assert.Equal(2, backend.Refreshes);
+        u.CancelInstall();
+        Assert.Equal(1, backend.Cancels);
+
+        // installing during a show waits, and says which version waits
+        var busy = true;
+        u.IsBusy = () => busy;
+        Assert.True(u.ShouldPostponeInstall(() => { }));
+        Assert.Equal(UpdateState.Installing, u.State);
+        Assert.Equal("1.0.6", u.Newest);
+
+        var none = new Updates(null, new Defaults(null, []));
+        none.Refresh();
+        none.InstallNewest();
+        Assert.Equal(UpdateState.Unknown, none.State);
+        Assert.False(string.IsNullOrEmpty(none.Version));
     }
 }

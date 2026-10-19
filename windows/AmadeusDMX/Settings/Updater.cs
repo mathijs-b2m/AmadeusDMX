@@ -31,6 +31,7 @@ public sealed class Updater : IUpdater
     bool _busy, _quitting;
     (AppCastItem Item, string Path)? _downloaded;   // downloaded in the background: installed when you quit
     TaskCompletionSource<string?>? _download;
+    AppCastItem? _newest;  // what the last check found newer than this build
     Action<double>? _progress;
 
     /// The updater for a release with a feed; nil in a development build.
@@ -130,6 +131,14 @@ public sealed class Updater : IUpdater
         Defaults.Standard.Contains(LastKey) ? DateTimeOffset.FromUnixTimeSeconds((long)Defaults.Standard.Double(LastKey)) : null;
 
     public void CheckForUpdates() => _ = Check(inBackground: false);
+    public void Refresh() => _ = Check(inBackground: false, quiet: true);
+    public void InstallNewest() => _ = InstallNewestQuietly();
+    public void CancelInstall() => _sparkle.CancelFileDownload();
+
+    void Report(UpdateState state, string? newest = null, double? progress = null, string? problem = null) =>
+        Post(() => _rules?.Report(state, newest, progress, problem));
+
+    static string Name(AppCastItem item) => item.ShortVersion ?? item.Version ?? "";
 
     // MARK: checking
 
@@ -155,9 +164,10 @@ public sealed class Updater : IUpdater
         }
     }
 
-    async Task Check(bool inBackground)
+    /// quiet: nothing shown but what Updates reports (the status in Settings).
+    async Task Check(bool inBackground, bool quiet = false)
     {
-        if (_busy || _rules?.MayCheck(inBackground) == false) return;
+        if (_busy || _rules?.MayCheck(inBackground) == false) { if (quiet) Report(_rules?.State ?? UpdateState.Unknown, _rules?.Newest); return; }
         Busy(true);
         try
         {
@@ -165,11 +175,17 @@ public sealed class Updater : IUpdater
             try { info = await _sparkle.CheckForUpdatesQuietly(ignoreSkippedVersions: !inBackground); }
             catch (Exception e)  // whatever the network or the feed did: the app goes on
             {
-                if (!inBackground) await Dialogs.Alert(_root(), "Update Error!", $"Amadeus DMX couldn’t check for updates: {e.Message}");
+                Report(UpdateState.Failed, problem: e.Message);
+                if (!inBackground && !quiet) await Dialogs.Alert(_root(), "Update Error!", $"Amadeus DMX couldn’t check for updates: {e.Message}");
                 return;
             }
             Defaults.Standard.Set(LastKey, (double)DateTimeOffset.Now.ToUnixTimeSeconds());
             var item = Newest(info.Updates);
+            _newest = info.Status == UpdateStatus.UpdateAvailable ? item : null;
+            if (_newest is { } n) Report(UpdateState.Available, Name(n));
+            else if (info.Status == UpdateStatus.CouldNotDetermine) Report(UpdateState.Failed, problem: "The update feed can't be read, or isn't signed with the release key.");
+            else Report(UpdateState.UpToDate, _version);
+            if (quiet) return;
             if (info.Status == UpdateStatus.UpdateAvailable && item is not null)
             {
                 if (inBackground && InstallsAutomatically) { await DownloadInBackground(item); return; }
@@ -253,6 +269,32 @@ public sealed class Updater : IUpdater
         Install(item, path);
     }
 
+    /// The one click in Settings: downloads with the progress in the status, then installs (after the show, if one runs).
+    async Task InstallNewestQuietly()
+    {
+        if (_newest is not { } item || _busy) return;
+        Busy(true);
+        try
+        {
+            Report(UpdateState.Downloading, Name(item));
+            string? path;
+            try
+            {
+                _progress = share => _rules?.Report(UpdateState.Downloading, Name(item), share > 0 ? share : null);
+                path = await Download(item);
+            }
+            catch (Exception e)
+            {
+                Report(UpdateState.Failed, Name(item), problem: $"The update couldn’t be downloaded: {e.Message}");
+                return;
+            }
+            if (path is null) { Report(UpdateState.Available, Name(item)); return; }  // cancelled
+            Report(UpdateState.Installing, Name(item));
+            Install(item, path, quiet: true);
+        }
+        finally { Busy(false); }
+    }
+
     /// One downloaded by itself waits until you quit.
     async Task DownloadInBackground(AppCastItem item)
     {
@@ -264,11 +306,12 @@ public sealed class Updater : IUpdater
     }
 
     /// Installing quits the app: while a show runs it waits until the show stops (the rules keep it).
-    void Install(AppCastItem item, string path)
+    void Install(AppCastItem item, string path, bool quiet = false)
     {
         void Now() => _ = _sparkle.InstallUpdate(item, path);
         if (_rules?.ShouldPostponeInstall(Now) == true)
         {
+            if (quiet) return;  // the status says it waits for the show
             _ = Dialogs.Alert(_root(), "The update installs when the show stops",
                 "Amadeus DMX never restarts during a show: the update is ready and installs as soon as you stop the show.");
             return;
