@@ -1,6 +1,6 @@
 // Amadeus Link: a notification-area app for the DJ's laptop. Switch it on, read the code to the lighting operator.
 // A window as well as the icon (the Mac has a menu bar icon and a window): closing the window keeps Link running
-// in the notification area; Quit Amadeus Link ends it.
+// in the notification area; Quit Amadeus Link ends it (asking first while a lighting computer is connected).
 using Microsoft.UI.Dispatching;
 using Microsoft.Windows.AppLifecycle;
 
@@ -13,6 +13,7 @@ public sealed partial class App : Application
     TrayIcon? _tray;
     Updater? _updater;
     bool _quitting;
+    bool _asking;
 
     public App()
     {
@@ -37,7 +38,7 @@ public sealed partial class App : Application
         // updates: a release with a feed only (appsettings.json), never while a lighting computer is connected
         _updater = Updater.ForThisBuild("Amadeus Link", () => _link?.Updates, Ask, Tell, Quit);
         _link = new LinkServer(_updater);
-        _window = new LinkWindow(_link, Quit);
+        _window = new LinkWindow(_link, AskToQuit);
         var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "AmadeusLink.ico");
         _tray = new TrayIcon(icon, "Amadeus Link", ShowWindow, TrayMenu);
         _link.PropertyChanged += (_, _) => _tray.Tooltip = TrayTip();
@@ -73,7 +74,7 @@ public sealed partial class App : Application
             menu.Add(new(LinkServer.Title(s), () => l.SetSoftware(s), Checked: l.Current == s));
         menu.Add(TrayIcon.Entry.Separator);
         if (l.Updates.IsAvailable) menu.Add(new("Check for Updates…", l.Updates.CanCheck ? l.Updates.CheckForUpdates : null));
-        menu.Add(new("Quit Amadeus Link", Quit));
+        menu.Add(new("Quit Amadeus Link", AskToQuit));
         return menu;
     }
 
@@ -100,6 +101,36 @@ public sealed partial class App : Application
         var dialog = new ContentDialog { Title = title, Content = message, CloseButtonText = "OK", XamlRoot = root };
         try { _ = dialog.ShowAsync(); }
         catch (Exception e) when (e is InvalidOperationException or System.Runtime.InteropServices.COMException) { }
+    }
+
+    /// The DJ quits (the window's button, Ctrl+Q, the notification area): while a lighting computer is connected,
+    /// only after saying what stops. An update's own quit (NetSparkle) goes straight to Quit: it waits until idle.
+    async void AskToQuit()
+    {
+        if (_quitting || _asking) return;
+        if (_link is not { Peers.Count: > 0 } l || _window?.Content?.XamlRoot is not { } root)
+        {
+            Quit();
+            return;
+        }
+        _asking = true;
+        ShowWindow();
+        var dialog = new ContentDialog
+        {
+            Title = "Quit Amadeus Link during the show?",
+            Content = new TextBlock
+            {
+                Text = $"A lighting computer is connected ({string.Join(", ", l.Peers.Select(p => p.Address))}). If you quit, "
+                       + "it loses the mix: the lights stop following the music until Amadeus Link is back.",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Quit Anyway", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close, XamlRoot = root,
+        };
+        bool quit;
+        try { quit = await dialog.ShowAsync() == ContentDialogResult.Primary; }
+        catch (Exception e) when (e is InvalidOperationException or System.Runtime.InteropServices.COMException) { quit = false; }  // another dialog is open
+        finally { _asking = false; }
+        if (quit) Quit();
     }
 
     void Quit()
