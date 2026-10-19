@@ -329,6 +329,12 @@ class UiaWindow(Controls):
                 raise SystemExit("djay on Windows needs comtypes (pip install comtypes)") from None
             self.comtypes = comtypes
             self.attach()
+            # This thread ends here, and with it its share of the multithreaded apartment: the UI Automation objects
+            # would go with it, and a thread that never set COM up (the caller's first scan) would read freed memory.
+            # The apartment stays as long as the process.
+            import ctypes
+
+            ctypes.oledll.ole32.CoIncrementMTAUsage(ctypes.byref(ctypes.c_void_p()))
             self.ui = comtypes.client.GetModule("UIAutomationCore.dll")
             self.uia = comtypes.CoCreateInstance(
                 self.ui.CUIAutomation._reg_clsid_, interface=self.ui.IUIAutomation, clsctx=comtypes.CLSCTX_INPROC_SERVER
