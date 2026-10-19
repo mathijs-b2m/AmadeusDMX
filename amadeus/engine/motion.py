@@ -61,6 +61,9 @@ DRIFT_BEATS_U, DRIFT_BEATS_V = 16.0, 12.0  # …sideways and back in 16 beats, u
 WAVE_BEATS = 4.0  # a wave runs over the heads (of the rig or a group) within this many beats
 
 
+CURVE_DEG = 20.0  # a bar whose cells tilt on their own fans out as a curve: its middle this much down, its ends up
+
+
 TILT_WAVE_DEG = 30.0  # tilt wave: how far each head tilts up and down (a little less at the fast peak tempo)
 TILT_WAVE_SPAN = 1.0  # …and how many waves the row shows at once (1: one full wave from end to end)
 
@@ -291,6 +294,8 @@ class MotionMixin:
                 az = 2 * aim["az"] - az
             elif f == "fan":
                 az += side * 30
+                if (cp := self._cell_place(j)) is not None:
+                    el += CURVE_DEG * (2 * cp * cp - 1)
             out = geometry.direction(az, el)
 
         if d.dynamics == "rise":  # swing up towards the drop
@@ -311,11 +316,26 @@ class MotionMixin:
                 return i + 1
         return None
 
+    def _motor_owner(self, j: int) -> str:
+        """Whose motor head j rides on: its bar's (cells of a moving bar share one), or its own (a moving head,
+        a cell of a bar with a motor per cell)."""
+        e = self.heads[j]
+        fx, defn = self.head_fx[j]
+        return e["id"] if fxlib.cell_motors(defn, fx["mode"]) else e["fixture"]
+
+    def _cell_place(self, j: int) -> float | None:
+        """Where head j sits along a bar whose cells tilt on their own (-1 one end .. +1 the other), else None."""
+        fx, defn = self.head_fx[j]
+        e = self.heads[j]
+        if "offset_m" not in e or not fxlib.cell_motors(defn, fx["mode"]):
+            return None
+        return float(np.clip(e["offset_m"] / max(fxlib.bar_length_m(fx, defn) / 2, 1e-6), -1, 1))
+
     def _share_motors(self):
         """The cells of a moving bar share its one tilt motor: they all follow the first cell."""
         by_fixture: dict[str, list[str]] = {}
-        for e in self.heads:
-            by_fixture.setdefault(e["fixture"], []).append(e["id"])
+        for j, e in enumerate(self.heads):
+            by_fixture.setdefault(self._motor_owner(j), []).append(e["id"])
         for ids in by_fixture.values():
             for eid in ids[1:]:
                 if ids[0] in self.traj:
@@ -517,6 +537,8 @@ class MotionMixin:
             elif f == "fan":
                 az = az + side * 30
                 el = el + role["vside"] * 12  # a tower fans out in height
+                if (cp := self._cell_place(j)) is not None:  # cells with their own motors: the bar bends into a curve
+                    el = el + CURVE_DEG * (2 * cp * cp - 1)
             elif f == "wave" and role["vside"]:
                 el = el + role["vside"] * 6
             out = self._direction_v(az, el)
@@ -612,22 +634,15 @@ class MotionMixin:
             HP = np.array(self.head_pos, dtype=float)
             ROLL = [geometry.mount_roll(fx) for fx, _ in self.head_fx]
             # a moving bar's cells share its motor: the first cell's move is checked for every cell of the bar
+            owner = [self._motor_owner(j) for j in range(n)]
             cells: dict[str, list[int]] = {}
-            for j, e in enumerate(self.heads):
-                cells.setdefault(e["fixture"], []).append(j)
+            for j in range(n):
+                cells.setdefault(owner[j], []).append(j)
             ROWS = np.array(
-                [
-                    k
-                    for j, e in enumerate(self.heads)
-                    for k in (cells[e["fixture"]] if cells[e["fixture"]][0] == j else [j])
-                ]
+                [k for j in range(n) for k in (cells[owner[j]] if cells[owner[j]][0] == j else [j])]
             )  # positions to test, per row
             OWNER = np.array(
-                [
-                    j
-                    for j, e in enumerate(self.heads)
-                    for _ in (cells[e["fixture"]] if cells[e["fixture"]][0] == j else [j])
-                ]
+                [j for j in range(n) for _ in (cells[owner[j]] if cells[owner[j]][0] == j else [j])]
             )  # whose motor each row is
 
             slot = np.full(n, -1)

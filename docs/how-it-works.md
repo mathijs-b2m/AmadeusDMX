@@ -142,7 +142,7 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
 | `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · off |
 | `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) |
-| `formation` | sync · mirror · wave · fan · focus (shared point) · cross |
+| `formation` | sync · mirror · wave · fan (a bar whose cells tilt on their own, like the COLORado PXL Curve, bends into a curve) · focus (shared point) · cross |
 | `aim` | crowd · stage · sky |
 | `head_color` | base · accent · white · cycle |
 | `beam_fx` | **open (default)** · gobo · gobo_shake · gobo_spin · gobo_rotate · prism · prism_spin · frost (rare) |

@@ -45,7 +45,7 @@ def element_info(rig: dict, e: dict, real=None) -> dict:
         "beam_deg": defn["physical"].get("beam_deg", 25),
         # how to draw it: the fixture it belongs to, its housing, how it is turned, where a static one shines
         "fixture": fx["id"],
-        "body": defn["kind"],
+        "body": "curve_bar" if fxlib.cell_motors(defn, fx["mode"]) else defn["kind"],  # cells tilting on their own
         "rot": fx.get("rot_deg", 0.0),
         "truss": fx.get("truss"),
         "size": [round(v / 1000, 3) for v in defn["physical"].get("size_mm", [])] or None,

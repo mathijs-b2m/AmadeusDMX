@@ -24,7 +24,8 @@ LIB_DIR = paths.FIXTURES
 USER_DIR = paths.USER_FIXTURES if paths.USER_FIXTURES != paths.FIXTURES else None
 PAN_TILT = {"pan", "pan_fine", "tilt", "tilt_fine"}
 # definition kind → element kind. A moving bar (DTS Katana, COLORband PiX-M) is a row of cells that share
-# one tilt motor: every cell is a "head" element; the engine moves them together.
+# one tilt motor: every cell is a "head" element; the engine moves them together. A bar with a tilt channel per
+# cell (COLORado PXL Curve) has a motor per cell: its cells move on their own (cell_motors).
 ELEMENT_KIND = {
     "moving_head": "head",
     "moving_bar": "head",
@@ -171,6 +172,11 @@ def mode_for_footprint(defn: dict, footprint: int) -> str | None:
 def heads(defn: dict, mode: str) -> list[int]:
     hs = sorted({c["head"] for c in channels(defn, mode) if "head" in c})
     return hs or [0]  # 0 = the whole fixture is one element
+
+
+def cell_motors(defn: dict, mode: str) -> bool:
+    """A bar whose cells tilt on their own (a tilt channel per cell, COLORado PXL Curve), not on one shared motor."""
+    return any(c["attr"] == "tilt" and "head" in c for c in channels(defn, mode))
 
 
 # Fixtures that can hurt eyes: risk group 2 and 3 (IEC 62471, `physical.risk_group` from the manual or label).
@@ -337,6 +343,10 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
             v = p16 >> 8
         elif a == "pan_fine":
             v = p16 & 255
+        elif a in ("tilt", "tilt_fine") and "head" in c:  # this cell's own motor
+            tc = s.tilt if getattr(s, "dmx_tilt", None) is None else s.dmx_tilt
+            tc16 = int(min(max(tc, tilt_l[0], 0), tilt_l[1], 1) * 65535)
+            v = tc16 >> 8 if a == "tilt" else tc16 & 255
         elif a == "tilt":
             v = t16 >> 8
         elif a == "tilt_fine":
@@ -361,7 +371,7 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         elif a == "color_wheel":
             v = (slot["from"] + slot["to"]) // 2
         elif a == "zoom" and "tight" in c:  # crisp, tight beams for scanning; wide only for a frost wash
-            v = c["wide"] if getattr(first, "fx", "open") == "frost" else c["tight"]
+            v = c["wide"] if getattr(s, "fx", "open") == "frost" else c["tight"]
         elif a.startswith("laser_") and "laser" in defn:
             v = _laser_value(a, defn["laser"], s)
         else:

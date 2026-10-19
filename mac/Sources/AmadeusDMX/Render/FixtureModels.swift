@@ -73,7 +73,7 @@ struct MeshBuilder {
 
 /// The rig's fixtures as models.
 final class FixtureModels {
-    enum Shape { case beamHead, spotHead, washHead, movingBar, parBar, par, strobe, blinder, laser, smoke }
+    enum Shape { case beamHead, spotHead, washHead, movingBar, curveBar, parBar, par, strobe, blinder, laser, smoke }
 
     struct Unit {
         var id: String
@@ -126,6 +126,7 @@ final class FixtureModels {
             let shape: Shape
             switch body {
             case "moving_bar": shape = .movingBar
+            case "curve_bar": shape = .curveBar
             case "par_bar": shape = .parBar
             case "strobe": shape = .strobe
             case "blinder": shape = .blinder
@@ -169,7 +170,7 @@ final class FixtureModels {
                 let bottom: Float
                 switch u.shape {
                 case .beamHead, .spotHead, .washHead: bottom = u.p.z - (headGeometry(u).armLen + 0.12 * u.scale)
-                case .movingBar: bottom = u.p.z - 0.25
+                case .movingBar, .curveBar: bottom = u.p.z - 0.25
                 default: bottom = u.p.z - 0.2
                 }
                 tripod(&m, at: u.p, top: bottom, u.selected ? Self.pick : u.hovered ? Self.lit : Self.standColor, em: em)
@@ -189,6 +190,10 @@ final class FixtureModels {
                     m.box(u.p + u.across * (u.length / 2 + 0.05) * e + [0, 0, hang * h * 0.55], b, [0.07, 0.12, h * 1.9],
                           col * 1.1, emissive: em)
                 }
+            case .curveBar:
+                // the base that stays put; its cells tilt on their own above it (dynamic)
+                let b = Basis.along(u.up, hint: u.across)
+                m.box(u.p - u.up * 0.1, b, [u.length, 0.16, 0.08], col, emissive: em)
             case .parBar:
                 let b = Basis.along(u.up, hint: u.across)
                 let d = min(0.25, u.size?.y ?? 0.12), h = min(0.25, u.size?.z ?? 0.1)
@@ -326,6 +331,21 @@ final class FixtureModels {
                     let (dim, lc) = light(i, frame, hl)
                     let along = simd_dot(positions[i] - u.p, u.across)
                     lens(&m, u.p + u.across * along + face * (h / 2 - 0.02 + 0.002), face, min(0.04, pitch * 0.38), dim, lc)
+                }
+            case .curveBar:
+                // every cell its own little head, tilting on its own motor towards where it shines
+                let pitch = u.length / Float(max(1, u.idx.count))
+                for i in u.idx {
+                    var face = frame.flatMap { i < $0.dirs.count ? $0.dirs[i] : nil } ?? (u.up + SIMD3(0, 0.6, 0))
+                    face -= u.across * simd_dot(face, u.across)
+                    face = simd_length(face) < 1e-3 ? u.up : simd_normalize(face)
+                    let along = simd_dot(positions[i] - u.p, u.across)
+                    let c = u.p + u.across * along
+                    m.box(c - u.up * 0.04, Basis.along(u.up, hint: u.across), [pitch * 0.25, 0.08, 0.06], col, emissive: em)
+                    m.box(c, Basis.along(face, hint: u.across), [pitch * 0.8, 0.09, 0.1],
+                          u.selected ? Self.pick : Self.bodyColor, emissive: em)
+                    let (dim, lc) = light(i, frame, hl)
+                    lens(&m, c + face * 0.052, face, min(0.035, pitch * 0.33), dim, lc)
                 }
             case .parBar:
                 let h = min(0.25, u.size?.z ?? 0.1), pitch = u.length / Float(max(1, u.idx.count))
