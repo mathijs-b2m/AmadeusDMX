@@ -133,3 +133,20 @@ def test_a_streamed_track_is_fetched_as_soon_as_it_is_loaded(capsys):
     d._slow(0.4)  # played: djay's library knows it now
     assert d.fetcher.asked[-1] is real and d.info[1]["stream"] is real and d.info[1]["length"] == 198.8
     assert "looking for a copy by artist and title" in capsys.readouterr().out
+
+
+def test_streamed_tracks_switched_on_in_settings_get_their_fetcher(monkeypatch):
+    """Settings ▸ Integrations ▸ Streamed tracks is enough: not only --streamed fetches copies of Spotify tracks."""
+    from amadeus.show.sources import djay
+
+    made = []
+    monkeypatch.setattr(djay, "enabled", lambda: True)
+    monkeypatch.setattr(djay, "Fetcher", lambda: made.append(1) or "fetcher")
+    from unittest.mock import MagicMock
+
+    for name in ("open_window", "DjayStreams", "Resolver", "Library"):  # no djay here: its window and library
+        monkeypatch.setattr(djay, name, MagicMock())
+    d = djay.Djay(link=0, streamed=0)
+    assert d.streamed and d.fetcher == "fetcher" and made == [1]
+    monkeypatch.setattr(djay, "enabled", lambda: False)
+    assert djay.Djay(link=0, streamed=0).fetcher is None

@@ -78,7 +78,7 @@ def library_file(windows: bool = system.WINDOWS) -> Path:
 LIBRARY = library_file()
 LATE_S = 0.15  # a label is at most this late (djay redraws ~10× a second, plus our polling)
 OFF = "dark (to light it: Settings ▸ Integrations ▸ Streamed tracks, or --opt streamed=1)"
-NO_YTDLP = "dark (yt-dlp isn't installed: pip install -e '.[streamed]')"
+NO_YTDLP = "dark (yt-dlp isn't installed: Settings ▸ General ▸ Optional packs, or pip install -e '.[streamed]')"
 KEEP = 8  # ticks to keep: the least late of them anchors the playhead
 SCAN_S = 2.0  # look for djay's controls again this often (tracks load, decks are added)
 
@@ -429,7 +429,7 @@ class Djay(Source):
         self.streams = DjayStreams(LIBRARY)
         self.fetcher = None
         self.streamed = bool(streamed) or enabled()
-        if streamed:
+        if self.streamed:  # switched on here (--streamed) or in Settings ▸ Integrations
             try:
                 self.fetcher = Fetcher()
             except ImportError:
