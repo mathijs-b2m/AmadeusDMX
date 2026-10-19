@@ -5,7 +5,30 @@
 // Opt-in: the app asks on the second launch whether to check automatically. Never while the app is busy (Amadeus
 // DMX: a show runs; Amadeus Link: a lighting computer is connected): no background check then, and an update you
 // start installing waits until it's idle again. One downloaded in the background is installed when you quit.
+//
+// What the apps show: this version, the newest in the feed, whether this one is up to date, and one button that
+// downloads and installs the newer one (State, Refresh, InstallNewest; the IUpdater reports what it finds).
+using System.Reflection;
+
 namespace AmadeusKit;
+
+/// Where this app stands with its updates.
+public enum UpdateState
+{
+    /// Not checked yet.
+    Unknown,
+    Checking,
+    /// This is the newest (Newest: the feed's newest version, when it said).
+    UpToDate,
+    /// Newest is newer than this one.
+    Available,
+    /// Downloading Newest (Progress: the share done, nil while its size isn't known).
+    Downloading,
+    /// Downloaded, now installing: the app starts again (with WaitingForIdle: once it's idle).
+    Installing,
+    /// Problem says why.
+    Failed,
+}
 
 /// What checks and installs (NetSparkle in the apps). It asks `Updates` before a check and before installing.
 public interface IUpdater
@@ -16,6 +39,12 @@ public interface IUpdater
     DateTimeOffset? LastChecked { get; }
     /// A check the person asked for (it shows what it finds).
     void CheckForUpdates();
+    /// A quiet check (nothing shown): reports what's newest with Updates.Report.
+    void Refresh();
+    /// Downloads and installs the newest the last check found, reporting its progress.
+    void InstallNewest();
+    /// Stops that download.
+    void CancelInstall();
     /// CanCheck changed.
     event Action? CanCheckChanged;
 }
@@ -27,6 +56,11 @@ public sealed class Updates : Observable
     readonly Defaults _defaults;
     Action? _pendingInstall;
     bool _canCheck, _waitingForIdle;
+    UpdateState _state;
+    string? _newest, _problem;
+    double? _progress;
+    DateTimeOffset? _lastRefresh;
+    readonly Func<DateTimeOffset> _now;
 
     /// Whether the app must not be interrupted now (a show runs, a lighting computer is connected).
     public Func<bool> IsBusy { get; set; } = () => false;
@@ -37,16 +71,64 @@ public sealed class Updates : Observable
 
     public bool IsAvailable => _updater is not null;
 
-    public Updates(IUpdater? updater = null, Defaults? defaults = null)
+    /// The version people see (1.0.5) and the build number updates compare (the fourth part of the assembly version).
+    public string Version { get; }
+    public int Build { get; }
+
+    public UpdateState State { get => _state; private set => Set(ref _state, value); }
+    /// The newest version the feed has (Available, Downloading, Installing: the one that's newer than this).
+    public string? Newest { get => _newest; private set => Set(ref _newest, value); }
+    public double? Progress { get => _progress; private set => Set(ref _progress, value); }
+    public string? Problem { get => _problem; private set => Set(ref _problem, value); }
+
+    public Updates(IUpdater? updater = null, Defaults? defaults = null, Func<DateTimeOffset>? now = null)
     {
         _updater = updater;
         _defaults = defaults ?? Defaults.Standard;
+        _now = now ?? (() => DateTimeOffset.UtcNow);
+        var entry = Assembly.GetEntryAssembly();
+        Version = entry?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+        Build = entry?.GetName().Version?.Revision is int r and > 0 ? r : 0;
         if (updater is null) return;
         CanCheck = updater.CanCheck;
         updater.CanCheckChanged += () => CanCheck = updater.CanCheck;
     }
 
     public void CheckForUpdates() => _updater?.CheckForUpdates();
+
+    /// A quiet check for what's newest: at most every five minutes unless forced, never while an update is on its way.
+    public void Refresh(bool force = false)
+    {
+        if (_updater is null || !CanCheck || State is UpdateState.Checking or UpdateState.Downloading or UpdateState.Installing) return;
+        if (!force && _lastRefresh is { } last && _now() - last < TimeSpan.FromMinutes(5)) return;
+        _lastRefresh = _now();
+        Report(UpdateState.Checking, Newest);
+        _updater.Refresh();
+    }
+
+    /// The one click: download and install the newest (after the show, if one runs). The app starts again.
+    public void InstallNewest()
+    {
+        if (_updater is null || !CanCheck || State != UpdateState.Available) return;
+        Report(UpdateState.Downloading, Newest);
+        _updater.InstallNewest();
+    }
+
+    public void CancelInstall()
+    {
+        if (State == UpdateState.Downloading) _updater?.CancelInstall();
+    }
+
+    /// What the IUpdater found or is doing (on the UI thread).
+    public void Report(UpdateState state, string? newest = null, double? progress = null, string? problem = null)
+    {
+        // the same state with under a percent more done: nothing to redraw
+        if (state == State && newest == Newest && problem == Problem && progress is { } p && Progress is { } q && Math.Abs(p - q) < 0.01) return;
+        State = state;
+        Newest = newest;
+        Progress = progress;
+        Problem = problem;
+    }
 
     public bool ChecksAutomatically
     {
@@ -99,6 +181,7 @@ public sealed class Updates : Observable
         if (!IsBusy()) return false;
         _pendingInstall = install;
         WaitingForIdle = true;
+        Report(UpdateState.Installing, Newest);
         return true;
     }
 

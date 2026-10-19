@@ -80,6 +80,11 @@ struct AppCommands: Commands {
                     .disabled(!model.updates.canCheck)
             }
         }
+        CommandGroup(replacing: .help) {
+            Link("Amadeus DMX Help", destination: HelpLinks.documentation)
+            Link("Mac Setup Guide", destination: HelpLinks.setupGuide)
+            Link("Release Notes", destination: HelpLinks.releaseNotes)
+        }
         CommandGroup(after: .newItem) {
             Button("New Set…") { openWindow(id: "wizard") }
                 .keyboardShortcut("n", modifiers: [.command, .shift])

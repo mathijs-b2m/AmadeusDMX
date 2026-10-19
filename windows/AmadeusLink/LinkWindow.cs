@@ -84,7 +84,10 @@ public sealed class LinkMenu(LinkServer link, Action quit)
             UI.Live(link, Problems, nameof(LinkServer.PluginError), nameof(LinkServer.Error)),
             UI.Live(link.Firewall, FirewallRows, nameof(FirewallWatch.BlockedOn), nameof(FirewallWatch.Allowing), nameof(FirewallWatch.Note)),
             UI.Divider(),
-            Updates.IsAvailable ? UI.Live(Updates, UpdateRows) : null,
+            Updates.IsAvailable
+                ? UI.VStack(6, UpdateStatusView.Build(Updates, "Amadeus Link", "when the lighting computer disconnects", compact: true),
+                            UI.Live(Updates, UpdateRows))
+                : UI.Text($"Amadeus Link {Updates.Version} (a development build)", Font.Caption).Secondary(),
             quitButton
         ).Padding(16);
     }
@@ -162,11 +165,7 @@ public sealed class LinkMenu(LinkServer link, Action quit)
 
     UIElement UpdateRows()
     {
-        var check = UI.Check("Check for updates", Updates.ChecksAutomatically, v => Updates.ChecksAutomatically = v).Font(Font.Callout);
-        var now = UI.Button("Check Now", Updates.CheckForUpdates).Disabled(!Updates.CanCheck).Font(Font.Callout);
-        return UI.VStack(6,
-            UI.HStack(check, UI.Spacer(), now),
-            Updates.WaitingForIdle ? UI.Text("An update installs when the lighting computer disconnects.", Font.Caption).Secondary().Wrap() : null);
+        return UI.Check("Check for updates automatically", Updates.ChecksAutomatically, v => Updates.ChecksAutomatically = v).Font(Font.Callout);
     }
 }
 

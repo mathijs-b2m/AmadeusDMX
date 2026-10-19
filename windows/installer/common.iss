@@ -65,6 +65,19 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; an update (the app's updater runs this silently with /RELAUNCH): start the app just installed, wherever the old
+; one ran from
+Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: WizardSilent and RelaunchAsked
 
 ; Your data (%LOCALAPPDATA%\Amadeus DMX: sets, rigs, settings, packs, the cache) is never touched: the uninstaller
 ; removes only the program folder.
+
+[Code]
+function RelaunchAsked: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/RELAUNCH') = 0 then Result := True;
+end;

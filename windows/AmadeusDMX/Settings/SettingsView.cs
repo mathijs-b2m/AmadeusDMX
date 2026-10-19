@@ -95,16 +95,16 @@ public sealed class UpdatesSection(AppModel model)
     {
         var updates = model.Updates;
         if (!updates.IsAvailable)
-            return Form.Section("Updates", [UI.Text("A development build: it updates with the code, not by itself.").Secondary().Wrap()]);
+            return Form.Section("Updates", [Form.Row($"Amadeus DMX {updates.Version}",
+                UI.Text("A development build: it updates with the code, not by itself.").Secondary().Wrap())]);
         var checks = UI.Toggle("", updates.ChecksAutomatically, v => updates.ChecksAutomatically = v);
         var installs = UI.Toggle("", updates.InstallsAutomatically, v => updates.InstallsAutomatically = v).Disabled(!updates.ChecksAutomatically);
         var rows = new List<UIElement?>
         {
             Form.Row("Check for updates automatically", checks),
             Form.Row("Download and install updates by themselves", installs),
-            Form.Row($"Version {Updater.AppVersion}", UI.Button("Check Now", updates.CheckForUpdates).Disabled(!updates.CanCheck)),
+            UpdateStatusView.Build(updates, "Amadeus DMX", "when the show stops"),
         };
-        if (updates.WaitingForIdle) rows.Add(Form.Note("clock", "An update installs when the show stops"));
         return Form.Section("Updates", rows,
             "Never during a show: no check while the lights run, and an update you install then waits until the show stops. One downloaded by itself is installed when you quit. Your sets, rigs and packs stay as they are.");
     }
