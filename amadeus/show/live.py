@@ -355,7 +355,8 @@ async def run(
                     if key != showing:
                         showing = key
                         title = feedlib.track_title(deck.file, deck.deck)
-                        feed.set_hello(feedlib.hello(a, plan, rig, real, title=title, director=used))
+                        cd = None if used == STANDIN else arc.countdown(deck.file, a, plan, time.time())
+                        feed.set_hello(feedlib.hello(a, plan, rig, real, title=title, director=used, countdown=cd))
                         print(f"  ▶ heads follow deck {deck.deck}: {Path(deck.file).name}")
                 else:
                     states, i, t = {eid: State() for eid in ids}, 0, 0.0

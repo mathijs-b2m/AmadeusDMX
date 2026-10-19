@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 
 from amadeus import paths, system
+from amadeus.director.arc import song_arc
 from amadeus.engine.fog import machine
 from amadeus.library import fixtures as fxlib
 from amadeus.rig.groups import head_groups
@@ -40,6 +41,13 @@ FILE = "show-arc.json"
 DEFAULT_LENGTH_S = 4 * 3600.0
 MIN_LENGTH_S, MAX_LENGTH_S = 30 * 60.0, 12 * 3600.0
 NEW_NIGHT_AFTER_S = 2 * 3600.0  # no music for this long (the engine stopped, the next day): a new night
+
+# The LED wall's 3-2-1 DROP! countdown is a once-or-twice-a-night moment: only in a peak (or the finale), into a
+# track's main drop after a build, at most this many tracks a night, and this far apart (share of the night).
+COUNTDOWNS_PER_NIGHT = 2
+COUNTDOWN_GAP = 0.2, 30 * 60.0  # at least a fifth of the night, and at least half an hour
+COUNTDOWN_STAGES = ("peak", "finale")
+COUNTDOWN_AFTER_S = 5 * 60.0  # the peak has run a few minutes: the floor is up before the wall shouts at it
 
 KNOBS = (
     "groups", "specials", "screen", "smoke",  # in play
@@ -327,6 +335,8 @@ class ShowArc:
         self.candidate, self.evidence = 0, 0.0  # the stage the music says, and for how long it has said so
         self.values = self._targets(0.5)
         self._revealed_saved: list[int] = []  # the groups tonight has already shown (_load)
+        self.countdowns: list[float] = []  # night time of each countdown tonight
+        self.countdown_for: dict[str, int | None] = {}  # per track tonight: the drop it counts into (None: none)
         self._load(now if now is not None else time.time())
         self._last_obs: float | None = None
         self._last_save = 0.0
@@ -478,6 +488,7 @@ class ShowArc:
         self.started, self.stage, self.stage_since, self.candidate, self.evidence = now, 0, 0.0, 0, 0.0
         self.fast = self.slow = self.bpm_fast = self.bpm_slow = self.bpm_base = None
         self.revealed = set()  # every surprise back in the box
+        self.countdowns, self.countdown_for = [], {}
         print(f"  ☾ show arc: a new night ({EVENTS[self.event]['title']}, {_hm(self.length)}) starts", flush=True)
 
     # ------------------------------------------------------------ the knobs
@@ -558,6 +569,28 @@ class ShowArc:
     def colour_variety(self) -> float | None:
         """For the engines (looks.py): None leaves the colours as designed."""
         return self.values["colour"] if self.enabled else None
+
+    def countdown(self, track: str, a, plan: list, now: float) -> int | None:
+        """The phrase of this track's drop the LED wall counts into (3-2-1 DROP!), or None. Decided once per track
+        as it takes over: a peak's moment (COUNTDOWN_STAGES), once or twice a night, well apart."""
+        if track in self.countdown_for:
+            return self.countdown_for[track]
+        at, el = None, self.elapsed(now)
+        gap = max(COUNTDOWN_GAP[0] * self.length, COUNTDOWN_GAP[1])
+        if (
+            self.started is not None
+            and STAGE_KEYS[self.stage] in COUNTDOWN_STAGES
+            and el - self.stage_since >= COUNTDOWN_AFTER_S
+            and len(self.countdowns) < COUNTDOWNS_PER_NIGHT
+            and all(el - c >= gap for c in self.countdowns)
+        ):
+            at = countdown_drop(a, plan)
+        self.countdown_for[track] = at
+        if at is not None:
+            self.countdowns.append(el)
+            print(f"  ☾ show arc: the wall counts into this track's drop ({len(self.countdowns)} tonight)", flush=True)
+            self.save(now)
+        return at
 
     # ------------------------------------------------------------ the frame
 
@@ -756,6 +789,7 @@ class ShowArc:
             "locked": self.locked,
             "manual": self.manual,
             "revealed": sorted(getattr(self, "revealed", ())),
+            "countdowns": self.countdowns,
             "heat": [self.fast, self.slow],
             "bpm": [self.bpm_fast, self.bpm_slow, self.bpm_base],
         }
@@ -781,10 +815,23 @@ class ShowArc:
             return  # the knobs and the length stay; the night itself starts again with the music
         self.started, self.seen = float(d["started"]), float(d["seen"])
         self._revealed_saved = [int(k) for k in d.get("revealed") or []]
+        self.countdowns = [float(c) for c in d.get("countdowns") or []]
         self.stage = STAGE_KEYS.index(d["stage"]) if d.get("stage") in STAGE_KEYS else 0
         self.stage_since = float(d.get("stage_since", 0.0))
         self.fast, self.slow = (d.get("heat") or [None, None])[:2]
         self.bpm_fast, self.bpm_slow, self.bpm_base = (d.get("bpm") or [None, None, None])[:3]
+
+
+def countdown_drop(a, plan: list) -> int | None:
+    """The drop a countdown fits: the song's first main drop (director/arc.py), straight after a build or a
+    breakdown (a countdown needs the tension before it)."""
+    roles = song_arc(a)
+    for i, d in enumerate(plan):
+        if i == 0 or i >= len(roles) or roles[i]["role"] != "main_drop" or d.section != "drop":
+            continue
+        if plan[i - 1].section in ("buildup", "breakdown"):
+            return i
+    return None
 
 
 def _towards(v: float, target: float, dt: float, seconds: float) -> float:

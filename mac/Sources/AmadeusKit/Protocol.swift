@@ -200,6 +200,8 @@ public struct Hello: Decodable, Sendable {
     public var maxFlashHz: Double
     public var energy: [Double]
     public var screen: Bool
+    /// The phrase of the drop the LED wall counts into (3-2-1 DROP!): a rare moment, once or twice a night.
+    public var countdown: Int?
     public var trusses: [Truss]
     public var zones: [Zone]
     /// What kind of music (one word), where that came from (you, ai, tag, audio), and the program it gets.
@@ -210,7 +212,7 @@ public struct Hello: Decodable, Sendable {
     public var style: String
 
     enum CodingKeys: String, CodingKey {
-        case track, duration, bpm, director, fixtures, stage, plan, maxFlashHz = "max_flash_hz", energy, screen, trusses, zones
+        case track, duration, bpm, director, fixtures, stage, plan, maxFlashHz = "max_flash_hz", energy, screen, countdown, trusses, zones
         case genre, genreSource = "genre_source", program, style
     }
 
@@ -226,6 +228,7 @@ public struct Hello: Decodable, Sendable {
         maxFlashHz = try c.decodeIfPresent(Double.self, forKey: .maxFlashHz) ?? 3
         energy = try c.decodeIfPresent([Double].self, forKey: .energy) ?? []
         screen = try c.decodeIfPresent(Bool.self, forKey: .screen) ?? false
+        countdown = try? c.decodeIfPresent(Int.self, forKey: .countdown)
         trusses = (try? c.decodeIfPresent([Truss].self, forKey: .trusses)) ?? []
         genre = (try? c.decodeIfPresent(String.self, forKey: .genre)) ?? ""
         genreSource = (try? c.decodeIfPresent(String.self, forKey: .genreSource)) ?? ""

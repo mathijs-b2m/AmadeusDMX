@@ -122,10 +122,10 @@ public sealed partial class WallRenderer : IDisposable
         else if (wall < 0.5f && want.Item1 != "off") want = ("ambient", WallScene.Ambient);
         var next = f.Phrase + 1 >= 0 && f.Phrase + 1 < h.Plan.Count ? h.Plan[f.Phrase + 1] : null;
         var spb = 60 / Math.Max(h.Bpm, 60);
-        var nextDrop = next?.Section == "drop" && d?.Section != "drop";
+        var nextDrop = h.Countdown == f.Phrase + 1 && next?.Section == "drop" && d?.Section != "drop";  // the rare one
         var beatsLeft = nextDrop ? (next!.Start - f.T) / spb : 99;
         if (want.Item1 == "off" && beatsLeft <= 4.5 && Force == WallScene.Auto && wall >= 0.5f) want = ("words", WallScene.Words);  // a dark wall counts in
-        var shout = wall >= 0.5f && d?.Section == "drop" && _cur.Mode != "off" && _cur.Mode != "psychedelic" && (f.T - d.Start) / spb < 2;
+        var shout = wall >= 0.5f && h.Countdown == f.Phrase && d?.Section == "drop" && _cur.Mode != "off" && _cur.Mode != "psychedelic" && (f.T - d.Start) / spb < 2;
         if (shout) _fade = 1;
         else if (want.Item2 != _cur.Scene)
         {
@@ -487,18 +487,18 @@ public sealed partial class WallRenderer : IDisposable
         }
     }
 
-    /// 3-2-1 into a drop, then DROP!
+    /// 3-2-1 into the drop the engine picked (hello.countdown: once or twice a night), then DROP!
     bool Countdown(Frame f, Decision? d, Hello h, Vector3[] cols)
     {
         var spb = 60 / Math.Max(h.Bpm, 60);
         string? label = null;
         var u = 0.0;
-        if (f.Phrase + 1 >= 0 && f.Phrase + 1 < h.Plan.Count && h.Plan[f.Phrase + 1].Section == "drop" && d?.Section != "drop")
+        if (h.Countdown == f.Phrase + 1 && f.Phrase + 1 >= 0 && f.Phrase + 1 < h.Plan.Count && h.Plan[f.Phrase + 1].Section == "drop" && d?.Section != "drop")
         {
             var left = (h.Plan[f.Phrase + 1].Start - f.T) / spb;
             if (left > 0 && left <= 4) { label = ((int)Math.Ceiling(left)).ToString(); u = 1 - (left % 1 == 0 ? 1 : left % 1); }
         }
-        if (d is { Section: "drop" } && f.T - d.Start < spb * 2) { label = "DROP!"; u = (f.T - d.Start) / (spb * 2); }
+        if (h.Countdown == f.Phrase && d is { Section: "drop" } && f.T - d.Start < spb * 2) { label = "DROP!"; u = (f.T - d.Start) / (spb * 2); }
         if (label is null) return false;
         SetShadow(0, null);
         _g.Fill = new SKColor(0, 0, 0, (byte)Math.Round(0.85 * 255));

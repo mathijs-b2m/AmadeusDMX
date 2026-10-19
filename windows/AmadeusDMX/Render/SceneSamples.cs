@@ -35,7 +35,7 @@ public static class SceneSamples
         };
         var hello = new Hello
         {
-            Track = "01 - Sample Track (Club Mix).wav", Bpm = 128, Fixtures = fixtures, Stage = stage, Plan = plan, Screen = screen,
+            Track = "01 - Sample Track (Club Mix).wav", Bpm = 128, Fixtures = fixtures, Stage = stage, Plan = plan, Screen = screen, Countdown = 1,
             Trusses = trusses,
         };
         var zones = new List<Zone> { new("z1", "Audience", "laser_out", "box", new Vec3(3, 4, 1), [6, 4, 2]) };

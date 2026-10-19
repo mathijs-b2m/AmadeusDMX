@@ -11,6 +11,7 @@ from amadeus.dmx.outputs import drives_real_lights, open_output
 from amadeus.engine import Engine
 from amadeus.engine.realism import Realism
 from amadeus.show import feed as feedlib
+from amadeus.show.arc import countdown_drop
 from amadeus.show.clock import AudioClock, WallClock, light_lead
 from amadeus.web.server import serve as serve_http
 
@@ -37,7 +38,8 @@ async def play(
     lead = light_lead(rig)
     real = Realism(rig)
     feed = feedlib.Feed(rig, real, period)
-    feed.set_hello(feedlib.hello(a, plan, rig, real, title=feedlib.track_title(a.path), director=director))
+    title = feedlib.track_title(a.path)  # one track on its own: its main drop is the moment (no night to save it for)
+    feed.set_hello(feedlib.hello(a, plan, rig, real, title=title, director=director, countdown=countdown_drop(a, plan)))
     bands = [a.band_norm(k) for k in a.bands_db]
 
     httpd = serve_http(http_port)

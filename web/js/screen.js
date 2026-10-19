@@ -284,15 +284,15 @@ const Screen = (() => {
     });
   }
 
-  // 4-3-2-1 into a drop, then DROP!
+  // 4-3-2-1 into the drop the engine picked (hello.countdown: once or twice a night), then DROP!
   function countdown(f, d, cols, bp) {
     const plan = S?.plan || [], next = plan[f.phrase + 1], spb = 60 / (S?.bpm || 120);
     let text = null, u = 0;
-    if (next && next.section === "drop" && d?.section !== "drop") {
+    if (next && S?.countdown === f.phrase + 1 && next.section === "drop" && d?.section !== "drop") {
       const left = (next.start - f.t) / spb;
       if (left > 0 && left <= 4) { text = String(Math.ceil(left)); u = 1 - (left % 1 || 1); }
     }
-    if (d?.section === "drop" && f.t - d.start < spb * 2) { text = "DROP!"; u = (f.t - d.start) / (spb * 2); }
+    if (S?.countdown === f.phrase && d?.section === "drop" && f.t - d.start < spb * 2) { text = "DROP!"; u = (f.t - d.start) / (spb * 2); }
     if (!text) return false;
     g.fillStyle = "rgba(0,0,0,0.85)"; g.shadowBlur = 0; g.fillRect(0, 0, W, H);
     neon(cols[0], 7);
@@ -326,10 +326,10 @@ const Screen = (() => {
     const wall = !force && f.arc?.on ? (f.arc.values?.screen ?? 1) : 1;
     if (wall < 0.03) want.mode = want.scene = "off";
     else if (wall < 0.5 && want.mode !== "off") want.mode = want.scene = "ambient";
-    const nextDrop = show_.plan?.[f.phrase + 1]?.section === "drop" && d?.section !== "drop";
+    const nextDrop = show_.countdown === f.phrase + 1 && show_.plan?.[f.phrase + 1]?.section === "drop" && d?.section !== "drop";
     const beatsLeft = nextDrop ? (show_.plan[f.phrase + 1].start - f.t) * (show_.bpm || 120) / 60 : 99;
     if (want.mode === "off" && beatsLeft <= 4.5 && wall >= 0.5) want.mode = want.scene = "words";  // a dark wall wakes up to count in
-    const shout = wall >= 0.5 && d?.section === "drop" && cur.mode !== "off" && cur.mode !== "psychedelic"
+    const shout = wall >= 0.5 && show_.countdown === f.phrase && d?.section === "drop" && cur.mode !== "off" && cur.mode !== "psychedelic"
       && (f.t - d.start) * (show_.bpm || 120) / 60 < 2;
     if (shout) fade = 1;  // DROP! at full strength; the drop's own scene comes after it
     else if (want.scene !== cur.scene) {
