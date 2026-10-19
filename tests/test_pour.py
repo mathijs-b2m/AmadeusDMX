@@ -28,8 +28,9 @@ def _play(track, rig_name, formation="sync", grouping="unison"):
     a, plan = track
     plan = list(plan)
     k = next(i for i, d in enumerate(plan) if d.section == "drop")
-    plan[k] = replace(plan[k], movement="pour", formation=formation, grouping=grouping, aim="crowd",
-                      head_light="steady", intensity=3)
+    plan[k] = replace(
+        plan[k], movement="pour", formation=formation, grouping=grouping, aim="crowd", head_light="steady", intensity=3
+    )
     e = Engine(a, plan, load_rig(f"tests/sets/{rig_name}.json"), real_output=False)
     d = plan[k]
     if not e.heads:

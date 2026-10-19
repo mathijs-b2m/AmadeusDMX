@@ -23,8 +23,17 @@ def _rig(mode: str = "179ch") -> dict:
             "fixtures": [
                 {**curve, "id": "curveL", "address": 1, "x": 0.25},
                 {**curve, "id": "curveR", "address": 1, "universe": 2, "x": 0.75},
-                {"fixture": "dts/katana", "mode": "Extended", "id": "katana", "universe": 3, "address": 1,
-                 "mount": "floor", "x": 0.5, "y_m": -0.5, "z_m": 0.3},
+                {
+                    "fixture": "dts/katana",
+                    "mode": "Extended",
+                    "id": "katana",
+                    "universe": 3,
+                    "address": 1,
+                    "mount": "floor",
+                    "x": 0.5,
+                    "y_m": -0.5,
+                    "z_m": 0.3,
+                },
             ],
             "stage": {"width_m": 6, "ceiling_m": 4, "room_depth_m": 8, "eye_safety": False},
             "safety": {"max_flash_hz": 3, "master": 1.0},
@@ -39,7 +48,12 @@ def _ch(defn, mode, attr, head=None):
 def test_every_mode_from_the_manual():
     defn = fxlib.get(KEY)
     assert {m: len(c) for m, c in defn["modes"].items()} == {
-        "179ch": 179, "169ch": 169, "155ch": 155, "101ch": 101, "53ch": 53, "20ch": 20
+        "179ch": 179,
+        "169ch": 169,
+        "155ch": 155,
+        "101ch": 101,
+        "53ch": 53,
+        "20ch": 20,
     }
     assert fxlib.default_mode(defn) == "179ch"
     for mode in defn["modes"]:
