@@ -19,8 +19,14 @@ public sealed partial class LinkWindow : Window
         var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "AmadeusLink.ico");
         if (File.Exists(icon)) AppWindow.SetIcon(icon);
         SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(380, 640));
-        if (AppWindow.Presenter is OverlappedPresenter p) { p.IsMaximizable = false; p.IsResizable = false; }
+        var scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0;  // Resize is in pixels
+        AppWindow.Resize(new Windows.Graphics.SizeInt32((int)(380 * scale), (int)(640 * scale)));
+        if (AppWindow.Presenter is OverlappedPresenter p)
+        {
+            p.IsMaximizable = false;
+            p.PreferredMinimumWidth = (int)(320 * scale);
+            p.PreferredMinimumHeight = (int)(360 * scale);
+        }
         AppWindow.Closing += (_, e) =>
         {
             if (_closing) return;
@@ -29,6 +35,9 @@ public sealed partial class LinkWindow : Window
         };
         Content = UI.Scroll(new LinkMenu(link, quit).Build());
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern uint GetDpiForWindow(IntPtr hwnd);
 
     /// Back from the notification area.
     public void Reveal()
@@ -73,6 +82,7 @@ public sealed class LinkMenu(LinkServer link, Action quit)
                     nameof(LinkServer.ReaderNote), nameof(LinkServer.DeckSummary)),
             UI.Live(link, Pairing, nameof(LinkServer.IsOn), nameof(LinkServer.Code), nameof(LinkServer.Peers), nameof(LinkServer.TracksServed)),
             UI.Live(link, Problems, nameof(LinkServer.PluginError), nameof(LinkServer.Error)),
+            UI.Live(link.Firewall, FirewallRows, nameof(FirewallWatch.BlockedOn), nameof(FirewallWatch.Allowing), nameof(FirewallWatch.Note)),
             UI.Divider(),
             Updates.IsAvailable ? UI.Live(Updates, UpdateRows) : null,
             quitButton
@@ -106,7 +116,9 @@ public sealed class LinkMenu(LinkServer link, Action quit)
         code.FontSize = 40;
         code.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
         code.CharacterSpacing = 400;
-        var box = UI.VStack(4, UI.Text("Pairing code", Font.Caption).Secondary().Center(), code,
+        code.TextTrimming = TextTrimming.None;  // all four digits, always: smaller in a narrow window, never "4 8 …"
+        var digits = new Viewbox { Child = code, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Center };
+        var box = UI.VStack(4, UI.Text("Pairing code", Font.Caption).Secondary().Center(), digits,
                             UI.Link("New Code", link.RenewCode).Align(HorizontalAlignment.Center));
         box.Alignment = 0.5;
         var rows = new List<UIElement?> { UI.Card(box, padding: 8, corner: 12) };
@@ -131,6 +143,21 @@ public sealed class LinkMenu(LinkServer link, Action quit)
             : UI.HStack(6, UI.Icon("exclamationmark.triangle.fill", 12).Foreground(Tint.Orange),
                         UI.Text(e, Font.Caption).Foreground(Tint.Orange).Wrap().Grow());
         return UI.VStack(6, Problem(link.PluginError), Problem(link.Error));
+    }
+
+    /// Windows Firewall keeps lighting computers out: say so, and let them in (the Mac has no such firewall rule).
+    UIElement? FirewallRows()
+    {
+        var fw = link.Firewall;
+        if (fw.BlockedOn is not { } profile) return null;
+        return UI.VStack(6,
+            UI.HStack(6, UI.Icon("exclamationmark.triangle.fill", 12).Foreground(Tint.Orange),
+                      UI.Text($"Windows Firewall keeps lighting computers out on this network (a {AmadeusKit.Firewall.Name(profile)} "
+                              + "network to Windows). They can't pair.", Font.Caption).Foreground(Tint.Orange).Wrap().Grow()),
+            UI.HStack(8,
+                UI.Button(fw.Allowing ? "Allowing…" : "Allow Amadeus Link…", () => _ = fw.Allow()).Disabled(fw.Allowing).Font(Font.Callout),
+                UI.Text("Windows asks for an administrator.", Font.Caption).Secondary().Wrap().Grow()),
+            fw.Note is { } note ? UI.Text(note, Font.Caption).Secondary().Wrap() : null);
     }
 
     UIElement UpdateRows()

@@ -52,6 +52,10 @@ public sealed class LinkServer : Observable, IDisposable
     /// Updates (a release build only): never while a lighting computer is connected.
     public Updates Updates { get; }
 
+    /// Whether Windows Firewall keeps lighting computers out (pairing, TCP 7123), looked at while Link is on.
+    public FirewallWatch Firewall { get; } = new("Amadeus Link", [Environment.ProcessPath ?? "AmadeusLink.exe"],
+        [(NetProtocol.Tcp, LinkProtocol.ServicePort), (NetProtocol.Udp, LinkProtocol.PluginPort)]);
+
     public LinkServer(IUpdater? updater)
     {
         Updates = new Updates(updater) { IsBusy = () => Peers.Count > 0 };
@@ -139,6 +143,7 @@ public sealed class LinkServer : Observable, IDisposable
         Error = null;
         if (on) _net.StartService(LinkProtocol.ServicePort, Environment.MachineName);
         else _net.StopService();
+        if (on) Firewall.Start(TimeSpan.FromSeconds(15)); else Firewall.Stop();
     }
 
     public void RenewCode()
@@ -159,6 +164,7 @@ public sealed class LinkServer : Observable, IDisposable
     public void Dispose()
     {
         _pump?.Cancel();
+        Firewall.Dispose();
         _net.Dispose();
     }
 }

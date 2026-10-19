@@ -347,6 +347,21 @@ public sealed class AppModel : Observable
     /// The DJ software Start (Ctrl+R) follows: the last one chosen in the Start menu.
     public string NextSourceName => Workspace?.DJSource(Defaults.Standard.String("djSource") ?? "vdj")?.App ?? "VirtualDJ";
 
+    /// With a DJ laptop: whether Windows Firewall keeps its decks (UDP) away from the engine.
+    FirewallWatch? _engineFirewall;
+    public FirewallWatch? EngineFirewall { get => _engineFirewall; private set => Set(ref _engineFirewall, value); }
+
+    void WatchFirewall(Workspace? ws)
+    {
+        EngineFirewall?.Dispose();
+        EngineFirewall = null;
+        if (ws is null || !OperatingSystem.IsWindows()) return;
+        var watch = new FirewallWatch("Amadeus DMX engine", ws.ListeningPythons(), [(NetProtocol.Udp, null)]);
+        watch.PropertyChanged += (_, _) => Changed(nameof(EngineFirewall));  // the footer rebuilds with the model
+        EngineFirewall = watch;
+        watch.Start(TimeSpan.FromSeconds(30));
+    }
+
     /// Start live mode: the lights follow the DJ software on this computer (VirtualDJ, Mixxx, …) or on a DJ laptop.
     public void StartLive(string? dj = null, string? code = null, string? source = null)
     {
@@ -359,6 +374,7 @@ public sealed class AppModel : Observable
         LiveSource = dj is null ? ws.DJSource(source ?? d.String("djSource") ?? "vdj") : null;
         _runningWithDMX = SendArtNet;
         var args = new List<string> { "live", "--set", SelectedSet, "--rig", SelectedRig, "--health", "30" };
+        WatchFirewall(dj is not null ? ws : null);
         if (dj is not null && code is not null) args.AddRange(["--remote", "dj:" + dj, "--code", code]);
         else if ((source ?? d.String("djSource")) is { } src && src != "vdj")
             args.AddRange(["--source", src]);  // another DJ software on this computer (the last one chosen in the Start menu)
@@ -371,6 +387,7 @@ public sealed class AppModel : Observable
     {
         if (Workspace is not { } ws || SelectedSet.Length == 0) return;
         PlayingFile = file;
+        WatchFirewall(null);
         _runningWithDMX = SendArtNet;
         var args = new List<string> { "play", file, "--set", SelectedSet, "--rig", SelectedRig };
         if (SendArtNet) args.Add("--artnet");

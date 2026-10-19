@@ -30,6 +30,19 @@ public sealed partial record Workspace
     public static string VenvPython(string env) =>
         OperatingSystem.IsWindows() ? Path.Combine(env, ".venv", "Scripts", "python.exe") : Path.Combine(env, ".venv", "bin", "python");
 
+    /// The interpreters that may be the one listening when the engine runs: `Python`, and, when that is a
+    /// virtual environment's (a checkout's .venv, the packs), the Python it was made from: on Windows a venv's
+    /// python.exe only starts that one (Windows Firewall's rules name the program that listens).
+    public IReadOnlyList<string> ListeningPythons()
+    {
+        var list = new List<string> { Python };
+        var cfg = Files.ReadText(Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Python) ?? "") ?? "", "pyvenv.cfg"));
+        var home = cfg?.Split('\n').Select(l => l.Split('=', 2)).FirstOrDefault(kv => kv.Length == 2 && kv[0].Trim() == "home")?[1].Trim();
+        if (home is { Length: > 0 })
+            list.Add(Path.Combine(home, OperatingSystem.IsWindows() ? "python.exe" : "python3"));
+        return list;
+    }
+
     static string EnvPython(string env) =>
         OperatingSystem.IsWindows() ? Path.Combine(env, "Scripts", "python.exe") : Path.Combine(env, "bin", "python3");
 
