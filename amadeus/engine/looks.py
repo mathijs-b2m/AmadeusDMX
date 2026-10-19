@@ -572,7 +572,9 @@ class LooksMixin:
             col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + step) % len(cols)]}[hc]
             hl = d.head_light
             mine = env if kick_turn(head_pattern, rank[f["id"]], nh, hit) else 0.0  # this head's kick
-            if hl == "flick":  # on around the beat, when the head arrives and turns; dark while travelling
+            if role["movement"] == "pour" and hl != "off":  # the pour plays its own light: lit falling, dark rising
+                dim = self.pour_light(d, t, j, role)
+            elif hl == "flick":  # on around the beat, when the head arrives and turns; dark while travelling
                 dim = 1.0 if (phase < 0.22 or phase > 0.85) else 0.0
             elif hl == "beat":  # on with the kick, held, let go: on/off (the phrase's pattern splits the group)
                 dim = mine
@@ -612,7 +614,7 @@ class LooksMixin:
                 dim *= 0.4 + 0.6 * progress
             st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
             if d.dynamics == "impact" and d.head_light != "off" and voice != "tac":  # (the flash: the boom's)
-                st.white = flash
+                st.white = flash * (dim if role["movement"] == "pour" else 1.0)  # (a pour waits dark at the floor)
             st.fx = d.beam_fx
             group = self.gobo_groups[j].get(d.gobo_style) or self.gobo_all[j]
             st.gobo = group[(d.phrase + bar // 4) % len(group)] - 1  # next gobo of the style every four bars

@@ -91,7 +91,7 @@ public sealed class MeshBuilder
 /// The rig's fixtures as models.
 public sealed class FixtureModels
 {
-    public enum Shape { BeamHead, SpotHead, WashHead, MovingBar, ParBar, Par, Strobe, Blinder, Laser, Smoke }
+    public enum Shape { BeamHead, SpotHead, WashHead, MovingBar, CurveBar, ParBar, Par, Strobe, Blinder, Laser, Smoke }
 
     public sealed record Unit
     {
@@ -152,6 +152,7 @@ public sealed class FixtureModels
             var shape = body switch
             {
                 "moving_bar" => Shape.MovingBar,
+                "curve_bar" => Shape.CurveBar,
                 "par_bar" => Shape.ParBar,
                 "strobe" => Shape.Strobe,
                 "blinder" => Shape.Blinder,
@@ -203,7 +204,7 @@ public sealed class FixtureModels
                 var bottom = u.Shape switch
                 {
                     Shape.BeamHead or Shape.SpotHead or Shape.WashHead => u.P.Z - (HeadGeometryOf(u).ArmLen + 0.12f * u.Scale),
-                    Shape.MovingBar => u.P.Z - 0.25f,
+                    Shape.MovingBar or Shape.CurveBar => u.P.Z - 0.25f,
                     _ => u.P.Z - 0.2f,
                 };
                 Tripod(m, u.P, bottom, u.Selected ? Pick : u.Hovered ? Lit : StandColor, em);
@@ -228,6 +229,13 @@ public sealed class FixtureModels
                     foreach (var e in new[] { -1f, 1f })   // the yoke ends that carry the tilting bar
                         m.Box(u.P + u.Across * ((u.Length / 2 + 0.05f) * e) + new Vector3(0, 0, hang * h * 0.55f), b, new(0.07f, 0.12f, h * 1.9f),
                               col * 1.1f, emissive: em);
+                    break;
+                }
+                case Shape.CurveBar:
+                {
+                    // the base that stays put; its cells tilt on their own above it (dynamic)
+                    var b = Basis.Along(u.Up, u.Across);
+                    m.Box(u.P - u.Up * 0.1f, b, new(u.Length, 0.16f, 0.08f), col, emissive: em);
                     break;
                 }
                 case Shape.ParBar:
@@ -399,6 +407,24 @@ public sealed class FixtureModels
                         var (dim, lc) = Light(i, frame, hl);
                         var along = Vector3.Dot(_positions[i] - u.P, u.Across);
                         Lens(m, u.P + u.Across * along + face * (h / 2 - 0.02f + 0.002f), face, MathF.Min(0.04f, pitch * 0.38f), dim, lc);
+                    }
+                    break;
+                }
+                case Shape.CurveBar:
+                {
+                    // every cell its own little head, tilting on its own motor towards where it shines
+                    var pitch = u.Length / Math.Max(1, u.Idx.Length);
+                    foreach (var i in u.Idx)
+                    {
+                        var face = Dir(frame, i) ?? u.Up + new Vector3(0, 0.6f, 0);
+                        face -= u.Across * Vector3.Dot(face, u.Across);
+                        face = face.Length() < 1e-3f ? u.Up : Vector3.Normalize(face);
+                        var along = Vector3.Dot(_positions[i] - u.P, u.Across);
+                        var c = u.P + u.Across * along;
+                        m.Box(c - u.Up * 0.04f, Basis.Along(u.Up, u.Across), new(pitch * 0.25f, 0.08f, 0.06f), col, emissive: em);
+                        m.Box(c, Basis.Along(face, u.Across), new(pitch * 0.8f, 0.09f, 0.1f), u.Selected ? Pick : BodyColor, emissive: em);
+                        var (dim, lc) = Light(i, frame, hl);
+                        Lens(m, c + face * 0.052f, face, MathF.Min(0.035f, pitch * 0.33f), dim, lc);
                     }
                     break;
                 }

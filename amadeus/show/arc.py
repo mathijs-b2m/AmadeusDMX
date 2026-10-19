@@ -100,6 +100,7 @@ CALM_PATH = {  # per-beat and wild paths → smooth ones
     "swing": "sweep",
     "ballyhoo": "circle",
     "tilt_wave": "sweep",
+    "pour": "nod",
     "follow_lead": "sweep",
 }
 MODERATE_PATH = {"ballyhoo": "circle", "bounce": "nod", "swing": "sweep"}

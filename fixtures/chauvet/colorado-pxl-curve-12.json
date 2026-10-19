@@ -1,0 +1,3025 @@
+{
+  "manufacturer": "Chauvet",
+  "model": "COLORado PXL Curve 12",
+  "kind": "moving_bar",
+  "source": "COLORado PXL Curve 12 User Manual Rev. 4, DMX Values (Single Control Mode); check it once with `amadeus test`",
+  "_note": "12 RGBW pixels, each on its own tilt motor with its own zoom: in every mode but 20ch the cells tilt on their own (a curve, a wave along the bar). 53ch tilts and zooms per cell but has one colour for the bar. Set the fixture to Single Control (Dual Control's two addresses aren't supported), Tilt Angle 200, Zoom Reverse NO. The control channel holds RGBW colour mixing on (a CMY menu setting would invert the colours).",
+  "physical": {
+    "pan_deg": 0,
+    "tilt_deg": 200,
+    "beam_deg": 5.7,
+    "beam_deg_max": 26.8,
+    "size_mm": [
+      1003,
+      169,
+      324
+    ],
+    "weight_kg": 34.5,
+    "watts": 800,
+    "lumens": 6000,
+    "_lumens_note": "estimated from the manual's photometrics (38,727 lux at 5 m in spot, 1,120 lux in flood)",
+    "light": "12 \u00d7 45 W RGBW LEDs, 5.7\u00b0\u201326.8\u00b0 zoom per cell",
+    "ip": "IP65"
+  },
+  "motion": {
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 180,
+    "accel_dps2": 700,
+    "_note": "Estimated; measure with `amadeus motion`."
+  },
+  "modes": {
+    "179ch": [
+      {
+        "attr": "tilt",
+        "head": 1
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 1
+      },
+      {
+        "attr": "tilt",
+        "head": 2
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 2
+      },
+      {
+        "attr": "tilt",
+        "head": 3
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 3
+      },
+      {
+        "attr": "tilt",
+        "head": 4
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 4
+      },
+      {
+        "attr": "tilt",
+        "head": 5
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 5
+      },
+      {
+        "attr": "tilt",
+        "head": 6
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 6
+      },
+      {
+        "attr": "tilt",
+        "head": 7
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 7
+      },
+      {
+        "attr": "tilt",
+        "head": 8
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 8
+      },
+      {
+        "attr": "tilt",
+        "head": 9
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 9
+      },
+      {
+        "attr": "tilt",
+        "head": 10
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 10
+      },
+      {
+        "attr": "tilt",
+        "head": 11
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 11
+      },
+      {
+        "attr": "tilt",
+        "head": 12
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 12
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "tilt_macro",
+        "default": 0
+      },
+      {
+        "attr": "ctc",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "pattern",
+        "default": 0
+      },
+      {
+        "attr": "led_program",
+        "default": 0
+      },
+      {
+        "attr": "led_program_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_program_delay",
+        "default": 0
+      },
+      {
+        "attr": "background_color",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer_fine",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "strobe",
+        "default": 22
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 1
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 2
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 3
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 4
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 5
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 6
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 7
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 8
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 9
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 10
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 11
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 12
+      },
+      {
+        "attr": "control",
+        "default": 22
+      },
+      {
+        "attr": "red",
+        "default": 0
+      },
+      {
+        "attr": "red_fine",
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "default": 0
+      },
+      {
+        "attr": "green_fine",
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "default": 0
+      },
+      {
+        "attr": "blue_fine",
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "default": 0
+      },
+      {
+        "attr": "white_fine",
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 1
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "red_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "green_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "blue_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "white_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 2
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "red_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "green_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "blue_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "white_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 3
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "red_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "green_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "blue_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "white_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 4
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "red_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "green_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "blue_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "white_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 5
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "red_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "green_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "blue_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "white_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 6
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "red_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "green_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "blue_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "white_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 7
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "red_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "green_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "blue_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "white_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 8
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "red_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "green_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "blue_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "white_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 9
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "red_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "green_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "blue_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "white_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 10
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "red_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "green_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "blue_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "white_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 11
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "red_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "green_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "blue_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "white_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "dimmer",
+        "head": 12
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "red_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "green_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "blue_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 12
+      },
+      {
+        "attr": "white_fine",
+        "head": 12,
+        "default": 0
+      }
+    ],
+    "169ch": [
+      {
+        "attr": "control",
+        "default": 22
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "tilt_macro",
+        "default": 0
+      },
+      {
+        "attr": "ctc",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "pattern",
+        "default": 0
+      },
+      {
+        "attr": "led_program",
+        "default": 0
+      },
+      {
+        "attr": "led_program_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_program_delay",
+        "default": 0
+      },
+      {
+        "attr": "background_color",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer_fine",
+        "default": 0
+      },
+      {
+        "attr": "strobe",
+        "default": 22
+      },
+      {
+        "attr": "tilt",
+        "head": 1
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 1
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 1
+      },
+      {
+        "attr": "dimmer",
+        "head": 1
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "red_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "green_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "blue_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "white_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 2
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 2
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 2
+      },
+      {
+        "attr": "dimmer",
+        "head": 2
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "red_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "green_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "blue_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "white_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 3
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 3
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 3
+      },
+      {
+        "attr": "dimmer",
+        "head": 3
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "red_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "green_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "blue_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "white_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 4
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 4
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 4
+      },
+      {
+        "attr": "dimmer",
+        "head": 4
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "red_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "green_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "blue_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "white_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 5
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 5
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 5
+      },
+      {
+        "attr": "dimmer",
+        "head": 5
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "red_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "green_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "blue_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "white_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 6
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 6
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 6
+      },
+      {
+        "attr": "dimmer",
+        "head": 6
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "red_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "green_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "blue_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "white_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 7
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 7
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 7
+      },
+      {
+        "attr": "dimmer",
+        "head": 7
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "red_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "green_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "blue_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "white_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 8
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 8
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 8
+      },
+      {
+        "attr": "dimmer",
+        "head": 8
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "red_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "green_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "blue_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "white_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 9
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 9
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 9
+      },
+      {
+        "attr": "dimmer",
+        "head": 9
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "red_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "green_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "blue_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "white_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 10
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 10
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 10
+      },
+      {
+        "attr": "dimmer",
+        "head": 10
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "red_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "green_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "blue_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "white_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 11
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 11
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 11
+      },
+      {
+        "attr": "dimmer",
+        "head": 11
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "red_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "green_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "blue_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "white_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "tilt",
+        "head": 12
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 12
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 12
+      },
+      {
+        "attr": "dimmer",
+        "head": 12
+      },
+      {
+        "attr": "dimmer_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "red_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "green_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "blue_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 12
+      },
+      {
+        "attr": "white_fine",
+        "head": 12,
+        "default": 0
+      }
+    ],
+    "155ch": [
+      {
+        "attr": "tilt",
+        "head": 1
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 1
+      },
+      {
+        "attr": "tilt",
+        "head": 2
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 2
+      },
+      {
+        "attr": "tilt",
+        "head": 3
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 3
+      },
+      {
+        "attr": "tilt",
+        "head": 4
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 4
+      },
+      {
+        "attr": "tilt",
+        "head": 5
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 5
+      },
+      {
+        "attr": "tilt",
+        "head": 6
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 6
+      },
+      {
+        "attr": "tilt",
+        "head": 7
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 7
+      },
+      {
+        "attr": "tilt",
+        "head": 8
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 8
+      },
+      {
+        "attr": "tilt",
+        "head": 9
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 9
+      },
+      {
+        "attr": "tilt",
+        "head": 10
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 10
+      },
+      {
+        "attr": "tilt",
+        "head": 11
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 11
+      },
+      {
+        "attr": "tilt",
+        "head": 12
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 12
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "tilt_macro",
+        "default": 0
+      },
+      {
+        "attr": "ctc",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "pattern",
+        "default": 0
+      },
+      {
+        "attr": "led_program",
+        "default": 0
+      },
+      {
+        "attr": "led_program_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_program_delay",
+        "default": 0
+      },
+      {
+        "attr": "background_color",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer_fine",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine"
+      },
+      {
+        "attr": "strobe",
+        "default": 22
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 1
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 2
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 3
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 4
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 5
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 6
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 7
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 8
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 9
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 10
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 11
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 12
+      },
+      {
+        "attr": "control",
+        "default": 22
+      },
+      {
+        "attr": "red",
+        "default": 0
+      },
+      {
+        "attr": "red_fine",
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "default": 0
+      },
+      {
+        "attr": "green_fine",
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "default": 0
+      },
+      {
+        "attr": "blue_fine",
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "default": 0
+      },
+      {
+        "attr": "white_fine",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "red_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "green_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "blue_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "white_fine",
+        "head": 1,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "red_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "green_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "blue_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "white_fine",
+        "head": 2,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "red_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "green_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "blue_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "white_fine",
+        "head": 3,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "red_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "green_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "blue_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "white_fine",
+        "head": 4,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "red_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "green_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "blue_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "white_fine",
+        "head": 5,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "red_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "green_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "blue_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "white_fine",
+        "head": 6,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "red_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "green_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "blue_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "white_fine",
+        "head": 7,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "red_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "green_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "blue_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "white_fine",
+        "head": 8,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "red_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "green_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "blue_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "white_fine",
+        "head": 9,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "red_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "green_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "blue_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "white_fine",
+        "head": 10,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "red_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "green_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "blue_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "white_fine",
+        "head": 11,
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "red_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "green_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "blue_fine",
+        "head": 12,
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "head": 12
+      },
+      {
+        "attr": "white_fine",
+        "head": 12,
+        "default": 0
+      }
+    ],
+    "101ch": [
+      {
+        "attr": "tilt",
+        "head": 1
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 1
+      },
+      {
+        "attr": "tilt",
+        "head": 2
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 2
+      },
+      {
+        "attr": "tilt",
+        "head": 3
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 3
+      },
+      {
+        "attr": "tilt",
+        "head": 4
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 4
+      },
+      {
+        "attr": "tilt",
+        "head": 5
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 5
+      },
+      {
+        "attr": "tilt",
+        "head": 6
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 6
+      },
+      {
+        "attr": "tilt",
+        "head": 7
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 7
+      },
+      {
+        "attr": "tilt",
+        "head": 8
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 8
+      },
+      {
+        "attr": "tilt",
+        "head": 9
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 9
+      },
+      {
+        "attr": "tilt",
+        "head": 10
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 10
+      },
+      {
+        "attr": "tilt",
+        "head": 11
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 11
+      },
+      {
+        "attr": "tilt",
+        "head": 12
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 12
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "tilt_macro",
+        "default": 0
+      },
+      {
+        "attr": "ctc",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "pattern",
+        "default": 0
+      },
+      {
+        "attr": "led_program",
+        "default": 0
+      },
+      {
+        "attr": "led_program_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_program_delay",
+        "default": 0
+      },
+      {
+        "attr": "background_color",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe",
+        "default": 22
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 1
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 2
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 3
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 4
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 5
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 6
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 7
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 8
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 9
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 10
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 11
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 12
+      },
+      {
+        "attr": "control",
+        "default": 22
+      },
+      {
+        "attr": "red",
+        "default": 0
+      },
+      {
+        "attr": "green",
+        "default": 0
+      },
+      {
+        "attr": "blue",
+        "default": 0
+      },
+      {
+        "attr": "white",
+        "default": 0
+      },
+      {
+        "attr": "red",
+        "head": 1
+      },
+      {
+        "attr": "green",
+        "head": 1
+      },
+      {
+        "attr": "blue",
+        "head": 1
+      },
+      {
+        "attr": "white",
+        "head": 1
+      },
+      {
+        "attr": "red",
+        "head": 2
+      },
+      {
+        "attr": "green",
+        "head": 2
+      },
+      {
+        "attr": "blue",
+        "head": 2
+      },
+      {
+        "attr": "white",
+        "head": 2
+      },
+      {
+        "attr": "red",
+        "head": 3
+      },
+      {
+        "attr": "green",
+        "head": 3
+      },
+      {
+        "attr": "blue",
+        "head": 3
+      },
+      {
+        "attr": "white",
+        "head": 3
+      },
+      {
+        "attr": "red",
+        "head": 4
+      },
+      {
+        "attr": "green",
+        "head": 4
+      },
+      {
+        "attr": "blue",
+        "head": 4
+      },
+      {
+        "attr": "white",
+        "head": 4
+      },
+      {
+        "attr": "red",
+        "head": 5
+      },
+      {
+        "attr": "green",
+        "head": 5
+      },
+      {
+        "attr": "blue",
+        "head": 5
+      },
+      {
+        "attr": "white",
+        "head": 5
+      },
+      {
+        "attr": "red",
+        "head": 6
+      },
+      {
+        "attr": "green",
+        "head": 6
+      },
+      {
+        "attr": "blue",
+        "head": 6
+      },
+      {
+        "attr": "white",
+        "head": 6
+      },
+      {
+        "attr": "red",
+        "head": 7
+      },
+      {
+        "attr": "green",
+        "head": 7
+      },
+      {
+        "attr": "blue",
+        "head": 7
+      },
+      {
+        "attr": "white",
+        "head": 7
+      },
+      {
+        "attr": "red",
+        "head": 8
+      },
+      {
+        "attr": "green",
+        "head": 8
+      },
+      {
+        "attr": "blue",
+        "head": 8
+      },
+      {
+        "attr": "white",
+        "head": 8
+      },
+      {
+        "attr": "red",
+        "head": 9
+      },
+      {
+        "attr": "green",
+        "head": 9
+      },
+      {
+        "attr": "blue",
+        "head": 9
+      },
+      {
+        "attr": "white",
+        "head": 9
+      },
+      {
+        "attr": "red",
+        "head": 10
+      },
+      {
+        "attr": "green",
+        "head": 10
+      },
+      {
+        "attr": "blue",
+        "head": 10
+      },
+      {
+        "attr": "white",
+        "head": 10
+      },
+      {
+        "attr": "red",
+        "head": 11
+      },
+      {
+        "attr": "green",
+        "head": 11
+      },
+      {
+        "attr": "blue",
+        "head": 11
+      },
+      {
+        "attr": "white",
+        "head": 11
+      },
+      {
+        "attr": "red",
+        "head": 12
+      },
+      {
+        "attr": "green",
+        "head": 12
+      },
+      {
+        "attr": "blue",
+        "head": 12
+      },
+      {
+        "attr": "white",
+        "head": 12
+      }
+    ],
+    "53ch": [
+      {
+        "attr": "tilt",
+        "head": 1
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 1
+      },
+      {
+        "attr": "tilt",
+        "head": 2
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 2
+      },
+      {
+        "attr": "tilt",
+        "head": 3
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 3
+      },
+      {
+        "attr": "tilt",
+        "head": 4
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 4
+      },
+      {
+        "attr": "tilt",
+        "head": 5
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 5
+      },
+      {
+        "attr": "tilt",
+        "head": 6
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 6
+      },
+      {
+        "attr": "tilt",
+        "head": 7
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 7
+      },
+      {
+        "attr": "tilt",
+        "head": 8
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 8
+      },
+      {
+        "attr": "tilt",
+        "head": 9
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 9
+      },
+      {
+        "attr": "tilt",
+        "head": 10
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 10
+      },
+      {
+        "attr": "tilt",
+        "head": 11
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 11
+      },
+      {
+        "attr": "tilt",
+        "head": 12
+      },
+      {
+        "attr": "tilt_fine",
+        "head": 12
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "tilt_macro",
+        "default": 0
+      },
+      {
+        "attr": "ctc",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "pattern",
+        "default": 0
+      },
+      {
+        "attr": "led_program",
+        "default": 0
+      },
+      {
+        "attr": "led_program_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_program_delay",
+        "default": 0
+      },
+      {
+        "attr": "background_color",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe",
+        "default": 22
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 1
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 2
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 3
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 4
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 5
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 6
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 7
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 8
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 9
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 10
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 11
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255,
+        "head": 12
+      },
+      {
+        "attr": "control",
+        "default": 22
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      }
+    ],
+    "20ch": [
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "tilt_speed",
+        "default": 0
+      },
+      {
+        "attr": "tilt_macro",
+        "default": 0
+      },
+      {
+        "attr": "ctc",
+        "default": 0
+      },
+      {
+        "attr": "color_macro",
+        "default": 0
+      },
+      {
+        "attr": "pattern",
+        "default": 0
+      },
+      {
+        "attr": "led_program",
+        "default": 0
+      },
+      {
+        "attr": "led_program_speed",
+        "default": 0
+      },
+      {
+        "attr": "led_program_delay",
+        "default": 0
+      },
+      {
+        "attr": "background_color",
+        "default": 0
+      },
+      {
+        "attr": "background_dimmer",
+        "default": 0
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "strobe",
+        "default": 22
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "control",
+        "default": 22
+      },
+      {
+        "attr": "red"
+      },
+      {
+        "attr": "green"
+      },
+      {
+        "attr": "blue"
+      },
+      {
+        "attr": "white"
+      }
+    ]
+  }
+}

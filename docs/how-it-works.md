@@ -141,8 +141,8 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 | `trigger`: what a hit is | kick · backbeat · dembow · drums · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
 | `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · off |
-| `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) |
-| `formation` | sync · mirror · wave · fan · focus (shared point) · cross |
+| `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) · pour (lit high at the ceiling, a fast fall to the floor, let go there, back up in the dark for the next beat; sync: a curtain, wave: a cascade, individual: each head on its own beat) |
+| `formation` | sync · mirror · wave · fan (a bar whose cells tilt on their own, like the COLORado PXL Curve, bends into a curve) · focus (shared point) · cross |
 | `aim` | crowd · stage · sky |
 | `head_color` | base · accent · white · cycle |
 | `beam_fx` | **open (default)** · gobo · gobo_shake · gobo_spin · gobo_rotate · prism · prism_spin · frost (rare) |

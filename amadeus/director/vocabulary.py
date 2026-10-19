@@ -157,6 +157,13 @@ MOVEMENTS = [  # the path; how heads relate to each other is the formation
         "neighbour (mirror: from the centre out). One wave per bar, faster at the peaks. A classic for energetic "
         "grooves and drops, with the light steady or pulsing at random; not for calm parts.",
     ),
+    (
+        "pour",
+        "Beams pour down: lit high up at the ceiling, they fall fast to the floor, let go there and fly back up "
+        "in the dark, landing on the beat for the next fall (the pour plays its own light). Sync: a curtain "
+        "coming down; wave: a cascade along the row; individual grouping: every head on its own beat. For "
+        "energetic grooves and drops; not for calm parts.",
+    ),
 ]
 
 FORMATIONS = [
