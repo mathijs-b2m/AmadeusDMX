@@ -68,6 +68,23 @@ TILT_WAVE_DEG = 30.0  # tilt wave: how far each head tilts up and down (a little
 TILT_WAVE_SPAN = 1.0  # …and how many waves the row shows at once (1: one full wave from end to end)
 
 
+POUR_FLOOR_DEG = -70.0  # pour: the beams fall from the top of their aim down to the floor…
+POUR_LOW_FLOOR_DEG = 15.0  # …heads standing on the floor fall to just over the crowd's heads instead
+POUR_HOLD = 0.06  # share of a pour's cycle at the top, lit, before the fall
+POUR_RELEASE_S = (0.12, 0.25)  # at the floor the light lets go over this long (shorter for a slow head), then
+# the head flies back up dark
+POUR_BEATS = (2, 4, 8)  # a pour's cycle: the shortest the slowest head can fall, let go and fly back up in
+POUR_MARGIN = 0.03  # share of the cycle the head is back at the top before its next hit
+POUR_LATE = 1.12  # …a slow head may still be finishing its climb as the hit comes (a few degrees, lit)
+
+
+def _travel(dist: float, vmax: float, acc: float) -> float:
+    """Seconds for a rest-to-rest move of `dist` degrees (accelerate, cruise, brake)."""
+    if dist <= vmax * vmax / acc:
+        return 2 * math.sqrt(dist / acc)
+    return dist / vmax + vmax / acc
+
+
 AIMS = {  # direction aims: centre azimuth/elevation and swing; point aims: (y centre, y half-range, z) of a surface
     "crowd": {"az": 0, "el": -32, "az_amp": 60, "el_amp": 15, "plane": (2.2, 1.5, 0.0)},
     "stage": {"az": 180, "el": -35, "az_amp": 60, "el_amp": 18, "plane": (-2.2, 1.0, 0.0)},
@@ -127,11 +144,6 @@ class MotionMixin:
         motion = defn.get("motion", DEFAULT_MOTION)
         period = float(np.median(np.diff(self.beats))) if len(self.beats) > 2 else 0.45
 
-        def travel(dist, vmax, acc):  # time for a rest-to-rest move (accelerate, cruise, brake)
-            if dist <= vmax * vmax / acc:
-                return 2 * math.sqrt(dist / acc)
-            return dist / vmax + vmax / acc
-
         def reach(vmax, acc, beats):
             t = 0.9 * period * beats  # leave a little rest at each landing
             return min(acc * t * t / 4, vmax * t * 0.75, 90.0)
@@ -143,7 +155,7 @@ class MotionMixin:
             beats = 1 if reach(vmax, acc, 1) >= MIN_BEAT_SWING_DEG else 2
             dist = reach(vmax, acc, beats)
             axes[axis] = (dist, beats)
-            frac[axis] = min(0.98, travel(dist, vmax, acc) / (beats * period))  # share of the move spent travelling
+            frac[axis] = min(0.98, _travel(dist, vmax, acc) / (beats * period))  # share of the move spent travelling
         self.move_beats[j] = (axes["pan"][1], axes["tilt"][1])
         self.move_travel[j] = (frac["pan"], frac["tilt"])
         out = {}
@@ -307,6 +319,102 @@ class MotionMixin:
             out = self.zones.filter(head_pos, out[None])[0]
         out = geometry.room_safe_v(out[None], head_pos, self.stage)[0]
         return geometry.eye_safe(out, head_pos[2], self.stage)
+
+    # ---------------------------------------------------------------- pour
+
+    def _pour_levels(self, j: int, aim_name: str) -> tuple[float, float]:
+        """A pour's top (high, under the ceiling) and floor elevation for head j."""
+        sky = self._fit_aim("sky", self.head_pos[j])
+        top = sky["el"] + 0.5 * sky["el_amp"]
+        floor = POUR_LOW_FLOOR_DEG if self.head_pos[j][2] < LOW_HEAD_M else POUR_FLOOR_DEG
+        if aim_name == "down":  # a truss that plays down: the fall ends straight under it
+            floor = min(floor, DOWN_LOWEST_DEG + 3)
+        return top, min(floor, top - 30.0)
+
+    def _pour_fall_s(self, j: int, dist: float) -> float:
+        _, defn = self.head_fx[j]
+        motion = defn.get("motion", DEFAULT_MOTION)
+        return _travel(dist, motion["tilt_speed_dps"], motion.get("tilt_accel_dps2", motion["accel_dps2"]))
+
+    def _pour_period(self, d: Decision) -> float:
+        """Beats per pour: the shortest cycle (two beats at the peaks, else four, else eight) in which the slowest
+        head can fall, let go and fly back up in time for the next hit."""
+        key = (d.phrase, d.intensity)
+        cache = self.__dict__.setdefault("_pour_cache", {})
+        if key not in cache:
+            beat = float(np.median(np.diff(self.beats))) if len(self.beats) > 2 else 0.45
+            need = 0.0
+            for j in range(len(self.heads)):
+                top, floor = self._pour_levels(j, self._aim_name(d.aim, j))
+                fall = self._pour_fall_s(j, top - floor)
+                need = max(need, (2 * fall + POUR_RELEASE_S[0]) / (1 - POUR_HOLD - POUR_MARGIN) / POUR_LATE)
+            options = POUR_BEATS if d.intensity >= 3 else POUR_BEATS[1:]
+            cache[key] = float(next((b for b in options if b * beat >= need), options[-1]))
+        return cache[key]
+
+    def _pour_cycle(self, d: Decision, pos, j: int, role: dict):
+        """Where head j is in its pour (0..1 of the cycle) at musical positions `pos` (beats), and the cycle's
+        beats. Sync: all together; wave: one after the other along the row (a bar whose cells tilt on their own:
+        along the bar), a cascade over one cycle; mirror: from the centre out; individual: each head its own
+        start, on a beat."""
+        period = self._pour_period(d)
+        f = role["formation"]
+        cp = self._cell_place(j)
+        across = (cp + 1) / 2 if cp is not None else (role["side"] + 1) / 2
+        lag = 0.0
+        if f == "wave":
+            lag = across * period
+        elif f == "mirror":
+            lag = (abs(cp) if cp is not None else abs(role["side"])) * period / 2
+        if role["seed"] is not None:  # individual: its own start, landing on a beat
+            lag += round(role["phase"]) % period
+        return np.mod((pos - lag) / period, 1.0), period
+
+    def _pour_marks(self, d: Decision, j: int, period: float) -> tuple[float, float, float, float]:
+        """A pour's moments for head j, as shares of its cycle: the fall starts, the light lets go (at the floor,
+        or where the beam would enter the audience's eye height), the head flies back up; and how long the light
+        takes to let go."""
+        beat = float(np.median(np.diff(self.beats))) if len(self.beats) > 2 else 0.45
+        cycle_s = period * beat
+        aim_name = self._aim_name(d.aim, j)
+        top, floor = self._pour_levels(j, aim_name)
+        fall = self._pour_fall_s(j, top - floor) / cycle_s
+        spare = 1.0 - POUR_HOLD - POUR_MARGIN - 2 * fall
+        release = min(max(spare, POUR_RELEASE_S[0] / cycle_s), POUR_RELEASE_S[1] / cycle_s)
+        arrive = POUR_HOLD + fall
+        st = self.stage
+        az = AIMS.get(aim_name, AIMS["crowd"])["az"]
+        if st["eye_safety"] and math.cos(math.radians(az)) > 0.15:
+            hi = 10.0 if self.head_pos[j][2] >= 2.5 else st["audience_min_up_deg"]
+            if floor < hi < top:  # dark before the beam crosses eye height: no flash on the way through
+                arrive = POUR_HOLD + fall * (top - hi) / (top - floor)
+        back = max(1.0 - POUR_MARGIN - fall, arrive + release)
+        return POUR_HOLD, arrive, back, release
+
+    def _pour_dir_v(self, d: Decision, pos, j: int, role: dict, aim_name: str) -> np.ndarray:
+        """Pour: high and lit, a rapid fall to the floor, dark at the floor, a rapid flight back up. The targets
+        jump; the motors make the moves as fast as they go."""
+        frac, period = self._pour_cycle(d, pos, j, role)
+        start, _, back, _ = self._pour_marks(d, j, period)
+        top, floor = self._pour_levels(j, aim_name)
+        aim = self._fit_aim(aim_name, self.head_pos[j])
+        side = role["side"]
+        az = aim["az"] + side * {"fan": 30, "mirror": 15}.get(role["formation"], 0)
+        el = np.where((frac >= start) & (frac < back), floor, top)
+        return self._direction_v(np.full_like(el, az, dtype=float), el)
+
+    def pour_light(self, d: Decision, t: float, j: int, role: dict) -> float:
+        """A pour's light for head j at t: on at the top, held through the fall, let go at the floor, dark on the
+        way back up (the hit on the next cycle's start)."""
+        beat, phase, _ = self.beat_info(t)
+        frac, period = self._pour_cycle(d, np.array([beat + phase]), j, role)
+        frac = float(frac[0])
+        _, arrive, _, release = self._pour_marks(d, j, period)
+        if frac < arrive:
+            return 1.0
+        if frac < arrive + release:
+            return 1.0 - _ease((frac - arrive) / release)
+        return 0.0
 
     def _drop_ahead(self, i: int, t: float) -> int | None:
         """Index of the drop phrase if one starts within the next beat (for moving in black)."""
@@ -503,7 +611,9 @@ class MotionMixin:
         az = aim["az"] + u * aim["az_amp"]
         el = aim["el"] + v * aim["el_amp"]
         cp = self._cell_place(j)  # a cell of a bar whose cells tilt on their own: its waves roll along the bar
-        if movement == "tilt_wave" or (f == "wave" and cp is not None and not ring):
+        if movement == "pour":
+            out = self._pour_dir_v(d, beat + phase, j, role, aim_name)
+        elif movement == "tilt_wave" or (f == "wave" and cp is not None and not ring):
             # A row of heads tilting up and down in a wave that rolls over the row: each head a step behind its
             # neighbour by where it hangs (left to right; mirrored: from the centre out). One wave per bar, every
             # two beats at the peaks. The beams fan out a little so the row reads as a row.

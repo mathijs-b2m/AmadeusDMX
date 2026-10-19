@@ -118,7 +118,7 @@ MIRROR_BALL = {"beam_fx": "gobo_rotate", "gobo_style": "dots", "movement": "circ
 
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
 _CALM_AVOID = {"head_light": {"flick", "beat", "random"},
-               "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave"},
+               "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave", "pour"},
                "par_accent": {"chase"}, "beam_fx": {"prism_spin", "gobo_spin", "gobo_shake"}}  # fmt: skip
 _CALM_PREFER = {"head_light": ("breathe", "steady"), "movement": ("sweep", "still", "circle"),
                 "par_accent": ("none", "pulse"), "beam_fx": ("open", "gobo_rotate")}  # fmt: skip

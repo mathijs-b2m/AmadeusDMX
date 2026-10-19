@@ -30,6 +30,7 @@ RULE_LOOKS = {
         ("dim", "chase", "synth", "pulse", "step_on_beat", "mirror", "crowd", "white", "steady"),
         ("off", "pulse", "kick", "steady", "tilt_wave", "wave", "crowd", "white", "steady"),
         ("dim", "chase", "hats", "random", "tilt_wave", "mirror", "crowd", "accent", "steady"),
+        ("off", "pulse", "kick", "steady", "pour", "wave", "crowd", "white", "steady"),
     ],
     "buildup": [
         ("dim", "pulse", "roll", "pulse", "nod", "fan", "sky", "white", "rise"),
@@ -41,6 +42,7 @@ RULE_LOOKS = {
         ("off", "pulse", "kick", "flick", "bounce", "mirror", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "random", "tilt_wave", "wave", "crowd", "white", "impact"),
         ("full", "color_pop", "kick", "steady", "tilt_wave", "mirror", "sky", "accent", "impact"),
+        ("off", "pulse", "kick", "steady", "pour", "sync", "crowd", "white", "impact"),
     ],
     "breakdown": [
         ("dim", "none", "accents", "breathe", "circle", "wave", "sky", "base", "steady"),
@@ -113,7 +115,7 @@ RULE_GROUPING = {  # rotated per section, like RULE_LOOKS (rigs with several hea
 }
 
 
-PER_BEAT = {"step_on_beat", "bounce", "swing", "ballyhoo", "tilt_wave"}
+PER_BEAT = {"step_on_beat", "bounce", "swing", "ballyhoo", "tilt_wave", "pour"}
 
 
 RULE_LAYERS = {  # (layer_split, base_glow), rotated per section

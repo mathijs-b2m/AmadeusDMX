@@ -172,9 +172,9 @@ def apply_arc(d: Decision, arc: dict, lasers, groups, next_best=None) -> bool:
             d.head_light, changed = "pulse", True
         if d.movement in ("ballyhoo", "figure8", "circle"):
             d.movement, changed = "nod", True
-    # the tilt wave and randomly pulsing heads are for medium and intense moments, not for calm ones
+    # the tilt wave, the pour and randomly pulsing heads are for medium and intense moments, not for calm ones
     calm = d.section in ("intro", "breakdown", "bridge", "outro") or d.intensity < 1
-    if calm and d.movement == "tilt_wave":
+    if calm and d.movement in ("tilt_wave", "pour"):
         d.movement, changed = "nod", True
     if calm and d.head_light == "random":
         d.head_light, changed = "breathe", True
