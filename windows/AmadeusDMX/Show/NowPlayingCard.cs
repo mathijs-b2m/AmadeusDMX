@@ -9,7 +9,7 @@ public sealed class NowPlayingCard(AppModel model)
     {
         // rebuilt when the state, the track, the phrase or the guard changes; the times follow the feed by themselves
         var live = UI.Live(model, Content, nameof(AppModel.ShowState), nameof(AppModel.ShowTitle), nameof(AppModel.DjWaiting), nameof(AppModel.CurrentSet))
-            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase), nameof(LiveFeed.LaserGuard)], c => c.Content = Content());
+            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase), nameof(LiveFeed.LaserGuard)], c => c.Rebuild(Content));
         return ShowUI.Glass(live).MaxWidth(420).Leading();
     }
 

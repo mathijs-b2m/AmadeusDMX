@@ -12,7 +12,7 @@ public sealed class PerformBoard(AppModel model)
     public FrameworkElement Build()
     {
         var live = UI.Live(model, Content, nameof(AppModel.ShowState), nameof(AppModel.CurrentSet))
-            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase)], c => c.Content = Content());
+            .Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.Phrase)], c => c.Rebuild(Content));
         live.HorizontalAlignment = HorizontalAlignment.Center;
         live.VerticalAlignment = VerticalAlignment.Center;
         var board = new Grid { Background = Theme.Brush("SolidBackgroundFillColorTertiaryBrush") };  // the Mac's under-page colour

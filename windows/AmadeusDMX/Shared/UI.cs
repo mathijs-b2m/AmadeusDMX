@@ -14,7 +14,13 @@
 // State: `.Bind(model, nameof(Prop), el => …)` runs now and on every change while the element is on screen (also
 // `.Bind(model, [nameof(A), nameof(B)], …)` and `.BindAll(model, …)`);
 // `UI.Live(model, () => …)` rebuilds a part of the view when the model changes (SwiftUI's re-evaluated body).
+//
+// A view the feed updates 5 times a second must stay clickable: setting a brush or a tooltip again restarts the
+// control's hover look and closes its tooltip, and a button rebuilt between press and release never gets its click.
+// So Foreground, Background and Tooltip leave an unchanged value alone, and rebuilds go through `host.Rebuild(…)`,
+// which waits while a pointer is pressed in the host.
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -364,7 +370,7 @@ public static partial class UI
             VerticalContentAlignment = VerticalAlignment.Stretch,
             IsTabStop = false,
         };
-        void Rebuild(ContentControl c) => c.Content = build();
+        void Rebuild(ContentControl c) => c.Rebuild(build);
         return properties.Length == 0 ? host.BindAll(model, Rebuild) : host.Bind(model, properties, Rebuild);
     }
 
@@ -378,8 +384,47 @@ public static partial class UI
             IsTabStop = false,
         };
         host.Content = build();
-        foreach (var m in models) host.Bind(m, name => true, c => c.Content = build(), applyNow: false);
+        foreach (var m in models) host.Bind(m, name => true, c => c.Rebuild(build), applyNow: false);
         return host;
+    }
+
+    /// Fills `host` with what `build` makes, but not while a pointer is pressed in it: the button under the pointer
+    /// would be thrown away between press and release, and its click lost. Then it waits for the release (the click
+    /// has run by then) and builds once, with the model as it is then.
+    public static void Rebuild(this ContentControl host, Func<UIElement?> build)
+    {
+        var presses = Presses.GetValue(host, Track);
+        if (presses.Down) presses.Pending = build;
+        else host.Content = build();
+    }
+
+    sealed class PressState
+    {
+        public bool Down;
+        public Func<UIElement?>? Pending;
+    }
+
+    static readonly ConditionalWeakTable<ContentControl, PressState> Presses = new();
+
+    static PressState Track(ContentControl host)
+    {
+        var state = new PressState();
+        // handledEventsToo: buttons mark their pointer events handled
+        host.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => state.Down = true), true);
+        var up = new PointerEventHandler((_, _) =>
+        {
+            if (!state.Down) return;
+            state.Down = false;
+            if (state.Pending is not { } build) return;
+            state.Pending = null;
+            Later(() => host.Rebuild(build));  // after the click's own handlers
+        });
+        host.AddHandler(UIElement.PointerReleasedEvent, up, true);
+        host.AddHandler(UIElement.PointerCaptureLostEvent, up, true);
+        host.AddHandler(UIElement.PointerCanceledEvent, up, true);
+        // released outside with nothing captured: don't wait forever (only the host's own exit, not a child's bubbling up)
+        host.AddHandler(UIElement.PointerExitedEvent, new PointerEventHandler((s, e) => { if (ReferenceEquals(e.OriginalSource, host)) up(s, e); }), true);
+        return state;
     }
 
     /// The UI thread's queue, for work that must wait for the next turn (DispatchQueue.main.async).
@@ -473,9 +518,9 @@ public static class Modifiers
     {
         switch (e)
         {
-            case TextBlock t: t.Foreground = brush; break;
-            case Control c: c.Foreground = brush; break;
-            case IconElement i: i.Foreground = brush; break;
+            case TextBlock t: if (!Same(t.Foreground, brush)) t.Foreground = brush; break;
+            case Control c: if (!Same(c.Foreground, brush)) c.Foreground = brush; break;
+            case IconElement i: if (!Same(i.Foreground, brush)) i.Foreground = brush; break;
             case Stack s: foreach (var child in s.Children.OfType<FrameworkElement>()) child.Foreground(brush); break;
         }
         return e;
@@ -490,12 +535,16 @@ public static class Modifiers
     {
         switch (e)
         {
-            case Control c: c.Background = brush; break;
-            case Border b: b.Background = brush; break;
-            case Panel p: p.Background = brush; break;
+            case Control c: if (!Same(c.Background, brush)) c.Background = brush; break;
+            case Border b: if (!Same(b.Background, brush)) b.Background = brush; break;
+            case Panel p: if (!Same(p.Background, brush)) p.Background = brush; break;
         }
         return e;
     }
+
+    // the same colour again (a new brush each update): a button's Background set anew takes back its hover look
+    static bool Same(Brush? a, Brush b) =>
+        ReferenceEquals(a, b) || a is SolidColorBrush x && b is SolidColorBrush y && x.Color == y.Color && x.Opacity == y.Opacity;
 
     public static T Background<T>(this T e, Color color) where T : FrameworkElement => e.Background(new SolidColorBrush(color));
 
@@ -514,7 +563,8 @@ public static class Modifiers
 
     public static T Tooltip<T>(this T e, string? text) where T : DependencyObject
     {
-        ToolTipService.SetToolTip(e, string.IsNullOrEmpty(text) ? null : text);
+        var tip = string.IsNullOrEmpty(text) ? null : text;
+        if (!Equals(ToolTipService.GetToolTip(e), tip)) ToolTipService.SetToolTip(e, tip);  // set again, an open one closes
         return e;
     }
 
