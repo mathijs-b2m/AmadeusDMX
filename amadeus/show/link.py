@@ -42,6 +42,7 @@ import subprocess
 import threading
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from amadeus import paths
@@ -146,7 +147,14 @@ def resolve(name: str, timeout: float = 3.0) -> tuple[str, int] | None:
 
 
 def _zeroconf(timeout: float, name: str | None = None) -> list[tuple[str, str, int]]:
-    """Browse (or, given a name, resolve that one) with python-zeroconf: [(name, address, port)], IPv4 first."""
+    """Browse (or, given a name, resolve that one) with python-zeroconf: [(name, address, port)], IPv4 first.
+    On a thread of its own: live mode looks from inside its event loop, where zeroconf's blocking calls refuse
+    to run."""
+    with ThreadPoolExecutor(1) as pool:
+        return pool.submit(_zeroconf_lookup, timeout, name).result()
+
+
+def _zeroconf_lookup(timeout: float, name: str | None) -> list[tuple[str, str, int]]:
     try:
         from zeroconf import IPVersion, ServiceBrowser, Zeroconf
     except ImportError:
@@ -211,7 +219,14 @@ class RemoteListener:
         self.udp = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         self.udp.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         self.udp.bind(("::", 0))
-        self._pair()
+        try:
+            self._pair()
+        except OSError as e:
+            raise SystemExit(
+                f"Can't reach Amadeus Link at {host}:{port} ({e}). Both computers must be on the same network; "
+                "on a Windows DJ laptop, Windows Firewall must let Amadeus Link in (on this network's type: "
+                "Private or Public)."
+            ) from None
         threading.Thread(target=self._receive, daemon=True).start()
         threading.Thread(target=self._keepalive, daemon=True).start()
 
