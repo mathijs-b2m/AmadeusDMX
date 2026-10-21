@@ -1,7 +1,7 @@
 // The DMX mapper's check, channel by channel on the real fixture: one channel sweeps slowly from 0 to 255 while
 // the others keep the light on and the head in the middle, and you say what the fixture does. That puts right what
-// the manual (or the layout a fixture was made from) has wrong; a colour wheel's colours are named on the way
-// (mac/Sources/AmadeusDMX/Sets/ChannelCheck.swift).
+// the manual (or the layout a fixture was made from) has wrong; a colour wheel's colours are named on the way, or on
+// their own from the mapper's Colours… (ColourWheelEditor) (mac/Sources/AmadeusDMX/Sets/ChannelCheck.swift).
 using System.Numerics;
 
 namespace AmadeusDMX;
@@ -38,18 +38,6 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
     UIElement Body()
     {
         var ch = Channel;
-        var sweep = Form.ToggleButton(UI.Label("play.fill", "Sweep"), s.Sweeping, on => s.Sweeping = on)
-            .Bind(s, nameof(ChannelCheckState.Sweeping), b =>
-            {
-                b.IsChecked = s.Sweeping;
-                b.Content = UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? "Sweeping" : "Sweep");
-            });
-        var probe = UI.Slider(s.Probe, 0, 255, v => { s.Probe = (int)Math.Round(v); s.Sweeping = false; }, step: 1)
-            .Bind(s, nameof(ChannelCheckState.Probe), sl => sl.SetValueQuietly(s.Probe));
-        var value = UI.Text($"{s.Probe}", Font.Mono).Frame(width: 34)
-            .Bind(s, nameof(ChannelCheckState.Probe), t => t.Text = $"{s.Probe}");
-        value.TextAlignment = TextAlignment.Right;
-
         var answers = new FlowPanel { Spacing = 8, LineSpacing = 8 };
         foreach (var a in Mapping.Check)
         {
@@ -71,7 +59,7 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
                 UI.Spacer()),
             UI.Text("Watch the fixture: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?")
                 .Secondary().Wrap(),
-            UI.HStack(8, sweep, probe.Grow(), value),
+            Probing(s),
             answers,
             ch.Role == "hold" ? Hold(ch) : null,
             ch.Role == "color_wheel" ? new WheelNaming(m, s).Build() : null,
@@ -81,6 +69,23 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
                 Last ? UI.Button("Finish Check", finish).Prominent()
                      : UI.Button("Next Channel", () => Go(s.Index + 1), "chevron.right").Prominent())
         ).Padding(16));
+    }
+
+    /// Sweep (or not) and the value the probed channel gets now.
+    internal static UIElement Probing(ChannelCheckState s)
+    {
+        var sweep = Form.ToggleButton(UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? "Sweeping" : "Sweep"), s.Sweeping, on => s.Sweeping = on)
+            .Bind(s, nameof(ChannelCheckState.Sweeping), b =>
+            {
+                b.IsChecked = s.Sweeping;
+                b.Content = UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? "Sweeping" : "Sweep");
+            });
+        var probe = UI.Slider(s.Probe, 0, 255, v => { s.Probe = (int)Math.Round(v); s.Sweeping = false; }, step: 1)
+            .Bind(s, nameof(ChannelCheckState.Probe), sl => sl.SetValueQuietly(s.Probe));
+        var value = UI.Text($"{s.Probe}", Font.Mono).Frame(width: 34)
+            .Bind(s, nameof(ChannelCheckState.Probe), t => t.Text = $"{s.Probe}");
+        value.TextAlignment = TextAlignment.Right;
+        return UI.HStack(8, sweep, probe.Grow(), value);
     }
 
     /// A held channel: its value, where the light is on and steady.
@@ -138,6 +143,23 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
         s.Sweeping = true;
         Rebuild();
     }
+}
+
+/// The mapper's Colours…: the colour wheel's colours named and their values put right, without the whole check.
+/// `s.Index` is not used: the wheel's channel is `index`.
+public sealed class ColourWheelEditor(MapperModel m, int index, ChannelCheckState s, Action done)
+{
+    public FrameworkElement Build() => UI.Scroll(UI.VStack(14,
+        UI.HStack(8,
+            UI.Text("Colour Wheel", Font.Title3).Bold(),
+            UI.Text($"channel {m.Mapping!.Channels[index].N}").Secondary(),
+            UI.Spacer(),
+            UI.Button("Done", done).Prominent()),
+        UI.Text("The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
+            .Secondary().Wrap(),
+        ChannelCheck.Probing(s),
+        new WheelNaming(m, s).Build()
+    ).Padding(16));
 }
 
 /// The colour wheel's colours: show each on the fixture, say what it is, put its values right.

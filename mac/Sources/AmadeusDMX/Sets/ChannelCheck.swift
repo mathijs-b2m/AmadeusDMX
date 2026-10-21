@@ -101,6 +101,38 @@ struct ChannelCheck: View {
     }
 }
 
+/// The mapper's Colours…: the colour wheel's colours named and their values put right, without the whole check.
+struct ColourWheelEditor: View {
+    @Binding var mapping: FixtureMapping
+    let index: Int
+    @Binding var probe: Int
+    @Binding var sweeping: Bool
+    let done: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Colour Wheel").font(.title3.weight(.semibold))
+                    Text("channel \(mapping.channels[index].n)").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Done") { done() }.buttonStyle(.borderedProminent)
+                }
+                Text("The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Toggle(isOn: $sweeping) { Label(sweeping ? "Sweeping" : "Sweep", systemImage: sweeping ? "pause.fill" : "play.fill") }
+                        .toggleStyle(.button)
+                    Slider(value: Binding(get: { Double(probe) }, set: { probe = Int($0.rounded()); sweeping = false }), in: 0...255)
+                    Text("\(probe)").font(.body.monospacedDigit()).frame(width: 34, alignment: .trailing)
+                }
+                WheelNaming(slots: $mapping.wheel, probe: $probe, sweeping: $sweeping)
+            }
+            .padding(16)
+        }
+    }
+}
+
 /// The colour wheel's colours: show each on the fixture, say what it is, put its values right.
 private struct WheelNaming: View {
     @Binding var slots: [FixtureMapping.Slot]

@@ -35,6 +35,8 @@ struct MapperSheet: View {
     @State private var sweeping = true
     @State private var checkLoop: Task<Void, Never>?
     @State private var checkedAll = false    // every channel was checked: saved as checked
+    @State private var colours: Int?         // the colour wheel channel whose colours are being named
+    @State private var loadedWheel: [FixtureMapping.Slot] = []   // the wheel as loaded: saved again only when changed
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,6 +52,9 @@ struct MapperSheet: View {
                         checkedAll = true
                         stopCheck()
                     }
+                } else if let i = colours {
+                    ColourWheelEditor(mapping: Binding(get: { mapping! }, set: { mapping = $0 }), index: i,
+                                      probe: $probe, sweeping: $sweeping) { closeColours() }
                 } else {
                     channels(m)
                 }
@@ -63,7 +68,7 @@ struct MapperSheet: View {
         }
         .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 640)
         .task { await load() }
-        .onDisappear { stopTrying(); stopCheck() }
+        .onDisappear { stopTrying(); stopCheck(); closeColours() }
     }
 
     // MARK: parts
@@ -90,7 +95,7 @@ struct MapperSheet: View {
                         .font(.callout).foregroundStyle(m.plays ? Color.secondary : Color.orange)
                 }
                 Spacer()
-                if checking == nil {
+                if checking == nil && colours == nil {
                     Toggle(isOn: Binding(get: { trying }, set: { $0 ? startTrying() : stopTrying() })) {
                         Label("Try on the Lights", systemImage: trying ? "lightbulb.fill" : "lightbulb")
                     }
@@ -105,7 +110,7 @@ struct MapperSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(needsCheck && checking == nil ? .orange : nil)
-                .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false))
+                .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false) || colours != nil)
                 .help(tryRefusal ?? "Go through the channels one by one on \(target.fixture): each sweeps while you say what the fixture does")
             }
             if needsCheck && !checkedAll && checking == nil {
@@ -125,7 +130,8 @@ struct MapperSheet: View {
     private func channels(_ m: FixtureMapping) -> some View {
         List {
             ForEach(m.channels.indices, id: \.self) { i in
-                ChannelRow(channel: binding(i), roles: m.roles, address: target.address.map { $0 + i }, universe: target.universe) {
+                ChannelRow(channel: binding(i), roles: m.roles, address: target.address.map { $0 + i }, universe: target.universe,
+                           colours: tryRefusal == nil ? { openColours(i) } : nil) {
                     valuesChanged()
                 }
             }
@@ -165,7 +171,10 @@ struct MapperSheet: View {
 
     private func load() async {
         guard await model.ensureSetupService() else { error = SetupAPIError.notRunning.localizedDescription; return }
-        do { mapping = try await model.api.mapping(key: target.key, mode: target.mode) }
+        do {
+            mapping = try await model.api.mapping(key: target.key, mode: target.mode)
+            loadedWheel = mapping?.wheel ?? []
+        }
         catch { self.error = error.localizedDescription }
     }
 
@@ -174,7 +183,7 @@ struct MapperSheet: View {
         saving = true
         defer { saving = false }
         do {
-            problems = try await model.api.saveMapping(m, checked: checkedAll)
+            problems = try await model.api.saveMapping(m, checked: checkedAll, wheel: m.wheel != loadedWheel)
             if problems.isEmpty { stopTrying(); saved(); dismiss() }
         } catch { problems = [error.localizedDescription] }
     }
@@ -188,11 +197,32 @@ struct MapperSheet: View {
         checking = 0
         probe = 0
         sweeping = true
+        startProbing()
+    }
+
+    /// The colour wheel's colours, shown one by one on the fixture (the light on, the head in the middle).
+    private func openColours(_ i: Int) {
+        stopTrying()
+        if mapping?.wheel.isEmpty ?? false { mapping?.wheel = FixtureMapping.usualWheel }
+        colours = i
+        probe = mapping?.wheel.first?.mid ?? 0
+        sweeping = false
+        startProbing()
+    }
+
+    private func closeColours() {
+        guard colours != nil else { return }
+        colours = nil
+        stopCheck()
+    }
+
+    /// Sends the probed channel's value (sweeping, or as set) with the others holding the light on, ~10 times a second.
+    private func startProbing() {
         checkLoop?.cancel()
         let id = target.fixture, rig = model.selectedRig, set = model.editingSet
         checkLoop = Task {
             var up = true
-            while !Task.isCancelled, let i = checking, let m = mapping {
+            while !Task.isCancelled, let i = checking ?? colours, let m = mapping {
                 if sweeping {  // 0 → 255 → 0 in about 8 s
                     probe = up ? min(probe + 6, 255) : max(probe - 6, 0)
                     if probe == 255 || probe == 0 { up.toggle() }
@@ -203,6 +233,7 @@ struct MapperSheet: View {
                 } catch {
                     problems = [error.localizedDescription]
                     checking = nil
+                    colours = nil
                     break
                 }
                 try? await Task.sleep(for: .milliseconds(90))
@@ -259,6 +290,7 @@ private struct ChannelRow: View {
     let roles: [FixtureMapping.Role]
     let address: Int?
     let universe: Int
+    let colours: (() -> Void)?   // name the colour wheel's colours (nil: can't be tried on the lights now)
     let changed: () -> Void
 
     private var role: FixtureMapping.Role? { roles.first { $0.role == channel.role } }
@@ -302,6 +334,12 @@ private struct ChannelRow: View {
                 Stepper(channel.cell == 0 ? "Whole" : "Cell \(channel.cell)", value: $channel.cell, in: 0...64)
                     .frame(width: 110, alignment: .leading)
                     .help("Which cell of a bar it belongs to (Whole: the fixture as one)")
+            } else if channel.role == "color_wheel" {
+                Button("Colours…") { colours?() }
+                    .disabled(colours == nil)
+                    .frame(width: 110, alignment: .leading)
+                    .help(colours == nil ? "Give the fixture a start address and a DMX output to see its colours"
+                                         : "Show each colour of the wheel on the fixture, name it and set its values")
             } else {
                 Color.clear.frame(width: 110, height: 1)
             }

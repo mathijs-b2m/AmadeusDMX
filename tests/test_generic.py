@@ -98,6 +98,23 @@ def test_the_check_puts_a_wrong_manual_right(library):
     assert buf[4] == 255 and buf[5] == 0
 
 
+def test_colours_named_without_the_check_are_saved_in_wheel_order(library):
+    r = generic.create("Chegit", "Spot", "spot-9", 9)
+    chans = [{"role": c["role"], "value": c["value"]} for c in mapper.describe(r["key"], r["mode"])["channels"]]
+    wheel = [
+        {"name": "open", "from": 0, "to": 5, "rgb": [1, 1, 1]},
+        {"name": "green", "from": 20, "to": 27, "rgb": [0, 1, 0]},
+        {"name": "red", "from": 6, "to": 13, "rgb": [1, 0, 0]},  # added last, lower on the wheel
+    ]
+    assert mapper.apply(r["key"], r["mode"], "moving_head", chans, wheel=wheel) == []
+    defn = fxlib.get(r["key"])
+    assert [s["name"] for s in defn["color_wheel"]["slots"]] == ["open", "red", "green"]
+    assert not defn["made"]["checked"]  # named, but the channels weren't all checked
+    buf = bytearray(512)
+    fxlib.patch(buf, _fx(r["key"], r["mode"]), {"h1": State(dimmer=1.0, r=1.0, g=0.0, b=0.0)})
+    assert buf[2] == 9  # red's middle
+
+
 def test_a_wheel_slot_out_of_range_is_refused(library):
     r = generic.create("Chegit", "Spot", "spot-9", 9)
     chans = [{"role": c["role"], "value": c["value"]} for c in mapper.describe(r["key"], r["mode"])["channels"]]
