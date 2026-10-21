@@ -21,6 +21,7 @@ struct MainView: View {
                     } else {
                         switch model.section {
                         case .show: ShowView(stage: stage)
+                        case .dmx: DMXPage()
                         case .rig: RigView()
                         case .set: SetView()
                         case .engine: EngineView()
@@ -47,7 +48,9 @@ struct MainView: View {
         .navigationSubtitle(subtitle)
         .onAppear {
             if model.needsSetup || model.sets.isEmpty || UserDefaults.standard.bool(forKey: "wizard") { openWindow(id: "wizard") }
-            if let id = UserDefaults.standard.string(forKey: "openWindow") { openWindow(id: id) }  // -openWindow dmx (screenshots)
+            if let id = UserDefaults.standard.string(forKey: "openWindow") {  // -openWindow wizard (screenshots)
+                if id == "dmx" { model.section = .dmx } else { openWindow(id: id) }
+            }
         }
     }
 
@@ -58,6 +61,8 @@ struct MainView: View {
         case .rig:
             let r = model.rigs.first { $0.name == model.editingRig }
             return r.map { $0.summary + (model.editingRigSet.isEmpty ? "" : " · \(model.editingRigSet) on it") } ?? ""
+        case .dmx:
+            return "set “\(model.selectedSet)”"
         case .engine, .settings:
             return ""
         case .show:

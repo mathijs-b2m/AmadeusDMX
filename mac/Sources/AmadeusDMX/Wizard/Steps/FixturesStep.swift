@@ -1,4 +1,4 @@
-// Wizard step 1: the set, your fixtures: search the libraries, choose the mode and how many of each.
+// Wizard step 2: the set, your fixtures (after the DMX output): search the libraries, choose the mode and how many of each.
 import AmadeusKit
 import SwiftUI
 
@@ -63,10 +63,26 @@ struct FixturesStep: View {
                         .padding(10)
                         .background(.background.secondary, in: .rect(cornerRadius: 10))
                     }
+                    capacity
                 }
             } else if w.results.isEmpty {
                 Text("No fixtures yet.").foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// The universes the fixtures take against what the DMX output carries.
+    @ViewBuilder
+    private var capacity: some View {
+        let need = w.universesNeeded
+        if let have = w.universesAvailable, need > have {
+            Label("\(need) universes needed, \(w.outputText) carries \(have). The fixtures past universe \(have) stay dark: take fewer, a smaller mode, or go back and tick another node.",
+                  systemImage: "exclamationmark.triangle.fill")
+                .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+        } else if need > 0 {
+            Label("\(need) universe\(need == 1 ? "" : "s")" + (w.universesAvailable.map { " of the \($0) on \(w.outputText)" } ?? (w.output == .visualiser ? " (visualiser only)" : "")),
+                  systemImage: "cable.connector")
+                .font(.callout).foregroundStyle(.secondary)
         }
     }
 

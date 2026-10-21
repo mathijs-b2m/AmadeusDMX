@@ -333,7 +333,8 @@ def discover(req):
     try:
         return {
             "nodes": [
-                {"ip": n.ip, "name": n.short_name, "long_name": n.long_name, "outputs": n.outputs, "port": addr[1]}
+                {"ip": n.ip, "name": n.short_name, "long_name": n.long_name, "port": addr[1],
+                 "outputs": len(n.outputs), "universes": n.outputs}  # how many outputs, and their Art-Net universes
                 for n, addr in c.poll()
             ]
         }

@@ -334,11 +334,11 @@ private struct SetHeader: View {
                 Metric(value: "\(doc?.fixtures.count ?? 0)", label: "fixtures")
                 Metric(value: "\(Set(doc?.fixtures.map(\.key) ?? []).count)", label: "models")
                 Metric(value: "\(Set(doc?.fixtures.map(\.universe) ?? []).count)", label: "universes")
-                Button { openWindow(id: "dmx") } label: {
+                Button { model.section = .dmx } label: {
                     Metric(value: set?.isVirtual ?? true ? "Visualiser" : (set?.outputText ?? "–"), label: "DMX output ›")
                 }
                 .buttonStyle(.plain)
-                .help("Where the set's universes go: DMX Devices & Output… (⇧⌘D)")
+                .help("Where the set's universes go: the DMX Output page (⇧⌘D)")
                 Spacer()
             }
         }

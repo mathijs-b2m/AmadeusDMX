@@ -35,8 +35,10 @@ public struct ArtNetNode: Decodable, Sendable, Identifiable, Hashable {
     public var name: String
     public var longName: String?
     public var outputs: Int?
+    /// The Art-Net universes of its outputs, as the node reports them (its first output's tells where it counts from).
+    public var universes: [Int]?
     public var id: String { ip }
-    enum CodingKeys: String, CodingKey { case ip, name, longName = "long_name", outputs }
+    enum CodingKeys: String, CodingKey { case ip, name, longName = "long_name", outputs, universes }
 }
 
 public struct USBInterface: Decodable, Sendable, Identifiable, Hashable {

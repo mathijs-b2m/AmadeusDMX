@@ -138,11 +138,14 @@ best certificate in `~/.amadeus-release` (`--dmg` also notarizes with `notary-ke
 
 ## Set up: a set, a rig, the set on the rig
 
-The set-up assistant (first launch, or *New Set…*) follows the three steps: your **fixtures** and where the DMX
-goes (the set), the **rig** (a new one from a template, or one you have), and how the set goes on it
-(**auto-mount**, or by hand in the rig editor). After that, three pages, each about one thing:
+The set-up assistant (first launch, or *New Set…*) follows the three steps: where the DMX goes and your **fixtures**
+(the set), the **rig** (a new one from a template, or one you have), and how the set goes on it
+(**auto-mount**, or by hand in the rig editor). After that, four pages, each about one thing:
 
-- **Sets:** a list of your sets of fixtures. Pick one to see every fixture, grouped by model, with its DMX
+- **DMX Output:** your DMX devices and where each universe of the set goes (see
+  [DMX devices and output](#dmx-devices-and-output-the-dmx-output-page-d)).
+- **Sets:** a list of your sets of fixtures, your own under *Your Sets* and the two a first run starts from under
+  *Examples* (adding fixtures to an example asks first: most who do meant to make their own set). Pick one to see every fixture, grouped by model, with its DMX
   patch and mode. *Add Fixtures…* searches our library, QLC+ and the Open Fixture Library and gives free
   addresses; right-click to identify fixtures on the real lights or remove them; the set's name is a menu to
   duplicate, rename or delete it. **Select a fixture** to edit it on the right: its name (renaming keeps where it
@@ -204,12 +207,12 @@ goes (the set), the **rig** (a new one from a template, or one you have), and ho
   set hangs; the set file gets any fixtures you added. The editor rereads the files when they change
   elsewhere, unless it has unsaved changes.
 
-## DMX devices and output (Show → DMX Devices & Output…, ⇧⌘D)
+## DMX devices and output (the DMX Output page, ⇧⌘D)
 
 Your DMX controllers are kept apart from the sets: an Art-Net node, an sACN node or multicast, a USB DMX
 interface, each set up once (name, address, its number of outputs and whether its first output is universe 0
 or 1). **Search** finds Art-Net nodes on the network and USB interfaces on this Mac; add them with one click,
-or by hand. For the selected set the window lists its universes (with how many fixtures each) and where each
+or by hand. For the selected set the page lists its universes (with how many fixtures each) and where each
 goes: a device and its output, showing the universe that goes out on the wire. Save writes your devices
 (`config/devices.json`) and the set's mapping; a running show uses it from its next start. The sidebar's
 output line and the Set page's *DMX output* open the window too.

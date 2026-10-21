@@ -8,8 +8,8 @@ struct NetworkStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            StepHeader(symbol: "cable.connector", title: "Connect the Lights",
-                       text: "DMX goes to a network node (Art-Net or sACN) or a USB interface on this Mac. No lights here? Run in the visualiser only.")
+            StepHeader(symbol: "cable.connector", title: "DMX Output",
+                       text: "First where the DMX goes: a network node (Art-Net or sACN) or a USB interface on this Mac. Your fixtures come next. No lights here? Run in the visualiser only.")
             Picker("", selection: $w.output) {
                 Text("Visualiser only").tag(WizardModel.Output.visualiser)
                 Text("Network node").tag(WizardModel.Output.node)
@@ -20,16 +20,18 @@ struct NetworkStep: View {
             .labelsHidden()
             switch w.output {
             case .visualiser:
-                Label("The show runs on screen only. You can add an output later on the setup page.", systemImage: "eye")
+                Label("The show runs on screen only. You can add an output later on the DMX Output page.", systemImage: "eye")
                     .foregroundStyle(.secondary)
             case .node, .manual:
                 protocolPicker
                 if w.output == .node { nodeList } else {
                     Form { TextField("Node IP address", text: $w.manualIP) }
                         .formStyle(.grouped).frame(height: 80)
+                    laterHint
                 }
             case .usb:
                 usbList
+                laterHint
             }
         }
         .task(id: w.output) {
@@ -62,13 +64,21 @@ struct NetworkStep: View {
             if w.discovering { ProgressView().controlSize(.small) }
         }
         if let e = w.discoverError { Text(e).foregroundStyle(.secondary).font(.callout) }
+        if w.nodes.count > 1 {
+            Text("Tick every node the set plays on: its universes go to them in this order.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
         ForEach(w.nodes) { n in
-            Button { w.node = n } label: {
+            let on = w.chosenNodes.contains(n)
+            Button {
+                if on { w.chosenNodes.removeAll { $0 == n } } else { w.chosenNodes = w.nodes.filter { w.chosenNodes.contains($0) || $0 == n } }
+            } label: {
                 HStack {
-                    Image(systemName: w.node == n ? "largecircle.fill.circle" : "circle")
+                    Image(systemName: on ? "checkmark.circle.fill" : "circle").foregroundStyle(on ? Color.accentColor : .secondary)
                     VStack(alignment: .leading) {
                         Text(n.name.isEmpty ? n.ip : n.name)
-                        Text("\(n.ip)\(n.longName.map { " · \($0)" } ?? "")").font(.caption).foregroundStyle(.secondary)
+                        Text("\(n.ip)\(n.outputs.map { " · \($0) output\($0 == 1 ? "" : "s")" } ?? "")\(n.longName.map { " · \($0)" } ?? "")")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
@@ -77,6 +87,13 @@ struct NetworkStep: View {
             }
             .buttonStyle(.plain)
         }
+        laterHint
+    }
+
+    private var laterHint: some View {
+        Label("More controllers later, or a node together with a USB interface: the DMX Output page in the sidebar (⇧⌘D).",
+              systemImage: "plus.circle")
+            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder

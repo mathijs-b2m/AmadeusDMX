@@ -12,10 +12,10 @@ struct ReviewStep: View {
             Form {
                 SwiftUI.Section("1 · The set") {
                     TextField("Set name", text: $w.name)
+                    LabeledContent("DMX output", value: w.outputText)
                     LabeledContent("Fixtures") {
                         VStack(alignment: .trailing) { ForEach(w.planned) { p in Text("\(p.count)× \(p.entry.model)") } }
                     }
-                    LabeledContent("Lights", value: w.outputText)
                     LabeledContent("Director", value: w.directors.first { $0.value == w.director }?.label ?? w.director)
                 }
                 SwiftUI.Section("2 · The rig") {

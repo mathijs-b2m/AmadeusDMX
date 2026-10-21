@@ -100,7 +100,7 @@ tested on, and exactly what that permission is used for: [docs/dj-software.md](d
 ## Sets and rigs
 
 - A **set** is your gear: the fixtures you own, their DMX mode and address, calibration, where the DMX goes (`config/sets/<name>.json`). Most people have one.
-- Your **DMX devices** (Art-Net and sACN nodes, USB interfaces) live apart from the sets, in `config/devices.json`: each set up once (name, address, how it counts its universes). A set maps its universes onto them (`"dmx": {"1": {"device": "pocket", "output": 1}}`): replace a node or play somewhere with other controllers, and only that mapping changes. In the Mac app: *Show → DMX Devices & Output…* (⇧⌘D). Sets without a mapping keep their own `output`/`artnet` settings.
+- Your **DMX devices** (Art-Net and sACN nodes, USB interfaces) live apart from the sets, in `config/devices.json`: each set up once (name, address, how it counts its universes). A set maps its universes onto them (`"dmx": {"1": {"device": "pocket", "output": 1}}`): replace a node or play somewhere with other controllers, and only that mapping changes. In the Mac app: the *DMX Output* page (⇧⌘D). Sets without a mapping keep their own `output`/`artnet` settings.
 - A **rig** is a venue: the stage's size, trusses and towers, the LED wall, zones, and where each set's fixtures hang on it (`config/rigs/<name>.json`).
 - A show runs with a set placed on a rig: the active ones (`config/active-set`, `config/active-rig`), or `--set NAME --rig NAME`. A running show keeps the ones it started with.
 

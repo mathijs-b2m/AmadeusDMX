@@ -140,11 +140,11 @@ Sets**, the two you started with under **Examples**: put your fixtures in a set 
 <td><sub><b>Where Do They Hang:</b> pick a venue (empty room, stands, a truss over the booth, club, concert stage, round truss) and its size.</sub></td>
 </tr>
 <tr>
-<td><img src="screenshots/guide/wizard-lights.png" alt="Connect the Lights: Visualiser only, Network node, Node address or USB interface"></td>
+<td><img src="screenshots/guide/wizard-lights.png" alt="DMX Output: Visualiser only, Network node, Node address or USB interface"></td>
 <td><img src="screenshots/guide/wizard-director.png" alt="Who Directs: Rules, OpenAI or a local model"></td>
 </tr>
 <tr>
-<td><sub><b>Connect the Lights:</b> an Art-Net or sACN node on your network, a USB DMX interface, or the visualiser only for now.</sub></td>
+<td><sub><b>DMX Output</b> (the first step, before your fixtures): an Art-Net or sACN node on your network, a USB DMX interface, or the visualiser only for now. The fixtures step then shows how many universes they take, and warns when that is more than the output carries.</sub></td>
 <td><sub><b>Who Directs:</b> choose <b>OpenAI</b>. It's only available once your key is in (step 3).</sub></td>
 </tr>
 </table>
@@ -159,7 +159,7 @@ one click.
 
 ## 8. Connect the lights
 
-1. **Show › DMX Devices & Output…** (⇧⌘D): click **Search** to find your Art-Net or sACN node, or **Add** a node
+1. The **DMX Output** page in the sidebar (⇧⌘D): click **Search** to find your Art-Net or sACN node, or **Add** a node
    or a USB interface. Then pick, per universe of your set, which device and output it goes to.
 2. On the **Sets** page every fixture has a **Test** button: it lights that one fixture so you can check its
    address and mode. A fixture the show can't drive from its library file is marked there; **Channels…** opens

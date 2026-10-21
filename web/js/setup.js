@@ -107,7 +107,7 @@ $("find").onclick = async () => {
   const r = await fetch("/api/discover", { method: "POST" }).then(r => r.json());
   if (r.error) return $("nodes").textContent = r.error;
   if (!r.nodes.length) return $("nodes").textContent = "No Art-Net node answered. Is it powered and on this network?";
-  $("nodes").innerHTML = r.nodes.map(n => `<button data-ip="${n.ip}" data-port="${n.port}">Use ${n.name} at ${n.ip} (universes ${n.outputs.join(", ")})</button>`).join("");
+  $("nodes").innerHTML = r.nodes.map(n => `<button data-ip="${n.ip}" data-port="${n.port}">Use ${n.name} at ${n.ip} (universes ${n.universes.join(", ")})</button>`).join("");
 };
 $("nodes").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; $("ip").value = b.dataset.ip; $("port").value = b.dataset.port; });
 $("director").onchange = async () => {
