@@ -353,11 +353,12 @@ public struct SetupAPI: Sendable {
     }
 
     /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it). `checked`:
-    /// every channel was checked on the fixture, and the colour wheel's slots named then are saved with it.
-    public func saveMapping(_ m: FixtureMapping, checked: Bool = false) async throws -> [String] {
+    /// every channel was checked on the fixture; `wheel`: the colour wheel's colours were named (saved with it, as
+    /// they are after a check too).
+    public func saveMapping(_ m: FixtureMapping, checked: Bool = false, wheel: Bool = false) async throws -> [String] {
         let chans = m.channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value, "attr": $0.attr] as [String: Any] }
         var body: [String: Any] = ["key": m.key, "mode": m.mode, "kind": m.kind, "channels": chans, "checked": checked]
-        if checked, m.channels.contains(where: { $0.role == "color_wheel" }), !m.wheel.isEmpty {
+        if checked || wheel, m.channels.contains(where: { $0.role == "color_wheel" }), !m.wheel.isEmpty {
             body["wheel"] = m.wheel.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
         }
         let r: SaveResult = try await post("api/fixture/map", body)

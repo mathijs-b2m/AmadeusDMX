@@ -371,17 +371,24 @@ public sealed class SetupAPI
 
     /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it). `checked`:
     /// every channel was checked on the fixture, and the colour wheel's slots named then are saved with it.
-    public async Task<IReadOnlyList<string>> SaveMapping(FixtureMapping m, bool @checked = false, CancellationToken ct = default)
+    public async Task<IReadOnlyList<string>> SaveMapping(FixtureMapping m, bool @checked = false, bool wheel = false, CancellationToken ct = default)
+    {
+        var r = await Post("api/fixture/map", MappingBody(m, @checked, wheel), SaveResult.From, ct: ct);
+        return r.Problems ?? [];
+    }
+
+    /// SaveMapping's body: `checked`: every channel was checked on the fixture; `wheel`: the colour wheel's colours
+    /// were named (saved with it, as they are after a check too).
+    internal static Dictionary<string, object?> MappingBody(FixtureMapping m, bool @checked, bool wheel)
     {
         var chans = m.Channels.Select(c => new { role = c.Role, cell = c.Cell, value = c.Value, attr = c.Attr }).ToList();
         var body = new Dictionary<string, object?>
         {
             ["key"] = m.Key, ["mode"] = m.Mode, ["kind"] = m.Kind, ["channels"] = chans, ["checked"] = @checked,
         };
-        if (@checked && m.Channels.Any(c => c.Role == "color_wheel") && m.Wheel.Count > 0)
+        if ((@checked || wheel) && m.Channels.Any(c => c.Role == "color_wheel") && m.Wheel.Count > 0)
             body["wheel"] = m.Wheel.Select(w => new { name = w.Name, from = w.From, to = w.To, rgb = w.Rgb }).ToList();
-        var r = await Post("api/fixture/map", body, SaveResult.From, ct: ct);
-        return r.Problems ?? [];
+        return body;
     }
 
     /// The common layouts a fixture without a brand is made from, the closest to `type` and `channels` first.
@@ -524,7 +531,12 @@ public sealed record FixtureMapping
         return this with { Channels = list, Wheel = a.Role == "color_wheel" && Wheel.Count == 0 ? UsualWheel : Wheel };
     }
 
-    public static readonly IReadOnlyList<Slot> UsualWheel = new (string Name, double[] Rgb)[]
+    /// The same colours, slot by slot (Swift's `==` on [Slot]: a record compares its Rgb list by reference here).
+    public static bool SameWheel(IReadOnlyList<Slot> a, IReadOnlyList<Slot> b) =>
+        a.Count == b.Count && a.Zip(b).All(p => p.First.Name == p.Second.Name && p.First.From == p.Second.From
+                                                && p.First.To == p.Second.To && p.First.Rgb.SequenceEqual(p.Second.Rgb));
+
+    public static readonly IReadOnlyList<Slot> UsualWheel =new (string Name, double[] Rgb)[]
     {
         ("open", [1, 1, 1]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
         ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("orange", [1, 0.45, 0]),

@@ -3,8 +3,9 @@
 // dimmer, a colour, pan or tilt, optionally for one cell of a bar) or held at a value. "Try on the Lights" sends
 // the values as they are to one fixture of the set, so you can find what a channel does; the library's names and
 // ranges are shown where QLC+ or the Open Fixture Library has them. "Check Channels" goes through them one by one on
-// the fixture (ChannelCheck.cs). Saved into your copy of the definition (amadeus/library/mapper.py): every fixture
-// of that model plays by it (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
+// the fixture (ChannelCheck.cs); a colour wheel's "Colours…" names its colours there on their own. Saved into your
+// copy of the definition (amadeus/library/mapper.py): every fixture of that model plays by it
+// (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
 namespace AmadeusDMX;
 
 /// `Fixture`: the one tried on the lights; `Address` null: it has no start address yet (nothing can be tried).
@@ -31,6 +32,8 @@ public sealed class MapperSheet
     bool _checking;                      // a channel is being checked (_check.Index)
     CancellationTokenSource? _checkLoop;
     bool _checkedAll;                    // every channel was checked: saved as checked
+    int? _colours;                       // the colour wheel channel whose colours are being named
+    IReadOnlyList<FixtureMapping.Slot> _loadedWheel = [];   // the wheel as loaded: saved again only when changed
 
     static ContentControl Host() => new()
     {
@@ -66,7 +69,7 @@ public sealed class MapperSheet
             try { if (await Save()) _dialog.Hide(); }
             finally { deferral.Complete(); }
         };
-        _dialog.Closed += (_, _) => { StopTrying(); StopCheck(); };
+        _dialog.Closed += (_, _) => { StopTrying(); _colours = null; StopCheck(); };
         var grid = new Grid { MinWidth = 760, Height = 540 };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -100,7 +103,7 @@ public sealed class MapperSheet
                     .Tooltip("What it is, when its channels don't say: pan and tilt make a moving head, cells a bar")
                 : null);
         Microsoft.UI.Xaml.Controls.Primitives.ToggleButton? tryIt = null;
-        if (!_checking)
+        if (!_checking && _colours is null)
         {
             tryIt = Form.ToggleButton(UI.Label(_trying ? "lightbulb.fill" : "lightbulb", "Try on the Lights"), _trying, on =>
             {
@@ -115,7 +118,7 @@ public sealed class MapperSheet
         {
             if (_checking) StopCheck(); else StartCheck();
         }, _checking ? "stop.fill" : "checklist")
-            .Disabled(_tryRefusal is not null || !_m.Editable)
+            .Disabled(_tryRefusal is not null || !_m.Editable || _colours is not null)
             .Tooltip(_tryRefusal ?? $"Go through the channels one by one on {_target.Fixture}: each sweeps while you say what the fixture does");
         if (_m.NeedsCheck && !_checking) check.Foreground(Tint.Orange);
         var line = UI.HStack(14,
@@ -149,11 +152,18 @@ public sealed class MapperSheet
                 }).Build();
                 return;
             }
+            if (_colours is { } c)
+            {
+                _body.Content = new ColourWheelEditor(_m, c, _check, CloseColours).Build();
+                return;
+            }
             var list = UI.VStack(0);
             for (var i = 0; i < m.Channels.Count; i++)
             {
                 if (i > 0) list.Children.Add(UI.Divider());
-                var row = new ChannelRow(_m, i, _target.Address + i, _target.Universe, ValuesChanged).Build().Padding(4, 6);
+                var at = i;
+                var row = new ChannelRow(_m, i, _target.Address + i, _target.Universe, ValuesChanged,
+                                         _tryRefusal is null ? () => OpenColours(at) : null).Build().Padding(4, 6);
                 if (i % 2 == 1) row.Background(Theme.Brush("SubtleFillColorSecondaryBrush"));
                 list.Children.Add(row);
             }
@@ -174,7 +184,11 @@ public sealed class MapperSheet
     async Task Load()
     {
         if (!await _model.EnsureSetupService()) { _error = SetupAPIException.NotRunningError().Message; Body(); return; }
-        try { _m.Mapping = await _model.Api.Mapping(_target.Key, _target.Mode); }
+        try
+        {
+            _m.Mapping = await _model.Api.Mapping(_target.Key, _target.Mode);
+            _loadedWheel = _m.Mapping.Wheel;
+        }
         catch (Exception e) when (SetView.IsApiError(e)) { _error = e.Message; }
         Header();
         Body();
@@ -188,7 +202,7 @@ public sealed class MapperSheet
         Footer();
         try
         {
-            _problemList = await _model.Api.SaveMapping(m, _checkedAll);
+            _problemList = await _model.Api.SaveMapping(m, _checkedAll, wheel: !FixtureMapping.SameWheel(m.Wheel, _loadedWheel));
             if (_problemList.Count == 0)
             {
                 StopTrying();
@@ -209,32 +223,58 @@ public sealed class MapperSheet
 
     /// Channel by channel from the first: the checked one sweeps 0 → 255 → 0 (about 8 s), the others hold the light
     /// on and the head in the middle, sent as they are about 10 times a second.
-    async void StartCheck()
+    void StartCheck()
     {
         StopTrying();
         _check.Index = 0;
         _check.Probe = 0;
         _check.Sweeping = true;
         _checking = true;
+        StartProbing();
+    }
+
+    /// The colour wheel's colours, shown one by one on the fixture (the light on, the head in the middle).
+    void OpenColours(int i)
+    {
+        StopTrying();
+        _check.Probe = _m.OpenWheel();
+        _check.Sweeping = false;
+        _colours = i;
+        StartProbing();
+    }
+
+    void CloseColours()
+    {
+        if (_colours is null) return;
+        _colours = null;
+        if (_checkLoop is null) { Header(); Body(); }
+        else StopCheck();
+    }
+
+    /// The probed channel (the one checked, or the colour wheel) gets its value, sweeping or as set, while the others
+    /// hold the light on, ~10 times a second.
+    async void StartProbing()
+    {
         _checkLoop?.Cancel();
         var cts = _checkLoop = new CancellationTokenSource();
         Header();
         Body();
         var (id, rig, set) = (_target.Fixture, _model.SelectedRig, _model.EditingSet);
         var up = true;
-        while (!cts.IsCancellationRequested && _checking && _m.Mapping is { } m)
+        while (!cts.IsCancellationRequested && (_checking ? _check.Index : _colours) is { } i && _m.Mapping is { } m)
         {
             if (_check.Sweeping)
             {
                 _check.Probe = up ? Math.Min(_check.Probe + 6, 255) : Math.Max(_check.Probe - 6, 0);
                 if (_check.Probe is 255 or 0) up = !up;
             }
-            try { await _model.Api.TestLight(id, true, m.CheckValues(_check.Index, _check.Probe), m.LightChannels, rig, set); }
+            try { await _model.Api.TestLight(id, true, m.CheckValues(i, _check.Probe), m.LightChannels, rig, set); }
             catch (Exception e) when (SetView.IsApiError(e))
             {
                 if (cts.IsCancellationRequested) break;
                 _problemList = [e.Message];
                 _checking = false;
+                _colours = null;
                 _checkLoop = null;
                 Header();
                 Body();
@@ -306,7 +346,8 @@ public sealed class MapperSheet
 }
 
 /// One channel: its number and address, the library's name and ranges, what the show does with it, its value.
-public sealed class ChannelRow(MapperModel m, int index, int? address, int universe, Action changed)
+/// `colours`: name the colour wheel's colours (null: it can't be tried on the lights now).
+public sealed class ChannelRow(MapperModel m, int index, int? address, int universe, Action changed, Action? colours)
 {
     FixtureMapping.Channel Channel => m.Mapping!.Channels[index];
     readonly ContentControl _cell = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false, Width = 110 };
@@ -377,14 +418,18 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
         return box;
     }
 
-    /// Which cell of a bar it belongs to, for a role that can be a cell's.
+    /// Which cell of a bar it belongs to, for a role that can be a cell's; a colour wheel's colours.
     void Cell()
     {
         var role = m.Mapping!.Roles.FirstOrDefault(r => r.RoleName == Channel.Role);
         _cell.Content = role?.Cell == true
             ? Form.Stepper(Channel.Cell, 0, 64, v => v == 0 ? "Whole" : $"Cell {v}", v => m.SetCell(index, v))
                 .Tooltip("Which cell of a bar it belongs to (Whole: the fixture as one)")
-            : null;
+            : Channel.Role == "color_wheel"
+                ? UI.Button("Colours…", () => colours?.Invoke()).Disabled(colours is null)
+                    .Tooltip(colours is null ? "Give the fixture a start address and a DMX output to see its colours"
+                                             : "Show each colour of the wheel on the fixture, name it and set its values")
+                : null;
     }
 
     void SetValue(int v, bool fromField = false)

@@ -192,7 +192,7 @@ ATTR = re.compile(r"[a-z][a-z0-9_]{0,40}")
 
 
 def _slots(wheel: list[dict], problems: list[str]) -> list[dict]:
-    """The colour wheel's slots as the check named them: {"name", "from", "to", "rgb"}, open first."""
+    """The colour wheel's slots as named in the check or Colours…: {"name", "from", "to", "rgb"}, open first."""
     out = []
     for s in wheel:
         try:
@@ -205,7 +205,7 @@ def _slots(wheel: list[dict], problems: list[str]) -> list[dict]:
             problems.append(f"Colour wheel slot {s.get('name', '')}: {lo}–{hi} is not a DMX range")
             return []
         out.append({"name": str(s.get("name") or "colour")[:40], "from": lo, "to": hi, "rgb": rgb})
-    return out
+    return sorted(out, key=lambda s: s["from"])  # in wheel order, however they were added
 
 
 def _follow_names(defn: dict, mode: str, old: list[dict], new: list[dict], checked: bool):

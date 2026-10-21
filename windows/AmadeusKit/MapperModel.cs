@@ -68,6 +68,13 @@ public sealed class MapperModel : Observable
         if (Mapping is { } m) Mapping = m with { Wheel = slots };
     }
 
+    /// The mapper's Colours…: the usual wheel when it has none yet; the value to show first (the first colour's middle).
+    public int OpenWheel()
+    {
+        if (Mapping is { Wheel.Count: 0 } m) Mapping = m with { Wheel = FixtureMapping.UsualWheel };
+        return Mapping?.Wheel.FirstOrDefault()?.Mid ?? 0;
+    }
+
     public void SetSlot(int index, Func<FixtureMapping.Slot, FixtureMapping.Slot> change)
     {
         if (Mapping is not { } m || index < 0 || index >= m.Wheel.Count) return;

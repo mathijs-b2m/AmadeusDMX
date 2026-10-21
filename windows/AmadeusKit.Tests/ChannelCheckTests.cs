@@ -56,6 +56,34 @@ public class ChannelCheckTests
     }
 
     [Fact]
+    public void NamedColoursAreSavedWithoutTheCheck()
+    {
+        var m = Mapping();
+        Assert.False(SetupAPI.MappingBody(m, false, false).ContainsKey("wheel"));
+        Assert.True(SetupAPI.MappingBody(m, false, true).ContainsKey("wheel"));   // Colours…: named, not checked
+        Assert.True(SetupAPI.MappingBody(m, true, false).ContainsKey("wheel"));
+        Assert.False(SetupAPI.MappingBody(m with { Wheel = [] }, false, true).ContainsKey("wheel"));
+        var noWheel = m with { Channels = [.. m.Channels.Where(c => c.Role != "color_wheel")] };
+        Assert.False(SetupAPI.MappingBody(noWheel, true, true).ContainsKey("wheel"));
+    }
+
+    [Fact]
+    public void ColoursOpensOnTheUsualWheelAndSavesOnlyAChange()
+    {
+        var loaded = Mapping().Wheel;
+        Assert.True(FixtureMapping.SameWheel(loaded, Mapping().Wheel));  // decoded twice: equal by value
+        var mm = new MapperModel { Mapping = Mapping() };
+        Assert.Equal(7, mm.OpenWheel());  // the first colour's middle, the wheel as it was
+        Assert.True(FixtureMapping.SameWheel(loaded, mm.Mapping!.Wheel));
+        mm.SetSlot(1, sl => sl with { Name = "orange" });
+        Assert.False(FixtureMapping.SameWheel(loaded, mm.Mapping.Wheel));
+
+        var empty = new MapperModel { Mapping = Mapping() with { Wheel = [] } };
+        Assert.Equal(7, empty.OpenWheel());
+        Assert.Equal(8, empty.Mapping!.Wheel.Count);
+    }
+
+    [Fact]
     public void AnOlderEngineWithoutTheCheckStillDecodes()
     {
         var m = J.DecodeOrThrow(J.Utf8("""
