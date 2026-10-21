@@ -27,7 +27,7 @@ FIXTURES_DIR = REPO_DIR / "resources" / "fixtures"
 REPO_URL = "https://github.com/mcallegari/qlcplus.git"
 RAW_URL = "https://raw.githubusercontent.com/mcallegari/qlcplus/master/resources/fixtures/{path}"
 NS = {"q": "http://www.qlcplus.org/FixtureDefinition"}
-CONVERTER_VERSION = 7
+CONVERTER_VERSION = 8
 
 PRESET_ATTR = {
     "IntensityMasterDimmer": "dimmer",
@@ -194,6 +194,28 @@ def _quiet_default(caps: list[dict], default: int) -> int:
     return default
 
 
+def _open_gobo(c: dict) -> bool:
+    """The wheel's open hole (QLC+ draws it as Others/open.svg; some files call it White)."""
+    n = c["name"].lower()
+    return n.startswith("open") or n in ("white", "no gobo") or c["res"].endswith("Others/open.svg")
+
+
+def _gobo_image(c: dict) -> str:
+    """The gobo's picture in the gobo catalogue (library/gobos.py), "" if the library draws none."""
+    return "qlc/" + c["res"].rsplit(".", 1)[0] if c["res"] and "/" in c["res"] else ""
+
+
+def _rotation(caps: list[dict]) -> dict:
+    """A rotation's DMX ranges, always [slow, fast]: {range: clockwise, reverse: counter-clockwise}."""
+    cw = next((c for c in caps if c["preset"].startswith("RotationClockwise")), None)
+    ccw = next((c for c in caps if c["preset"].startswith("RotationCounterClockwise")), None)
+    spin = {}
+    for key, c in (("range", cw), ("reverse", ccw)):
+        if c:
+            spin[key] = [c["max"], c["min"]] if "FastToSlow" in c["preset"] else [c["min"], c["max"]]
+    return spin
+
+
 def _classify(ch) -> dict:
     name = ch.get("Name", "")
     preset = ch.get("Preset", "")
@@ -243,26 +265,35 @@ def _classify(ch) -> dict:
                 slots.append({"name": c["name"].lower(), "from": c["min"], "to": c["max"], "rgb": _hex_rgb(c["res"])})
         return {"attr": "color_wheel", "_slots": slots}
     if group == "Gobo":
-        gobos = [c for c in caps if c["preset"] == "GoboMacro" and not c["name"].lower().startswith("open")]
-        open_c = next((c for c in caps if c["name"].lower().startswith("open")), None)
+        gobos = [c for c in caps if c["preset"] == "GoboMacro" and not _open_gobo(c)]
+        open_c = next((c for c in caps if _open_gobo(c)), None)
+        rot = [c for c in caps if "Rotation" in c["preset"]]
+        if not gobos and rot:  # turns the gobo in its slot (a rotating gobo wheel)
+            stop = next((c for c in caps if c["preset"] in ("RotationStop", "RotationIndexed")), None)
+            return {
+                "attr": "gobo_rotation",
+                "default": stop["min"] if stop else _quiet_default(caps, default),
+                "_rot": _rotation(caps),
+            }
+        if not gobos:  # a wheel the library names no gobos for: left open
+            return {"attr": "gobo_wheel", "default": open_c["min"] if open_c else _quiet_default(caps, default)}
         spin = [c for c in caps if "Rotation" in c["preset"] and "Stop" not in c["preset"]]
+        shakes = [c for c in caps if c["preset"] == "GoboShakeMacro"]
         return {
             "attr": "gobo",
             "default": open_c["min"] if open_c else 0,
             "_gobos": [(c["min"] + c["max"]) // 2 for c in gobos],
             "_gobo_names": [c["name"] for c in gobos],
-            "_shake": [(c["min"] + c["max"]) // 2 for c in caps if c["preset"] == "GoboShakeMacro"],
+            "_gobo_images": [_gobo_image(c) for c in gobos],
+            "_shake": [(c["min"] + c["max"]) // 2 for c in shakes],
+            "_shake_images": [_gobo_image(c) for c in shakes],
             "_spin": [[c["min"], c["max"]] for c in spin[:1]],
+            "_rotating": "rot" in name.lower(),
         }
     if group == "Prism":
         on = next((c for c in caps if c["preset"] == "PrismEffectOn"), None)
         off = next((c for c in caps if c["preset"] == "PrismEffectOff"), None)
-        cw = next((c for c in caps if c["preset"].startswith("RotationClockwise")), None)
-        ccw = next((c for c in caps if c["preset"].startswith("RotationCounterClockwise")), None)
-        spin = {}
-        for key, c in (("range", cw), ("reverse", ccw)):
-            if c:  # always [slow, fast]
-                spin[key] = [c["max"], c["min"]] if "FastToSlow" in c["preset"] else [c["min"], c["max"]]
+        spin = _rotation(caps)
         return {
             "attr": "prism",
             "default": (off["min"] + off["max"]) // 2 if off else _quiet_default(caps, default),
@@ -286,6 +317,20 @@ def _classify(ch) -> dict:
     return {"attr": attr, "default": _quiet_default(caps, default)}
 
 
+def _gobo_wheels(specs: list[dict]) -> dict | None:
+    """The gobo wheel the show drives, of a mode's channels: the rotating one when the gobos can be turned (a
+    gobo rotation channel), else the first. The others stay open."""
+    wheels = [s for s in specs if s["attr"] == "gobo" and s.get("_gobos")]
+    if any(s["attr"] == "gobo_rotation" and s.get("_rot") for s in specs):
+        return next((w for w in wheels if w["_rotating"]), wheels[0] if wheels else None)
+    return wheels[0] if wheels else None
+
+
+def _rot_fx(rot: dict) -> dict:
+    """A gobo rotation as a beam effect: clockwise, or the other way round if that is all there is."""
+    return rot if "range" in rot else {"range": rot["reverse"]}
+
+
 def convert(rel: str) -> dict:
     root = _load(rel)
     channels = {ch.get("Name"): ch for ch in root.findall("q:Channel", NS)}
@@ -304,7 +349,7 @@ def convert(rel: str) -> dict:
         "physical": {"pan_deg": 540, "tilt_deg": 270, "beam_deg": 25},
         "modes": {},
     }
-    wheel_slots, beam_fx, gobo_names = None, {"open": {}}, None
+    wheel_slots, beam_fx, gobo_names, images = None, {"open": {}}, None, {}
     for mode in root.findall("q:Mode", NS):
         phys = mode.find("q:Physical", NS)
         phys = phys if phys is not None else root.find("q:Physical", NS)
@@ -337,7 +382,7 @@ def convert(rel: str) -> dict:
         order = {int(c.get("Number")): c.text.strip() for c in mode.findall("q:Channel", NS)}
         heads = [[int(x.text) for x in h.findall("q:Channel", NS)] for h in mode.findall("q:Head", NS)]
         head_of = {n: i + 1 for i, h in enumerate(heads) for n in h} if len(heads) > 1 else {}
-        chans = []
+        specs = []
         for n in range(len(order)):
             ch = channels.get(order.get(n))
             spec = _classify(ch) if ch is not None else {"attr": "unused", "default": 0}
@@ -348,19 +393,30 @@ def convert(rel: str) -> dict:
                 if not safe:
                     unsafe.append(ch.get("Name", ""))
                 if kind == "smoke":  # the output and the fan are played (engine/fog.py)
-                    have = any(c["attr"] == "fog" for c in chans)
+                    have = any(c["attr"] == "fog" for c in specs)
                     full = [(c["min"], c["max"], c["name"]) for c in _caps(ch)]
                     spec = fxlib.smoke_channel(ch.get("Name", ""), full, have) or spec
+            specs.append(spec)
+        wheel = _gobo_wheels(specs)
+        chans = []
+        for n, spec in enumerate(specs):
             if spec.get("_slots"):
                 wheel_slots = wheel_slots or spec["_slots"]
-            if spec["attr"] == "gobo":
-                if spec.get("_gobos"):
-                    beam_fx["gobo"] = {"gobo": spec["_gobos"]}
-                    gobo_names = gobo_names or spec["_gobo_names"]
+            if spec is wheel:
+                beam_fx["gobo"] = {"gobo": spec["_gobos"]}
+                gobo_names = gobo_names or spec["_gobo_names"]
+                images.setdefault("gobo", spec["_gobo_images"])
                 if spec.get("_shake"):
                     beam_fx["gobo_shake"] = {"gobo": spec["_shake"]}
+                    images.setdefault("gobo_shake", spec["_shake_images"])
                 if spec.get("_spin"):
                     beam_fx["gobo_spin"] = {"gobo": {"range": spec["_spin"][0]}}
+                rot = next((r for r in specs if r["attr"] == "gobo_rotation" and r.get("_rot")), None)
+                if rot and (spec["_rotating"] or sum(1 for r in specs if r["attr"] == "gobo") == 1):
+                    beam_fx["gobo_rotate"] = {"gobo": spec["_gobos"], "gobo_rotation": _rot_fx(rot["_rot"])}
+                    images.setdefault("gobo_rotate", spec["_gobo_images"])
+            elif spec["attr"] == "gobo":  # another wheel: left open
+                spec = {"attr": "gobo_wheel", "default": spec["default"]}
             if spec["attr"] == "prism" and spec.get("_on") is not None:
                 beam_fx["prism"] = {"prism": spec["_on"]}
                 if spec.get("_spin"):
@@ -382,8 +438,10 @@ def convert(rel: str) -> dict:
         out["beam_fx"] = beam_fx
     if gobo_names:
         out["gobo_names"] = gobo_names
+    if any(any(v) for v in images.values()):
+        out["gobo_images"] = images
     if dark:
-        for k in ("beam_fx", "color_wheel", "gobo_names"):
+        for k in ("beam_fx", "color_wheel", "gobo_names", "gobo_images"):
             out.pop(k, None)
         if kind == "smoke" and any(c["attr"] == "fog" for m in out["modes"].values() for c in m):
             fxlib.mark_smoke(out, haze=ftype == "Hazer" or "haz" in out["model"].lower())

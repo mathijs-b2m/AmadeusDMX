@@ -22,10 +22,36 @@ safety rules below.
 
 ## What the converters do
 
-Driven channels get their role (dimmer, colours, pan/tilt with fine, colour wheel, gobo, prism, frost,
-zoom). Every other channel gets a value that keeps the fixture quiet: shutter open, no programs, no
+Driven channels get their role (dimmer, colours, pan/tilt with fine, colour wheel, gobo and its rotation,
+prism, frost, zoom). Every other channel gets a value that keeps the fixture quiet: shutter open, no programs, no
 macros. OFL 16-bit channels are scaled to bytes, and an OFL alias follows the fixture it points to.
 Moving heads get an estimated speed (measure it), brightness comes from the lumens or else the power.
+
+### Gobos and zoom
+
+A moving head's gobo wheel is driven on one channel: with a static and a rotating wheel, the rotating one
+when a gobo rotation channel turns its gobos (then `gobo_rotate` really turns them), else the first; any
+other wheel stays at its open hole, and the rotation channel stops (it used to get the wheel's values). The
+open hole isn't counted as a gobo, also when a library calls it "White". A beam effect a mode can't play is
+played as the nearest one it can: a rotating or shaking gobo as a still one, a turning prism as a still one,
+else an open beam (`fixtures.beam_effect`); the 3D stage shows the same.
+
+**What the gobos look like.** Nearly every QLC+ gobo points to a picture of it (about a thousand, shipped
+rendered in `fixtures/catalog/gobos.json.gz`; `tools/build_gobos.py` rebuilds them), the Open Fixture
+Library has pictures for some and names for the rest. Each gobo of a converted fixture keeps its picture
+(`gobo_images`) and name (`gobo_names`). A gobo with only a name gets a pattern drawn from it ("Stars": dots,
+"Spiral": a swirl; "Gobo 5": some pattern), so the 3D stage always has something to show.
+
+**Interpreting them.** Each picture is read as one of the director's gobo styles (`amadeus/library/gobos.py`):
+*rings* when the light depends on the distance from the centre only or the holes sit on one circle, *dots*
+for many small round holes, tiny flakes or a fine texture, *shapes* for figures with straight edges, *curves*
+for swirls, petals and waves. Pictures and words (animals, skylines, "Happy Birthday") are *figures*: on the
+wheel, but the show never picks them by itself. A converted fixture without hand-made `gobo_groups` is
+grouped by these styles, so a "rings" phrase really picks the rings.
+
+**Zoom.** A zoom channel (QLC+ presets, OFL `Zoom` capabilities, with the lens's range) is played between
+its tightest and widest end: beams tight, gobos opened up enough to read on the floor and walls, frost
+fully open (`looks.BEAM_ZOOM`).
 
 ### Fixtures the show can't play: the DMX mapper
 

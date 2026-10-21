@@ -1,7 +1,7 @@
 #!/bin/bash
 # Mac (or Linux): a syntax and type check of the stage's HLSL with clang's HLSL front end, which needs no Windows.
 # D3DCompiler compiles them for real at startup (and `AmadeusDMX.exe -renderSelfTest` draws with them); this catches
-# typos, undeclared names, wrong swizzles and type mismatches before that. The semantics, registers and `discard`
+# typos, undeclared names, wrong swizzles and type mismatches before that. The semantics, registers, `nointerpolation` and `discard`
 # are stripped first (clang's HLSL support doesn't know them all yet), and hlsl.h here stands in for the intrinsics.
 # Skips itself when the clang on the PATH has no HLSL front end.
 set -euo pipefail
@@ -25,7 +25,7 @@ for f in sorted(glob.glob(os.path.join(src, "*.hlsl"))):
     s = re.sub(r"\s*:\s*(SV_\w+|POSITION|NORMAL|COLOR\d*|TEXCOORD\d*)\b", "", s)
     s = re.sub(r"\s*:\s*register\(\w+\)", "", s)
     s = re.sub(r"cbuffer\s+\w+\s*\{([^}]*)\};", lambda m: m.group(1).replace("column_major ", ""), s)
-    s = s.replace("[loop]", "").replace("discard;", "return (float4)0;")
+    s = s.replace("[loop]", "").replace("nointerpolation ", "").replace("discard;", "return (float4)0;")
     open(os.path.join(out, os.path.basename(f)), "w").write(s)
 PY
 status=0

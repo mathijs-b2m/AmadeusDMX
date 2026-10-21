@@ -234,6 +234,53 @@ public class ProtocolTests
         Assert.All(f.Lz, Assert.Null);
         Assert.False(f.Lite);
         Assert.Empty(f.Bands);
+        Assert.Empty(f.Gobo);
+        Assert.Empty(f.Zoom);
+    }
+
+    // the hello's gobo pictures and a frame's gobo and zoom, in the format of docs/protocols.md
+    [Fact]
+    public void AHelloCarriesTheGoboPictures()
+    {
+        var h = DecodeHello("""
+            {"type": "hello", "track": "Deck 1: track.mp3", "fixtures": [],
+             "gobos": [{"key": "qlc/ClayPaky/gobo00006", "img": "iVBORw0KGgo=", "style": "rings"},
+                       {"key": "ofl/robe/glass-1", "img": "/9j/4AAQ", "style": "figure"}]}
+            """);
+        Assert.Equal(2, h.Gobos.Count);
+        Assert.Equal(new GoboPicture { Key = "qlc/ClayPaky/gobo00006", Img = "iVBORw0KGgo=", Style = "rings" }, h.Gobos[0]);
+        Assert.Equal("figure", h.Gobos[1].Style);
+        // none sent, or not readable: no pictures, the hello survives
+        Assert.Empty(DecodeHello("""{"type": "hello"}""").Gobos);
+        Assert.Empty(DecodeHello("""{"type": "hello", "gobos": [{"key": "x"}]}""").Gobos);
+    }
+
+    [Fact]
+    public void AFrameCarriesEachHeadsGoboAndZoom()
+    {
+        var f = DecodeFrame("""
+            {"type": "frame", "t": 1.0, "phrase": 0, "fx": [[1,1,1,1,0,0.5,0.5],[1,1,1,1,0,0.5,0.5],[1,0,0,0,0,0,0]],
+             "beam": ["gobo", "open", null],
+             "gobo": [[3, 4, 0.25, -0.5, 2.0, 1], null, null],
+             "zoom": [0.0, 0.75, null]}
+            """);
+        Assert.Equal(3, f.Gobo.Length);
+        Assert.Equal(new GoboState(3, 4, 0.25f, -0.5f, 2.0f, true), f.Gobo[0]);
+        Assert.Null(f.Gobo[1]);
+        Assert.Null(f.Gobo[2]);
+        Assert.Equal(new float?[] { 0f, 0.75f, null }, f.Zoom);
+        // the open hole and no prism
+        var open = DecodeFrame("""{"type": "frame", "gobo": [[-1, 2, 0.5, 0, 0, 0]]}""");
+        Assert.Equal(new GoboState(-1, 2, 0.5f), open.Gobo[0]);
+        Assert.False(open.Gobo[0]!.Value.Prism);
+        // too short is null; not sent is empty; the wrong type drops the field, not the frame
+        Assert.Null(DecodeFrame("""{"type": "frame", "gobo": [[1, 2, 0.5]]}""").Gobo[0]);
+        var none = DecodeFrame("""{"type": "frame"}""");
+        Assert.Empty(none.Gobo);
+        Assert.Empty(none.Zoom);
+        var bad = DecodeFrame("""{"type": "frame", "gobo": [["a", 1, 0, 0, 0, 0]], "zoom": ["wide"]}""");
+        Assert.Empty(bad.Gobo);
+        Assert.Empty(bad.Zoom);
     }
 }
 

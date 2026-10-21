@@ -9,6 +9,7 @@ struct AmadeusDMXApp: App {
     @State private var model = AppModel()
 
     init() {
+        StageSnapshot.runIfAsked()  // development: -stageSnapshot DIR draws recorded frames and quits
         // tooltips (.help) after a quarter second instead of the system's second: the icon buttons explain themselves
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
     }

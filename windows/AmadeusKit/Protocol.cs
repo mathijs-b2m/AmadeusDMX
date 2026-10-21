@@ -378,6 +378,8 @@ public sealed partial class Hello
     public string Program { get; init; } = "";
     /// The genre whose house style the plan follows: in a live set the set's genre, which can differ.
     public string Style { get; init; } = "";
+    /// The pictures on the heads' gobo wheels; a frame's `gobo` points into this list.
+    public IReadOnlyList<GoboPicture> Gobos { get; init; } = [];
 
     public static Hello From(JsonElement c) => new()
     {
@@ -398,6 +400,7 @@ public sealed partial class Hello
         Program = J.Try(() => J.Ref(c, "program", J.String)) ?? "",
         Style = J.Try(() => J.Ref(c, "style", J.String)) ?? "",
         Zones = J.Try(() => J.Ref(c, "zones", J.ArrayOf(Zone.From))) ?? [],
+        Gobos = J.Try(() => J.Ref(c, "gobos", J.ArrayOf(GoboPicture.From))) ?? [],
     };
 
     [GeneratedRegex(@"^Deck \w+:\s*")]
@@ -464,6 +467,29 @@ public sealed record DeckInfo
         Genre = J.Ref(c, "genre", J.String), Style = J.Ref(c, "style", J.String),
     };
 }
+
+/// A gobo picture from the fixture libraries (amadeus/library/gobos.py): how much light it lets through.
+public sealed record GoboPicture
+{
+    public string Key { get; init; } = "";
+    /// Base64 PNG (a metal gobo, grey) or JPEG (a glass gobo, in colour).
+    public string Img { get; init; } = "";
+    /// dots, shapes, rings, curves or figure (a picture or words).
+    public string Style { get; init; } = "";
+
+    public static GoboPicture From(JsonElement c) => new()
+    {
+        Key = J.Req(c, "key", J.String), Img = J.Req(c, "img", J.String), Style = J.Req(c, "style", J.String),
+    };
+}
+
+/// The gobo in a moving head's beam this frame (amadeus/engine/realism.py).
+/// Picture and Next: the picture in the beam and the next one on the wheel (indices into Hello.Gobos; -1: the open
+/// hole). Slide: how far the wheel has turned towards the next picture, 0..1. Turn: the gobo turning in its slot,
+/// turns per second, minus the other way. Shake: wobbles per second (0: still). Prism: a prism splits the gobo beam
+/// into three.
+public readonly record struct GoboState(int Picture, int Next = -1, float Slide = 0, float Turn = 0, float Shake = 0,
+                                        bool Prism = false);
 
 /// One laser beam: direction from the laser, colour and brightness.
 public readonly record struct LaserBeam(Vector3 Dir, Vector3 Color, float Bright);
@@ -538,6 +564,10 @@ public sealed class Frame
     public string?[] Beam { get; init; } = [];
     public Vector3?[] Dirs { get; init; } = [];
     public LaserBeam[]?[] Lz { get; init; } = [];
+    /// Per element: the gobo in a head's beam (null: an open beam, or not a head).
+    public GoboState?[] Gobo { get; init; } = [];
+    /// Per element: a head's zoom, 0 tightest .. 1 widest (null: no zoom).
+    public float?[] Zoom { get; init; } = [];
     public IReadOnlyList<DeckInfo>? Decks { get; init; }
     /// What the laser guard did this frame: laser id → "zone 'Audience'" / "blanked (…)".
     public IReadOnlyDictionary<string, string>? LaserGuard { get; init; }
@@ -568,6 +598,15 @@ public sealed class Frame
         return d.Length >= 3 ? new Vector3(d[0], d[1], d[2]) : null;
     }
 
+    static GoboState? GoboOf(JsonElement e)
+    {
+        if (e.ValueKind == JsonValueKind.Null) return null;
+        var g = J.Array(e, J.Float);
+        return g.Length >= 6 ? new GoboState((int)g[0], (int)g[1], g[2], g[3], g[4], g[5] > 0.5f) : null;
+    }
+
+    static float? ZoomOf(JsonElement e) => e.ValueKind == JsonValueKind.Null ? null : J.Float(e);
+
     static LaserBeam[]? Beams(JsonElement e)
     {
         if (e.ValueKind == JsonValueKind.Null) return null;
@@ -587,6 +626,8 @@ public sealed class Frame
         Beam = J.Ref(c, "beam", J.ArrayOf(J.OrNull(J.String))) ?? [],
         Dirs = J.Ref(c, "dirs", J.ArrayOf(Direction)) ?? [],
         Lz = J.Ref(c, "lz", J.ArrayOf(Beams)) ?? [],
+        Gobo = J.Try(() => J.Ref(c, "gobo", J.ArrayOf(GoboOf))) ?? [],
+        Zoom = J.Try(() => J.Ref(c, "zoom", J.ArrayOf(ZoomOf))) ?? [],
         Decks = J.Ref(c, "decks", J.ArrayOf(DeckInfo.From)),
         LaserGuard = J.Try(() => J.Ref(c, "guard", J.DictOf(J.String))),
         Link = J.Try(() => J.Ref(c, "link", LinkStatus.From)),

@@ -97,6 +97,8 @@ def hello(
             "genre_source": getattr(a, "genre_source", ""),
             "style": getattr(a, "style", ""),  # the genre whose house style the plan follows
             "program": "cinematic" if getattr(a, "genre", "") == "cinematic" and a.hits is not None else "",
+            # the pictures on the heads' gobo wheels (base64 PNG, JPEG for glass): frames point into this list
+            "gobos": real.gobo_pictures() if real is not None else [],
         }
     )
 
@@ -178,9 +180,11 @@ class Feed:
             broadcast(self.full, json.dumps({"type": "frame", **status, **fixtures()}))
 
     def fixture_fields(self, states: dict, lasers: dict | None = None) -> dict:
-        """Every element's colour and level as the fixtures really show it, each head's beam effect and
-        direction (computed back from its DMX pan/tilt), and the beams each laser draws."""
+        """Every element's colour and level as the fixtures really show it, each head's beam effect (what it
+        really plays), gobo, zoom and direction (computed back from its DMX pan/tilt), and the beams each laser
+        draws."""
         shown = self.real.step(states, self.period)
+        beams = self.real.beams(states, self.period)
         fx = []
         for e in self.ids:
             s = states[e]
@@ -190,7 +194,7 @@ class Feed:
             fx.append([round(v, 3) for v in (dim, r, g, b, w, s.pan, s.tilt)])
         out = {
             "fx": fx,
-            "beam": [states[e].fx if e in self.head_fk else None for e in self.ids],
+            "beam": [beams[e][0] if e in beams else None for e in self.ids],
             "dirs": [
                 [round(float(v), 3) for v in geometry.fk(*self.head_fk[e], states[e].pan, states[e].tilt)]
                 if e in self.head_fk
@@ -198,6 +202,10 @@ class Feed:
                 for e in self.ids
             ],
         }
+        if any(b[1] for b in beams.values()):  # a gobo in a beam: [picture, next, wheel turn, rotation, shake, prism]
+            out["gobo"] = [beams[e][1] if e in beams else None for e in self.ids]
+        if any(b[2] is not None for b in beams.values()):  # zoom 0 (tightest) .. 1 (widest), heads that have one
+            out["zoom"] = [round(beams[e][2], 3) if e in beams and beams[e][2] is not None else None for e in self.ids]
         if lasers:
             out["lz"] = [lasers.get(e) for e in self.ids]
         if self.smokes:  # each smoke machine's output now, 0..1

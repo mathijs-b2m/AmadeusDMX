@@ -29,6 +29,7 @@ from amadeus.engine.rolls import RollsMixin
 from amadeus.engine.state import State
 from amadeus.engine.timing import TimingMixin, _ease, note_env, pick_stabs
 from amadeus.library import fixtures as fxlib
+from amadeus.library import gobos
 from amadeus.rig import geometry
 
 PICKUP_LEAD = 0.65  # a section that leads in early: how far its look has come in by the downbeat (which lands it)
@@ -128,13 +129,8 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, Cine
         self.stab_t, self.stab_s = pick_stabs(self.syn_t, self.syn_s)  # the synth's key hits, for accent lights
         self.accent_family: list[str] = [""] * len(plan)  # per phrase: the instrument the accent lights follow
         self._stabs_per_instrument(analysis)
-        self.gobo_groups = [
-            {k: v for k, v in defn.get("gobo_groups", {}).items() if not k.startswith("_")} for _, defn in self.head_fx
-        ]
-        self.gobo_all = [
-            list(range(1, len(defn.get("beam_fx", {}).get("gobo", {}).get("gobo", [0])) + 1))
-            for _, defn in self.head_fx
-        ]
+        self.gobo_groups = [gobos.groups(defn) for _, defn in self.head_fx]  # hand-made, else from the pictures
+        self.gobo_all = [gobos.usable(defn) for _, defn in self.head_fx]  # a style the fixture hasn't: any of these
         self.drop_idx = {i for i, d in enumerate(plan) if getattr(d, "drop_score", 0) >= DROP_THRESHOLD}
         on = analysis.onsets
         self.fill_t = np.sort(np.concatenate([on["snare"][0], on["accent"][0]])) if on else np.zeros(0)  # fill hits

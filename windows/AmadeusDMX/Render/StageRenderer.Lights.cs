@@ -1,5 +1,7 @@
 // The lights of one frame: beams, spots on surfaces, lens flares and laser lines, from the feed's frame
-// (mac/Sources/AmadeusDMX/Render/StageRenderer+Lights.swift).
+// (mac/Sources/AmadeusDMX/Render/StageRenderer+Lights.swift). A head with a gobo in its beam draws it as a gobo beam:
+// the pattern in the haze and projected where it lands, turning, shaking and sliding on its wheel as the frame says;
+// its zoom sets how wide the beam opens.
 using System.Numerics;
 
 using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
@@ -10,7 +12,8 @@ public sealed partial class StageRenderer
     static float Max(Vector3 v) => MathF.Max(v.X, MathF.Max(v.Y, v.Z));
 
     internal void BuildLights(StageInput inp, Frame? frame, Scenery s, Vector3 eye, float t, List<BeamInstance> beams,
-                              List<SpriteInstance> sprites, List<DecalInstance> decals, List<LineInstance> lines, ref Vector3 ambient)
+                              List<SpriteInstance> sprites, List<DecalInstance> decals, List<LineInstance> lines,
+                              List<GoboBeamInstance> goboBeams, List<GoboDecalInstance> goboDecals, ref Vector3 ambient)
     {
         var room = s.Room;
         var nHeads = Math.Max(1, inp.Fixtures.Count(f => f.Kind == FixtureKind.Head));
@@ -30,6 +33,25 @@ public sealed partial class StageRenderer
                 decals.Add(new DecalInstance(new(p + d * len, MathF.Max(0.12f, R * 1.3f)), new(n, squash), new(color, intensity * 0.9f)));
             }
         }
+
+        void GoboBeam(Vector3 p, Vector3 d, float spreadDeg, Vector3 color, float intensity, Vector4 wheel, Vector4 axis)
+        {
+            var (len, surf) = room.Hit(p, d, 30);
+            float r0 = wheel.W, R = MathF.Max(r0 + 0.01f, len * MathF.Tan(spreadDeg * MathF.PI / 360));
+            goboBeams.Add(new GoboBeamInstance(new(p, len), new(d, R), new(color, intensity), wheel, axis));
+            if (surf != Room.Surface.Air)
+            {
+                var n = Room.Normal(surf);
+                var squash = MathF.Max(1, MathF.Min(3, 1 / MathF.Max(0.25f, MathF.Abs(Vector3.Dot(d, n)))));
+                goboDecals.Add(new GoboDecalInstance(new(p + d * len, MathF.Max(0.12f, R * 1.15f)), new(n, squash),
+                                                     new(color, intensity * 0.75f), new(p, len),
+                                                     new(d, (R - r0) / MathF.Max(len, 1e-3f)), wheel, axis));
+            }
+        }
+
+        // gobos turn and shake with the renderer's own clock (smooth between the show's frames)
+        var gdt = MathF.Min(0.2f, MathF.Max(0, t - GoboT));
+        GoboT = t;
 
         // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears
         var dt = MathF.Min(0.2f, MathF.Max(0, t - FogT));
@@ -83,27 +105,59 @@ public sealed partial class StageRenderer
                     var d = Vector3.Normalize((frame is not null && i < frame.Dirs.Length ? frame.Dirs[i] : null)
                                               ?? Vector3.Normalize(rest + new Vector3(0, 0.6f, 0)));
                     var name = (frame is not null && i < frame.Beam.Length ? frame.Beam[i] : null) ?? "open";
+                    var gobo = highlight.Contains(fx.Id) ? null : frame is not null && i < frame.Gobo.Length ? frame.Gobo[i] : null;
+                    // the lens with the zoom the show sends: between its tightest and widest beam, as bright as the light
+                    // packed into it
+                    var zoom = frame is not null && i < frame.Zoom.Length ? frame.Zoom[i] : null;
+                    var lens = (float)fx.BeamDeg + (float)(fx.BeamWide - fx.BeamDeg) * (zoom ?? 0);
+                    var zoomed = (float)fx.Output + (float)(fx.OutputWide - fx.Output) * (zoom ?? 0);
+                    // the gobo's picture across the beam: along the head's tilt axis (pan turns it with the head)
+                    var tilt = Vector3.Cross(rest, d);
+                    if (tilt.Length() > 0.15f) GoboAxis[fx.Id] = Vector3.Normalize(tilt);
+                    var across = GoboAxis.TryGetValue(fx.Id, out var kept) ? kept
+                        : MathF.Abs(d.Z) > 0.9f ? new Vector3(1, 0, 0) : Vector3.Normalize(Vector3.Cross(d, new Vector3(0, 0, 1)));
+                    var turn = GoboTurn.GetValueOrDefault(fx.Id);
+                    if (gobo is { } gt) turn = (turn + gt.Turn * 2 * MathF.PI * gdt) % (2 * MathF.PI);
+                    GoboTurn[fx.Id] = turn;
+                    var prism = name.StartsWith("prism", StringComparison.Ordinal) || gobo?.Prism == true;
                     var nRays = 1;
                     rays[0] = d;
-                    if (name.StartsWith("prism", StringComparison.Ordinal) || name == "gobo_rotate")
+                    if (prism)
                     {
                         var side = MathF.Abs(d.Z) > 0.9f ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1);
                         var a1 = Vector3.Normalize(Vector3.Cross(d, side));
                         var a2 = Vector3.Cross(d, a1);
-                        var off = name == "gobo_rotate" ? 0.035f : 0.07f;
+                        var spin = gobo is not null ? turn : name != "prism" ? t * 2.5f : 0;
                         for (var k = 0; k < 3; k++)
                         {
-                            var a = (name != "prism" ? t * 2.5f : 0) + k * 2.094f;
-                            rays[k] = Vector3.Normalize(d + off * (MathF.Cos(a) * a1 + MathF.Sin(a) * a2));
+                            var a = spin + k * 2.094f;
+                            rays[k] = Vector3.Normalize(d + 0.07f * (MathF.Cos(a) * a1 + MathF.Sin(a) * a2));
                         }
                         nRays = 3;
                     }
                     var frost = name == "frost";
-                    var spread = frost ? MathF.Max((float)fx.BeamWide, 25) * 1.2f : MathF.Max((float)fx.BeamDeg * 1.6f, 2.5f);
-                    var strength = (float)(frost ? fx.OutputWide : fx.Output);
+                    var spread = frost ? MathF.Max((float)fx.BeamWide, 25) * 1.2f : MathF.Max(lens * 1.6f, 2.5f);
+                    var strength = frost ? (float)fx.OutputWide : zoomed;
                     var a0 = (frost ? dim * 0.45f : nRays > 1 ? dim * 0.6f : dim) * density * strength * 0.75f;
                     if (highlight.Contains(fx.Id)) a0 = 2.5f;
-                    for (var k = 0; k < nRays; k++) Beam(p, rays[k], spreadDeg: spread, color: col, intensity: a0);
+                    if (gobo is { } g && GoboSlices > 0)
+                    {
+                        // a shaking gobo wobbles on its wheel: a little to and fro, a little turned
+                        var wobble = g.Shake > 0 ? MathF.Sin(t * g.Shake * 2 * MathF.PI) : 0;
+                        var slices = GoboSlices;
+                        float Slot(int k) => k >= 0 && k < slices ? k : -1;
+                        var wheel = new Vector4(Slot(g.Picture), Slot(g.Next), MathF.Min(1, MathF.Max(0, g.Slide + wobble * 0.06f)), 0.05f);
+                        var rot = (prism ? 0 : turn) + wobble * 0.25f;
+                        // a gobo is projected with the lens as it is (the haze cone's extra width would blur the pattern); its
+                        // shafts a little brighter than a plain beam's haze, as the metal between them takes most of the light
+                        for (var k = 0; k < nRays; k++)
+                            GoboBeam(p, rays[k], spreadDeg: MathF.Max(lens * 1.25f, 2.5f), color: col, intensity: a0 * 1.5f, wheel: wheel,
+                                     axis: new Vector4(across, rot));
+                    }
+                    else
+                    {
+                        for (var k = 0; k < nRays; k++) Beam(p, rays[k], spreadDeg: spread, color: col, intensity: a0);
+                    }
                     // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
                     // smaller for the cells of a bar (many small lenses, not one big one)
                     var toEye = Vector3.Normalize(eye - p);

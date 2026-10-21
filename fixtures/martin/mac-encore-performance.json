@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Martin/Martin-MAC-Encore-Performance.qxf",
     "type": "Moving Head",
-    "converter": 3
+    "converter": 8
   },
   "physical": {
     "pan_deg": 540,
@@ -503,5 +503,21 @@
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
     "_note": "Estimated; measure with `amadeus motion`."
+  },
+  "gobo_images": {
+    "gobo": [
+      "qlc/Others/gobo00111",
+      "qlc/Others/gobo00112",
+      "qlc/Others/gobo00113",
+      "qlc/Others/gobo00114",
+      "qlc/Others/gobo00115"
+    ],
+    "gobo_shake": [
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
   }
 }

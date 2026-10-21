@@ -1,5 +1,5 @@
-// The Direct3D 11 stage (mac/Sources/AmadeusDMX/Render/StageRenderer.swift): scenery, volumetric beams, spots,
-// lasers, flares and the LED wall into an HDR target, then bloom (a blur at half and quarter resolution) and a
+// The Direct3D 11 stage (mac/Sources/AmadeusDMX/Render/StageRenderer.swift): scenery, volumetric beams, gobo beams
+// and their projections, spots, lasers, flares and the LED wall into an HDR target, then bloom (a blur at half and quarter resolution) and a
 // tone curve into the window. What a frame shows is worked out on the CPU first (StageRenderer.State.cs,
 // PrepareFrame); this half puts it on the GPU. The view (StageView) owns the swap chain and presents; the render
 // self-test draws into a texture instead.
@@ -79,12 +79,17 @@ public sealed partial class StageRenderer : IDisposable
     public ID3D11DeviceContext Context { get; private set; } = null!;
     public FeatureLevel FeatureLevel { get; private set; }
     Pipeline? solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, downsamplePipe, blurPipe;
+    Pipeline? goboBeamPipe, goboDecalPipe;
     ID3D11DepthStencilState? solidDepth, lightDepth;
     ID3D11RasterizerState? rasterizer;
     ID3D11SamplerState? sampler;
     ID3D11BlendState? additive, premultiplied;
-    ID3D11Buffer? coneBuffer;
-    int coneCount;
+    ID3D11Buffer? coneBuffer, cappedConeBuffer;
+    int coneCount, cappedConeCount;
+    // the gobo pictures (StageRenderer.State.cs GoboPictures) as texture slices
+    ID3D11Texture2D? goboTexture;
+    ID3D11ShaderResourceView? goboView;
+    int _uploadedGobos = -1;
     ID3D11Buffer? sceneryBuffer, zoneBuffer, wallBuffer;
     int sceneryCount, zoneCount;
     int _uploadedScenery = -1;
@@ -99,6 +104,8 @@ public sealed partial class StageRenderer : IDisposable
     readonly DynamicBuffer _sprites = new(BindFlags.ShaderResource, SpriteInstance.Size, true);
     readonly DynamicBuffer _decals = new(BindFlags.ShaderResource, DecalInstance.Size, true);
     readonly DynamicBuffer _lines = new(BindFlags.ShaderResource, LineInstance.Size, true);
+    readonly DynamicBuffer _goboBeams = new(BindFlags.ShaderResource, GoboBeamInstance.Size, true);
+    readonly DynamicBuffer _goboDecals = new(BindFlags.ShaderResource, GoboDecalInstance.Size, true);
     readonly DynamicBuffer _zoneEdges = new(BindFlags.ShaderResource, LineInstance.Size, true);
     // auto exposure: the mean of the quarter-size light buffer, read back a couple of frames later (no stall)
     readonly ID3D11Texture2D?[] _stats = new ID3D11Texture2D?[3];
@@ -149,6 +156,7 @@ public sealed partial class StageRenderer : IDisposable
                 ResourceUsage.Staging, CpuAccessFlags.Read));
         _timer = new GpuTimer(Device);
         _uploadedScenery = -1;
+        _uploadedGobos = -1;
     }
 
     /// The device was lost (a driver update, the GPU reset, a laptop switching GPUs): everything on the GPU is
@@ -163,17 +171,20 @@ public sealed partial class StageRenderer : IDisposable
     void ReleaseDevice()
     {
         ReleaseTargets();
-        foreach (var p in new[] { solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, downsamplePipe, blurPipe })
+        foreach (var p in new[] { solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, downsamplePipe, blurPipe,
+                                  goboBeamPipe, goboDecalPipe })
             p?.Dispose();
         solidPipe = beamPipe = spritePipe = decalPipe = linePipe = wallPipe = compositePipe = zonePipe = downsamplePipe = blurPipe = null;
+        goboBeamPipe = goboDecalPipe = null;
         solidDepth?.Dispose(); lightDepth?.Dispose(); rasterizer?.Dispose(); sampler?.Dispose(); additive?.Dispose(); premultiplied?.Dispose();
         solidDepth = lightDepth = null; rasterizer = null; sampler = null; additive = premultiplied = null;
-        coneBuffer?.Dispose(); sceneryBuffer?.Dispose(); zoneBuffer?.Dispose(); wallBuffer?.Dispose();
-        coneBuffer = sceneryBuffer = zoneBuffer = wallBuffer = null;
+        coneBuffer?.Dispose(); cappedConeBuffer?.Dispose(); sceneryBuffer?.Dispose(); zoneBuffer?.Dispose(); wallBuffer?.Dispose();
+        coneBuffer = cappedConeBuffer = sceneryBuffer = zoneBuffer = wallBuffer = null;
+        goboView?.Dispose(); goboTexture?.Dispose(); goboView = null; goboTexture = null;
         wallView?.Dispose(); wallTexture?.Dispose(); wallView = null; wallTexture = null;
         uniformsBuffer?.Dispose(); wallParamsBuffer?.Dispose(); blurBuffer?.Dispose();
         uniformsBuffer = wallParamsBuffer = blurBuffer = null;
-        foreach (var d in new[] { _parts, _beams, _sprites, _decals, _lines, _zoneEdges }) d.Dispose();
+        foreach (var d in new[] { _parts, _beams, _sprites, _decals, _lines, _zoneEdges, _goboBeams, _goboDecals }) d.Dispose();
         for (var i = 0; i < _stats.Length; i++) { _stats[i]?.Dispose(); _stats[i] = null; }
         _timer?.Dispose(); _timer = null;
         Context?.ClearState();
@@ -234,6 +245,11 @@ public sealed partial class StageRenderer : IDisposable
         EnsureTargets(f.Width, f.Height);
         var ctx = Context;
         UploadScenery();
+        if (GoboPictures is { } pics && (_uploadedGobos != GoboVersion || goboView is null))
+        {
+            _uploadedGobos = GoboVersion;
+            BuildGobos(pics);
+        }
         _timer?.Begin(ctx);
 
         // the frame's buffers
@@ -245,6 +261,8 @@ public sealed partial class StageRenderer : IDisposable
         _sprites.Upload(Device, ctx, (ReadOnlySpan<SpriteInstance>)f.Sprites.Span());
         _decals.Upload(Device, ctx, (ReadOnlySpan<DecalInstance>)f.Decals.Span());
         _lines.Upload(Device, ctx, (ReadOnlySpan<LineInstance>)f.Lines.Span());
+        _goboBeams.Upload(Device, ctx, (ReadOnlySpan<GoboBeamInstance>)f.GoboBeams.Span());
+        _goboDecals.Upload(Device, ctx, (ReadOnlySpan<GoboDecalInstance>)f.GoboDecals.Span());
 
         // scene → HDR
         ctx.RSSetState(rasterizer);
@@ -278,6 +296,26 @@ public sealed partial class StageRenderer : IDisposable
             ctx.Draw(6, 0);
         }
         if (f.Decals.Count > 0) Instanced(decalPipe!, _decals, 6, f.Decals.Count);
+        // gobos: the instances are read by the pixel shader too, the pictures are a texture array
+        if (f.GoboDecals.Count > 0 && goboView is not null)
+        {
+            Use(goboDecalPipe!, lightDepth);
+            ctx.VSSetShaderResource(0, _goboDecals.View!);
+            ctx.PSSetShaderResource(0, _goboDecals.View!);
+            ctx.PSSetShaderResource(1, goboView);
+            ctx.DrawInstanced(6, (uint)f.GoboDecals.Count, 0, 0);
+            UnbindShaderResources();
+        }
+        if (f.GoboBeams.Count > 0 && goboView is not null)
+        {
+            Use(goboBeamPipe!, lightDepth);
+            ctx.IASetVertexBuffer(0, cappedConeBuffer!, 12);
+            ctx.VSSetShaderResource(0, _goboBeams.View!);
+            ctx.PSSetShaderResource(0, _goboBeams.View!);
+            ctx.PSSetShaderResource(1, goboView);
+            ctx.DrawInstanced((uint)cappedConeCount, (uint)f.GoboBeams.Count, 0, 0);
+            UnbindShaderResources();
+        }
         if (f.Beams.Count > 0)
         {
             Use(beamPipe!, lightDepth);

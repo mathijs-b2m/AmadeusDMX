@@ -1,4 +1,6 @@
-// The lights of one frame: beams, spots on surfaces, lens flares and laser lines, from the feed's frame.
+// The lights of one frame: beams, spots on surfaces, lens flares and laser lines, from the feed's frame. A head with a
+// gobo in its beam draws it as a gobo beam: the pattern in the haze and projected where it lands, turning, shaking
+// and sliding on its wheel as the frame says; its zoom sets how wide the beam opens.
 import AmadeusKit
 import Metal
 import MetalKit
@@ -9,7 +11,8 @@ import simd
 extension StageRenderer {
     func buildLights(_ inp: StageInput, _ frame: Frame?, _ s: Scenery, eye: SIMD3<Float>, t: Float,
                              beams: inout [BeamInstance], sprites: inout [SpriteInstance], decals: inout [DecalInstance],
-                             lines: inout [LineInstance], ambient: inout SIMD3<Float>) {
+                             lines: inout [LineInstance], goboBeams: inout [GoboBeamInstance],
+                             goboDecals: inout [GoboDecalInstance], ambient: inout SIMD3<Float>) {
         let room = s.room
         let nHeads = max(1, inp.fixtures.filter { $0.kind == .head }.count)
         let density = min(1, 4 / Float(nHeads).squareRoot())
@@ -28,6 +31,25 @@ extension StageRenderer {
                                             color: SIMD4(color, intensity * 0.9)))
             }
         }
+
+        func goboBeam(_ p: SIMD3<Float>, _ d: SIMD3<Float>, spreadDeg: Float, color: SIMD3<Float>, intensity: Float,
+                      wheel: SIMD4<Float>, axis: SIMD4<Float>) {
+            let (len, surf) = room.hit(p, d, maxLen: 30)
+            let r0 = wheel.w, R = max(r0 + 0.01, len * tan(spreadDeg * .pi / 360))
+            goboBeams.append(GoboBeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, intensity),
+                                              wheel: wheel, axis: axis))
+            if surf != .air {
+                let n = Room.normal(surf)
+                let squash = max(1, min(3, 1 / max(0.25, abs(simd_dot(d, n)))))
+                goboDecals.append(GoboDecalInstance(centerRadius: SIMD4(p + d * len, max(0.12, R * 1.15)), normal: SIMD4(n, squash),
+                                                    color: SIMD4(color, intensity * 0.75), apexLen: SIMD4(p, len),
+                                                    dirK: SIMD4(d, (R - r0) / max(len, 1e-3)), wheel: wheel, axis: axis))
+            }
+        }
+
+        // gobos turn and shake with the renderer's own clock (smooth between the show's frames)
+        let gdt = min(0.2, max(0, t - goboT))
+        goboT = t
 
         // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears
         let dt = min(0.2, max(0, t - fogT))
@@ -70,22 +92,50 @@ extension StageRenderer {
                 var d = frame.flatMap { i < $0.dirs.count ? $0.dirs[i] : nil } ?? simd_normalize(rest + SIMD3(0, 0.6, 0))
                 d = simd_normalize(d)
                 let name = frame.flatMap { i < $0.beam.count ? $0.beam[i] : nil } ?? "open"
+                let gobo = highlight.contains(fx.id) ? nil : frame.flatMap { i < $0.gobo.count ? $0.gobo[i] : nil }
+                // the lens with the zoom the show sends: between its tightest and widest beam, as bright as the light
+                // packed into it
+                let zoom = frame.flatMap { i < $0.zoom.count ? $0.zoom[i] : nil }
+                let lens = Float(fx.beamDeg) + Float(fx.beamWide - fx.beamDeg) * (zoom ?? 0)
+                let zoomed = Float(fx.output) + Float(fx.outputWide - fx.output) * (zoom ?? 0)
+                // the gobo's picture across the beam: along the head's tilt axis (pan turns it with the head)
+                let tilt = simd_cross(rest, d)
+                if simd_length(tilt) > 0.15 { goboAxis[fx.id] = simd_normalize(tilt) }
+                let across = goboAxis[fx.id] ?? (abs(d.z) > 0.9 ? [1, 0, 0] : simd_normalize(simd_cross(d, [0, 0, 1])))
+                var turn = goboTurn[fx.id] ?? 0
+                if let g = gobo { turn = (turn + g.turn * 2 * .pi * gdt).truncatingRemainder(dividingBy: 2 * .pi) }
+                goboTurn[fx.id] = turn
+                let prism = name.hasPrefix("prism") || gobo?.prism == true
                 var rays = [d]
-                if name.hasPrefix("prism") || name == "gobo_rotate" {
+                if prism {
                     let side: SIMD3<Float> = abs(d.z) > 0.9 ? [1, 0, 0] : [0, 0, 1]
                     let a1 = simd_normalize(simd_cross(d, side)), a2 = simd_cross(d, a1)
-                    let off: Float = name == "gobo_rotate" ? 0.035 : 0.07
+                    let spin = gobo.map { _ in turn } ?? (name != "prism" ? t * 2.5 : 0)
                     rays = (0..<3).map { k in
-                        let a = (name != "prism" ? t * 2.5 : 0) + Float(k) * 2.094
-                        return simd_normalize(d + off * (cos(a) * a1 + sin(a) * a2))
+                        let a = spin + Float(k) * 2.094
+                        return simd_normalize(d + 0.07 * (cos(a) * a1 + sin(a) * a2))
                     }
                 }
                 let frost = name == "frost"
-                let spread = frost ? max(Float(fx.beamWide), 25) * 1.2 : max(Float(fx.beamDeg) * 1.6, 2.5)
-                let strength = Float(frost ? fx.outputWide : fx.output)
+                let spread = frost ? max(Float(fx.beamWide), 25) * 1.2 : max(lens * 1.6, 2.5)
+                let strength = frost ? Float(fx.outputWide) : zoomed
                 var a = (frost ? dim * 0.45 : rays.count > 1 ? dim * 0.6 : dim) * density * strength * 0.75
                 if highlight.contains(fx.id) { a = 2.5 }
-                for r in rays { beam(p, r, spreadDeg: spread, color: col, intensity: a) }
+                if let g = gobo, goboSlices > 0 {
+                    // a shaking gobo wobbles on its wheel: a little to and fro, a little turned
+                    let wobble = g.shake > 0 ? sin(t * g.shake * 2 * .pi) : 0
+                    func slot(_ k: Int) -> Float { k >= 0 && k < goboSlices ? Float(k) : -1 }
+                    let wheel = SIMD4<Float>(slot(g.picture), slot(g.next), min(1, max(0, g.slide + wobble * 0.06)), 0.05)
+                    let rot = (prism ? 0 : turn) + wobble * 0.25
+                    // a gobo is projected with the lens as it is (the haze cone's extra width would blur the pattern); its
+                    // shafts a little brighter than a plain beam's haze, as the metal between them takes most of the light
+                    for r in rays {
+                        goboBeam(p, r, spreadDeg: max(lens * 1.25, 2.5), color: col, intensity: a * 1.5, wheel: wheel,
+                                 axis: SIMD4(across, rot))
+                    }
+                } else {
+                    for r in rays { beam(p, r, spreadDeg: spread, color: col, intensity: a) }
+                }
                 // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
                 // smaller for the cells of a bar (many small lenses, not one big one)
                 let toEye = simd_normalize(eye - p)

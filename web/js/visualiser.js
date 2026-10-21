@@ -20,8 +20,28 @@ let show = null, frame = null, shownPhrase = -1;
 $("meters").innerHTML = BANDS.map(b => `<div class="meter"><div class="tube"><b id="m-${b}"></b></div><span>${b}</span></div>`).join("");
 $("legend").innerHTML = SECTIONS.map(s => `<span><i style="background:var(--${s})"></i>${s}</span>`).join("");
 
+// gobo pictures (the hello's): light passes where they are light; drawn tinted in the beam's colour into the spots
+let goboPics = [], goboTint = new Map(), goboTurn = {}, goboClock = performance.now();
+function goboTinted(k, c) {
+  const im = goboPics[k];
+  if (!im || !im.complete || !im.naturalWidth) return null;
+  const q = c.map(x => Math.round(Math.min(1, x) * 15));
+  const key = `${k}:${q}`;
+  if (goboTint.has(key)) return goboTint.get(key);
+  if (goboTint.size > 400) goboTint.clear();
+  const cv2 = document.createElement("canvas"); cv2.width = cv2.height = 96;
+  const g = cv2.getContext("2d");
+  g.fillStyle = `rgb(${q.map(x => x * 17).join(",")})`; g.fillRect(0, 0, 96, 96);
+  g.globalCompositeOperation = "multiply"; g.drawImage(im, 0, 0, 96, 96);
+  g.globalCompositeOperation = "destination-in"; g.beginPath(); g.arc(48, 48, 47, 0, 7); g.fill();
+  goboTint.set(key, cv2);
+  return cv2;
+}
+
 function onHello(msg) {
   show = msg;
+  goboPics = (msg.gobos || []).map(g => { const im = new Image(); im.src = `data:image/${g.img.startsWith("/9j") ? "jpeg" : "png"};base64,${g.img}`; return im; });
+  goboTint = new Map();
   // how big the rig is: the camera, floor grid and back wall follow (a DJ booth or a 16 m truss grid)
   const ps = msg.fixtures.map(f => f.pos);
   const trussBack = (msg.trusses || []).map(t => t.vertical ? t.y_m          // the back wall clears the trusses too
@@ -401,6 +421,8 @@ function draw() {
   // many beams add up: keep the total brightness of a 60-head rig in range (2-4 heads: unchanged)
   const nHeads = show.fixtures.filter(f => f.kind === "head").length;
   const density = Math.min(1, 3 / Math.sqrt(Math.max(nHeads, 1)));
+  const now = performance.now(), gdt = Math.min(0.2, (now - goboClock) / 1000);
+  goboClock = now;
   show.fixtures.forEach((fx, i) => {
     const f = frame.fx[i]; if (!f) return;
     const { c, dim } = colourOf(f);
@@ -408,24 +430,32 @@ function draw() {
     if (fx.kind === "head") {
       const d = frame.dirs?.[i]; if (!d) return;
       const fxName = frame.beam?.[i] || "open";
-      // prism: three beams a few degrees apart (rotating for prism_spin); frost: one wide, soft beam
-      const rays = (fxName.startsWith("prism") || fxName === "gobo_rotate") ? [0, 1, 2].map(k => {
-        const a = (fxName !== "prism" ? frame.t * 2.5 : 0) + k * 2.094, off = fxName === "gobo_rotate" ? 0.035 : 0.07;
+      // a gobo in the beam: [picture, next, slide, turns/s, shakes/s, prism]; it turns on our own clock
+      const gobo = frame.gobo?.[i];
+      if (gobo) goboTurn[i] = ((goboTurn[i] || 0) + gobo[3] * 2 * Math.PI * gdt) % (2 * Math.PI);
+      // prism: three beams a few degrees apart (rotating for prism_spin, or with the gobo); frost: one wide, soft beam
+      const rays = (fxName.startsWith("prism") || gobo?.[5]) ? [0, 1, 2].map(k => {
+        const a = (gobo ? goboTurn[i] : fxName !== "prism" ? frame.t * 2.5 : 0) + k * 2.094, off = 0.07;
         const side = Math.abs(d[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
         const u = [d[1] * side[2] - d[2] * side[1], d[2] * side[0] - d[0] * side[2], d[0] * side[1] - d[1] * side[0]];
         const ul = Math.hypot(...u), v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
         const r = [0, 1, 2].map(m => d[m] + off * (Math.cos(a) * u[m] / ul + Math.sin(a) * v[m] / ul));
         const rl = Math.hypot(...r); return r.map(x => x / rl);
       }) : [d];
-      // the real lens: tight zoom for beams, wide (and softer: same light, bigger area) for frost
-      const frost = fxName === "frost";
-      const spread = frost ? Math.max(fx.beam_wide ?? 25, 25) * 1.2 : fx.beam_deg * 1.6;
-      const strength = frost ? (fx.output_wide ?? 1) : (fx.output ?? 1);
+      // the real lens with the zoom the show sends (wider: same light over a bigger area, softer); frost: wide
+      const frost = fxName === "frost", zoom = frame.zoom?.[i] ?? 0;
+      const lens = fx.beam_deg + ((fx.beam_wide ?? fx.beam_deg) - fx.beam_deg) * zoom;
+      const spread = frost ? Math.max(fx.beam_wide ?? 25, 25) * 1.2 : lens * (gobo ? 1.25 : 1.6);
+      const strength = frost ? (fx.output_wide ?? 1) : (fx.output ?? 1) + ((fx.output_wide ?? 1) - (fx.output ?? 1)) * zoom;
       const alpha = (frost ? dim * 0.45 : rays.length > 1 ? dim * 0.6 : dim) * density * strength;
       rays.forEach(rd => {
         const end = beamEnd(fx.pos, rd, st);
         const b = drawBeam(P, fx.pos, end.p, end.t, spread, c, alpha);
-        if (b && end.surf !== "air") spots.push({ ...b, c, dim: alpha, surf: end.surf, d: rd });
+        if (b && end.surf !== "air") {
+          const wobble = gobo && gobo[4] ? Math.sin(frame.t * gobo[4] * 2 * Math.PI) * 0.25 : 0;
+          const pic = gobo ? (gobo[2] < 0.5 ? gobo[0] : gobo[1]) : -1;  // the wheel between two: the nearer one
+          spots.push({ ...b, c, dim: alpha, surf: end.surf, d: rd, gobo: pic, turn: (gobo?.[5] ? 0 : goboTurn[i] || 0) + wobble });
+        }
       });
     } else if (fx.kind === "laser") {
       // lasers: razor-thin beams, each with its own colour and brightness (fans, sheets, tunnels, ripples),
@@ -485,8 +515,16 @@ function draw() {
     }
   });
   // where beams land: the clearest view of sync / mirror / focus / cross
-  spots.forEach(({ e, rEnd, c, dim, surf, d }) => {
+  spots.forEach(({ e, rEnd, c, dim, surf, d, gobo, turn }) => {
     const squash = surf === "floor" ? Math.max(0.25, Math.min(1, Math.abs(d[2]) * 0.8)) : surf === "wall" ? 0.9 : 0.5;
+    const pic = gobo >= 0 ? goboTinted(gobo, c) : null;
+    if (pic) {  // the gobo's pattern where the beam lands, turning in its slot
+      const r = rEnd * 1.15;
+      ctx.save(); ctx.translate(e[0], e[1]); ctx.scale(1, squash); ctx.rotate(turn || 0);
+      ctx.globalAlpha = Math.min(1, dim * 1.2); ctx.drawImage(pic, -r, -r, 2 * r, 2 * r);
+      ctx.restore();
+      return;
+    }
     const r = rEnd * 1.4, g = ctx.createRadialGradient(e[0], e[1], 0, e[0], e[1], r);
     g.addColorStop(0, rgb(c, 0.9 * dim)); g.addColorStop(1, rgb(c, 0));
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(e[0], e[1], r, r * squash, 0, 0, 7); ctx.fill();

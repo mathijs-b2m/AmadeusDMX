@@ -5,7 +5,7 @@ from __future__ import annotations
 from amadeus.engine import NUMERIC, State
 
 DOMINANCE_MARGIN = 1.2  # the heads switch decks only when the other deck is clearly louder
-HEAD_FIELDS = ("pan", "tilt", "dmx_pan", "dmx_tilt", "fx", "gobo", "fx_speed", "fx_reverse")
+HEAD_FIELDS = ("pan", "tilt", "dmx_pan", "dmx_tilt", "fx", "gobo", "fx_speed", "fx_reverse", "zoom")
 LASER_FIELDS = ("pan", "tilt", "fx", "size", "spin", "lcolor", "phase", "dimmer", "r", "g", "b", "white")
 
 

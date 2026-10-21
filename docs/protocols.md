@@ -44,8 +44,13 @@ visualiser and the Mac app both read it.
 {"type": "hello", "track": "Deck 1: track.mp3", "duration": 412.0, "bpm": 128.0, "director": "openai",
  "fixtures": [{"id": "sharpy1", "kind": "head", "pos": [2.1, -1.5, 4.0], "fixture": "sharpy1", "...": "..."}],
  "stage": {"width_m": 12, "...": "..."}, "trusses": [], "zones": [], "plan": [{"section": "drop", "...": "..."}],
- "energy": [0.12, "..."], "max_flash_hz": 3.0, "screen": true}
+ "energy": [0.12, "..."], "max_flash_hz": 3.0, "screen": true,
+ "gobos": [{"key": "qlc/ClayPaky/gobo00006", "img": "iVBORw0…", "style": "rings"}]}
 ```
+
+`gobos` are the pictures on the heads' gobo wheels (base64: a grey PNG for a metal gobo, a JPEG for a glass
+one; light passes where it is light), with their style (`dots`, `shapes`, `rings`, `curves`, or `figure` for a
+picture or words). Frames point into this list.
 
 **`frame`**, 40 times a second (the rig's `artnet.fps`):
 
@@ -53,7 +58,9 @@ visualiser and the Mac app both read it.
 |---|---|
 | `t`, `phrase`, `bp` | track position, phrase index, beat position (beat + phase) |
 | `fx` | per element: `[dimmer, r, g, b, white, pan, tilt]` as the fixture really shows it |
-| `beam` | per element: the head's beam effect (`open`, `gobo`, `prism`, …) or null |
+| `beam` | per element: the beam effect the head really plays (`open`, `gobo`, `prism`, …; what its mode can't play, the nearest it can) or null |
+| `gobo` | only when a gobo is in a beam: per element `[picture, next picture, slide 0..1, turns per second (± direction), shakes per second, prism 0/1]` or null; pictures index the hello's `gobos`, -1 is the wheel's open hole, slide is how far the wheel has turned from one to the next |
+| `zoom` | only when a head has a zoom: per element 0 (tightest) .. 1 (widest), as far as the zoom motor has got, or null |
 | `dirs` | per element: the head's beam direction (unit vector), computed back from its DMX pan/tilt |
 | `lz` | per element: the beams a laser draws, `[dx, dy, dz, r, g, b, brightness]` each |
 | `bands` | spectrum meters, 0..1 |

@@ -6,7 +6,12 @@
 - Lasers only have their colour macros.
 - Brightness of a beam in haze follows the light packed into the beam: lumens / beam angle². A 4° LED
   beam punches about as hard as a 12° 11,600 lm profile; a zoomed-out wash is much softer.
-- Beam angle: the lens with the zoom the show sends (tight for beams, wide for frost).
+- Beam angle: the lens with the zoom the show sends (tight for beams, opened up for gobos, wide for frost); a
+  zoom motor takes a moment to get there.
+- Beam effects: only what the fixture (its mode) has; a rotating gobo it can't turn is a still one, a prism it
+  doesn't have an open beam (fixtures.beam_effect).
+- Gobo wheels: the wheel turns from gobo to gobo through the ones in between (half one, half the next while it
+  passes), scrolls when the show spins it; a rotating gobo turns, a shaking one shakes, at the speed sent.
 """
 
 from __future__ import annotations
@@ -14,14 +19,20 @@ from __future__ import annotations
 import math
 
 from amadeus.library import fixtures as fxlib
+from amadeus.library import gobos
 
 WHEEL_SLOTS_PER_S = 14.0  # a typical colour wheel moves about 14 slots per second (shortest way round)
 REF_INTENSITY = 1500 / 4**2  # lumens per square degree that counts as a full-strength beam (a 4° 1,500 lm beam)
+GOBO_SLOTS_PER_S = 9.0  # a gobo wheel moves about this many slots per second
+ZOOM_PER_S = 2.5  # a zoom motor goes from tight to wide in about 0.4 s
 
 
 class Realism:
     def __init__(self, rig: dict):
         self.rig = rig
+        self.gobos: list[str] = []  # the gobo pictures of the rig's heads (catalogue keys)
+        self.gobo_index: dict[str, int] = {}
+        self.heads: dict[str, dict] = {}
         fixtures = {f["id"]: f for f in rig["fixtures"]}
         self.info: dict[str, dict] = {}
         for e in rig["elements"]:
@@ -46,6 +57,8 @@ class Realism:
                 fixed = fxlib.UV_RGB
             elif not attrs & {"red", "green", "blue", "cyan", "color_wheel"}:
                 fixed = (1.0, 1.0, 1.0) if e["kind"] == "strobe" else (1.0, 0.72, 0.42)
+            if e["kind"] == "head":
+                self.heads[e["id"]] = self._head(defn, chans)
             self.info[e["id"]] = {
                 "kind": e["kind"],
                 "defn": defn,
@@ -56,8 +69,38 @@ class Realism:
                 "wide": wide if has_zoom else tight,
                 "output": output,
                 "output_wide": output_wide if has_zoom else output,
+                "zoom": has_zoom,
             }
         self.wheel_pos: dict[str, float] = {}  # current (continuous) slot position per wheel fixture
+        self.gobo_pos: dict[str, float] = {}  # where each head's gobo wheel is (0 = open, k = its k-th gobo)
+        self.zoom_now: dict[str, float] = {}
+
+    def _head(self, defn: dict, chans: list[dict]) -> dict:
+        """A moving head's beam effects: the effect it really plays for each, and the pictures on its gobo wheel
+        (indices into self.gobos, the rig's gobo pictures)."""
+        wheels = {}
+        for fx in gobos.BEAM_WHEELS:
+            if fxlib.beam_effect(defn, chans, fx) == fx:
+                wheels[fx] = [self._gobo(k) for k in gobos.wheel(defn, fx)]
+        entry = defn.get("beam_fx", {})
+        return {
+            "defn": defn,
+            "chans": chans,
+            "wheels": wheels,
+            "slots": len(wheels.get("gobo", [])),
+            "spin": fxlib.beam_effect(defn, chans, "gobo_spin") == "gobo_spin",
+            "prism": {fx for fx in gobos.BEAM_WHEELS if "prism" in entry.get(fx, {})},
+        }
+
+    def _gobo(self, key: str) -> int:
+        if key not in self.gobo_index:
+            self.gobo_index[key] = len(self.gobos)
+            self.gobos.append(key)
+        return self.gobo_index[key]
+
+    def gobo_pictures(self) -> list[dict]:
+        """The rig's gobo pictures, for the visualisers (the hello): the frames say which is in each beam."""
+        return [{"key": k, "img": gobos.picture(k), "style": gobos.style(k)} for k in self.gobos]
 
     def hello_info(self, eid: str) -> dict:
         """Static per-fixture facts for the visualiser."""
@@ -91,6 +134,57 @@ class Realism:
                 white = 0.0  # a wheel/macro can't add white on top of a colour: the slot is what you get
             out[eid] = (s.dimmer, r, g, b, white)
         return out
+
+    def beams(self, states: dict, dt: float) -> dict[str, tuple[str, list | None, float | None]]:
+        """Per moving head: the beam effect it really shows; its gobo as [picture, next picture, how far the wheel
+        has turned towards it 0..1, rotation (turns per second, ± direction), shake (per second), prism 0/1]
+        (pictures index gobo_pictures(), -1 = the open hole), None without one; the zoom 0..1, None without one."""
+        out = {}
+        for eid, h in self.heads.items():
+            s = states[eid]
+            fx = fxlib.beam_effect(h["defn"], h["chans"], s.fx)
+            gobo = self._gobo_wheel(eid, h, fx, s, dt) if h["slots"] else None
+            zoom = None
+            if self.info[eid]["zoom"]:
+                now = self.zoom_now.get(eid, fxlib.zoom_of(s))
+                step = ZOOM_PER_S * dt
+                want = fxlib.zoom_of(s)
+                now = want if abs(want - now) <= step else now + math.copysign(step, want - now)
+                self.zoom_now[eid] = zoom = now
+            out[eid] = (fx, gobo, zoom)
+        return out
+
+    def _gobo_wheel(self, eid: str, h: dict, fx: str, s, dt: float) -> list | None:
+        n = h["slots"] + 1  # the open hole and the gobos, round the wheel
+        pos = self.gobo_pos.get(eid, 0.0)
+        speed = min(max(s.fx_speed, 0.0), 1.0)
+        if fx == "gobo_spin":  # the wheel scrolls through every gobo
+            pos = (pos + (0.4 + 1.6 * speed) * dt * (-1 if s.fx_reverse else 1)) % n
+        else:
+            target = 1 + s.gobo % h["slots"] if fx in h["wheels"] else 0
+            diff = (target - pos + n / 2) % n - n / 2  # shortest way round
+            step = GOBO_SLOTS_PER_S * dt
+            pos = float(target) if abs(diff) <= step else (pos + math.copysign(step, diff)) % n
+        self.gobo_pos[eid] = pos
+        k = int(math.floor(pos)) % n
+        frac = pos - math.floor(pos)
+        if k == 0 and frac < 0.02 and fx not in h["wheels"] and fx != "gobo_spin":
+            return None  # open: no gobo in the beam
+        pics = h["wheels"].get(fx) or h["wheels"]["gobo"]
+
+        def pic(slot: int) -> int:
+            return -1 if slot == 0 else pics[(slot - 1) % len(pics)]
+
+        turn = 0.1 + 0.9 * speed if fx == "gobo_rotate" else 0.0
+        shake = 2.0 + 4.0 * speed if fx == "gobo_shake" else 0.0
+        return [
+            pic(k),
+            pic((k + 1) % n),
+            round(frac, 3),
+            round(-turn if s.fx_reverse else turn, 3),
+            round(shake, 2),
+            1 if fx in h["prism"] else 0,
+        ]
 
     def _wheel(self, eid: str, slots: list, target: int, dt: float):
         n = len(slots)

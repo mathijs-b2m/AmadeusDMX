@@ -5,7 +5,7 @@ itself is downloaded into .cache/ofl only to rebuild that or for a fixture newer
 adds is saved into fixtures/<manufacturer>/<model>.json, after which it is a normal library fixture.
 
 Conversion rules (safety first): channels the engine drives get an attribute (dimmer, red/green/
-blue/white, pan/tilt + fine, color_wheel, gobo, prism, frost); every other channel gets a default
+blue/white, pan/tilt + fine, color_wheel, gobo (one wheel; its rotation), prism, frost, zoom); every other channel gets a default
 that keeps the fixture quiet: shutter "Open", programs/effects/macros "no function".
 """
 
@@ -25,7 +25,7 @@ from amadeus.library import fixtures as fxlib
 OFL_DIR = paths.CACHE / "ofl"
 OFL_TARBALL = "https://codeload.github.com/OpenLightingProject/open-fixture-library/tar.gz/refs/heads/master"
 INDEX = OFL_DIR / "index.json"
-CONVERTER_VERSION = 4
+CONVERTER_VERSION = 5
 
 COLOR_ATTR = {
     "Red": "red",
@@ -119,14 +119,15 @@ def _resolve_channel(d: dict, key: str) -> tuple[str, dict | None, str | None]:
     return key, None, None
 
 
-def _wheel_slots(d: dict, ch: dict, slot_type: str):
-    """WheelSlot capabilities of the given slot type with their DMX ranges, plus the 'open' capability."""
+def _wheel_slots(d: dict, ch: dict, slot_type: str, key: str = ""):
+    """WheelSlot capabilities of the given slot type with their DMX ranges, plus the 'open' capability. A capability
+    that doesn't name its wheel is on the wheel named like the channel (OFL's rule), else the first."""
     wheels = d.get("wheels", {})
     out, open_cap = [], None
     for cap in _caps(ch):
         if cap["type"] != "WheelSlot" or "slotNumber" not in cap:
             continue
-        wheel = wheels.get(cap.get("wheel", ""), wheels.get(next(iter(wheels), ""), {}))
+        wheel = wheels.get(cap.get("wheel", ch.get("name", key)), wheels.get(next(iter(wheels), ""), {}))
         n = cap["slotNumber"]
         if not isinstance(n, (int, float)) or n != int(n):
             continue  # split colours between two slots
@@ -139,6 +140,41 @@ def _wheel_slots(d: dict, ch: dict, slot_type: str):
         elif slot.get("type") == slot_type:
             out.append((slot, cap))
     return out, open_cap
+
+
+def _gobo_image(slot: dict | None) -> str:
+    """A gobo slot's picture in the gobo catalogue (library/gobos.py), "" if the library draws none."""
+    res = (slot or {}).get("resource")
+    return "ofl/" + res.split("/")[-1] if isinstance(res, str) and res.startswith("gobos/") else ""
+
+
+def _slot(slots: list[dict], cap: dict) -> dict | None:
+    n = cap.get("slotNumber")
+    return slots[int(n) - 1] if isinstance(n, (int, float)) and n == int(n) and 1 <= n <= len(slots) else None
+
+
+def _angle(v) -> float:
+    """A zoom angle: "10deg", "narrow", "wide", "50%" → comparable numbers."""
+    v = str(v).lower()
+    if v in ("narrow", "small"):
+        return 0.0
+    if v in ("wide", "big"):
+        return 1000.0
+    m = re.match(r"([\d.]+)", v)
+    return float(m.group(1)) if m else 0.0
+
+
+def _rotation(caps: list[dict]) -> dict:
+    """A rotation's DMX ranges, always [slow, fast]: {range: clockwise, reverse: counter-clockwise}."""
+    spin = {}
+    for c in caps:
+        a, b = str(c.get("speedStart", "")).lower(), str(c.get("speedEnd", "")).lower()
+        if not a or not b:
+            continue
+        key = "reverse" if "ccw" in a + b or "reverse" in a + b else "range"
+        lo, hi = c["dmxRange"]
+        spin.setdefault(key, [hi, lo] if a.startswith("fast") else [lo, hi])
+    return spin
 
 
 def _classify(d: dict, key: str, ch: dict | None, fine_of: str | None) -> dict:
@@ -163,7 +199,7 @@ def _classify(d: dict, key: str, ch: dict | None, fine_of: str | None) -> dict:
     if dims and (dims[0]["dmxRange"][1] - dims[0]["dmxRange"][0]) >= 128:
         return {"attr": "dimmer", "range": [dims[0]["dmxRange"][0], dims[0]["dmxRange"][1]]}
     if "WheelSlot" in types:
-        colors, open_cap = _wheel_slots(d, ch, "Color")
+        colors, open_cap = _wheel_slots(d, ch, "Color", key)
         if colors:
             slots = [
                 {
@@ -184,15 +220,37 @@ def _classify(d: dict, key: str, ch: dict | None, fine_of: str | None) -> dict:
                     }
                 )
             return {"attr": "color_wheel", "_slots": slots}
-        gobos, open_cap = _wheel_slots(d, ch, "Gobo")
+        gobos, open_cap = _wheel_slots(d, ch, "Gobo", key)
         if gobos:
+            wheel = gobos[0][1].get("wheel", ch.get("name", key))
+            slots = d.get("wheels", {}).get(wheel, {}).get("slots", [])
+            shakes = [c for c in caps if c["type"] == "WheelShake"]
             return {
                 "attr": "gobo",
                 "default": open_cap["dmxRange"][0] if open_cap else 0,
                 "_gobos": [_mid(cap) for _, cap in gobos],
-                "_shake": [_mid(c) for c in caps if c["type"] == "WheelShake"],
+                "_gobo_names": [slot.get("name", "") for slot, _ in gobos],
+                "_gobo_images": [_gobo_image(slot) for slot, _ in gobos],
+                "_shake": [_mid(c) for c in shakes],
+                "_shake_images": [_gobo_image(_slot(slots, c)) for c in shakes],
                 "_spin": [c["dmxRange"] for c in caps if c["type"] == "WheelRotation"],
+                "_wheel": wheel,
             }
+    if "WheelSlotRotation" in types:  # turns the gobo in its slot (a rotating gobo wheel)
+        rot = [c for c in caps if c["type"] == "WheelSlotRotation"]
+        stop = next((c for c in rot if str(c.get("speed", "")).lower() == "stop" or "angleStart" in c), None)
+        return {
+            "attr": "gobo_rotation",
+            "default": stop["dmxRange"][0] if stop else _quiet_default(ch),
+            "_rot": _rotation(rot),
+            "_wheel": rot[0].get("wheel", ""),
+        }
+    zoom = [c for c in caps if c["type"] == "Zoom"]
+    if zoom and all(c["type"] in ("Zoom", "NoFunction") for c in caps):
+        z = zoom[0]
+        lo, hi = z["dmxRange"]
+        narrow_first = _angle(z.get("angleStart", z.get("angle", "narrow"))) <= _angle(z.get("angleEnd", "wide"))
+        return {"attr": "zoom", "tight": lo if narrow_first else hi, "wide": hi if narrow_first else lo}
     if "Prism" in types:
         on = next((c for c in caps if c["type"] == "Prism"), None)
         return {
@@ -286,16 +344,22 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
             "pan_deg": focus.get("panMax", 540),
             "tilt_deg": focus.get("tiltMax", 270),
             "beam_deg": (lens.get("degreesMinMax") or [25])[0],
+            **(
+                {"beam_deg_max": lens["degreesMinMax"][1]}
+                if len(lens.get("degreesMinMax") or []) > 1 and lens["degreesMinMax"][1] > lens["degreesMinMax"][0]
+                else {}
+            ),
             **({"size_mm": d["physical"]["dimensions"]} if d.get("physical", {}).get("dimensions") else {}),
         },
         "modes": {},
     }
-    wheel_slots, beam_fx = None, {"open": {}}
+    wheel_slots, beam_fx, gobo_names, images = None, {"open": {}}, None, {}
     for mode in d.get("modes", []):
-        chans = []
+        specs, heads = [], []
         for key, head in _expand_mode(d, mode):
             if key is None:
-                chans.append({"attr": "unused", "default": 0})
+                specs.append({"attr": "unused", "default": 0})
+                heads.append(head)
                 continue
             _, ch, fine_of = _resolve_channel(d, key)
             spec = _classify(d, key, ch, fine_of)
@@ -305,21 +369,37 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
                 if not safe:
                     unsafe.append(key)
                 if kind == "smoke":  # the output and the fan are played (engine/fog.py)
-                    have = any(c["attr"] == "fog" for c in chans)
+                    have = any(c["attr"] == "fog" for c in specs)
                     full = [(c["dmxRange"][0], c["dmxRange"][1], _cap_text(c)) for c in _caps(ch)]
                     output = any(c.get("type") == "FogOutput" for c in _caps(ch))
                     spec = fxlib.smoke_channel("output" if output else key, full, have) or spec
+            specs.append(spec)
+            heads.append(head)
+        # the gobo wheel the show drives: the one a rotation channel turns, else the first; the others stay open
+        wheels = [sp for sp in specs if sp["attr"] == "gobo" and sp.get("_gobos")]
+        rot = next((sp for sp in specs if sp["attr"] == "gobo_rotation" and sp.get("_rot")), None)
+        wheel = next((w for w in wheels if rot and w["_wheel"] == rot["_wheel"]), wheels[0] if wheels else None)
+        chans = []
+        for spec, head in zip(specs, heads):
             if "_slots" in spec:
                 wheel_slots = wheel_slots or spec.pop("_slots")
                 spec.pop("_slots", None)
-            if spec["attr"] == "gobo":
-                if spec.get("_gobos"):
-                    beam_fx["gobo"] = {"gobo": spec["_gobos"]}
+            if spec is wheel:
+                beam_fx["gobo"] = {"gobo": spec["_gobos"]}
+                gobo_names = gobo_names or spec["_gobo_names"]
+                images.setdefault("gobo", spec["_gobo_images"])
                 if spec.get("_shake"):
                     beam_fx["gobo_shake"] = {"gobo": spec["_shake"]}
+                    images.setdefault("gobo_shake", spec["_shake_images"])
                 if spec.get("_spin"):
                     lo, hi = spec["_spin"][0]
                     beam_fx["gobo_spin"] = {"gobo": {"range": [lo, hi]}}
+                if rot and rot["_wheel"] == spec["_wheel"]:
+                    turn = rot["_rot"] if "range" in rot["_rot"] else {"range": rot["_rot"]["reverse"]}
+                    beam_fx["gobo_rotate"] = {"gobo": spec["_gobos"], "gobo_rotation": turn}
+                    images.setdefault("gobo_rotate", spec["_gobo_images"])
+            elif spec["attr"] == "gobo":  # another wheel: left open
+                spec = {"attr": "gobo_wheel", "default": spec.get("default", 0)}
             if spec["attr"] == "prism" and spec.get("_on") is not None:
                 beam_fx["prism"] = {"prism": spec["_on"]}
                 if spec.get("_spin"):
@@ -351,6 +431,10 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
         }
     if len(beam_fx) > 1:
         out["beam_fx"] = beam_fx
+    if gobo_names and any(gobo_names):
+        out["gobo_names"] = gobo_names
+    if any(any(v) for v in images.values()):
+        out["gobo_images"] = images
     if out["kind"] in fxlib.MOVING:
         out["motion"] = {
             "estimated": True,
