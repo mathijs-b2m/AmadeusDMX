@@ -492,6 +492,65 @@ final class RigEditorModel: StageEditing {
         (try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any]) ?? [:]
     }
 
+    // MARK: - the light test and identify (as on the Sets page)
+
+    /// Fixtures the light test keeps on, and their switch-off when the engine's time runs out.
+    var lit = Set<String>()
+    private var testOff: [String: Task<Void, Never>] = [:]
+
+    /// Why this fixture can't be lit on the real rig now (nil: it can).
+    func testRefusal(_ model: AppModel, _ f: PlacedFixture) -> String? {
+        if model.sets.first(where: { $0.name == setName })?.isVirtual ?? true {
+            return "This set only feeds the visualiser: give it a DMX output to test the real lights"
+        }
+        if model.engineRunning { return "Stop the show to test the lights" }
+        if f.address == nil { return "No start address yet: give it one on the Sets page" }
+        if let d = definition(f.key), !d.inert.isEmpty { return "Not tested: \(d.inert)" }
+        if definition(f.key)?.kind == "smoke" { return "Smoke machines fire only in the show or the hardware test" }
+        return nil
+    }
+
+    /// The fixture on (the rest of the set dark, a head aimed where it is aimed here) until switched off again.
+    func toggleTest(_ model: AppModel, _ id: String) async {
+        let on = !lit.contains(id)
+        if on { lit.insert(id) } else { lit.remove(id) }
+        testOff[id]?.cancel()
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            let moving = doc.fixtures.first { $0.id == id }.flatMap { definition($0.key)?.isMoving } ?? false
+            let r = try await model.api.testLight(fixture: id, on: on, layout: try layoutDict(), point: on && moving)
+            if on {
+                message = "\(id) on: \(r.summary)"
+                testOff[id] = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(r.seconds))
+                    if !Task.isCancelled { self?.lit.remove(id) }
+                }
+            }
+        } catch {
+            lit.remove(id)
+            message = error.localizedDescription
+        }
+    }
+
+    func switchOffTests(_ model: AppModel) async {
+        let ids = lit
+        lit = []
+        testOff.values.forEach { $0.cancel() }
+        testOff = [:]
+        for id in ids { _ = try? await model.api.testLight(fixture: id, on: false, layout: try layoutDict(), point: false) }
+    }
+
+    /// Light it on the real rig for 2 seconds.
+    func identify(_ model: AppModel, _ id: String) async {
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            try await model.api.identify(fixture: id, rig: rigName, set: setName)
+            message = "Lit \(id) for 2 s"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
     func startCheck(_ model: AppModel) async {
         busy = true
         defer { busy = false }

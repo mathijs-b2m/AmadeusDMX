@@ -39,7 +39,10 @@ struct RigEditorView: View {
                 .frame(minWidth: 300, idealWidth: 340, maxWidth: 440)
         }
         .onChange(of: undoManager) { editor.undoManager = undoManager }
-        .onDisappear { if editor.check != nil { Task { await editor.stopCheck(model) } } }  // the light goes off
+        .onDisappear {  // the lights go off
+            if editor.check != nil { Task { await editor.stopCheck(model) } }
+            if !editor.lit.isEmpty { Task { await editor.switchOffTests(model) } }
+        }
         .onChange(of: model.configVersion) { editor.reloadIfClean() }
         .background {  // ⌘S saves the rig
             Button("") { save() }.keyboardShortcut("s", modifiers: .command).hidden()
