@@ -15,6 +15,10 @@ struct PatchInspector: View {
     @State private var name = ""
     @State private var address = ""
     @State private var firstAddress = "1"
+    /// The text field being edited: what is typed there is saved on Return, on leaving it or on Save.
+    @FocusState private var focus: Field?
+    enum Field { case name, address }
+    @State private var sent = ""   // the last change sent ("id:address" or "id>name"): sent once, not on every blur
 
     private func string(_ f: [String: Any], _ k: String) -> String { f[k] as? String ?? "" }
     private func int(_ f: [String: Any], _ k: String, _ d: Int) -> Int { (f[k] as? NSNumber)?.intValue ?? d }
@@ -56,7 +60,21 @@ struct PatchInspector: View {
         }
         .formStyle(.grouped)
         .onAppear(perform: sync)
-        .onChange(of: ids) { sync() }
+        .onChange(of: ids) { old, _ in commit(old); sync() }   // another fixture picked: keep what was typed
+        .onChange(of: focus) { old, _ in if old != nil { commit(ids) } }
+    }
+
+    /// What is typed in the name and address fields, saved (for the one fixture `ids` holds).
+    private func commit(_ ids: Set<String>) {
+        guard ids.count == 1, let id = ids.first, let f = fixtures.first(where: { string($0, "id") == id }) else { return }
+        if let v = Int(address), v != int(f, "address", 1), sent != "\(id):\(v)" {
+            if (1...512).contains(v) {
+                sent = "\(id):\(v)"
+                apply("Change Address") { all in Self.set(&all, id) { $0["address"] = v } }
+            } else { address = String(int(f, "address", 1)) }
+        }
+        let new = name.trimmingCharacters(in: .whitespaces)
+        if new.isEmpty { name = id } else if new != id, sent != "\(id)>\(new)" { sent = "\(id)>\(new)"; rename(id, new) }
     }
 
     private func sync() {
@@ -73,9 +91,15 @@ struct PatchInspector: View {
         let id = string(f, "id"), key = string(f, "fixture"), def = definition(key)
         let u = int(f, "universe", 1), a = int(f, "address", 1), n = footprint(f)
         SwiftUI.Section(def?.name ?? key) {
-            TextField("Name", text: $name)
-                .onSubmit { if name != id { rename(id, name) } }
-                .help("The fixture's name in the set (renaming keeps where it hangs on your rigs). Press Return to rename.")
+            HStack {
+                TextField("Name", text: $name)
+                    .focused($focus, equals: .name)
+                    .onSubmit { commit(ids) }
+                    .help("The fixture's name in the set (renaming keeps where it hangs on your rigs). Saved on Return or when you leave the field.")
+                if name != id {
+                    Button("Rename") { sent = ""; commit(ids) }.buttonStyle(.borderedProminent)
+                }
+            }
             Picker("DMX mode", selection: Binding(get: { string(f, "mode") }, set: { m in
                 apply("Change Mode") { all in Self.set(&all, id) { $0["mode"] = m } }
             })) {
@@ -88,22 +112,31 @@ struct PatchInspector: View {
             Stepper("Universe \(u)", value: Binding(get: { u }, set: { nu in
                 apply("Change Universe") { all in Self.set(&all, id) { $0["universe"] = nu } }
             }), in: 1...64)
+            let typed = Int(address).flatMap { (1...512).contains($0) ? $0 : nil }
             HStack {
                 TextField("Start address", text: $address)
-                    .onSubmit {
-                        if let v = Int(address), (1...512).contains(v) {
+                    .focused($focus, equals: .address)
+                    .onSubmit { commit(ids) }
+                    .help("Saved on Return, when you leave the field, or with Save")
+                if let typed, typed != a {
+                    Button("Save") { sent = ""; commit(ids) }.buttonStyle(.borderedProminent)
+                    Button("Revert") { address = String(a) }
+                } else {
+                    Button("Next Free") {
+                        if let v = free(universe: u, count: n, except: [id]) {
+                            address = String(v)
                             apply("Change Address") { all in Self.set(&all, id) { $0["address"] = v } }
-                        } else { address = String(a) }
+                        }
                     }
-                Button("Next Free") {
-                    if let v = free(universe: u, count: n, except: [id]) {
-                        address = String(v)
-                        apply("Change Address") { all in Self.set(&all, id) { $0["address"] = v } }
-                    }
+                    .help("The first address in this universe where its \(n) channels fit")
                 }
-                .help("The first address in this universe where its \(n) channels fit")
             }
-            LabeledContent("Channels", value: "\(u).\(String(format: "%03d", a)) – \(u).\(String(format: "%03d", a + n - 1))")
+            if Int(address) != nil && typed == nil {
+                Label("A start address is 1 to 512.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+            let a = typed ?? a   // what is typed, checked before it is saved
+            LabeledContent("Channels", value: "\(u).\(String(format: "%03d", a)) – \(u).\(String(format: "%03d", a + n - 1))"
+                           + (a != int(f, "address", 1) ? " (not saved yet)" : ""))
             if a + n - 1 > 512 {
                 Label("It doesn't fit in the universe: \(a + n - 1 - 512) channels past 512.", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
