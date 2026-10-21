@@ -361,19 +361,14 @@ struct FixtureInspector: View {
             }
             LabeledContent("Patch", value: "\(fixture.patchText) · \(fixture.mode)")
             let refusal = editor.testRefusal(model, fixture), on = editor.lit.contains(fixture.id)
-            HStack {
-                Button(on ? "On" : "Test", systemImage: on ? "lightbulb.fill" : "lightbulb") {
-                    Task { await editor.toggleTest(model, fixture.id) }
-                }
-                .tint(on ? .yellow : nil)
-                .disabled(refusal != nil && !on)
-                .help(refusal ?? (on ? "Switch it off again"
-                                  : "Light it on the real rig until you switch it off (a minute at most), a head aimed as here: is it patched, connected and hung the way it is placed?"))
-                Button("Identify", systemImage: "lightbulb.max") { Task { await editor.identify(model, fixture.id) } }
-                    .disabled(refusal != nil)
-                    .help(refusal ?? "Light it on the real rig for 2 seconds")
+            Button(on ? "On: Click to Switch Off" : "Test on the Lights", systemImage: on ? "lightbulb.fill" : "lightbulb") {
+                Task { await editor.toggleTest(model, fixture.id) }
             }
             .buttonStyle(.bordered)
+            .tint(on ? .yellow : nil)
+            .disabled(refusal != nil && !on)
+            .help(refusal ?? (on ? "Switch it off again"
+                              : "Light it on the real rig until you switch it off (a minute at most), a head aimed as here: is it patched, connected and hung the way it is placed?"))
             if let refusal {
                 Text(refusal).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }

@@ -492,7 +492,7 @@ final class RigEditorModel: StageEditing {
         (try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any]) ?? [:]
     }
 
-    // MARK: - the light test and identify (as on the Sets page)
+    // MARK: - the light test (as on the Sets page)
 
     /// Fixtures the light test keeps on, and their switch-off when the engine's time runs out.
     var lit = Set<String>()
@@ -538,17 +538,6 @@ final class RigEditorModel: StageEditing {
         testOff.values.forEach { $0.cancel() }
         testOff = [:]
         for id in ids { _ = try? await model.api.testLight(fixture: id, on: false, layout: try layoutDict(), point: false) }
-    }
-
-    /// Light it on the real rig for 2 seconds.
-    func identify(_ model: AppModel, _ id: String) async {
-        do {
-            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
-            try await model.api.identify(fixture: id, rig: rigName, set: setName)
-            message = "Lit \(id) for 2 s"
-        } catch {
-            message = error.localizedDescription
-        }
     }
 
     func startCheck(_ model: AppModel) async {

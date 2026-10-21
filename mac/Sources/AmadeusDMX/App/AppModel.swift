@@ -41,8 +41,26 @@ final class AppModel {
     /// The Sets page edits this set (it has nothing to do with the show's choice).
     var editingSet = ""
     /// The Rigs page edits this rig, and the set placed on it whose placement is shown ("": the rig alone).
-    var editingRig = ""
-    var editingRigSet = ""
+    /// Opening a rig shows a set on it (rigSetDefault), not the bare rig: that is what you came to see.
+    var editingRig = "" { didSet { if editingRig != oldValue { editingRigSet = rigSetDefault(editingRig) } } }
+    var editingRigSet = "" {
+        didSet {
+            guard !editingRig.isEmpty, editingRigSet != oldValue else { return }
+            var chosen = UserDefaults.standard.dictionary(forKey: "rigEditorSet") as? [String: String] ?? [:]
+            chosen[editingRig] = editingRigSet
+            UserDefaults.standard.set(chosen, forKey: "rigEditorSet")
+        }
+    }
+
+    /// The set a rig opens with: the one last shown on it ("" too, when you chose the rig alone), else the show's
+    /// set when it is on this rig, else the first one placed on it.
+    func rigSetDefault(_ rig: String) -> String {
+        let on = setsOn(rig)
+        if let last = (UserDefaults.standard.dictionary(forKey: "rigEditorSet") as? [String: String])?[rig],
+           last.isEmpty || on.contains(last) { return last }
+        if on.contains(selectedSet) { return selectedSet }
+        return on.first ?? ""
+    }
 
     /// A set placed on a rig: what a show runs. Made on the Rigs page; the show picks one of these.
     struct Combination: Hashable, Identifiable {
@@ -224,7 +242,9 @@ final class AppModel {
         }
         if editingSet.isEmpty || !sets.contains(where: { $0.name == editingSet }) { editingSet = selectedSet }
         if editingRig.isEmpty || !rigs.contains(where: { $0.name == editingRig }) { editingRig = selectedRig }
-        if !editingRigSet.isEmpty && !setsOn(editingRig).contains(editingRigSet) { editingRigSet = "" }
+        if !editingRigSet.isEmpty && !setsOn(editingRig).contains(editingRigSet) || editingRigSet.isEmpty {
+            editingRigSet = rigSetDefault(editingRig)  // also once the rigs are read: a rig opens with a set on it
+        }
         previewCache = nil
         configVersion += 1
     }

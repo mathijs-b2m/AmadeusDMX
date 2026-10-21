@@ -87,22 +87,36 @@ private struct PlacementBar: View {
         let on = model.setsOn(rig)
         let off = model.sets.map(\.name).filter { !on.contains($0) }
         HStack(spacing: 10) {
-            Text("On this rig").foregroundStyle(.secondary)
-            Picker("Edit", selection: Binding(get: { model.editingRigSet }, set: { model.editingRigSet = $0 })) {
-                Text("The rig alone").tag("")
-                ForEach(on, id: \.self) { s in Text(s).tag(s) }
+            if on.isEmpty {
+                Text("No set on this rig yet").foregroundStyle(.secondary)
+                Menu {
+                    ForEach(off, id: \.self) { s in Button(s) { placing = s } }
+                } label: {
+                    Label("Place a Set", systemImage: "plus")
+                }
+                .menuStyle(.button).buttonStyle(.borderedProminent)
+                .fixedSize()
+                .disabled(off.isEmpty || model.engineRunning || busy)
+                .help("Put one of your sets on this rig, to hang its fixtures: a combination the show can run")
+            } else {
+                Text("Showing").foregroundStyle(.secondary)
+                Picker("Showing", selection: Binding(get: { model.editingRigSet }, set: { model.editingRigSet = $0 })) {
+                    ForEach(on, id: \.self) { s in Text(s).tag(s) }
+                    Divider()
+                    Text("No set: the rig alone").tag("")
+                }
+                .labelsHidden()
+                .fixedSize()
+                .help("Which of the sets on this rig you see and hang; or the rig alone (its trusses, no fixtures)")
+                Menu {
+                    ForEach(off, id: \.self) { s in Button(s) { placing = s } }
+                } label: {
+                    Label("Place Another Set", systemImage: "plus")
+                }
+                .fixedSize()
+                .disabled(off.isEmpty || model.engineRunning || busy)
+                .help(off.isEmpty ? "Every set is on this rig already" : "Put another of your sets on this rig: another combination the show can run")
             }
-            .labelsHidden()
-            .fixedSize()
-            .help("Edit the rig alone, or where a set's fixtures hang on it")
-            Menu {
-                ForEach(off, id: \.self) { s in Button(s) { placing = s } }
-            } label: {
-                Label("Place a Set", systemImage: "plus")
-            }
-            .fixedSize()
-            .disabled(off.isEmpty || model.engineRunning || busy)
-            .help("Put one of your sets on this rig: a combination the show can run")
             if !model.editingRigSet.isEmpty {
                 Button("Take Off…", systemImage: "minus.circle") { removing = model.editingRigSet }
                     .disabled(model.engineRunning || busy)
