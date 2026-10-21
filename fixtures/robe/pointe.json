@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Robe/Robe-Pointe.qxf",
     "type": "Moving Head",
-    "converter": 4
+    "converter": 8
   },
   "physical": {
     "pan_deg": 540,
@@ -60,7 +60,7 @@
         "default": 0
       },
       {
-        "attr": "gobo",
+        "attr": "gobo_wheel",
         "default": 0
       },
       {
@@ -142,7 +142,7 @@
         "default": 0
       },
       {
-        "attr": "gobo",
+        "attr": "gobo_wheel",
         "default": 0
       },
       {
@@ -239,7 +239,7 @@
         "default": 0
       },
       {
-        "attr": "gobo",
+        "attr": "gobo_wheel",
         "default": 0
       },
       {

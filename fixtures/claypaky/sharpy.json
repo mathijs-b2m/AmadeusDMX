@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Clay_Paky/Clay-Paky-Sharpy.qxf",
     "type": "Moving Head",
-    "converter": 4
+    "converter": 8
   },
   "physical": {
     "pan_deg": 540,
@@ -319,7 +319,6 @@
     "open": {},
     "gobo": {
       "gobo": [
-        1,
         5,
         9,
         13,
@@ -360,7 +359,6 @@
     }
   },
   "gobo_names": [
-    "White",
     "Gobo 1",
     "Gobo 2",
     "Gobo 3",
@@ -385,5 +383,43 @@
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
     "_note": "Estimated; measure with `amadeus motion`."
+  },
+  "gobo_images": {
+    "gobo": [
+      "qlc/ClayPaky/gobo00006",
+      "qlc/ClayPaky/gobo00007",
+      "qlc/ClayPaky/gobo00008",
+      "qlc/ClayPaky/gobo00009",
+      "qlc/ClayPaky/gobo00010",
+      "qlc/ClayPaky/gobo00011",
+      "qlc/ClayPaky/gobo00091",
+      "qlc/ClayPaky/gobo00085",
+      "qlc/ClayPaky/gobo00086",
+      "qlc/ClayPaky/gobo00089",
+      "qlc/ClayPaky/gobo00095",
+      "qlc/ClayPaky/gobo00094",
+      "qlc/ClayPaky/gobo00090",
+      "qlc/ClayPaky/gobo00088",
+      "qlc/ClayPaky/gobo00087",
+      "qlc/ClayPaky/gobo00093",
+      "qlc/ClayPaky/gobo00012"
+    ],
+    "gobo_shake": [
+      "qlc/ClayPaky/gobo00007",
+      "qlc/ClayPaky/gobo00008",
+      "qlc/ClayPaky/gobo00009",
+      "qlc/ClayPaky/gobo00010",
+      "qlc/ClayPaky/gobo00011",
+      "qlc/ClayPaky/gobo00091",
+      "qlc/ClayPaky/gobo00085",
+      "qlc/ClayPaky/gobo00086",
+      "qlc/ClayPaky/gobo00089",
+      "qlc/ClayPaky/gobo00095",
+      "qlc/ClayPaky/gobo00094",
+      "qlc/ClayPaky/gobo00090",
+      "qlc/ClayPaky/gobo00088",
+      "qlc/ClayPaky/gobo00087",
+      "qlc/ClayPaky/gobo00093"
+    ]
   }
 }

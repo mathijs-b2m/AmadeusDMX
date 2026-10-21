@@ -210,10 +210,12 @@ public struct Hello: Decodable, Sendable {
     public var program: String
     /// The genre whose house style the plan follows: in a live set the set's genre, which can differ.
     public var style: String
+    /// The pictures on the heads' gobo wheels; a frame's `gobo` points into this list.
+    public var gobos: [GoboPicture]
 
     enum CodingKeys: String, CodingKey {
         case track, duration, bpm, director, fixtures, stage, plan, maxFlashHz = "max_flash_hz", energy, screen, countdown, trusses, zones
-        case genre, genreSource = "genre_source", program, style
+        case genre, genreSource = "genre_source", program, style, gobos
     }
 
     public init(from decoder: Decoder) throws {
@@ -235,6 +237,7 @@ public struct Hello: Decodable, Sendable {
         program = (try? c.decodeIfPresent(String.self, forKey: .program)) ?? ""
         style = (try? c.decodeIfPresent(String.self, forKey: .style)) ?? ""
         zones = (try? c.decodeIfPresent([Zone].self, forKey: .zones)) ?? []
+        gobos = (try? c.decodeIfPresent([GoboPicture].self, forKey: .gobos)) ?? []
     }
 
     /// The track title without the "Deck A: " prefix and the file extension.
@@ -276,6 +279,34 @@ public struct DeckInfo: Decodable, Sendable, Identifiable, Equatable {
     public var genre: String?
     public var style: String?
     public var id: Int { deck }
+}
+
+/// A gobo picture from the fixture libraries (amadeus/library/gobos.py): how much light it lets through.
+public struct GoboPicture: Decodable, Sendable, Hashable {
+    public var key: String
+    /// Base64 PNG (a metal gobo, grey) or JPEG (a glass gobo, in colour).
+    public var img: String
+    /// dots, shapes, rings, curves or figure (a picture or words).
+    public var style: String
+}
+
+/// The gobo in a moving head's beam this frame (amadeus/engine/realism.py).
+public struct GoboState: Sendable, Equatable {
+    /// The picture in the beam and the next one on the wheel (indices into Hello.gobos; -1: the open hole).
+    public var picture: Int
+    public var next: Int
+    /// How far the wheel has turned towards the next picture, 0..1.
+    public var slide: Float
+    /// The gobo turning in its slot: turns per second, minus the other way.
+    public var turn: Float
+    /// Shaking: wobbles per second (0: still).
+    public var shake: Float
+    /// A prism splits the gobo beam into three.
+    public var prism: Bool
+
+    public init(picture: Int, next: Int = -1, slide: Float = 0, turn: Float = 0, shake: Float = 0, prism: Bool = false) {
+        self.picture = picture; self.next = next; self.slide = slide; self.turn = turn; self.shake = shake; self.prism = prism
+    }
 }
 
 /// One laser beam: direction from the laser, colour and brightness.
@@ -332,6 +363,10 @@ public struct Frame: Decodable, Sendable {
     public var beam: [String?]
     public var dirs: [SIMD3<Float>?]
     public var lz: [[LaserBeam]?]
+    /// Per element: the gobo in a head's beam (nil: an open beam, or not a head).
+    public var gobo: [GoboState?]
+    /// Per element: a head's zoom, 0 tightest .. 1 widest (nil: no zoom).
+    public var zoom: [Float?]
     public var decks: [DeckInfo]?
     /// What the laser guard did this frame: laser id → "zone 'Audience'" / "blanked (…)".
     public var laserGuard: [String: String]?
@@ -344,12 +379,12 @@ public struct Frame: Decodable, Sendable {
     /// The show arc (live mode).
     public var arc: ArcStatus?
 
-    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, decks, laserGuard = "guard", link, lite, fog, arc }
+    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, gobo, zoom, decks, laserGuard = "guard", link, lite, fog, arc }
 
     /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
     public init(fx: [[Float]], dirs: [SIMD3<Float>?]) {
         t = 0; phrase = 0; bp = nil; self.fx = fx; bands = []; beam = dirs.map { $0 == nil ? nil : "open" }
-        self.dirs = dirs; lz = fx.map { _ in nil }; decks = nil; laserGuard = nil; link = nil; lite = false; fog = [:]; arc = nil
+        self.dirs = dirs; lz = fx.map { _ in nil }; gobo = []; zoom = []; decks = nil; laserGuard = nil; link = nil; lite = false; fog = [:]; arc = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -368,6 +403,11 @@ public struct Frame: Decodable, Sendable {
                 b.count >= 7 ? LaserBeam(dir: SIMD3(b[0], b[1], b[2]), color: SIMD3(b[3], b[4], b[5]), bright: b[6]) : nil
             }
         }
+        gobo = ((try? c.decodeIfPresent([[Float]?].self, forKey: .gobo)) ?? nil ?? []).map { g in
+            g.flatMap { $0.count >= 6 ? GoboState(picture: Int($0[0]), next: Int($0[1]), slide: $0[2], turn: $0[3], shake: $0[4],
+                                                  prism: $0[5] > 0.5) : nil }
+        }
+        zoom = (try? c.decodeIfPresent([Float?].self, forKey: .zoom)) ?? nil ?? []
         decks = try c.decodeIfPresent([DeckInfo].self, forKey: .decks)
         laserGuard = try? c.decodeIfPresent([String: String].self, forKey: .laserGuard)
         link = try? c.decodeIfPresent(LinkStatus.self, forKey: .link)

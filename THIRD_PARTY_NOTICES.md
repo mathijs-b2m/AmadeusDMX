@@ -30,6 +30,11 @@ the Open Fixture Library (`ofl.json.gz`, MIT, © 2017 Florian & Felix Edelmann a
 mapped, safe defaults added, lasers kept dark, smoke machines' output channels mapped). Each file records the
 upstream version it was built from (`"upstream"`); `tools/build_catalog.py` rebuilds it.
 
+**Gobo pictures** (`fixtures/catalog/gobos.json.gz`): the gobo images of the QLC+ fixture library
+(`resources/gobos/`, Apache License 2.0, © the QLC+ authors) and of the Open Fixture Library
+(`resources/gobos/`, MIT, © the Open Fixture Library contributors), rendered small and modified (as the light
+each lets through, outside the gobo dark); `tools/build_gobos.py` rebuilds them.
+
 **Butterchurn** and **Butterchurn presets** (MIT, © 2013-2018 Jordan Berg), `web/vendor/`: the LED wall's
 MilkDrop-style visuals in the web visualiser. License texts: `licenses/butterchurn-MIT.txt`,
 `licenses/butterchurn-presets-MIT.txt`.

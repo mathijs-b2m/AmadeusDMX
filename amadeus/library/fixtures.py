@@ -265,6 +265,28 @@ def has_wheel(defn: dict) -> bool:
 # ---------------------------------------------------------------- patching
 
 
+# a beam effect a fixture (or its mode) can't play, played as the nearest one it can: a rotating gobo as a still one
+FX_FALLBACK = {"gobo_rotate": "gobo", "gobo_shake": "gobo", "gobo_spin": "gobo", "prism_spin": "prism"}
+
+
+def beam_effect(defn: dict, chans: list[dict], fx: str) -> str:
+    """The beam effect the fixture really plays for `fx`: the one asked for when this mode has its channels, else
+    the nearest it has, else an open beam."""
+    table = defn.get("beam_fx", {})
+    attrs = {c["attr"] for c in chans}
+    while fx:
+        entry = table.get(fx)
+        if isinstance(entry, dict) and set(entry) <= attrs:
+            return fx
+        fx = FX_FALLBACK.get(fx, "")
+    return "open"
+
+
+def zoom_of(s) -> float:
+    """How wide the zoom opens for a state: 0 tightest .. 1 widest (a frost wash always wide)."""
+    return 1.0 if getattr(s, "fx", "open") == "frost" else min(max(getattr(s, "zoom", 0.0), 0.0), 1.0)
+
+
 def patched(fx: dict) -> bool:
     """Has a start address. A fixture added without one plays in the visualiser only until it gets one."""
     return isinstance(fx.get("address"), int) and not isinstance(fx.get("address"), bool)
@@ -316,7 +338,8 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         else None
     )
     overrides = {}
-    for attr, val in defn.get("beam_fx", {}).get(getattr(first, "fx", "open"), {}).items():
+    shown = beam_effect(defn, chans, getattr(first, "fx", "open"))
+    for attr, val in defn.get("beam_fx", {}).get(shown, {}).items():
         if isinstance(val, list):  # one value per gobo
             overrides[attr] = val[getattr(first, "gobo", 0) % len(val)]
         elif isinstance(val, dict):  # rotation: [slow, fast] range, optionally the other direction
@@ -377,8 +400,8 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
             v = defn["laser"]["color_modes"][first.lcolor]  # laser multicolour modes
         elif a == "color_wheel":
             v = (slot["from"] + slot["to"]) // 2
-        elif a == "zoom" and "tight" in c:  # crisp, tight beams for scanning; wide only for a frost wash
-            v = c["wide"] if getattr(s, "fx", "open") == "frost" else c["tight"]
+        elif a == "zoom" and "tight" in c:  # the show's zoom between the lens's tightest and widest
+            v = round(c["tight"] + (c["wide"] - c["tight"]) * zoom_of(s))
         elif a.startswith("laser_") and "laser" in defn:
             v = _laser_value(a, defn["laser"], s)
         else:

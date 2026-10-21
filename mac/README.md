@@ -306,4 +306,6 @@ open "build/Amadeus DMX.app" --args -section rig -lastRig concert -editSet conce
 open "build/Amadeus DMX.app" --args -engineRoot /path/to/a/copy    # another engine folder (a sandbox)
 open "build/Amadeus DMX.app" --args -editorSelfTest NAME   # the set NAME on the rig NAME (copies: it saves!)
                                                                    # report in $TMPDIR/editor-selftest.txt
+.build/debug/AmadeusDMX -stageSnapshot DIR [-camera Side]   # DIR/hello.json + frame-NAME.json (feed messages) →
+                                                                   # DIR/NAME.png, drawn offscreen; quits before the app starts
 ```

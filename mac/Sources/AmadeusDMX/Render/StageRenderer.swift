@@ -38,12 +38,24 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
     let queue: MTLCommandQueue
     var solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe: MTLRenderPipelineState!
+    var goboBeamPipe, goboDecalPipe: MTLRenderPipelineState!
     var zoneBuffer: MTLBuffer?
     var zoneCount = 0
     var zoneEdges: [LineInstance] = []
     var solidDepth, lightDepth: MTLDepthStencilState!
     var coneBuffer: MTLBuffer!
     var coneCount = 0
+    var cappedConeBuffer: MTLBuffer!
+    var cappedConeCount = 0
+    // gobos: the hello's pictures as texture slices, and per head how far its gobo has turned (radians) and the
+    // direction its picture's x axis lies in (kept while the beam points along the mount, where it is undefined)
+    static let goboSize = 128, maxGobos = 256
+    var goboTexture: MTLTexture?
+    var goboKeys: [String] = []
+    var goboSlices = 0
+    var goboTurn: [String: Float] = [:]
+    var goboAxis: [String: SIMD3<Float>] = [:]
+    var goboT: Float = 0
     var sceneryBuffer: MTLBuffer?
     var sceneryCount = 0
     var wallBuffer: MTLBuffer?
@@ -126,6 +138,8 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     private(set) var preset: CameraPreset = .frontOfHouse
     var lastTime = CACurrentMediaTime()
     var startTime = CACurrentMediaTime()
+    /// Development (StageSnapshot): draw into this texture on a clock of its own instead of the window's.
+    var snapshot: (target: MTLTexture, now: CFTimeInterval)?
     var viewSize = CGSize(width: 1, height: 1)
 
     init?(view: MTKView) {
@@ -287,7 +301,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
-        let now = CACurrentMediaTime()
+        let now = snapshot?.now ?? CACurrentMediaTime()
         let dt = Float(min(0.1, now - lastTime))
         lastTime = now
         let (inp, frame) = input?() ?? (nil, nil)
@@ -311,7 +325,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         ensureTargets(CGSize(width: (view.drawableSize.width * renderScale).rounded(),
                              height: (view.drawableSize.height * renderScale).rounded()))
         guard let hdr, let depth, let halfA, let halfB, let quarterA, let quarterB,
-              let drawable = view.currentDrawable, let cmd = queue.makeCommandBuffer() else { return }
+              let target = snapshot?.target ?? view.currentDrawable?.texture, let cmd = queue.makeCommandBuffer() else { return }
 
         // camera
         let eye = pose.eye
@@ -322,10 +336,12 @@ final class StageRenderer: NSObject, MTKViewDelegate {
 
         // lights
         var beams: [BeamInstance] = [], sprites: [SpriteInstance] = [], decals: [DecalInstance] = [], lines: [LineInstance] = []
+        var goboBeams: [GoboBeamInstance] = [], goboDecals: [GoboDecalInstance] = []
         var ambient = SIMD3<Float>(repeating: 0)
+        if let pics = inp?.hello?.gobos, pics.map(\.key) != goboKeys || goboTexture == nil { buildGobos(pics) }
         if let inp, let s = scenery {
             buildLights(inp, frame, s, eye: eye, t: Float(now - startTime), beams: &beams, sprites: &sprites,
-                        decals: &decals, lines: &lines, ambient: &ambient)
+                        decals: &decals, lines: &lines, goboBeams: &goboBeams, goboDecals: &goboDecals, ambient: &ambient)
         }
 
         var u = Uniforms(viewProj: proj * viewM, camPos: SIMD4(eye, 1), camRight: SIMD4(right, 0), camUp: SIMD4(up, 0),
@@ -402,6 +418,23 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 enc.setVertexBytes(decals, length: decals.count * MemoryLayout<DecalInstance>.stride, index: 2)
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: decals.count)
             }
+            if !goboDecals.isEmpty, let tex = goboTexture {
+                enc.setRenderPipelineState(goboDecalPipe)
+                let buf = device.makeBuffer(bytes: goboDecals, length: goboDecals.count * MemoryLayout<GoboDecalInstance>.stride)
+                enc.setVertexBuffer(buf, offset: 0, index: 2)
+                enc.setFragmentBuffer(buf, offset: 0, index: 2)
+                enc.setFragmentTexture(tex, index: 0)
+                enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: goboDecals.count)
+            }
+            if !goboBeams.isEmpty, let tex = goboTexture {
+                enc.setRenderPipelineState(goboBeamPipe)
+                enc.setVertexBuffer(cappedConeBuffer, offset: 0, index: 0)
+                let buf = device.makeBuffer(bytes: goboBeams, length: goboBeams.count * MemoryLayout<GoboBeamInstance>.stride)
+                enc.setVertexBuffer(buf, offset: 0, index: 2)
+                enc.setFragmentBuffer(buf, offset: 0, index: 2)
+                enc.setFragmentTexture(tex, index: 0)
+                enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: cappedConeCount, instanceCount: goboBeams.count)
+            }
             if !beams.isEmpty {
                 enc.setRenderPipelineState(beamPipe)
                 enc.setVertexBuffer(coneBuffer, offset: 0, index: 0)
@@ -462,7 +495,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
 
         // composite → window
         let fp = MTLRenderPassDescriptor()
-        fp.colorAttachments[0].texture = drawable.texture
+        fp.colorAttachments[0].texture = target
         fp.colorAttachments[0].loadAction = .dontCare
         fp.colorAttachments[0].storeAction = .store
         if let enc = cmd.makeRenderCommandEncoder(descriptor: fp) {
@@ -474,7 +507,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
             enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
             enc.endEncoding()
         }
-        cmd.present(drawable)
+        if snapshot == nil, let drawable = view.currentDrawable { cmd.present(drawable) }
         if Self.gpuStats, Date().timeIntervalSince(Self.nanCheckAt) > 3, let blit = cmd.makeBlitCommandEncoder() {
             // development: count invalid (NaN/inf) pixels in the light buffer
             Self.nanCheckAt = Date()

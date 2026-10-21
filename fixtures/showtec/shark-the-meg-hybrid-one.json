@@ -9,7 +9,7 @@
       "Moving Head",
       "Color Changer"
     ],
-    "converter": 1
+    "converter": 5
   },
   "physical": {
     "pan_deg": 540,
@@ -19,7 +19,9 @@
       283,
       165,
       435
-    ]
+    ],
+    "beam_deg_max": 15.8,
+    "lumens": 3075
   },
   "modes": {
     "8ch": [
@@ -46,7 +48,8 @@
       },
       {
         "attr": "zoom",
-        "default": 0
+        "tight": 0,
+        "wide": 255
       },
       {
         "attr": "channel_functions",
@@ -81,14 +84,16 @@
         "attr": "color_wheel"
       },
       {
-        "attr": "color_wheel"
-      },
-      {
-        "attr": "gobo_rotation",
+        "attr": "gobo_wheel",
         "default": 0
       },
       {
-        "attr": "color_wheel"
+        "attr": "gobo_rotation",
+        "default": 128
+      },
+      {
+        "attr": "gobo",
+        "default": 0
       },
       {
         "attr": "focus",
@@ -96,7 +101,8 @@
       },
       {
         "attr": "zoom",
-        "default": 0
+        "tight": 0,
+        "wide": 255
       },
       {
         "attr": "prism",
@@ -139,14 +145,16 @@
         "attr": "color_wheel"
       },
       {
-        "attr": "color_wheel"
-      },
-      {
-        "attr": "gobo_rotation",
+        "attr": "gobo_wheel",
         "default": 0
       },
       {
-        "attr": "color_wheel"
+        "attr": "gobo_rotation",
+        "default": 128
+      },
+      {
+        "attr": "gobo",
+        "default": 0
       },
       {
         "attr": "focus",
@@ -154,7 +162,8 @@
       },
       {
         "attr": "zoom",
-        "default": 0
+        "tight": 0,
+        "wide": 255
       },
       {
         "attr": "prism",
@@ -291,6 +300,72 @@
     },
     "frost": {
       "frost": 255
+    },
+    "gobo": {
+      "gobo": [
+        14,
+        24,
+        34,
+        44,
+        54,
+        64,
+        74,
+        84,
+        94,
+        104,
+        114,
+        124
+      ]
+    },
+    "gobo_shake": {
+      "gobo": [
+        133,
+        141,
+        149,
+        157,
+        165,
+        173,
+        181,
+        189,
+        197,
+        205,
+        213,
+        221
+      ]
+    },
+    "gobo_spin": {
+      "gobo": {
+        "range": [
+          226,
+          255
+        ]
+      }
+    },
+    "gobo_rotate": {
+      "gobo": [
+        14,
+        24,
+        34,
+        44,
+        54,
+        64,
+        74,
+        84,
+        94,
+        104,
+        114,
+        124
+      ],
+      "gobo_rotation": {
+        "range": [
+          127,
+          4
+        ],
+        "reverse": [
+          132,
+          255
+        ]
+      }
     }
   },
   "motion": {
@@ -299,5 +374,19 @@
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
     "_note": "Estimated; measure with `amadeus motion`."
-  }
+  },
+  "gobo_names": [
+    "Gobo 1",
+    "Gobo 2",
+    "Gobo 3",
+    "Gobo 4",
+    "Gobo 5",
+    "Gobo 6",
+    "Gobo 7",
+    "Gobo 8",
+    "Gobo 9",
+    "Gobo 10",
+    "Gobo 11",
+    "Gobo 12"
+  ]
 }

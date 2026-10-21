@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Chauvet/Chauvet-Intimidator-Spot-375Z-IRC.qxf",
     "type": "Moving Head",
-    "converter": 4
+    "converter": 8
   },
   "physical": {
     "pan_deg": 540,
@@ -48,8 +48,8 @@
         "default": 0
       },
       {
-        "attr": "gobo",
-        "default": 0
+        "attr": "gobo_rotation",
+        "default": 1
       },
       {
         "attr": "prism",
@@ -95,8 +95,8 @@
         "default": 0
       },
       {
-        "attr": "gobo",
-        "default": 0
+        "attr": "gobo_rotation",
+        "default": 1
       },
       {
         "attr": "prism",
@@ -240,13 +240,34 @@
     "gobo_spin": {
       "gobo": {
         "range": [
-          1,
-          63
+          128,
+          189
         ]
       }
     },
     "prism": {
       "prism": 5
+    },
+    "gobo_rotate": {
+      "gobo": [
+        11,
+        19,
+        27,
+        35,
+        43,
+        51,
+        59
+      ],
+      "gobo_rotation": {
+        "range": [
+          145,
+          64
+        ],
+        "reverse": [
+          150,
+          231
+        ]
+      }
     }
   },
   "gobo_names": [
@@ -264,5 +285,34 @@
     "tilt_speed_dps": 160,
     "accel_dps2": 800,
     "_note": "Estimated; measure with `amadeus motion`."
+  },
+  "gobo_images": {
+    "gobo": [
+      "qlc/Others/gobo00013",
+      "qlc/Chauvet/gobo00045",
+      "qlc/Chauvet/gobo00037",
+      "qlc/Others/gobo00108",
+      "qlc/Others/gobo00044",
+      "qlc/Chauvet/gobo00057",
+      "qlc/Others/gobo00039"
+    ],
+    "gobo_shake": [
+      "qlc/Others/gobo00039",
+      "qlc/Chauvet/gobo00057",
+      "qlc/Others/gobo00044",
+      "qlc/Others/gobo00108",
+      "qlc/Chauvet/gobo00037",
+      "qlc/Chauvet/gobo00045",
+      "qlc/Others/gobo00013"
+    ],
+    "gobo_rotate": [
+      "qlc/Others/gobo00013",
+      "qlc/Chauvet/gobo00045",
+      "qlc/Chauvet/gobo00037",
+      "qlc/Others/gobo00108",
+      "qlc/Others/gobo00044",
+      "qlc/Chauvet/gobo00057",
+      "qlc/Others/gobo00039"
+    ]
   }
 }
