@@ -4,7 +4,7 @@
 // - Constant buffers (Uniforms, WallParams, BlurParams) follow HLSL's cbuffer rules: members never straddle a 16-byte
 //   boundary, every array element starts on one, and the buffer's size is a multiple of 16. Everything here is float4
 //   or float4x4, so the C# structs are packed tight and match (sizes checked in RenderTests).
-// - Instance data (BeamInstance, SpriteInstance, DecalInstance, LineInstance) is read in the vertex shader as a
+// - Instance data (BeamInstance, SpriteInstance, DecalInstance, LineInstance, GoboBeamInstance, GoboDecalInstance) is read in the vertex shader as a
 //   StructuredBuffer (Metal: `const device T*`), whose stride is the C# struct's size; float4 only, so no padding.
 // - Vertex buffers (SolidVertex, WallVertex, the cone's float3) go through an input layout with explicit offsets.
 //   Swift's SIMD3<Float> takes 16 bytes (a SolidVertex is 48 there); here a Vector3 is 12 and a SolidVertex 40.
@@ -55,6 +55,36 @@ public struct DecalInstance(Vector4 centerRadius, Vector4 normal, Vector4 color)
     public Vector4 Color = color;
 
     public const int Size = 48;
+}
+
+/// A beam with a gobo (Shaders/GoboBeam.hlsl): wheel = (picture, next picture, slide, lens radius), axis = (the
+/// picture's x direction across the beam, its rotation).
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
+public struct GoboBeamInstance(Vector4 apexLen, Vector4 dirRadius, Vector4 color, Vector4 wheel, Vector4 axis)
+{
+    public Vector4 ApexLen = apexLen;       // xyz apex, w length
+    public Vector4 DirRadius = dirRadius;   // xyz direction, w end radius
+    public Vector4 Color = color;           // rgb, a intensity
+    public Vector4 Wheel = wheel;           // x picture (texture slice; -1 the open hole), y next, z slide 0..1, w lens radius
+    public Vector4 Axis = axis;             // xyz the picture's x direction, w its rotation (radians)
+
+    public const int Size = 80;
+}
+
+/// Where a gobo beam lands: the decal quad, and the beam it projects (apex and length, direction and spread per metre).
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
+public struct GoboDecalInstance(Vector4 centerRadius, Vector4 normal, Vector4 color, Vector4 apexLen, Vector4 dirK, Vector4 wheel,
+                                Vector4 axis)
+{
+    public Vector4 CenterRadius = centerRadius;
+    public Vector4 Normal = normal;         // xyz normal, w squash
+    public Vector4 Color = color;
+    public Vector4 ApexLen = apexLen;
+    public Vector4 DirK = dirK;             // xyz direction, w how much the radius grows per metre
+    public Vector4 Wheel = wheel;
+    public Vector4 Axis = axis;
+
+    public const int Size = 112;
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 4)]

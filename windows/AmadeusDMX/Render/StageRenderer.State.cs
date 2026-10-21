@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using SkiaSharp;
 
 using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
 namespace AmadeusDMX;
@@ -17,6 +18,8 @@ public sealed class StageFrame
     public readonly List<SpriteInstance> Sprites = [];
     public readonly List<DecalInstance> Decals = [];
     public readonly List<LineInstance> Lines = [];
+    public readonly List<GoboBeamInstance> GoboBeams = [];
+    public readonly List<GoboDecalInstance> GoboDecals = [];
     public readonly MeshBuilder Parts = new();
     /// The wall's picture changed this frame (upload it to the wall texture).
     public bool WallPictureChanged;
@@ -27,7 +30,7 @@ public sealed class StageFrame
 
     internal void Clear()
     {
-        Beams.Clear(); Sprites.Clear(); Decals.Clear(); Lines.Clear(); Parts.Clear();
+        Beams.Clear(); Sprites.Clear(); Decals.Clear(); Lines.Clear(); GoboBeams.Clear(); GoboDecals.Clear(); Parts.Clear();
         WallPictureChanged = false;
         Show = null;
         Wp = default;
@@ -50,6 +53,17 @@ public sealed partial class StageRenderer
     internal readonly Dictionary<string, Vector2> FogPuffs = [];
     internal float RoomFog;
     internal float FogT;
+    // gobos: the hello's pictures (texture slices, uploaded by the Direct3D half when GoboVersion changes), and per
+    // head how far its gobo has turned (radians) and the direction its picture's x axis lies in (kept while the beam
+    // points along the mount, where it is undefined)
+    public const int GoboSize = 128, MaxGobos = 256;
+    internal IReadOnlyList<string> GoboKeys = [];
+    internal IReadOnlyList<GoboPicture>? GoboPictures;
+    internal int GoboSlices;
+    internal int GoboVersion;
+    internal readonly Dictionary<string, float> GoboTurn = [];
+    internal readonly Dictionary<string, Vector3> GoboAxis = [];
+    internal float GoboT;
     float _exposure = 1.0f;
     public float Exposure { get => _exposure; set { _exposure = value; Wake(); } }
 
@@ -358,8 +372,10 @@ public sealed partial class StageRenderer
         // lights
         var ambient = Vector3.Zero;
         var t = (float)(now - _startTime);
+        if (inp?.Hello?.Gobos is { } pics && (GoboPictures is null || !pics.Select(p => p.Key).SequenceEqual(GoboKeys))) SetGobos(pics);
         if (inp is not null && Scenery is { } s)
-            BuildLights(inp, frame, s, eye, t, out_.Beams, out_.Sprites, out_.Decals, out_.Lines, ref ambient);
+            BuildLights(inp, frame, s, eye, t, out_.Beams, out_.Sprites, out_.Decals, out_.Lines, out_.GoboBeams, out_.GoboDecals,
+                        ref ambient);
 
         var u = new Uniforms
         {
@@ -399,6 +415,37 @@ public sealed partial class StageRenderer
 
         // the fixtures' moving parts and lenses: where the beams point, in the colours they play
         if (Scenery is { } sc && inp is not null) sc.Models.Dynamic(inp.Fixtures, frame, Highlight, out_.Parts);
+    }
+
+    // MARK: the gobo pictures (the CPU half of StageRenderer+Setup's buildGobos)
+
+    /// New gobo pictures: slice i is picture i (at most MaxGobos); the Direct3D half builds the texture from them.
+    void SetGobos(IReadOnlyList<GoboPicture> pictures)
+    {
+        GoboKeys = pictures.Select(p => p.Key).ToArray();
+        GoboPictures = pictures;
+        GoboSlices = pictures.Count == 0 ? 0 : Math.Min(pictures.Count, MaxGobos);
+        GoboVersion++;
+    }
+
+    /// A gobo picture as `size` × `size` RGBA pixels (rows from the top), drawn over black like the Mac's Core
+    /// Graphics context (its alpha ignored, set to 255); null when it isn't a PNG or JPEG in base64.
+    internal static byte[]? GoboPixels(GoboPicture p, int size)
+    {
+        byte[] data;
+        try { data = Convert.FromBase64String(p.Img); }
+        catch (FormatException) { return null; }
+        using var img = SKImage.FromEncodedData(data);
+        if (img is null) return null;
+        using var bmp = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
+        using (var canvas = new SKCanvas(bmp))
+        {
+            canvas.Clear(SKColors.Transparent);
+            canvas.DrawImage(img, new SKRect(0, 0, size, size), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+        }
+        var px = bmp.Bytes;
+        for (var i = 3; i < px.Length; i += 4) px[i] = 255;
+        return px;
     }
 
     // MARK: the scenery and the zones (the CPU half of StageRenderer+Setup)

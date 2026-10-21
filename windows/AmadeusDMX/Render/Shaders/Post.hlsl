@@ -11,14 +11,6 @@ FSOut fullscreen_vertex(uint vid : SV_VertexID)
     FSOut o; o.pos = float4(p * 2.0 - 1.0, 0, 1); o.uv = float2(p.x, 1.0 - p.y); return o;
 }
 
-// invalid values (NaN, inf) become 0: one bad pixel would otherwise show black and the bloom would smear it
-// (by their bits: the compiler may fold isnan() away)
-float3 clean(float3 c)
-{
-    bool3 bad = (asuint(c) & 0x7F800000u) == 0x7F800000u;
-    return bad ? float3(0, 0, 0) : c;
-}
-
 float3 aces(float3 x)
 {
     const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;

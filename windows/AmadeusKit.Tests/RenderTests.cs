@@ -122,6 +122,8 @@ public class RenderTests
         Assert.Equal(SpriteInstance.Size, Marshal.SizeOf<SpriteInstance>());
         Assert.Equal(DecalInstance.Size, Marshal.SizeOf<DecalInstance>());
         Assert.Equal(LineInstance.Size, Marshal.SizeOf<LineInstance>());
+        Assert.Equal(GoboBeamInstance.Size, Marshal.SizeOf<GoboBeamInstance>());
+        Assert.Equal(GoboDecalInstance.Size, Marshal.SizeOf<GoboDecalInstance>());
         Assert.Equal(WallParams.Size, Marshal.SizeOf<WallParams>());
         Assert.Equal(BlurParams.Size, Marshal.SizeOf<BlurParams>());
         Assert.Equal(SolidVertex.Size, Marshal.SizeOf<SolidVertex>());
@@ -161,6 +163,8 @@ public class RenderTests
         Assert.Equal(SpriteInstance.Size, HlslSize(common, "SpriteInstance"));
         Assert.Equal(DecalInstance.Size, HlslSize(common, "DecalInstance"));
         Assert.Equal(LineInstance.Size, HlslSize(common, "LineInstance"));
+        Assert.Equal(GoboBeamInstance.Size, HlslSize(common, "GoboBeamInstance"));
+        Assert.Equal(GoboDecalInstance.Size, HlslSize(common, "GoboDecalInstance"));
         Assert.Equal(WallParams.Size, HlslSize(common, "WallParams"));
         Assert.Equal(BlurParams.Size, HlslSize(common, "BlurParams"));
     }
@@ -186,6 +190,8 @@ public class RenderTests
         ("Sprite.hlsl", ["sprite_vertex", "sprite_fragment"]),
         ("Decal.hlsl", ["decal_vertex", "decal_fragment"]),
         ("Line.hlsl", ["line_vertex", "line_fragment"]),
+        ("GoboBeam.hlsl", ["gobo_beam_vertex", "gobo_beam_fragment"]),
+        ("GoboDecal.hlsl", ["gobo_decal_vertex", "gobo_decal_fragment"]),
         ("Wall.hlsl", ["wall_vertex", "wall_fragment"]),
         ("Post.hlsl", ["fullscreen_vertex", "composite_fragment", "downsample_fragment", "blur_fragment"]),
     ];
@@ -224,8 +230,10 @@ public class RenderTests
         r.PrepareFrame(f, StageRenderer.Now(), new(1280, 720));
         Assert.Equal(1280, f.Width);
         Assert.Equal(720, f.Height);
-        // 4 heads (one through a prism: 3 rays), 8 cells, 2 pars, the strobe and the smoke plume
-        Assert.Equal(3 + 3 + 8 + 2 + 1 + 1, f.Beams.Count);
+        // 4 heads (one through a prism: 3 rays, one with a gobo: a gobo beam), 8 cells, 2 pars, the strobe and the smoke plume
+        Assert.Equal(3 + 2 + 8 + 2 + 1 + 1, f.Beams.Count);
+        Assert.Single(f.GoboBeams);
+        Assert.Single(f.GoboDecals);   // it lands on the floor
         Assert.Equal(14, f.Lines.Count);   // 7 laser beams: a glow and a core each
         Assert.NotEmpty(f.Decals);
         Assert.NotEmpty(f.Parts.V);
@@ -235,6 +243,53 @@ public class RenderTests
         Assert.All(f.Beams, b => Assert.True(float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0 && b.DirRadius.W > 0));
         Assert.Equal(12, r.ZoneEdges.Count);  // a box zone: 12 edges
         Assert.Equal(36, r.ZoneVertices.Count);
+    }
+
+    [Fact]
+    public void AGoboHeadThrowsAGoboBeamThatTurns()
+    {
+        var inp = SceneSamples.Club();
+        var frame = SceneSamples.Frame(inp);
+        var r = new StageRenderer { Input = () => (inp, frame) };
+        var f = new StageFrame();
+        var now = StageRenderer.Now();
+        r.PrepareFrame(f, now, new(800, 600));
+        Assert.Equal(1, r.GoboSlices);
+        Assert.Equal(new[] { "sample/dots" }, r.GoboKeys);
+        var b = Assert.Single(f.GoboBeams);
+        Assert.Equal(new Vector4(0, -1, 0, 0.05f), b.Wheel);   // the picture, the open hole next, not sliding, the lens
+        Assert.True(MathF.Abs(new Vector3(b.Axis.X, b.Axis.Y, b.Axis.Z).Length() - 1) < 1e-4f);
+        Assert.True(b.DirRadius.W > b.Wheel.W && float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0);
+        var d = Assert.Single(f.GoboDecals);
+        Assert.Equal(b.ApexLen, d.ApexLen);
+        Assert.Equal(b.Color.W * 0.75f, d.Color.W, 5);
+        Assert.Equal((b.DirRadius.W - b.Wheel.W) / b.ApexLen.W, d.DirK.W, 5);
+        // half a turn a second on the renderer's clock: a tenth of a second later it has turned 0.1π further
+        var before = b.Axis.W;
+        r.PrepareFrame(f, now + 0.1, new(800, 600));
+        Assert.Equal(before + 0.5f * 2 * MathF.PI * 0.1f, f.GoboBeams[0].Axis.W, 4);
+        Assert.Equal(1, r.GoboVersion);   // the same pictures: not uploaded again
+        // a gobo the hello has no pictures for draws a plain beam
+        var plain = inp with { Hello = new Hello { Fixtures = inp.Hello!.Fixtures, Stage = inp.Stage } };
+        var r2 = new StageRenderer { Input = () => (plain, frame) };
+        r2.PrepareFrame(f, now, new(800, 600));
+        Assert.Empty(f.GoboBeams);
+        Assert.Equal(3 + 3 + 8 + 2 + 1 + 1, f.Beams.Count);
+    }
+
+    [Fact]
+    public void GoboPicturesDecodeToTextureSlices()
+    {
+        var px = StageRenderer.GoboPixels(SceneSamples.DotsGobo(), StageRenderer.GoboSize)!;
+        const int n = StageRenderer.GoboSize;
+        Assert.Equal(n * n * 4, px.Length);
+        int At(int x, int y, int c) => px[(y * n + x) * 4 + c];
+        Assert.True(At(n / 2, n / 2, 0) > 240 && At(n / 2, n / 2, 1) > 240 && At(n / 2, n / 2, 2) > 240);   // the middle hole
+        Assert.True(At(2, 2, 0) < 10 && At(n / 2 + 19, n / 2, 0) < 10);   // the metal
+        Assert.True(At(n / 2 + 40, n / 2, 0) > 240);   // a hole of the ring
+        Assert.Equal(255, At(2, 2, 3));
+        Assert.Null(StageRenderer.GoboPixels(new GoboPicture { Key = "x", Img = "not base64!", Style = "dots" }, n));
+        Assert.Null(StageRenderer.GoboPixels(new GoboPicture { Key = "x", Img = "aGVsbG8=", Style = "dots" }, n));   // not a picture
     }
 
     [Fact]
