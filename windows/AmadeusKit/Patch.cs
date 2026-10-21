@@ -1,7 +1,8 @@
 // A set's DMX patch, the arithmetic the Set page does (mac/Sources/AmadeusDMX/Sets/PatchInspector.swift and
 // AddToSetSheet.swift): a fixture's footprint, which fixtures overlap a range of channels, the first free start
-// address in a universe, patching several fixtures one after another, free addresses for new fixtures. Every
-// universe has 512 channels. Fixtures are as in the set file ({"id", "fixture", "mode", "universe", "address", …}).
+// address in a universe, patching several fixtures one after another, names for new fixtures. Every universe has
+// 512 channels. Fixtures are as in the set file ({"id", "fixture", "mode", "universe", "address", …}); one without
+// an "address" has no start address yet (it plays in the visualiser only until you give it one) and overlaps nothing.
 namespace AmadeusKit;
 
 public sealed class Patch
@@ -28,7 +29,8 @@ public sealed class Patch
     public static string Key(IReadOnlyDictionary<string, JSONValue> f) => Str(f, "fixture");
     public static string Mode(IReadOnlyDictionary<string, JSONValue> f) => Str(f, "mode");
     public static int Universe(IReadOnlyDictionary<string, JSONValue> f) => Int(f, "universe", 1);
-    public static int Address(IReadOnlyDictionary<string, JSONValue> f) => Int(f, "address", 1);
+    /// The start address, null when it has none yet (added fixtures wait for you to give them one).
+    public static int? Address(IReadOnlyDictionary<string, JSONValue> f) => f.GetValueOrDefault("address")?.Number is { } n ? (int)n : null;
 
     public static string Str(IReadOnlyDictionary<string, JSONValue> f, string k) => f.GetValueOrDefault(k)?.String ?? "";
     public static int Int(IReadOnlyDictionary<string, JSONValue> f, string k, int d) =>
@@ -40,16 +42,15 @@ public sealed class Patch
     /// How many DMX channels a fixture takes.
     public int Footprint(IReadOnlyDictionary<string, JSONValue> f) => Math.Max(1, _channels(Key(f), Mode(f)));
 
-    /// The selected fixtures in patch order (universe, then address).
+    /// The selected fixtures in patch order (universe, then address; those without one last).
     public IReadOnlyList<IReadOnlyDictionary<string, JSONValue>> Selected(IReadOnlySet<string> ids) =>
-        _fixtures.Where(f => ids.Contains(Id(f))).OrderBy(Universe).ThenBy(Address).ToList();
+        _fixtures.Where(f => ids.Contains(Id(f))).OrderBy(Universe).ThenBy(f => Address(f) ?? UniverseSize + 1).ToList();
 
     /// The fixtures (by id) whose channels overlap `count` channels from `from`, in a universe.
     public IReadOnlyList<string> Clashes(int universe, int from, int count, IReadOnlySet<string> except) =>
         _fixtures.Where(f =>
         {
-            if (except.Contains(Id(f)) || Universe(f) != universe) return false;
-            var b = Address(f);
+            if (except.Contains(Id(f)) || Universe(f) != universe || Address(f) is not { } b) return false;
             return b <= from + count - 1 && from <= b + Footprint(f) - 1;
         }).Select(Id).ToList();
 
@@ -101,42 +102,22 @@ public sealed class Patch
         return letters.Length == 0 ? "fx" : letters;
     }
 
-    /// `count` new fixtures of a model and mode at free addresses after what is patched, universe by universe,
-    /// each with a name of its own: the fixtures to add.
+    /// `count` new fixtures of a model and mode, each with a name of its own: the fixtures to add. No start
+    /// addresses: you give each the one set on the fixture (a guess is usually wrong, and then they overlap).
     public List<Dictionary<string, JSONValue>> NewFixtures(string key, string mode, int count)
     {
-        var footprint = Math.Min(UniverseSize, Math.Max(1, _channels(key, mode)));
-        var used = new Dictionary<int, List<(int Lo, int Hi)>>();
-        foreach (var f in _fixtures)
-        {
-            var a = Address(f);
-            Used(used, Universe(f)).Add((a, a + Footprint(f) - 1));
-        }
         var baseName = BaseName(key);
         var ids = _fixtures.Select(Id).ToHashSet();
         var added = new List<Dictionary<string, JSONValue>>();
         for (var i = 0; i < count; i++)
         {
-            int u = 1, a = 1;
-            while (a + footprint - 1 > UniverseSize || Used(used, u).Any(r => r.Lo <= a + footprint - 1 && a <= r.Hi))
-            {
-                a++;
-                if (a + footprint - 1 > UniverseSize) { a = 1; u++; }
-            }
-            Used(used, u).Add((a, a + footprint - 1));
             var n = 1;
             while (ids.Contains($"{baseName}{n}")) n++;
             ids.Add($"{baseName}{n}");
-            added.Add(new Dictionary<string, JSONValue>
-            {
-                ["id"] = $"{baseName}{n}", ["fixture"] = key, ["mode"] = mode, ["universe"] = u, ["address"] = a,
-            });
+            added.Add(new Dictionary<string, JSONValue> { ["id"] = $"{baseName}{n}", ["fixture"] = key, ["mode"] = mode, ["universe"] = 1 });
         }
         return added;
     }
-
-    static List<(int Lo, int Hi)> Used(Dictionary<int, List<(int Lo, int Hi)>> used, int u) =>
-        used.TryGetValue(u, out var l) ? l : used[u] = [];
 }
 
 /// A set's layout (the set file, or a set on a rig) as the app edits it: its fixtures as mutable dictionaries.

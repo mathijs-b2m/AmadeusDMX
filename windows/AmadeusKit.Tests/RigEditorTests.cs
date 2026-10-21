@@ -323,8 +323,7 @@ public class RigEditorTests(ITestOutputHelper output)
         var ks = e.Doc.Fixtures.Where(f => f.Truss == id).ToList();
         Assert.Equal(2, ks.Count);
         Assert.Equal(["katana3", "katana4"], ks.Select(k => k.Id).ToArray());  // the set has katana1 and 2
-        var used = e.Doc.Fixtures.Select(f => (f.Universe, f.Address)).ToList();
-        Assert.Equal(used.Count, used.Distinct().Count());
+        Assert.All(ks, k => Assert.Null(k.Address));  // added without addresses: given on the Sets page
         e.Key(EditorKey.Char("r", shift: true));  // Shift+R: 90°
         Assert.All(e.Doc.Fixtures.Where(f => f.Truss == id), f => Assert.Equal(90, f.RotDeg, 6));
         var after = e.Doc.Fixtures.Where(f => f.Truss == id).Select(f => f.Position(e.Doc.Width)).ToList();

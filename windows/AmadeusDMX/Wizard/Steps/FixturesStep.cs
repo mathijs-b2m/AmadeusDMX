@@ -70,11 +70,22 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
                 UI.Text($"{p.Entry.Manufacturer} {p.Entry.Model}").Lines(1).Grow(),
                 p.Modes.Count > 1 ? UI.Picker(p.Modes, p.Mode, m => m, m => { p.Mode = m; w.PlannedChanged(); }).Frame(width: 110) : null,
                 Form.Stepper(p.Count, 1, 120, v => $"{v}×", v => { p.Count = v; w.PlannedChanged(); }).Frame(width: 120),
+                Start(p),
                 UI.IconButton("minus.circle.fill", "Remove", () => w.Remove(p)));
             return (UIElement)UI.Card(row, padding: 10);
         })]);
+        list.Children.Add(UI.Text("Addresses are optional here: type the one set on the first fixture of a row, or leave it empty and give them later on the Sets page. Fixtures without one play in the visualiser only.",
+                                  Font.Callout).Secondary().Wrap());
         if (Capacity() is { } c) list.Children.Add(c);
         return list;
+    }
+
+    /// The start address set on the first of a row (the others follow one after another); empty: given later.
+    static UIElement Start(PlannedFixture p)
+    {
+        var t = new TextBox { PlaceholderText = "address", Text = p.Start, Width = 64, MinWidth = 0, TextAlignment = TextAlignment.Right };
+        t.TextChanged += (_, _) => p.Start = t.Text;
+        return t.Tooltip("The start address set on the first of them; the others follow one after another. Empty: give them later on the Sets page.");
     }
 
     /// The universes the fixtures take against what the DMX output carries.

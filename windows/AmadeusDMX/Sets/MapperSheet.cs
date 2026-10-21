@@ -6,7 +6,8 @@
 // (amadeus/library/mapper.py): every fixture of that model plays by it (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
 namespace AmadeusDMX;
 
-public sealed record MapTarget(string Key, string Mode, string Fixture, int Address, int Universe)
+/// `Fixture`: the one tried on the lights; `Address` null: it has no start address yet (nothing can be tried).
+public sealed record MapTarget(string Key, string Mode, string Fixture, int? Address, int Universe)
 {
     public string Id => $"{Key}|{Mode}";
 }
@@ -217,7 +218,7 @@ public sealed class MapperSheet
 }
 
 /// One channel: its number and address, the library's name and ranges, what the show does with it, its value.
-public sealed class ChannelRow(MapperModel m, int index, int address, int universe, Action changed)
+public sealed class ChannelRow(MapperModel m, int index, int? address, int universe, Action changed)
 {
     FixtureMapping.Channel Channel => m.Mapping!.Channels[index];
     readonly ContentControl _cell = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false, Width = 110 };
@@ -230,7 +231,7 @@ public sealed class ChannelRow(MapperModel m, int index, int address, int univer
         var c = Channel;
         var number = UI.VStack(1,
             UI.Text($"{c.N}").Bold(),
-            UI.Text(Patch.Where(universe, address), Font.Caption2).Secondary()).Frame(width: 44);
+            UI.Text(address is { } a ? Patch.Where(universe, a) : "–", Font.Caption2).Secondary()).Frame(width: 44);
 
         var name = UI.HStack(4, UI.Text(c.Name).Lines(1));
         if (c.Ranges.Count > 0)

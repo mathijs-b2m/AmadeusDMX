@@ -1,6 +1,6 @@
 // Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library), choose its mode and how
-// many. They get free DMX addresses (the kit's Patch). Where they hang is done on the Rigs page
-// (mac/Sources/AmadeusDMX/Sets/AddToSetSheet.swift). A sheet: a ContentDialog here.
+// many. No start addresses: you give each the one set on the fixture (in the inspector). Where they hang is done
+// on the Rigs page (mac/Sources/AmadeusDMX/Sets/AddToSetSheet.swift). A sheet: a ContentDialog here.
 namespace AmadeusDMX;
 
 public sealed class AddToSetSheet
@@ -61,7 +61,7 @@ public sealed class AddToSetSheet
             Child = search, CornerRadius = new CornerRadius(9), Background = Theme.Brush("ControlFillColorSecondaryBrush"),
         };
         _dialog.Content = UI.VStack(14,
-            UI.Text("Search by brand or model. They get free DMX addresses; where they hang is set on the Rigs page.").Secondary().Wrap(),
+            UI.Text("Search by brand or model. Then give each its start address (the one set on the fixture) on the right; where they hang is set on the Rigs page.").Secondary().Wrap(),
             field,
             _results,
             _options,
@@ -164,7 +164,7 @@ public sealed class AddToSetSheet
             if (!await _model.EnsureSetupService() || SetLayout.Parse(ws.Composed("", set)) is not { } layout)
                 throw SetupAPIException.NotRunningError();
             var fixtures = SetLayout.Fixtures(layout);
-            // free addresses after what is patched, universe by universe
+            // no start address: a guess is usually wrong, and then they overlap
             fixtures.AddRange(new Patch(fixtures, Patch.ChannelsFrom(ws.Definition)).NewFixtures(key, _mode, _count));
             await _model.Api.SaveSet(SetLayout.WithFixtures(layout, fixtures), set);
             _onDone();

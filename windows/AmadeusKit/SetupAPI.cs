@@ -482,13 +482,13 @@ public sealed record LightTest
     public string Output { get; init; } = "";         // the set's output, in words ("Art-Net → 2.0.0.10:6454")
     public int Universe { get; init; }
     public int? WireUniverse { get; init; }           // the Art-Net / sACN universe it goes out as
-    public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel
+    public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel (empty: no start address)
 
     public static LightTest From(JsonElement c) => new()
     {
         On = J.Req(c, "on", J.Bool), Seconds = J.Req(c, "seconds", J.Double), Output = J.Req(c, "output", J.String),
         Universe = J.Req(c, "universe", J.Int), WireUniverse = J.Val(c, "wire_universe", J.Int),
-        Channels = J.Req(c, "channels", J.ArrayOf(J.Int)),
+        Channels = J.Ref(c, "channels", J.ArrayOf(J.Int)) ?? [],  // null: no start address (switching off one)
     };
 
     /// "universe 1, channels 43–50 · Art-Net → 2.0.0.10:6454 (universe 1 on the wire)"

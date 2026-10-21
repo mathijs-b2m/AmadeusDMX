@@ -522,42 +522,25 @@ public sealed class RigEditorModel : Observable, IStageEditing
         }
     }
 
-    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. Addresses are
-    /// filled in after the last used channel, universe by universe.
+    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. No start
+    /// addresses: you give them on the Sets page (a guess is usually wrong, and then they overlap).
     public void AddFixtures(string key, string mode, int count)
     {
         if (Definition(key) is not { } def || count <= 0) return;
-        var footprint = Math.Max(1, def.ChannelCount(mode));
         var last = key.Split('/').LastOrDefault() ?? "";
         var letters = new string(last.TakeWhile(char.IsLetter).ToArray());
         var prefix = letters.Length == 0 ? "fx" : letters;
         Change($"Add {count} × {def.Model}", d =>
         {
-            var used = new Dictionary<int, List<(int Lo, int Hi)>>();
-            void Use(int u, int lo, int hi)
-            {
-                if (!used.TryGetValue(u, out var l)) used[u] = l = [];
-                l.Add((lo, hi));
-            }
-            foreach (var f in d.Fixtures)
-            {
-                var n0 = Definition(f.Key)?.ChannelCount(f.Mode) ?? 1;
-                Use(f.Universe, f.Address, f.Address + Math.Max(1, n0) - 1);
-            }
-            bool Free(int u, int a) =>
-                a + footprint - 1 <= 512 && !(used.GetValueOrDefault(u) ?? []).Any(r => r.Lo <= a + footprint - 1 && a <= r.Hi);
             var truss = Selection?.TrussId is { } tid ? d.Trusses.FirstOrDefault(t => t.Id == tid) : null;
             var newIDs = new List<string>();
             for (var k = 0; k < count; k++)
             {
-                int u = 1, a = 1;
-                while (!Free(u, a)) { a++; if (a > 512) { a = 1; u++; } }
-                Use(u, a, a + footprint - 1);
                 var n = 1;
                 while (d.Fixtures.Any(f => f.Id == $"{prefix}{n}") || newIDs.Contains($"{prefix}{n}")) n++;
                 var id = $"{prefix}{n}";
                 newIDs.Add(id);
-                var f = new PlacedFixture(id, key, mode, u, a, "floor", (k + 1.0) / (count + 1), -0.6, 0.25, 0, null, null, null);
+                var f = new PlacedFixture(id, key, mode, 1, null, "floor", (k + 1.0) / (count + 1), -0.6, 0.25, 0, null, null, null);
                 if (truss is { } t)
                 {
                     var span = t.Vertical ? t.LengthM : t.LengthM * 0.9;

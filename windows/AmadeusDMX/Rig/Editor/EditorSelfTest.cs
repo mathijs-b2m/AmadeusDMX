@@ -87,9 +87,8 @@ public static partial class EditorSelfTest
         e.AddFixtures("dts/katana", "Extended", 2);
         var ks = e.Doc.Fixtures.Where(x => x.Truss == newID).ToList();
         Check("add fixtures on truss", ks.Count == 2 && ks.All(x => x.Mount == "hang"),
-              string.Join(" ", ks.Select(x => $"{x.Id}@{x.Universe}.{x.Address}")));
-        var used = e.Doc.Fixtures.Select(x => $"{x.Universe}.{x.Address}").ToList();
-        Check("unique addresses", used.Distinct().Count() == used.Count);
+              string.Join(" ", ks.Select(x => $"{x.Id}@{x.PatchText}")));
+        Check("added without addresses (given on the Sets page)", ks.All(x => x.Address is null));
         // 9. rotate the new truss 90°: the Katanas turn with it (they now run front to back)
         var before = ks.Select(x => x.Position(W)).ToList();
         e.Selection = EditorSelection.Truss(newID);

@@ -71,18 +71,26 @@ public class PatchTests
     }
 
     [Fact]
-    public void NewFixturesGetFreeAddressesAndNamesOfTheirOwn()
+    public void NewFixturesGetNamesOfTheirOwnAndNoAddress()
     {
         Assert.Equal("fuze", Patch.BaseName("beamz/fuze75b-beam"));
         Assert.Equal("fx", Patch.BaseName("acme/75x"));
         var p = P(F("fuze1", 1, 1), F("fuze3", 1, 25));
         var added = p.NewFixtures("beamz/fuze75b-beam", "12ch", 3);
         Assert.Equal(["fuze2", "fuze4", "fuze5"], added.Select(Patch.Id));
-        Assert.Equal([13, 37, 49], added.Select(Patch.Address));
-        var full = P(Enumerable.Range(0, 42).Select(i => F($"fuze{i + 1}", 1, 1 + 12 * i)).ToArray());
-        var next = full.NewFixtures("beamz/fuze75b-beam", "12ch", 1).Single();
-        Assert.Equal(2, Patch.Universe(next));  // 42 × 12 = 504: no 12 channels left in universe 1
-        Assert.Equal(1, Patch.Address(next));
+        Assert.All(added, f => Assert.Null(Patch.Address(f)));  // you give it: a guess is usually wrong
+        Assert.All(added, f => Assert.Equal(1, Patch.Universe(f)));
+    }
+
+    [Fact]
+    public void FixturesWithoutAnAddressOverlapNothing()
+    {
+        var unpatched = new Dictionary<string, JSONValue> { ["id"] = "new1", ["fixture"] = "beamz/fuze75b-beam", ["mode"] = "12ch", ["universe"] = 1 };
+        var p = P(F("a", 1, 13), unpatched);
+        Assert.Null(Patch.Address(unpatched));
+        Assert.Empty(p.Clashes(1, 1, 12, new HashSet<string>()));
+        Assert.Equal(1, p.Free(1, 12, new HashSet<string>()));
+        Assert.Equal(["a", "new1"], p.Selected(new HashSet<string> { "new1", "a" }).Select(Patch.Id));  // those without one last
     }
 
     [Fact]
@@ -428,6 +436,7 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
             Assert.Equal("12ch", w.Planned.Single().Mode);  // the most channels first
             w.Name = "Wizard Test";
             w.Template = RigTemplate.Booth;
+            w.Planned.Single().Start = "1";  // the optional address of the row: the others follow one after another
             w.OutputKind = WizardModel.Output.Manual;
             w.ManualIP = "2.0.0.30";
             await w.Create(host);
@@ -443,14 +452,14 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
             await w.Create(host);
             Assert.Contains("already exists", w.Error);
 
-            // Add Fixtures…: two more, after what is patched; saved as the set alone
+            // Add Fixtures…: two more, without addresses; saved as the set alone
             var layout = SetLayout.Parse(ws.Composed("", "wizard-test"))!;
             var fixtures = SetLayout.Fixtures(layout);
             var patch = new Patch(fixtures, Patch.ChannelsFrom(ws.Definition));
             fixtures.AddRange(patch.NewFixtures("beamz/fuze75b-beam", "12ch", 2));
             await api.SaveSet(SetLayout.WithFixtures(layout, fixtures), "wizard-test");
             Assert.Equal(["fuze5", "fuze6"], ws.LoadSet("wizard-test")!.Fixtures.Skip(4).Select(f => f.Id));
-            Assert.Equal([49, 61], ws.LoadSet("wizard-test")!.Fixtures.Skip(4).Select(f => f.Address ?? 0));
+            Assert.All(ws.LoadSet("wizard-test")!.Fixtures.Skip(4), f => Assert.Null(f.Address));  // no address until you give one
 
             // the address became a DMX device, universe 1 on its first output
             Assert.Equal("→ node", ws.LoadSet("wizard-test")!.OutputText);

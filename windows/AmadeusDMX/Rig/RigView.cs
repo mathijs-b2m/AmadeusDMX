@@ -80,7 +80,7 @@ sealed class RigList(AppModel model)
         var header = UI.HStack(8, UI.Text("Rigs", Font.Subheadline).Secondary().Bold(), UI.Spacer(),
                                UI.IconButton("plus", "Make a new rig (Ctrl+Alt+N)", () => model.ShowNewRig = true)).Padding(14, 10);
         // a real button, full width under the list: the first place you look for a new rig
-        var add = UI.Button("New Rig…", () => model.ShowNewRig = true, "plus").Tooltip("Make a new rig: start from an empty room or a template (Ctrl+Alt+N)");
+        var add = UI.Button("New Rig…", () => model.ShowNewRig = true, "plus").Prominent().Tooltip("Make a new rig: start from an empty room or a template (Ctrl+Alt+N)");
         add.HorizontalAlignment = HorizontalAlignment.Stretch;
         add.Padding = new Thickness(10);
         add.Margin = new Thickness(10);

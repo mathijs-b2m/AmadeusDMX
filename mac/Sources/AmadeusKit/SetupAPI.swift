@@ -419,15 +419,26 @@ public struct LightTest: Decodable, Sendable {
     public var output: String           // the set's output, in words ("Art-Net → 192.168.2.18:6454")
     public var universe: Int
     public var wireUniverse: Int?       // the Art-Net / sACN universe it goes out as
-    public var channels: [Int]          // first and last DMX channel
+    public var channels: [Int]          // first and last DMX channel (empty: no start address)
 
     enum CodingKeys: String, CodingKey {
         case on, seconds, output, universe, wireUniverse = "wire_universe", channels
     }
 
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        on = try c.decode(Bool.self, forKey: .on)
+        seconds = try c.decode(Double.self, forKey: .seconds)
+        output = try c.decode(String.self, forKey: .output)
+        universe = try c.decode(Int.self, forKey: .universe)
+        wireUniverse = try c.decodeIfPresent(Int.self, forKey: .wireUniverse)
+        channels = try c.decodeIfPresent([Int].self, forKey: .channels) ?? []  // null: a fixture without an address
+    }
+
     /// "universe 1, channels 43–50 · Art-Net → 192.168.2.18:6454 (universe 1 on the wire)"
     public var summary: String {
-        let first = channels.first ?? 0, last = channels.last ?? first
+        guard let first = channels.first else { return "universe \(universe), no start address · \(output)" }
+        let last = channels.last ?? first
         var s = "universe \(universe), channels \(first)–\(last) · \(output)"
         if let w = wireUniverse { s += " (universe \(w) on the wire)" }
         return s

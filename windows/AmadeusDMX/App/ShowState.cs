@@ -1,7 +1,7 @@
 // The app's pages, the show's state, and what a show does with the computer (the mode).
 namespace AmadeusDMX;
 
-public enum Section { Show, Dmx, Set, Rig, Engine, Settings }
+public enum Section { Show, Set, Rig, Engine, Dmx, Settings }
 
 public static class SectionExtensions
 {

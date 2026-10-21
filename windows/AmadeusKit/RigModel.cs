@@ -264,11 +264,14 @@ public sealed class FixtureDefinition
 
 public sealed class PlacedFixture
 {
+    /// "1.033", or what it is without a start address.
+    public string PatchText => Address is { } a ? $"{Universe}.{a:000}" : "no address";
+
     public string Id { get; set; }
     public string Key { get; set; }
     public string Mode { get; set; }
     public int Universe { get; set; }
-    public int Address { get; set; }
+    public int? Address { get; set; }     // null: no start address yet (the visualiser only until you give it one)
     public string Mount { get; set; }
     public double X { get; set; }          // fraction of the stage width
     public double YM { get; set; }
@@ -282,7 +285,7 @@ public sealed class PlacedFixture
     /// Not mounted on this rig yet: it waits on the floor at the front (the engine's waiting spot).
     public bool Waiting { get; set; }
 
-    public PlacedFixture(string id, string key, string mode, int universe, int address, string mount, double x, double yM,
+    public PlacedFixture(string id, string key, string mode, int universe, int? address, string mount, double x, double yM,
                          double zM, double rotDeg, Vec2? aim, string? truss, double? trussPos, string? side = null,
                          double? mountRoll = null)
     {
@@ -388,7 +391,7 @@ public sealed class RigDocument
             var aim = o.GetValueOrDefault("aim")?.Array is { Count: 2 } a ? new Vec2(a[0].Number ?? 0, a[1].Number ?? 0) : (Vec2?)null;
             double? N(string k) => o.GetValueOrDefault(k)?.Number;
             return new PlacedFixture(id, key, o.GetValueOrDefault("mode")?.String ?? "", (int)(N("universe") ?? 1),
-                (int)(N("address") ?? 1), mount, N("x") ?? 0.5, N("y_m") ?? d.Y, N("z_m") ?? d.Z, N("rot_deg") ?? 0, aim,
+                (int?)N("address"), mount, N("x") ?? 0.5, N("y_m") ?? d.Y, N("z_m") ?? d.Z, N("rot_deg") ?? 0, aim,
                 o.GetValueOrDefault("truss")?.String, N("truss_pos_m"), o.GetValueOrDefault("truss_side")?.String,
                 N("mount_roll_deg"))
             {
@@ -478,7 +481,7 @@ public sealed class RigDocument
             var o = old.TryGetValue(f.Id, out var was) ? new Dictionary<string, JSONValue>(was) : new Dictionary<string, JSONValue>();
             void Patch()
             {
-                o["id"] = f.Id; o["fixture"] = f.Key; o["mode"] = f.Mode; o["universe"] = f.Universe; o["address"] = f.Address;
+                o["id"] = f.Id; o["fixture"] = f.Key; o["mode"] = f.Mode; o["universe"] = f.Universe; Put(o, "address", f.Address is { } ad ? ad : null);
             }
             if (f.Waiting)  // not mounted: its waiting spot, marked as such (the engine doesn't save it as a place)
             {

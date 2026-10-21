@@ -12,6 +12,18 @@ public sealed record PlannedFixture(CatalogEntry Entry, IReadOnlyList<string> Mo
     public string Mode { get; set; } = Modes.FirstOrDefault() ?? "";
     public int Count { get; set; } = 1;
     public IReadOnlyDictionary<string, int> Channels { get; init; } = new Dictionary<string, int>();  // mode → channels (empty: not known)
+    public string Start { get; set; } = "";  // from this address, one after another; empty: given later, on the Sets page
+
+    /// The start addresses of its fixtures (null each when none was typed, or past 512).
+    public IReadOnlyList<int?> Addresses
+    {
+        get
+        {
+            if (!int.TryParse(Start.Trim(), out var s) || s is < 1 or > 512) return Enumerable.Repeat((int?)null, Count).ToList();
+            var n = Math.Max(Footprint, 1);
+            return Enumerable.Range(0, Count).Select(i => s + i * n + n - 1 <= 512 ? s + i * n : (int?)null).ToList();
+        }
+    }
 
     public int Footprint => Channels.GetValueOrDefault(Mode);
 }
@@ -333,15 +345,17 @@ public sealed class WizardModel : Observable
             else await api.CreateRig(rig, Template.RawValue(), Width, Height, Depth, LedWall);
             var layout = await api.Rig(rig, setName);
             var items = new List<JSONValue>();
+            var starts = new List<int?>();
             foreach (var p in _planned)
             {
                 Progress = $"Adding {p.Count}× {p.Entry.Model}…";
                 var key = p.Entry.IsLocal ? p.Entry.Key : await api.AddToLibrary(p.Entry.Key);
                 for (var i = 0; i < p.Count; i++)
                     items.Add(JSONValue.Of(new Dictionary<string, JSONValue> { ["fixture"] = key, ["mode"] = p.Mode, ["universe"] = 1 }));
+                starts.AddRange(p.Addresses);
             }
             Progress = "Patching addresses…";
-            Compose(layout, await Autopatch(api, items));
+            Compose(layout, WithStarts(await Autopatch(api, items), starts));
             if (OutputKind != Output.Visualiser)
             {
                 Progress = "Adding your DMX devices…";
@@ -484,16 +498,18 @@ public sealed class WizardModel : Observable
                 Progress = "The set…";
                 await api.CreateSet(setName);
                 var items = new List<JSONValue>();
+                var starts = new List<int?>();
                 foreach (var p in _planned)
                 {
                     Progress = $"Adding {p.Count}× {p.Entry.Model}…";
                     var key = p.Entry.IsLocal ? p.Entry.Key : await api.AddToLibrary(p.Entry.Key);
                     for (var n = 0; n < p.Count; n++)
                         items.Add(JSONValue.Of(new Dictionary<string, JSONValue> { ["fixture"] = key, ["mode"] = p.Mode, ["universe"] = 1 }));
+                    starts.AddRange(p.Addresses);
                 }
                 Progress = "Patching addresses…";
                 var placement = RigDocument.PlacementKeys.ToHashSet();
-                var fixtures = (await Autopatch(api, items)).Select(v => v.Object).OfType<IReadOnlyDictionary<string, JSONValue>>()
+                var fixtures = WithStarts(await Autopatch(api, items), starts).Select(v => v.Object).OfType<IReadOnlyDictionary<string, JSONValue>>()
                     .Select(o => JSONValue.Of(o.Where(p => !placement.Contains(p.Key)))).ToList();
                 var layout = host.Workspace?.Composed("", setName) is { } data ? JSONValue.ParseObject(data) ?? [] : [];
                 layout["fixtures"] = JSONValue.Of(fixtures);
@@ -525,9 +541,15 @@ public sealed class WizardModel : Observable
         }
     }
 
+    // ids and a layout, no start addresses: a guess is usually wrong (the typed ones are put in afterwards)
     static async Task<IReadOnlyList<JSONValue>> Autopatch(SetupAPI api, IReadOnlyList<JSONValue> items) =>
-        await api.Post("api/autopatch", new Dictionary<string, object> { ["fixtures"] = items },
+        await api.Post("api/autopatch", new Dictionary<string, object> { ["fixtures"] = items, ["addresses"] = false },
             c => J.Req(c, "fixtures", J.ArrayOf(JSONValue.From)));
+
+    /// The autopatched fixtures with the start addresses typed for them (by index; null: none yet).
+    static IReadOnlyList<JSONValue> WithStarts(IReadOnlyList<JSONValue> fixtures, IReadOnlyList<int?> starts) =>
+        fixtures.Select((v, i) => i < starts.Count && starts[i] is { } a && v.Object is { } o
+            ? JSONValue.Of(new Dictionary<string, JSONValue>(o) { ["address"] = a }) : v).ToList();
 
     static bool IsApiError(Exception e) =>
         e is HttpRequestException or SetupAPIException or TaskCanceledException or System.Text.Json.JsonException;
