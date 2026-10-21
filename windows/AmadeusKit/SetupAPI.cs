@@ -369,13 +369,33 @@ public sealed class SetupAPI
     public Task<FixtureMapping> Mapping(string key, string mode, CancellationToken ct = default) =>
         Get("api/fixture/map", FixtureMapping.From, new Dictionary<string, string> { ["key"] = key, ["mode"] = mode }, ct);
 
-    /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it).
-    public async Task<IReadOnlyList<string>> SaveMapping(FixtureMapping m, CancellationToken ct = default)
+    /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it). `checked`:
+    /// every channel was checked on the fixture, and the colour wheel's slots named then are saved with it.
+    public async Task<IReadOnlyList<string>> SaveMapping(FixtureMapping m, bool @checked = false, CancellationToken ct = default)
     {
-        var chans = m.Channels.Select(c => new { role = c.Role, cell = c.Cell, value = c.Value }).ToList();
-        var r = await Post("api/fixture/map", new { key = m.Key, mode = m.Mode, kind = m.Kind, channels = chans }, SaveResult.From, ct: ct);
+        var chans = m.Channels.Select(c => new { role = c.Role, cell = c.Cell, value = c.Value, attr = c.Attr }).ToList();
+        var body = new Dictionary<string, object?>
+        {
+            ["key"] = m.Key, ["mode"] = m.Mode, ["kind"] = m.Kind, ["channels"] = chans, ["checked"] = @checked,
+        };
+        if (@checked && m.Channels.Any(c => c.Role == "color_wheel") && m.Wheel.Count > 0)
+            body["wheel"] = m.Wheel.Select(w => new { name = w.Name, from = w.From, to = w.To, rgb = w.Rgb }).ToList();
+        var r = await Post("api/fixture/map", body, SaveResult.From, ct: ct);
         return r.Problems ?? [];
     }
+
+    /// The common layouts a fixture without a brand is made from, the closest to `type` and `channels` first.
+    public Task<AmadeusKit.FixtureTemplates> FixtureTemplates(string type = "", int channels = 0, CancellationToken ct = default) =>
+        Get("api/fixture/templates", AmadeusKit.FixtureTemplates.From,
+            new Dictionary<string, string> { ["type"] = type, ["channels"] = channels.ToString(System.Globalization.CultureInfo.InvariantCulture) }, ct);
+
+    /// Makes a fixture in your library from a template; returns its key and mode, or the problems.
+    public Task<AmadeusKit.NewFixture> NewFixture(string manufacturer, string model, string template, int channels, string type,
+                                                  int watts, int panDeg, int tiltDeg, CancellationToken ct = default) =>
+        Post("api/fixture/new", new
+        {
+            manufacturer, model, template, channels, type, watts, pan_deg = panDeg, tilt_deg = tiltDeg,
+        }, AmadeusKit.NewFixture.From, ct: ct);
 
     // MARK: DMX devices (config/devices.json)
 
@@ -392,10 +412,30 @@ public sealed class SetupAPI
 /// A fixture mode as the DMX mapper shows it (amadeus/library/mapper.py).
 public sealed record FixtureMapping
 {
-    public sealed record Role(string RoleName, string Label, string Group, bool Cell)  // "role" in the file
+    /// `Light`: it carries light (kept under the brightness limiter when tried); `Check`: its value while another
+    /// channel is checked (the light on, the head centred).
+    public sealed record Role(string RoleName, string Label, string Group, bool Cell, bool? Light = null, int? Check = null)  // "role" in the file
     {
         public static Role From(JsonElement c) =>
-            new(J.Req(c, "role", J.String), J.Req(c, "label", J.String), J.Req(c, "group", J.String), J.Req(c, "cell", J.Bool));
+            new(J.Req(c, "role", J.String), J.Req(c, "label", J.String), J.Req(c, "group", J.String), J.Req(c, "cell", J.Bool),
+                J.Val(c, "light", J.Bool), J.Val(c, "check", J.Int));
+    }
+
+    /// An answer in the channel-by-channel check: what the channel did, and what that makes it.
+    public sealed record Answer(string AnswerText, string Role, string? Attr, int? Value)  // "answer" in the file
+    {
+        public static Answer From(JsonElement c) =>
+            new(J.Req(c, "answer", J.String), J.Req(c, "role", J.String), J.Ref(c, "attr", J.String), J.Val(c, "value", J.Int));
+    }
+
+    /// A colour of the wheel: its DMX values and how it looks.
+    public sealed record Slot(string Name, int From, int To, IReadOnlyList<double> Rgb)
+    {
+        public static Slot Decode(JsonElement c) =>
+            new(J.Req(c, "name", J.String), J.Req(c, "from", J.Int), J.Req(c, "to", J.Int), J.Req(c, "rgb", J.ArrayOf(J.Double)));
+
+        public int Id => From;
+        public int Mid => (From + To) / 2;
     }
 
     /// What a range of a channel's values does, from the QLC+ or OFL file.
@@ -439,6 +479,10 @@ public sealed record FixtureMapping
     public bool Plays { get; init; }
     public bool Mapped { get; init; }
     public string Refusal { get; init; } = "";
+    public bool Made { get; init; }                 // made here from a template: it wants the check on the fixture
+    public bool Checked { get; init; } = true;
+    public IReadOnlyList<Answer> Check { get; init; } = [];
+    public IReadOnlyList<Slot> Wheel { get; init; } = [];
 
     public static FixtureMapping From(JsonElement c) => new()
     {
@@ -446,7 +490,69 @@ public sealed record FixtureMapping
         Kind = J.Req(c, "kind", J.String), Kinds = J.Req(c, "kinds", J.DictOf(J.String)), Roles = J.Req(c, "roles", J.ArrayOf(Role.From)),
         Channels = J.Req(c, "channels", J.ArrayOf(Channel.From)), Plays = J.Req(c, "plays", J.Bool), Mapped = J.Req(c, "mapped", J.Bool),
         Refusal = J.Req(c, "refusal", J.String),
+        Made = J.Val(c, "made", J.Bool) ?? false, Checked = J.Val(c, "checked", J.Bool) ?? true,
+        Check = J.Ref(c, "check", J.ArrayOf(Answer.From)) ?? [], Wheel = J.Ref(c, "wheel", J.ArrayOf(Slot.Decode)) ?? [],
     };
+
+    /// The values sent while channel `probe` is checked at `value`: the others hold the light on and the head in
+    /// the middle (their role's check value), held ones at their value.
+    public IReadOnlyList<int> CheckValues(int probe, int value) =>
+        Channels.Select((ch, i) => i == probe ? value : Roles.FirstOrDefault(r => r.RoleName == ch.Role)?.Check ?? ch.Value).ToList();
+
+    /// The channels that carry light (kept under the brightness limiter when tried).
+    public IReadOnlyList<int> LightChannels
+    {
+        get
+        {
+            var lit = Roles.Where(r => r.Light ?? (r.Group != "Position")).Select(r => r.RoleName).ToHashSet();
+            return Channels.Select((ch, i) => (ch, i)).Where(p => lit.Contains(p.ch.Role)).Select(p => p.i).ToList();
+        }
+    }
+
+    /// What the check found channel `i` does: a changed copy (Swift's mutating answer(_:for:)).
+    public FixtureMapping Answered(Answer a, int i)
+    {
+        if (i < 0 || i >= Channels.Count) return this;
+        var list = Channels.ToList();
+        var ch = list[i] with { Role = a.Role };
+        if (a.Attr is { } attr) ch = ch with { Attr = attr };
+        else if (a.Role == "hold") ch = ch with { Attr = $"channel_{ch.N}" };
+        if (a.Value is { } v) ch = ch with { Value = v };
+        if (a.Role != "hold") ch = ch with { Cell = 0 };
+        list[i] = ch;
+        // a colour wheel: the usual cheap wheel until its colours are named
+        return this with { Channels = list, Wheel = a.Role == "color_wheel" && Wheel.Count == 0 ? UsualWheel : Wheel };
+    }
+
+    public static readonly IReadOnlyList<Slot> UsualWheel = new (string Name, double[] Rgb)[]
+    {
+        ("open", [1, 1, 1]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
+        ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("orange", [1, 0.45, 0]),
+    }.Select((s, i) => new Slot(s.Name, i * 16, i * 16 + 15, s.Rgb)).ToList();
+}
+
+/// The layouts a new fixture is made from (amadeus/library/generic.py).
+public sealed record FixtureTemplates(IReadOnlyList<FixtureTemplates.Kind> Types, IReadOnlyList<FixtureTemplates.Template> Templates)
+{
+    public sealed record Kind(string Type, string Label, string KindName)  // "kind" in the file
+    {
+        public static Kind From(JsonElement c) => new(J.Req(c, "type", J.String), J.Req(c, "label", J.String), J.Req(c, "kind", J.String));
+    }
+
+    public sealed record Template(string Id, string Label, string Type, string About, IReadOnlyList<string> Channels, int Count)
+    {
+        public static Template From(JsonElement c) => new(J.Req(c, "id", J.String), J.Req(c, "label", J.String), J.Req(c, "type", J.String),
+            J.Req(c, "about", J.String), J.Req(c, "channels", J.ArrayOf(J.String)), J.Req(c, "count", J.Int));
+    }
+
+    public static FixtureTemplates From(JsonElement c) =>
+        new(J.Req(c, "types", J.ArrayOf(Kind.From)), J.Req(c, "templates", J.ArrayOf(Template.From)));
+}
+
+public sealed record NewFixture(string? Key, string? Mode, IReadOnlyList<string>? Problems)
+{
+    public static NewFixture From(JsonElement c) =>
+        new(J.Ref(c, "key", J.String), J.Ref(c, "mode", J.String), J.Ref(c, "problems", J.ArrayOf(J.String)));
 }
 
 /// One step of the check after hanging (amadeus/rig/hangsheet.py check_steps).

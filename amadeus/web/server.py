@@ -13,6 +13,9 @@ POST /api/test-light         {"fixture": id, "rig": {...}, "on": bool}: keep tha
                              "raw": [v, …] sends those values to its channels instead (the DMX mapper)
 GET  /api/fixture/map?key=…&mode=…   a mode channel by channel, with the library's names and ranges (DMX mapper)
 POST /api/fixture/map        {"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}: save a hand mapping
+                             ("wheel": colour wheel slots and "checked": true from the channel-by-channel check)
+GET  /api/fixture/templates?type=spot&channels=9   common layouts to make a fixture without a brand from
+POST /api/fixture/new        {"manufacturer", "model", "template", "channels", …}: make it in your library
 GET  /api/directors          decision models available right now (rules, OpenAI, local Ollama decision models)
 POST /api/director           {"director": "..."}: switch the decision model (saved in the rig file on its own)
 GET  /api/catalog?q=fuze     search our library + the QLC+ library + the Open Fixture Library

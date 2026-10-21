@@ -159,8 +159,11 @@ public struct FixtureDefinition: Decodable, Sendable {
     public var inert: String
     /// Something the user must do for it to be safe (a laser DMX can't keep off).
     public var warning: String?
+    /// Made here from a common layout and not yet checked channel by channel on the fixture.
+    public var needsCheck: Bool
 
-    enum CodingKeys: String, CodingKey { case manufacturer, model, kind, physical, modes, inert, warning, laser }
+    struct Made: Decodable { var checked: Bool? }
+    enum CodingKeys: String, CodingKey { case manufacturer, model, kind, physical, modes, inert, warning, laser, made }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -170,6 +173,7 @@ public struct FixtureDefinition: Decodable, Sendable {
         physical = try c.decodeIfPresent(Physical.self, forKey: .physical)
         modes = (try? c.decodeIfPresent([String: [[String: JSONValue]]].self, forKey: .modes)) ?? [:]
         warning = try c.decodeIfPresent(String.self, forKey: .warning)
+        needsCheck = (try? c.decodeIfPresent(Made.self, forKey: .made)).flatMap { $0 }.map { !($0.checked ?? false) } ?? false
         let reason = try c.decodeIfPresent(String.self, forKey: .inert) ?? ""
         inert = !reason.isEmpty ? reason
             : kind == "smoke" && !modes.values.joined().contains(where: { $0["attr"]?.string == "fog" })

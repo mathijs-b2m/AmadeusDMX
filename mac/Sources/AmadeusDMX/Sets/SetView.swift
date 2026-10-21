@@ -454,11 +454,15 @@ private struct GroupHeader: View {
                     Label("Plays nothing", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange)
                         .help("The show finds no dimmer or colour channel in this mode: map its channels by hand")
+                } else if d.needsCheck {
+                    Label("Not checked yet", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                        .help("Made from a common layout: check its channels one by one on the fixture")
                 }
-                Button(dark ? "Map Channels…" : "Channels…", systemImage: "slider.vertical.3", action: map)
+                Button(dark ? "Map Channels…" : d.needsCheck ? "Check Channels…" : "Channels…", systemImage: "slider.vertical.3", action: map)
                     .controlSize(.small)
                     .buttonStyle(.bordered)
-                    .tint(dark ? .orange : nil)
+                    .tint(dark || d.needsCheck ? .orange : nil)
                     .disabled(model.engineRunning)
                     .help("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture")
             }

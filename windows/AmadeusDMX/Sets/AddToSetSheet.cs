@@ -1,6 +1,7 @@
 // Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library), choose its mode and how
 // many. No start addresses: you give each the one set on the fixture (in the inspector). Where they hang is done
-// on the Rigs page (mac/Sources/AmadeusDMX/Sets/AddToSetSheet.swift). A sheet: a ContentDialog here.
+// on the Rigs page (mac/Sources/AmadeusDMX/Sets/AddToSetSheet.swift). A sheet: a ContentDialog here. A fixture no
+// library knows is made from a common layout with New Fixture… (NewFixtureSheet.cs, shown in this dialog).
 namespace AmadeusDMX;
 
 public sealed class AddToSetSheet
@@ -20,6 +21,10 @@ public sealed class AddToSetSheet
     int _count = 4;
     bool _busy;
     CancellationTokenSource? _search;
+    string? _madeKey;                    // a fixture just made from a template
+    NewFixtureSheet? _new;               // New Fixture… is showing (in this dialog: one ContentDialog at a time)
+    UIElement? _main;
+    readonly TextBlock _madeNote = UI.Text("", Font.Callout).Secondary().Wrap();
 
     static ContentControl Host() => new() { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
 
@@ -46,8 +51,18 @@ public sealed class AddToSetSheet
         {
             e.Cancel = true;  // stays open until added (or with what went wrong)
             var deferral = e.GetDeferral();
-            try { if (await Add()) _dialog.Hide(); }
+            try
+            {
+                if (_new is { } n) { await n.Make(); }
+                else if (await Add()) _dialog.Hide();
+            }
             finally { deferral.Complete(); }
+        };
+        _dialog.Closing += (_, e) =>
+        {
+            if (_new is null || e.Result == ContentDialogResult.Primary) return;
+            e.Cancel = true;  // Cancel (or Esc) on New Fixture: back to the search
+            CloseNew();
         };
         _query.TextChanged += (_, _) => Search();
         _results.SelectionChanged += (_, _) =>
@@ -60,10 +75,15 @@ public sealed class AddToSetSheet
         {
             Child = search, CornerRadius = new CornerRadius(9), Background = Theme.Brush("ControlFillColorSecondaryBrush"),
         };
-        _dialog.Content = UI.VStack(14,
+        var newFixture = UI.HStack(8,
+            _madeNote.Grow(),
+            UI.Button("New Fixture…", ShowNew, "plus")
+                .Tooltip("Make it from a common channel layout, then check it channel by channel on the real fixture"));
+        _dialog.Content = _main = UI.VStack(14,
             UI.Text("Search by brand or model. Then give each its start address (the one set on the fixture) on the right; where they hang is set on the Rigs page.").Secondary().Wrap(),
             field,
             _results,
+            newFixture,
             _options,
             _note,
             _error).MinWidth(520);
@@ -74,9 +94,17 @@ public sealed class AddToSetSheet
 
     void Refresh()
     {
+        if (_new is { } n)
+        {
+            _dialog.PrimaryButtonText = "Make Fixture";
+            _dialog.IsPrimaryButtonEnabled = n.CanMake;
+            return;
+        }
         _busyRing.Visibility = _busy ? Visibility.Visible : Visibility.Collapsed;
         _dialog.PrimaryButtonText = $"Add {_count} to the Set";
         _dialog.IsPrimaryButtonEnabled = _key is not null && _mode.Length > 0 && !_busy;
+        _madeNote.Text = _madeKey is null ? "Not in any library, or no real brand on it?"
+            : "Made from a common layout: once added, give it its start address and check its channels on the fixture.";
         _note.Content = _definition?.AddingNote is { } note
             ? UI.Text(note, Font.Callout).Foreground(_definition.Warning is null ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Red)).Wrap()
             : null;
@@ -119,9 +147,45 @@ public sealed class AddToSetSheet
         _ => "lightbulb",
     };
 
+    // MARK: New Fixture…
+
+    void ShowNew()
+    {
+        var q = _query.Text;
+        _new = new NewFixtureSheet(_model, q.Length >= 2 && _found.Count == 0 ? q : "", Use, Refresh);
+        _dialog.Title = NewFixtureSheet.Title;
+        _dialog.Content = _new.Build();
+        Refresh();
+    }
+
+    void CloseNew()
+    {
+        _new = null;
+        _dialog.Title = $"Add Fixtures to {_model.EditingSet}";
+        _dialog.Content = _main;
+        Refresh();
+    }
+
+    /// A fixture just made from a template: chosen, in its only mode.
+    void Use(string k, string m)
+    {
+        CloseNew();
+        _chosen = null;
+        _results.SelectedItem = null;
+        _key = k;
+        _madeKey = k;
+        _definition = _model.Workspace?.Definition(k);
+        _mode = m;
+        _count = 2;
+        ShowError(_definition is null ? $"Couldn’t read {k}" : null);
+        ShowOptions();
+        Refresh();
+    }
+
     async Task Prepare()
     {
         if (_chosen is not { } e) return;
+        _madeKey = null;
         _busy = true;
         Refresh();
         try

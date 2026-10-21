@@ -81,10 +81,42 @@ def save_mapping(req):
     from amadeus.library import mapper
 
     b = req.body()
-    problems = mapper.apply(b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])))
+    checked = bool(b.get("checked"))
+    problems = mapper.apply(
+        b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])), b.get("wheel"), checked
+    )
     if not problems:
-        event(f"{req.client} mapped {b['key']} {b['mode']} by hand")
+        event(f"{req.client} mapped {b['key']} {b['mode']} by hand{' (checked on the fixture)' if checked else ''}")
     return {"saved": not problems, "problems": problems}
+
+
+def fixture_templates(req):
+    """The common layouts a new fixture is made from, closest to `type` and `channels` first."""
+    from amadeus.library import generic
+
+    q = req.query
+    return {"types": generic.types(), "templates": generic.templates(q.get("type", ""), int(q.get("channels") or 0))}
+
+
+def new_fixture(req):
+    """{"manufacturer", "model", "template", "channels", "type", "watts", "pan_deg", "tilt_deg"}: make a fixture in
+    your library from a template; returns {"key", "mode"} or {"problems"}."""
+    from amadeus.library import generic
+
+    b = req.body()
+    r = generic.create(
+        str(b.get("manufacturer", "")),
+        str(b.get("model", "")),
+        str(b.get("template", "")),
+        int(b.get("channels") or 0),
+        str(b.get("type", "")),
+        int(b.get("watts") or 0),
+        int(b.get("pan_deg") or 540),
+        int(b.get("tilt_deg") or 270),
+    )
+    if "key" in r:
+        event(f"{req.client} made {r['key']} ({r['mode']}) from the template {b.get('template')}")
+    return r
 
 
 def label_engines(req):
@@ -118,6 +150,7 @@ GET = {
     "/api/catalog/details": details,
     "/api/fixture/map": get_mapping,
     "/api/label/engines": label_engines,
+    "/api/fixture/templates": fixture_templates,
 }
 POST = {
     "/api/catalog/add": add_to_library,
@@ -125,4 +158,5 @@ POST = {
     "/api/rig/add": add_to_rig,
     "/api/label": identify_label,
     "/api/fixture/map": save_mapping,
+    "/api/fixture/new": new_fixture,
 }

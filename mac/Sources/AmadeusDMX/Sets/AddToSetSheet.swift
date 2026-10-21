@@ -17,6 +17,8 @@ struct AddToSetSheet: View {
     @State private var count = 4
     @State private var busy = false
     @State private var error: String?
+    @State private var showNew = false
+    @State private var madeKey: String?   // a fixture just made from a template
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -49,6 +51,13 @@ struct AddToSetSheet: View {
             }
             .frame(minHeight: 200)
             .onChange(of: chosen) { Task { await prepare() } }
+            HStack {
+                Text(madeKey == nil ? "Not in any library, or no real brand on it?" : "Made from a common layout: once added, give it its start address and check its channels on the fixture.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button("New Fixture…", systemImage: "plus") { showNew = true }
+                    .help("Make it from a common channel layout, then check it channel by channel on the real fixture")
+            }
             if let definition {
                 Form {
                     Picker("DMX mode", selection: $mode) {
@@ -76,7 +85,22 @@ struct AddToSetSheet: View {
             }
         }
         .padding(22)
-        .frame(width: 560, height: 560)
+        .frame(width: 560, height: 600)
+        .sheet(isPresented: $showNew) {
+            NewFixtureSheet(brand: query.count >= 2 && results.isEmpty ? query : "") { k, m in use(k, mode: m) }
+                .environment(model)
+        }
+    }
+
+    /// A fixture just made from a template: chosen, in its only mode.
+    private func use(_ k: String, mode m: String) {
+        chosen = nil
+        key = k
+        madeKey = k
+        definition = model.workspace?.definition(k)
+        mode = m
+        count = 2
+        error = definition == nil ? "Couldn’t read \(k)" : nil
     }
 
     private func icon(_ e: CatalogEntry) -> String {
@@ -92,6 +116,7 @@ struct AddToSetSheet: View {
 
     private func prepare() async {
         guard let e = chosen else { return }
+        madeKey = nil
         busy = true
         defer { busy = false }
         do {

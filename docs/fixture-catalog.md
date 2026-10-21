@@ -62,10 +62,10 @@ undefined. The Mac app's Set page marks such a model **Plays nothing**; its **Ma
 
 - every channel of the mode, with its name and what its value ranges do from QLC+ or the Open Fixture
   Library (pick a range to set it);
-- per channel what the show plays on it (dimmer, red, green, blue, white, UV, cyan/magenta/yellow, pan,
-  tilt, their fine channels; a colour or dimmer optionally for one cell of a bar), or *hold at value*
-  (programs off, a shutter open, a macro parked on a colour), or *keep* what the converter made of it
-  (a colour wheel, zoom);
+- per channel what the show plays on it (dimmer, red, green, blue, white, UV, cyan/magenta/yellow, the
+  colour wheel, pan, tilt, their fine channels; a colour or dimmer optionally for one cell of a bar), or
+  *hold at value* (programs off, a shutter open, a macro parked on a colour), or *keep* what the converter
+  made of it (zoom);
 - **Try on the Lights** sends the values as they are to one fixture of the set (the rest dark, a running
   show paused), so you can find out what a channel does; the channels that carry light (as the file has
   them, or as you map them) stay under the brightness limiter;
@@ -74,6 +74,25 @@ undefined. The Mac app's Set page marks such a model **Plays nothing**; its **Ma
 
 It saves into your copy of the definition (`"mapped": {"modes": [...]}`), so every fixture of that model in
 your sets plays by it. Lasers and smoke machines aren't mapped here.
+
+**Check Channels** goes through the channels one by one on the real fixture: the channel being checked
+sweeps slowly from 0 to 255 while the others keep the light on and the head in the middle, and you say what
+the fixture does (turns, tilts, gets brighter, red, colours change, gobos change, strobes, starts programs,
+nothing). A held channel is then set where the light is on and steady. On a colour wheel you show each
+colour and name it, and put its values right. Finishing the check saves the fixture as checked.
+
+### Fixtures without a brand: New Fixture
+
+Cheap moving heads and pars are mostly the same few factory designs sold under many names, so a "brand" on
+the box rarely finds anything in a library, but their DMX tables look alike. **New Fixture…** in Add
+Fixtures makes one from a common layout (`amadeus/library/generic.py`): LED spot (9, 11 and 14 channels),
+LED wash (9 and 14), 7R beam (16), LED par (8 and 3), or nothing known. You give it a brand (or none) and a
+name, its type and how many channels it has (the manual says; the display often shows "9CH" or "d-11"), and
+pick the layout closest to the manual's table; a layout with more channels is cut off, one with fewer gets
+unknown channels added. It lands in your library (`"made": {"template", "checked": false}`) and plays at
+once, but the Set page marks it **Not checked yet** until its channels have been checked on the fixture,
+because manuals of these fixtures are often wrong (channels swapped, a fine channel missing, the wheel in
+another order).
 
 ### Lasers: dark until mapped by hand
 

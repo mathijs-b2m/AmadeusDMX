@@ -16,22 +16,25 @@ import re
 
 from amadeus.library import fixtures as fxlib
 
-# The roles the show plays (patch in fixtures.py), in the order the mapper offers them. "cell": per bar cell.
+# The roles the show plays (patch in fixtures.py), in the order the mapper offers them. "cell": per bar cell;
+# "light": it carries light (kept under the brightness limiter when tried); "check": its value while another
+# channel is checked (the light on and steady, the head in the middle)
 ROLES = [
-    {"role": "dimmer", "label": "Dimmer", "group": "Intensity", "cell": True},
-    {"role": "dimmer_fine", "label": "Dimmer (fine)", "group": "Intensity", "cell": False},
-    {"role": "red", "label": "Red", "group": "Colour", "cell": True},
-    {"role": "green", "label": "Green", "group": "Colour", "cell": True},
-    {"role": "blue", "label": "Blue", "group": "Colour", "cell": True},
-    {"role": "white", "label": "White", "group": "Colour", "cell": True},
-    {"role": "uv", "label": "UV", "group": "Colour", "cell": True},
-    {"role": "cyan", "label": "Cyan", "group": "Colour", "cell": False},
-    {"role": "magenta", "label": "Magenta", "group": "Colour", "cell": False},
-    {"role": "yellow", "label": "Yellow", "group": "Colour", "cell": False},
-    {"role": "pan", "label": "Pan", "group": "Position", "cell": False},
-    {"role": "pan_fine", "label": "Pan (fine)", "group": "Position", "cell": False},
-    {"role": "tilt", "label": "Tilt", "group": "Position", "cell": False},
-    {"role": "tilt_fine", "label": "Tilt (fine)", "group": "Position", "cell": False},
+    {"role": "dimmer", "label": "Dimmer", "group": "Intensity", "cell": True, "light": True, "check": 255},
+    {"role": "dimmer_fine", "label": "Dimmer (fine)", "group": "Intensity", "cell": False, "light": True, "check": 255},
+    {"role": "red", "label": "Red", "group": "Colour", "cell": True, "light": True, "check": 255},
+    {"role": "green", "label": "Green", "group": "Colour", "cell": True, "light": True, "check": 255},
+    {"role": "blue", "label": "Blue", "group": "Colour", "cell": True, "light": True, "check": 255},
+    {"role": "white", "label": "White", "group": "Colour", "cell": True, "light": True, "check": 255},
+    {"role": "uv", "label": "UV", "group": "Colour", "cell": True, "light": True, "check": 0},
+    {"role": "cyan", "label": "Cyan", "group": "Colour", "cell": False, "light": True, "check": 0},
+    {"role": "magenta", "label": "Magenta", "group": "Colour", "cell": False, "light": True, "check": 0},
+    {"role": "yellow", "label": "Yellow", "group": "Colour", "cell": False, "light": True, "check": 0},
+    {"role": "color_wheel", "label": "Colour wheel", "group": "Colour", "cell": False, "light": False, "check": 0},
+    {"role": "pan", "label": "Pan", "group": "Position", "cell": False, "light": False, "check": 128},
+    {"role": "pan_fine", "label": "Pan (fine)", "group": "Position", "cell": False, "light": False, "check": 0},
+    {"role": "tilt", "label": "Tilt", "group": "Position", "cell": False, "light": False, "check": 128},
+    {"role": "tilt_fine", "label": "Tilt (fine)", "group": "Position", "cell": False, "light": False, "check": 0},
 ]
 ROLE = {r["role"]: r for r in ROLES}
 HOLD = "hold"  # not played: held at its value
@@ -39,6 +42,31 @@ KEEP = "keep"  # played as the converter or a hand-made file has it (a colour wh
 LIGHT = {"dimmer", "red", "green", "blue", "white", "uv", "cyan", "magenta", "yellow"}
 # What it is, when its channels don't say (pan and tilt make a moving head, cells a bar)
 KINDS = {"par": "Par / wash / effect", "strobe": "Strobe", "blinder": "Blinder", "moving_head": "Moving head"}
+
+# The check, channel by channel on the real fixture (a channel sweeps, the others hold the light on): what it did,
+# and what that makes the channel. A held one gets "attr" (beam effects find a gobo or prism by its name) and the
+# value where the light looks right.
+CHECK = [
+    {"answer": "Turns left and right", "role": "pan"},
+    {"answer": "Tilts up and down", "role": "tilt"},
+    {"answer": "Moves a little sideways", "role": "pan_fine"},
+    {"answer": "Moves a little up and down", "role": "tilt_fine"},
+    {"answer": "Gets brighter", "role": "dimmer"},
+    {"answer": "Red", "role": "red"},
+    {"answer": "Green", "role": "green"},
+    {"answer": "Blue", "role": "blue"},
+    {"answer": "White", "role": "white"},
+    {"answer": "Colours change (wheel)", "role": "color_wheel"},
+    {"answer": "Gobos change", "role": "hold", "attr": "gobo", "value": 0},
+    {"answer": "Prism", "role": "hold", "attr": "prism", "value": 0},
+    {"answer": "Focus", "role": "hold", "attr": "focus", "value": 128},
+    {"answer": "Strobes or flashes", "role": "hold", "attr": "strobe", "value": 0},
+    {"answer": "Opens or closes the light", "role": "hold", "attr": "shutter", "value": 255},
+    {"answer": "Changes the speed", "role": "hold", "attr": "pan_tilt_speed", "value": 0},
+    {"answer": "Starts programs", "role": "hold", "attr": "auto", "value": 0},
+    {"answer": "Resets or goes dark", "role": "hold", "attr": "reset", "value": 0},
+    {"answer": "Nothing I can see", "role": "hold", "value": 0},
+]
 
 
 def refusal(defn: dict) -> str:
@@ -79,6 +107,7 @@ def describe(key: str, mode: str) -> dict:
                 "ranges": src["ranges"] if src else [],
             }
         )
+    made = defn.get("made", {})
     return {
         "key": key,
         "name": f"{defn['manufacturer']} {defn['model']}",
@@ -90,12 +119,19 @@ def describe(key: str, mode: str) -> dict:
         "plays": plays(defn, mode),
         "mapped": mode in defn.get("mapped", {}).get("modes", []),
         "refusal": refusal(defn),
+        "made": bool(made),  # made here from a template (generic.py): it wants the check
+        "checked": bool(made.get("checked")) or not made,
+        "check": CHECK,
+        "wheel": defn.get("color_wheel", {}).get("slots", []),
     }
 
 
-def apply(key: str, mode: str, kind: str, channels: list[dict]) -> list[str]:
-    """Save a mode's channels ({"role", "cell", "value"} per channel, in order) into your copy of the definition.
-    Returns the problems (nothing saved if there are any)."""
+def apply(
+    key: str, mode: str, kind: str, channels: list[dict], wheel: list[dict] | None = None, checked: bool = False
+) -> list[str]:
+    """Save a mode's channels ({"role", "cell", "value"} per channel, in order; a held one may get its "attr",
+    what the check found it does) into your copy of the definition. `wheel`: the colour wheel's slots as named in
+    the check; `checked`: every channel was checked on the fixture. Returns the problems (nothing saved if any)."""
     defn = copy.deepcopy(fxlib.get(key))
     defn.pop("key", None)
     if refusal(defn):
@@ -115,8 +151,8 @@ def apply(key: str, mode: str, kind: str, channels: list[dict]) -> list[str]:
             new.append(copy.deepcopy(o))
             continue
         if role == HOLD:  # keeps its name (beam effects refer to it), held at the value
-            attr = o["attr"] if o["attr"] not in ROLE else f"channel_{n + 1}"
-            spec = {"attr": attr, "default": value}
+            attr = c["attr"] if ATTR.fullmatch(str(c.get("attr", ""))) else o["attr"]
+            spec = {"attr": attr if attr not in ROLE else f"channel_{n + 1}", "default": value}
         elif role in ROLE:
             spec = {"attr": role}
             if cell and ROLE[role]["cell"]:
@@ -133,9 +169,16 @@ def apply(key: str, mode: str, kind: str, channels: list[dict]) -> list[str]:
         problems.append("A moving head needs both pan and tilt")
     if not any(r in LIGHT for r in roles):
         problems.append("No channel lights it: give one a dimmer or a colour")
+    slots = _slots(wheel, problems) if wheel else None
     if problems:
         return problems
 
+    if "color_wheel" in roles and (slots or "color_wheel" not in defn):
+        from amadeus.library import generic
+
+        defn["color_wheel"] = generic.wheel(slots)
+    if "made" in defn:
+        _follow_names(defn, mode, old, new, checked)
     defn["modes"][mode] = new
     _set_kind(defn, kind, roles, len({s["head"] for s in new if "head" in s}))
     mapped = defn.setdefault("mapped", {"modes": []})
@@ -143,6 +186,43 @@ def apply(key: str, mode: str, kind: str, channels: list[dict]) -> list[str]:
     mapped["_note"] = "Channels mapped by hand in the DMX mapper (Set page)."
     fxlib.save(key, defn)
     return []
+
+
+ATTR = re.compile(r"[a-z][a-z0-9_]{0,40}")
+
+
+def _slots(wheel: list[dict], problems: list[str]) -> list[dict]:
+    """The colour wheel's slots as the check named them: {"name", "from", "to", "rgb"}, open first."""
+    out = []
+    for s in wheel:
+        try:
+            lo, hi = int(s["from"]), int(s["to"])
+            rgb = [min(max(float(v), 0.0), 1.0) for v in s["rgb"]]
+        except (KeyError, TypeError, ValueError):
+            problems.append("A colour wheel slot needs from, to and rgb")
+            return []
+        if not 0 <= lo <= hi <= 255 or len(rgb) != 3:
+            problems.append(f"Colour wheel slot {s.get('name', '')}: {lo}–{hi} is not a DMX range")
+            return []
+        out.append({"name": str(s.get("name") or "colour")[:40], "from": lo, "to": hi, "rgb": rgb})
+    return out
+
+
+def _follow_names(defn: dict, mode: str, old: list[dict], new: list[dict], checked: bool):
+    """A fixture made from a template: the names shown follow what the check found (the template's ranges no
+    longer apply to a channel that turned out to do something else)."""
+    shown = defn["made"].setdefault("channels", {}).get(mode) or []
+    names = []
+    for n, s in enumerate(new):
+        if n < len(shown) and old[n]["attr"] == s["attr"]:
+            names.append(shown[n])
+        else:
+            label = ROLE[s["attr"]]["label"] if s["attr"] in ROLE else s["attr"].replace("_", " ").capitalize()
+            names.append({"name": label, "ranges": []})
+    defn["made"]["channels"][mode] = names
+    if checked:
+        defn["made"]["checked"] = True
+        defn["source"] = re.sub(r": check it.*$", ": checked channel by channel on the fixture", defn["source"])
 
 
 def _set_kind(defn: dict, kind: str, roles: list[str], cells: int):
@@ -182,6 +262,8 @@ def source_channels(defn: dict, mode: str) -> list[dict] | None:
     """[{"name", "ranges": [[lo, hi, what]]}] per channel of the mode, from the QLC+ or OFL file it was
     converted from; None when that file isn't at hand (or the fixture is hand-made)."""
     try:
+        if "made" in defn:
+            return defn["made"].get("channels", {}).get(mode)
         if "qlc" in defn:
             return _qlc_channels(defn["qlc"]["key"], mode)
         if "ofl" in defn:
