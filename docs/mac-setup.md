@@ -127,7 +127,8 @@ No DJ software? Press ⌘O and play a track from your Mac.
 ## 7. Set up your rig with the assistant
 
 **File › New Set…** opens the set-up assistant. It makes your **set** (the fixtures you own) and a **rig**
-(the venue they hang in), and mounts one on the other.
+(the venue they hang in), and mounts one on the other. On the Sets page your own sets are listed under **Your
+Sets**, the two you started with under **Examples**: put your fixtures in a set of your own, not in an example.
 
 <table>
 <tr>

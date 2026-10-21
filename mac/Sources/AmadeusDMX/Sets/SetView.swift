@@ -22,26 +22,37 @@ struct SetView: View {
         @Bindable var model = model
         HSplitView {
             List(selection: Binding(get: { model.editingSet }, set: { if let v = $0 { model.editingSet = v } })) {
-                SwiftUI.Section("Sets") {
-                    ForEach(model.sets) { s in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(s.name).font(.headline)
-                            Text("\(s.fixtureCount) fixtures · \(s.isVirtual ? "visualiser only" : s.outputText)")
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        .tag(Optional(s.name))
+                SwiftUI.Section("Your Sets") {
+                    ForEach(model.sets.filter { !$0.isExample }) { SetRow(set: $0) }
+                    if !model.sets.contains(where: { !$0.isExample }) {
+                        Text("None yet. Your fixtures go in a set of your own: make one with New Set…")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .selectionDisabled()
+                    }
+                }
+                if model.sets.contains(where: \.isExample) {
+                    SwiftUI.Section {
+                        ForEach(model.sets.filter(\.isExample)) { SetRow(set: $0) }
+                    } header: {
+                        Text("Examples")
+                    } footer: {
+                        Text("To look around in and try the show.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
-                    .buttonStyle(.borderless).padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { openWindow(id: "wizard") } label: {
+                    Label("New Set…", systemImage: "plus").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .disabled(model.engineRunning)
+                .padding(10)
             }
             .frame(minWidth: 180, idealWidth: 220, maxWidth: 300, maxHeight: .infinity)
 
             VStack(spacing: 0) {
                 SetHeader(doc: doc, showAdd: $showAdd)
+                if editingSummary?.isExample ?? false { ExampleNotice() }
                 Divider()
                 if let doc, !doc.fixtures.isEmpty {
                     List(selection: $selection) {
@@ -284,10 +295,12 @@ private struct SetHeader: View {
     @Binding var showAdd: Bool
     @State private var renaming: String?
     @State private var confirmDelete = false
+    @State private var confirmExample = false
     @State private var error: String?
 
     var body: some View {
         let set = model.sets.first { $0.name == model.editingSet }
+        let example = set?.isExample ?? false
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Menu {
@@ -306,11 +319,16 @@ private struct SetHeader: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
                 .disabled(model.engineRunning)
-                Text("your fixtures").foregroundStyle(.secondary)
+                Text(example ? "example" : "your fixtures").foregroundStyle(.secondary)
                 Spacer()
-                Button("Add Fixtures…", systemImage: "plus") { showAdd = true }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.engineRunning)
+                if example {
+                    Button("Add Fixtures…", systemImage: "plus") { confirmExample = true }
+                        .disabled(model.engineRunning)
+                } else {
+                    Button("Add Fixtures…", systemImage: "plus") { showAdd = true }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.engineRunning)
+                }
             }
             HStack(spacing: 18) {
                 Metric(value: "\(doc?.fixtures.count ?? 0)", label: "fixtures")
@@ -333,6 +351,13 @@ private struct SetHeader: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .confirmationDialog("Add fixtures to the example “\(model.editingSet)”?", isPresented: $confirmExample, titleVisibility: .visible) {
+            Button("New Set…") { openWindow(id: "wizard") }
+            Button("Add to the Example") { showAdd = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The examples are there to look around in. Your own fixtures belong in a set of your own.")
+        }
         .confirmationDialog("Delete the set “\(model.editingSet)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { let s = model.editingSet; run { try await model.api.deleteSet(s) } }
         } message: {
@@ -354,6 +379,43 @@ private struct SetHeader: View {
             do { try await op() } catch { self.error = error.localizedDescription }
             model.reloadSets()
         }
+    }
+}
+
+private struct SetRow: View {
+    let set: SetSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(set.name).font(.headline)
+            Text("\(set.fixtureCount) fixtures · \(set.isVirtual ? "visualiser only" : set.outputText)")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .tag(Optional(set.name))
+    }
+}
+
+/// Over an example set: it is not yours, and where yours go.
+private struct ExampleNotice: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill").font(.title2).foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("This is an example set").font(.headline)
+                Text("Look around and try the show with it. For the fixtures you own, make a set of your own.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.engineRunning)
+        }
+        .padding(12)
+        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 10))
+        .padding(.horizontal, 16).padding(.bottom, 12)
     }
 }
 

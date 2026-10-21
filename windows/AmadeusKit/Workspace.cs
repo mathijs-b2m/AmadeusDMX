@@ -202,9 +202,13 @@ public sealed partial record Workspace
     public IReadOnlyList<SetSummary> Sets()
     {
         var active = ActiveSet;
-        return SetNames().Select(name => LoadSet(name) is { } rig ? new SetSummary(name, rig, name == active) : null)
+        return SetNames().Select(name => LoadSet(name) is { } rig ? new SetSummary(name, rig, name == active, IsExampleSet(name)) : null)
             .OfType<SetSummary>().ToList();
     }
+
+    /// One of the sets a first run starts from (examples/sets): there to look around in, not for your own gear.
+    /// Renamed or duplicated, it is yours.
+    public bool IsExampleSet(string name) => File.Exists(Path.Combine(Root, "examples", "sets", $"{name}.json"));
 
     // MARK: rigs (venues)
 
@@ -406,10 +410,12 @@ public sealed record SetSummary
     public string Director { get; init; }
     public bool HasScreen { get; init; }
     public bool IsDefault { get; init; }
+    /// One of the shipped example sets (Workspace.IsExampleSet).
+    public bool IsExample { get; init; }
 
     public string Id => Name;
 
-    internal SetSummary(string name, RigFile rig, bool isDefault)
+    internal SetSummary(string name, RigFile rig, bool isDefault, bool isExample = false)
     {
         Name = name;
         Description = rig.Description ?? "";
@@ -428,10 +434,12 @@ public sealed record SetSummary
         Director = rig.Director ?? "rules";
         HasScreen = rig.HasScreen;
         IsDefault = isDefault;
+        IsExample = isExample;
     }
 
     public bool Equals(SetSummary? b) =>
-        b is not null && Name == b.Name && FixtureCount == b.FixtureCount && IsDefault == b.IsDefault && Description == b.Description;
+        b is not null && Name == b.Name && FixtureCount == b.FixtureCount && IsDefault == b.IsDefault && Description == b.Description
+        && IsExample == b.IsExample;
 
     public override int GetHashCode() => Name.GetHashCode();
 }
