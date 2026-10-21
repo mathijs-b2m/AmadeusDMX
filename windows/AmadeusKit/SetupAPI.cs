@@ -53,12 +53,13 @@ public sealed record CatalogDetails
         Modes.Select(p => (p.Key, p.Value.Array?.Count ?? (int)(p.Value.Number ?? 0))).OrderByDescending(m => m.Item2).ToList();
 }
 
-public sealed record ArtNetNode(string Ip, string Name, string? LongName, int? Outputs)
+public sealed record ArtNetNode(string Ip, string Name, string? LongName, int? Outputs, IReadOnlyList<int>? Universes = null)
 {
     public string Id => Ip;
 
     public static ArtNetNode From(JsonElement c) =>
-        new(J.Req(c, "ip", J.String), J.Req(c, "name", J.String), J.Ref(c, "long_name", J.String), J.Val(c, "outputs", J.Int));
+        new(J.Req(c, "ip", J.String), J.Req(c, "name", J.String), J.Ref(c, "long_name", J.String), J.Val(c, "outputs", J.Int),
+            c.TryGetProperty("universes", out var u) && u.ValueKind == JsonValueKind.Array ? u.EnumerateArray().Select(e => e.GetInt32()).ToList() : null);
 }
 
 public sealed record USBInterface(string Port, string? Description, string? Manufacturer, bool? Pro, string? WidgetSerial, string? Firmware)
@@ -481,13 +482,13 @@ public sealed record LightTest
     public string Output { get; init; } = "";         // the set's output, in words ("Art-Net → 2.0.0.10:6454")
     public int Universe { get; init; }
     public int? WireUniverse { get; init; }           // the Art-Net / sACN universe it goes out as
-    public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel
+    public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel (empty: no start address)
 
     public static LightTest From(JsonElement c) => new()
     {
         On = J.Req(c, "on", J.Bool), Seconds = J.Req(c, "seconds", J.Double), Output = J.Req(c, "output", J.String),
         Universe = J.Req(c, "universe", J.Int), WireUniverse = J.Val(c, "wire_universe", J.Int),
-        Channels = J.Req(c, "channels", J.ArrayOf(J.Int)),
+        Channels = J.Ref(c, "channels", J.ArrayOf(J.Int)) ?? [],  // null: no start address (switching off one)
     };
 
     /// "universe 1, channels 43–50 · Art-Net → 2.0.0.10:6454 (universe 1 on the wire)"

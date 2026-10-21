@@ -15,6 +15,8 @@ public sealed class SetView(AppModel model, MainWindow window)
     readonly Dictionary<string, CancellationTokenSource> _testOff = [];  // their switch-off when the engine's time runs out
     string? _message;
     string _loaded = "";
+    readonly PatchInspector.Typing _typing = new();   // what is typed in the inspector, kept while it is made again
+    PatchInspector? _patchInspector;
 
     readonly ListView _sets = new() { SelectionMode = ListViewSelectionMode.Single };
     readonly ListView _fixtures = new() { SelectionMode = ListViewSelectionMode.Extended };
@@ -34,18 +36,18 @@ public sealed class SetView(AppModel model, MainWindow window)
         // the sets
         _sets.SelectionChanged += (_, _) =>
         {
-            if (!_quiet && _sets.SelectedItem is ListViewItem { Tag: string name } && name != model.EditingSet) model.EditingSet = name;
+            if (_quiet) return;
+            if (_sets.SelectedItem is ListViewItem { Tag: string name }) { if (name != model.EditingSet) model.EditingSet = name; }
+            else ListSets();  // a section header isn't a set
         };
-        var newSet = new Button
-        {
-            Content = UI.Label("plus", "New Set…"), Background = Tint.Brush(Tint.Black, 0), BorderThickness = new Thickness(0),
-        };
-        newSet.Click += (_, _) => window.OpenWizard();
+        var newSet = UI.Button("New Set…", window.OpenWizard, "plus").Prominent();
+        newSet.HorizontalAlignment = HorizontalAlignment.Stretch;
         var setsPane = new Grid { MinWidth = 180, Width = 220 };
         setsPane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         setsPane.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         setsPane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var setsTitle = UI.Text("Sets", Font.Subheadline).Secondary().Bold().Margin(16, 12, 0, 4);
+        setsTitle.Visibility = Visibility.Collapsed;  // the list has its own sections
         Grid.SetRow(setsTitle, 0);
         Grid.SetRow(_sets, 1);
         Grid.SetRow(newSet.Margin(6, 6, 6, 10), 2);
@@ -60,6 +62,7 @@ public sealed class SetView(AppModel model, MainWindow window)
             // group headers aren't fixtures
             foreach (var h in _fixtures.SelectedItems.OfType<ListViewItem>().Where(i => i.Tag is not string).ToList()) _fixtures.SelectedItems.Remove(h);
             _selection = _fixtures.SelectedItems.OfType<ListViewItem>().Select(i => i.Tag).OfType<string>().ToHashSet();
+            _patchInspector?.Commit();  // another fixture picked: keep what was typed
             ShowInspector();
             Header();
         };
@@ -106,6 +109,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         {
             if (_loaded == model.EditingSet) return;
             SwitchOffTests(_loaded);
+            _typing.Forget();
             _selection = [];
             ListSets();
             Load();
@@ -113,6 +117,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         grid.Bind(model, nameof(AppModel.EngineRunning), _ =>
         {
             if (model.EngineRunning) SwitchOffTests();
+            ListSets();
             Header();
             ListFixtures();
         });
@@ -128,7 +133,12 @@ public sealed class SetView(AppModel model, MainWindow window)
         try
         {
             _sets.Items.Clear();
-            foreach (var s in model.Sets)
+            void Title(UIElement content) =>
+                _sets.Items.Add(new ListViewItem
+                {
+                    Content = content, IsTabStop = false, Padding = new Thickness(12, 10, 12, 2), HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                });
+            void Row(SetSummary s) =>
                 _sets.Items.Add(new ListViewItem
                 {
                     Tag = s.Name,
@@ -137,6 +147,18 @@ public sealed class SetView(AppModel model, MainWindow window)
                         UI.Text($"{s.FixtureCount} fixtures · {(s.IsVirtual ? "visualiser only" : s.OutputText)}", Font.Caption).Secondary().Lines(1)
                     ).Padding(0, 4),
                 });
+            // as on the Rigs page: a + by the title, the big button under the list
+            Title(UI.HStack(8, UI.Text("Your Sets", Font.Subheadline).Secondary().Bold(), UI.Spacer(),
+                            UI.IconButton("plus", "Make a new set with the set-up assistant", window.OpenWizard).Disabled(model.EngineRunning)));
+            foreach (var s in model.Sets.Where(s => !s.IsExample)) Row(s);
+            if (!model.Sets.Any(s => !s.IsExample))
+                Title(UI.Text("None yet. Your fixtures go in a set of your own: make one with New Set…", Font.Callout).Secondary().Wrap());
+            if (model.Sets.Any(s => s.IsExample))
+            {
+                Title(UI.VStack(1, UI.Text("Examples", Font.Subheadline).Secondary().Bold(),
+                                UI.Text("To look around in and try the show.", Font.Caption).Secondary().Wrap()));
+                foreach (var s in model.Sets.Where(s => s.IsExample)) Row(s);
+            }
             _sets.SelectedItem = _sets.Items.OfType<ListViewItem>().FirstOrDefault(i => i.Tag as string == model.EditingSet);
         }
         finally { _quiet = false; }
@@ -148,7 +170,7 @@ public sealed class SetView(AppModel model, MainWindow window)
     {
         var order = new List<string>();
         var by = new Dictionary<string, List<PlacedFixture>>();
-        foreach (var f in doc.Fixtures.OrderBy(f => f.Universe).ThenBy(f => f.Address))
+        foreach (var f in doc.Fixtures.OrderBy(f => f.Universe).ThenBy(f => f.Address ?? Patch.UniverseSize + 1))
         {
             if (!by.TryGetValue(f.Key, out var l)) { order.Add(f.Key); by[f.Key] = l = []; }
             l.Add(f);
@@ -180,7 +202,8 @@ public sealed class SetView(AppModel model, MainWindow window)
                 {
                     var item = new ListViewItem
                     {
-                        Tag = f.Id, Content = FixtureRow(f, _lit.Contains(f.Id), TestRefusal(g.Definition)),
+                        Tag = f.Id,
+                        Content = FixtureRow(f, _lit.Contains(f.Id), f.Address is null ? "No start address yet: give it one first" : TestRefusal(g.Definition)),
                         HorizontalContentAlignment = HorizontalAlignment.Stretch,
                     };
                     item.ContextFlyout = ContextMenu(f.Id);
@@ -219,6 +242,7 @@ public sealed class SetView(AppModel model, MainWindow window)
     {
         var d = g.Definition;
         var f = g.Fixtures.FirstOrDefault();
+        var tried = g.Fixtures.FirstOrDefault(x => x.Address is not null) ?? f;  // the mapper tries its values on a patched one
         var row = UI.HStack(8,
             UI.Icon(FixtureIcon.Symbol(d?.Kind)).Foreground(Tint.Accent),
             UI.Text($"{g.Fixtures.Count}× {d?.Name ?? g.Key}", Font.Headline),
@@ -230,7 +254,7 @@ public sealed class SetView(AppModel model, MainWindow window)
             if (dark)
                 row.Children.Add(UI.Label("exclamationmark.triangle.fill", "Plays nothing", Font.Caption).Foreground(Tint.Orange)
                     .Tooltip("The show finds no dimmer or colour channel in this mode: map its channels by hand"));
-            var b = UI.Button(dark ? "Map Channels…" : "Channels…", () => MapChannels(f), "slider.vertical.3").Font(Font.Caption).Padding(8, 3)
+            var b = UI.Button(dark ? "Map Channels…" : "Channels…", () => MapChannels(tried), "slider.vertical.3").Font(Font.Caption).Padding(8, 3)
                 .Disabled(model.EngineRunning)
                 .Tooltip("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture");
             if (dark) b.Foreground(Tint.Orange);
@@ -248,8 +272,9 @@ public sealed class SetView(AppModel model, MainWindow window)
         if (lit) button.Foreground(Tint.Yellow);
         return UI.HStack(8,
             UI.Text(f.Id, Font.Mono).Frame(width: 110),
-            UI.Text(Patch.Where(f.Universe, f.Address)).Secondary().Frame(width: 70)
-                .Tooltip("Universe.address: set this start address on the fixture's display"),
+            (f.Address is null ? UI.Text("no address").Foreground(Tint.Orange) : UI.Text(f.PatchText).Secondary()).Frame(width: 80)
+                .Tooltip(f.Address is null ? "No start address yet: select it and give it one (the visualiser only until then)"
+                    : "Universe.address: set this start address on the fixture's display"),
             UI.Text(f.Mode, Font.Callout).Secondary(),
             UI.Spacer(),
             button);
@@ -264,11 +289,13 @@ public sealed class SetView(AppModel model, MainWindow window)
     {
         if (_selection.Count == 0)
         {
+            _patchInspector = null;
             _inspector.Content = UI.Unavailable("slider.horizontal.3", "Select a Fixture",
                 "Its DMX mode, universe and address, and its name, are edited here. Select several to patch them in a row.");
             return;
         }
-        _inspector.Content = new PatchInspector(_selection, SetLayout.Fixtures(_layout), Definition, Change, RenameFixture).Build();
+        _patchInspector = new PatchInspector(_selection, SetLayout.Fixtures(_layout), Definition, Change, RenameFixture, _typing);
+        _inspector.Content = _patchInspector.Build();
     }
 
     void ShowFlash()
@@ -370,7 +397,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         if (f is null) return;
         SwitchOffTests();
         var target = new MapTarget(f.Key, f.Mode, f.Id, f.Address, f.Universe);
-        MapperSheet.Present(model, Root, target, TryRefusal, () =>
+        MapperSheet.Present(model, Root, target, target.Address is null ? $"Give {target.Fixture} a start address to try values on it" : TryRefusal, () =>
         {
             _names[target.Key] = model.Workspace?.Definition(target.Key);
             model.ReloadSets();
@@ -480,6 +507,7 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
     public FrameworkElement Build()
     {
         var set = model.Sets.FirstOrDefault(s => s.Name == model.EditingSet);
+        var example = set?.IsExample ?? false;
         var name = UI.MenuButton(UI.Text(model.EditingSet, Font.Title2), () =>
         {
             var delete = UI.Item("Delete…", Delete, "trash");
@@ -498,27 +526,67 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
         var identifyButton = UI.Button("Identify", identify, "lightbulb.max")
             .Disabled(!hasSelection || (set?.IsVirtual ?? true) || model.EngineRunning)
             .Tooltip("Light the selected fixtures on the real rig for 2 seconds");
-        var add = UI.Button("Add Fixtures…", showAdd, "plus").Prominent().Disabled(model.EngineRunning);
+        var add = example
+            ? UI.Button("Add Fixtures…", AddToExample, "plus").Disabled(model.EngineRunning)
+            : UI.Button("Add Fixtures…", showAdd, "plus").Prominent().Disabled(model.EngineRunning);
         var output = new Button
         {
             Content = Metric(set?.IsVirtual ?? true ? "Visualiser" : set?.OutputText ?? "–", "DMX output ›"),
             Background = Tint.Brush(Tint.Black, 0), BorderThickness = new Thickness(0), Padding = new Thickness(0),
-        }.Tooltip("Where the set's universes go: DMX Devices & Output… (Ctrl+Shift+D)");
+        }.Tooltip("Where the set's universes go: the DMX Output page (Ctrl+Shift+D)");
         output.Click += (_, _) => window.OpenDMX();
         var fixtures = doc?.Fixtures ?? [];
         return UI.VStack(12,
-            UI.HStack(8, name, UI.Text("your fixtures").Secondary(), UI.Spacer(), identifyButton, add),
+            UI.HStack(8, name, UI.Text(example ? "example" : "your fixtures").Secondary(), UI.Spacer(), identifyButton, add),
             UI.HStack(18,
                 Metric($"{fixtures.Count}", "fixtures"),
                 Metric($"{fixtures.Select(f => f.Key).Distinct().Count()}", "models"),
                 Metric($"{fixtures.Select(f => f.Universe).Distinct().Count()}", "universes"),
+                fixtures.Count(f => f.Address is null) is > 0 and var unpatched
+                    ? Metric($"{unpatched}", "without address", Tint.Orange)
+                        .Tooltip("Fixtures without a start address play in the visualiser only: select one and give it the address set on the fixture")
+                    : null,
                 output,
-                UI.Spacer())
+                UI.Spacer()),
+            example ? ExampleNotice() : null
         ).Padding(16);
     }
 
-    static FrameworkElement Metric(string value, string label) =>
-        UI.VStack(1, UI.Text(value, Font.Title3).Bold(), UI.Text(label, Font.Caption).Secondary());
+    /// Over an example set: it is not yours, and where yours go.
+    FrameworkElement ExampleNotice() => new Border
+    {
+        Background = Tint.Brush(Tint.Accent, 0.12), CornerRadius = new CornerRadius(8), Padding = new Thickness(12),
+        Child = UI.HStack(12,
+            UI.Icon("info.circle", 22).Foreground(Tint.Accent),
+            UI.VStack(2,
+                UI.Text("This is an example set", Font.Headline),
+                UI.Text("Look around and try the show with it. For the fixtures you own, make a set of your own.", Font.Callout).Secondary().Wrap()
+            ).Grow(),
+            UI.Button("New Set…", window.OpenWizard, "plus").Prominent().Disabled(model.EngineRunning)),
+    };
+
+    /// Adding to an example asks first: most who do meant to start their own set.
+    async void AddToExample()
+    {
+        if (window.Root is null) return;
+        var d = new ContentDialog
+        {
+            XamlRoot = window.Root, Title = $"Add fixtures to the example “{model.EditingSet}”?",
+            Content = UI.Text("The examples are there to look around in. Your own fixtures belong in a set of your own.").Wrap(),
+            PrimaryButtonText = "New Set…", SecondaryButtonText = "Add to the Example", CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        switch (await Dialogs.Show(d))
+        {
+            case ContentDialogResult.Primary: window.OpenWizard(); break;
+            case ContentDialogResult.Secondary: showAdd(); break;
+        }
+    }
+
+    static FrameworkElement Metric(string value, string label, Windows.UI.Color? color = null) =>
+        color is { } c
+            ? UI.VStack(1, UI.Text(value, Font.Title3).Bold().Foreground(c), UI.Text(label, Font.Caption).Foreground(c))
+            : UI.VStack(1, UI.Text(value, Font.Title3).Bold(), UI.Text(label, Font.Caption).Secondary());
 
     string Unique(string baseName)
     {

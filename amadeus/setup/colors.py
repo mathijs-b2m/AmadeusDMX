@@ -79,7 +79,8 @@ def run(show, fixture_id: str, level: float = 0.8):
             # make sure the wheel sits on this slot even if two guessed slots had the same colour
             off = next(i for i, c in enumerate(fxlib.channels(defn, fx["mode"])) if c["attr"] == "color_wheel")
             slot = slots[state["slot"]]
-            unis[fx["universe"]][fx["address"] - 1 + off] = (slot["from"] + slot["to"]) // 2
+            if fxlib.patched(fx):
+                unis[fx["universe"]][fx["address"] - 1 + off] = (slot["from"] + slot["to"]) // 2
             sender.send(unis)
             time.sleep(0.025)
 

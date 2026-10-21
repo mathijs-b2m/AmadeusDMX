@@ -82,9 +82,8 @@ enum EditorSelfTest {
         e.addFixtures(key: "dts/katana", mode: "Extended", count: 2)
         let ks = e.doc.fixtures.filter { $0.truss == newID }
         check("add fixtures on truss", ks.count == 2 && ks.allSatisfy { $0.mount == "hang" },
-              ks.map { "\($0.id)@\($0.universe).\($0.address)" }.joined(separator: " "))
-        let used = e.doc.fixtures.map { ($0.universe, $0.address) }
-        check("unique addresses", Set(used.map { "\($0.0).\($0.1)" }).count == used.count)
+              ks.map { "\($0.id)@\($0.patchText)" }.joined(separator: " "))
+        check("added without addresses (given on the Sets page)", ks.allSatisfy { $0.address == nil })
         // 9. rotate the new truss 90°: the Katanas turn with it (they now run front to back)
         let before = ks.map { $0.position(width: W) }
         e.selection = .truss(newID)

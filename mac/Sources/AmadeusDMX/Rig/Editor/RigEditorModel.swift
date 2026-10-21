@@ -146,6 +146,7 @@ final class RigEditorModel: StageEditing {
         guard doc != before else { return }
         version += 1
         registerUndo(name, before)
+        reaimTests()
     }
 
     private func registerUndo(_ name: String, _ before: RigDocument) {
@@ -405,32 +406,20 @@ final class RigEditorModel: StageEditing {
         }
     }
 
-    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. Addresses are
-    /// filled in after the last used channel, universe by universe.
+    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. No start
+    /// addresses: you give them on the Sets page (a guess is usually wrong, and then they overlap).
     func addFixtures(key: String, mode: String, count: Int) {
         guard let def = definition(key), count > 0 else { return }
-        let footprint = max(1, def.channels(mode))
         let base = key.split(separator: "/").last.map { String($0.prefix { $0.isLetter }) }.flatMap { $0.isEmpty ? nil : $0 } ?? "fx"
         change("Add \(count) × \(def.model)") { d in
-            var used: [Int: [ClosedRange<Int>]] = [:]
-            for f in d.fixtures {
-                let n = definition(f.key)?.channels(f.mode) ?? 1
-                used[f.universe, default: []].append(f.address...(f.address + max(1, n) - 1))
-            }
-            func free(_ u: Int, _ a: Int) -> Bool {
-                a + footprint - 1 <= 512 && !(used[u] ?? []).contains { $0.overlaps(a...(a + footprint - 1)) }
-            }
             let truss: Truss? = if case .truss(let id) = selection { d.trusses.first { $0.id == id } } else { nil }
             var newIDs: [String] = []
             for k in 0..<count {
-                var u = 1, a = 1
-                while !free(u, a) { a += 1; if a > 512 { a = 1; u += 1 } }
-                used[u, default: []].append(a...(a + footprint - 1))
                 var n = 1
                 while d.fixtures.contains(where: { $0.id == "\(base)\(n)" }) || newIDs.contains("\(base)\(n)") { n += 1 }
                 let id = "\(base)\(n)"
                 newIDs.append(id)
-                var f = PlacedFixture(id: id, key: key, mode: mode, universe: u, address: a, mount: "floor",
+                var f = PlacedFixture(id: id, key: key, mode: mode, universe: 1, address: nil, mount: "floor",
                                       x: (Double(k) + 1) / Double(count + 1), yM: -0.6, zM: 0.25, rotDeg: 0, aim: nil,
                                       truss: nil, trussPos: nil)
                 if let t = truss {
@@ -502,6 +491,99 @@ final class RigEditorModel: StageEditing {
 
     private func layoutDict() throws -> [String: Any] {
         (try JSONSerialization.jsonObject(with: try doc.json()) as? [String: Any]) ?? [:]
+    }
+
+    // MARK: - the light test (as on the Sets page)
+
+    /// Fixtures the light test keeps on, and their switch-off when the engine's time runs out.
+    var lit = Set<String>()
+    private var testOff: [String: Task<Void, Never>] = [:]
+    /// Where each lit head's beam goes (straight out to the audience): drawn on the stage, to compare with the real one.
+    var testDirs: [String: SIMD3<Float>] = [:]
+    private weak var testModel: AppModel?
+    private var retest: Task<Void, Never>?
+
+    /// The lit fixtures as a still frame for the stage (nil: none lit).
+    func testFrame() -> Frame? {
+        guard !lit.isEmpty else { return nil }
+        let els = RigElements.elements(doc) { [unowned self] in definition($0) }
+        let on = els.map { e in lit.contains(e.fixture ?? e.id) }
+        return Frame(fx: on.map { $0 ? [1, 1, 1, 1, 0, 0.5, 0.5] : [0, 0, 0, 0, 0, 0.5, 0.5] },
+                     dirs: zip(els, on).map { e, on in on ? testDirs[e.fixture ?? e.id] : nil })
+    }
+
+    /// The fixture moved or turned while lit: its head aimed again from the new placing (the real one moves, the
+    /// beam on the stage stays pointing at the audience: they agree once it is placed the way it hangs).
+    private func reaimTests() {
+        guard !lit.isEmpty, let model = testModel else { return }
+        retest?.cancel()
+        retest = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard let self, !Task.isCancelled, let layout = try? layoutDict() else { return }
+            for id in lit {
+                if let r = try? await model.api.testLightFront(fixture: id, on: true, layout: layout) { testDirs[id] = r.dir }
+            }
+            version += 1
+        }
+    }
+
+    /// Why this fixture can't be lit on the real rig now (nil: it can).
+    func testRefusal(_ model: AppModel, _ f: PlacedFixture) -> String? {
+        if model.sets.first(where: { $0.name == setName })?.isVirtual ?? true {
+            return "This set only feeds the visualiser: give it a DMX output to test the real lights"
+        }
+        if model.engineRunning { return "Stop the show to test the lights" }
+        if f.address == nil { return "No start address yet: give it one on the Sets page" }
+        if let d = definition(f.key), !d.inert.isEmpty { return "Not tested: \(d.inert)" }
+        if definition(f.key)?.kind == "smoke" { return "Smoke machines fire only in the show or the hardware test" }
+        return nil
+    }
+
+    /// The fixture on (the rest of the set dark, a head aimed where it is aimed here) until switched off again.
+    func toggleTest(_ model: AppModel, _ id: String) async {
+        let on = !lit.contains(id)
+        if on { lit.insert(id) } else { lit.remove(id) }
+        testOff[id]?.cancel()
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            testModel = model
+            let r = try await model.api.testLightFront(fixture: id, on: on, layout: try layoutDict())
+            testDirs[id] = on ? r.dir : nil
+            version += 1
+            if on {
+                message = "\(id) on: \(r.summary)"
+                testOff[id] = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(r.seconds))
+                    if !Task.isCancelled { self?.lit.remove(id); self?.testDirs[id] = nil; self?.version += 1 }
+                }
+            }
+        } catch {
+            lit.remove(id)
+            testDirs[id] = nil
+            message = error.localizedDescription
+        }
+    }
+
+    /// The real beam went `seen` ("left" / "right" as the audience sees it, "back") instead of to the audience: the
+    /// head's calibration put right in the set (its pan home, as amadeus bringup did), and aimed again to see.
+    func fixFront(_ model: AppModel, _ id: String, seen: String) async {
+        do {
+            let fields = try await model.api.hangCheckFix(layout: try layoutDict(), fixture: id, fix: seen)
+            change("Calibrate \(id)") { d in d.calibrate(id, fields) }   // re-aims it (reaimTests)
+            message = "\(id) calibrated: its beam should come round to the audience now"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    func switchOffTests(_ model: AppModel) async {
+        let ids = lit
+        lit = []
+        testDirs = [:]
+        retest?.cancel()
+        testOff.values.forEach { $0.cancel() }
+        testOff = [:]
+        for id in ids { _ = try? await model.api.testLight(fixture: id, on: false, layout: try layoutDict(), point: false) }
     }
 
     func startCheck(_ model: AppModel) async {

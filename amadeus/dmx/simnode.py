@@ -68,7 +68,7 @@ def preaddress(fixtures: list[VirtualFixture], show) -> bool:
     if not patched:
         return False
     queues: dict[str, list[dict]] = {}
-    for fx in sorted(patched, key=lambda f: (f["universe"], f["address"])):
+    for fx in sorted((f for f in patched if fxlib.patched(f)), key=lambda f: (f["universe"], f["address"])):
         queues.setdefault(fx["fixture"], []).append(fx)
     for f in fixtures:
         if queues.get(f.key):

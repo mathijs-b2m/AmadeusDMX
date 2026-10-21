@@ -71,18 +71,26 @@ public class PatchTests
     }
 
     [Fact]
-    public void NewFixturesGetFreeAddressesAndNamesOfTheirOwn()
+    public void NewFixturesGetNamesOfTheirOwnAndNoAddress()
     {
         Assert.Equal("fuze", Patch.BaseName("beamz/fuze75b-beam"));
         Assert.Equal("fx", Patch.BaseName("acme/75x"));
         var p = P(F("fuze1", 1, 1), F("fuze3", 1, 25));
         var added = p.NewFixtures("beamz/fuze75b-beam", "12ch", 3);
         Assert.Equal(["fuze2", "fuze4", "fuze5"], added.Select(Patch.Id));
-        Assert.Equal([13, 37, 49], added.Select(Patch.Address));
-        var full = P(Enumerable.Range(0, 42).Select(i => F($"fuze{i + 1}", 1, 1 + 12 * i)).ToArray());
-        var next = full.NewFixtures("beamz/fuze75b-beam", "12ch", 1).Single();
-        Assert.Equal(2, Patch.Universe(next));  // 42 × 12 = 504: no 12 channels left in universe 1
-        Assert.Equal(1, Patch.Address(next));
+        Assert.All(added, f => Assert.Null(Patch.Address(f)));  // you give it: a guess is usually wrong
+        Assert.All(added, f => Assert.Equal(1, Patch.Universe(f)));
+    }
+
+    [Fact]
+    public void FixturesWithoutAnAddressOverlapNothing()
+    {
+        var unpatched = new Dictionary<string, JSONValue> { ["id"] = "new1", ["fixture"] = "beamz/fuze75b-beam", ["mode"] = "12ch", ["universe"] = 1 };
+        var p = P(F("a", 1, 13), unpatched);
+        Assert.Null(Patch.Address(unpatched));
+        Assert.Empty(p.Clashes(1, 1, 12, new HashSet<string>()));
+        Assert.Equal(1, p.Free(1, 12, new HashSet<string>()));
+        Assert.Equal(["a", "new1"], p.Selected(new HashSet<string> { "new1", "a" }).Select(Patch.Id));  // those without one last
     }
 
     [Fact]
@@ -183,7 +191,7 @@ public class WizardModelTests
     {
         var w = new WizardModel(new Defaults(null, []));
         Assert.Equal(WizardStep.Welcome, w.Step);
-        Assert.Equal(WizardStep.Fixtures, w.NextStep(engineValid: true, hasSets: true));  // a new set: the engine is there
+        Assert.Equal(WizardStep.Network, w.NextStep(engineValid: true, hasSets: true));  // a new set: the engine is there
         Assert.Equal(WizardStep.Engine, w.NextStep(engineValid: true, hasSets: false));    // the first launch
         w.Step = WizardStep.Fixtures;
         Assert.False(w.CanContinue);
@@ -193,7 +201,7 @@ public class WizardModelTests
         Assert.True(w.CanContinue);  // the visualiser only
         w.OutputKind = WizardModel.Output.Node;
         Assert.False(w.CanContinue);  // no node chosen
-        w.Node = new ArtNetNode("2.0.0.10", "node", null, 2);
+        w.ChosenNodes = [new ArtNetNode("2.0.0.10", "node", null, 2)];
         Assert.True(w.CanContinue);
         w.Step = WizardStep.Rig;
         w.RigName = "  ";
@@ -208,8 +216,39 @@ public class WizardModelTests
         Assert.Equal(WizardStep.Director, w.PreviousStep);
         w.Step = WizardStep.Done;
         Assert.Equal(WizardStep.Done, w.NextStep(true, true));
-        Assert.Equal(WizardStep.Network, new WizardModel(new Defaults(null, ["x", "-wizardStep", "lights"])).Step);
+        Assert.Equal(WizardStep.Network, new WizardModel(new Defaults(null, ["x", "-wizardStep", "dmx output"])).Step);
         Assert.Equal(WizardModel.Output.Usb, new WizardModel(new Defaults(null, ["x", "-wizardStep", "network"])).OutputKind);
+    }
+
+    [Fact]
+    public async Task TheFixturesAreCountedInUniversesAgainstTheOutput()
+    {
+        var w = new WizardModel(new Defaults(null, []));
+        Assert.Equal(0, w.UniversesNeeded);
+        Assert.False(w.HasSomethingToSave);
+        // 40 × 14 channels: 36 fit in 512 (a fixture never straddles two universes), 4 more in the second
+        await w.Add(Entry("k", modes: new() { ["14ch"] = 14, ["8ch"] = 8 }), new SetupAPI(1));  // modes known: no request
+        var p = w.Planned.Single();
+        Assert.Equal("14ch", p.Mode);
+        p.Count = 40;
+        Assert.Equal(14, p.Footprint);
+        Assert.Equal(2, w.UniversesNeeded);
+        Assert.True(w.HasSomethingToSave);
+        p.Mode = "8ch";
+        Assert.Equal(1, w.UniversesNeeded);
+        Assert.Null(w.UniversesAvailable);  // the visualiser
+        w.OutputKind = WizardModel.Output.Usb;
+        Assert.Equal(1, w.UniversesAvailable);
+        w.OutputKind = WizardModel.Output.Node;
+        Assert.Null(w.UniversesAvailable);  // no node yet
+        w.ChosenNodes = [new ArtNetNode("2.0.0.10", "a", null, 2), new ArtNetNode("2.0.0.11", "b", null, 4)];
+        Assert.Equal(6, w.UniversesAvailable);
+        Assert.Equal("2.0.0.10", w.Node!.Ip);
+        Assert.Equal("Art-Net → 2 nodes (2.0.0.10, 2.0.0.11)", w.OutputText);
+        w.ChosenNodes = [new ArtNetNode("2.0.0.10", "a", null, null)];
+        Assert.Null(w.UniversesAvailable);  // outputs not known
+        w.Sacn = true;
+        Assert.Null(w.UniversesAvailable);  // multicast: no limit
     }
 
     [Fact]
@@ -255,7 +294,7 @@ public class WizardModelTests
         var layout = new Dictionary<string, JSONValue> { ["output"] = "old", ["stage"] = JSONValue.Of(new Dictionary<string, JSONValue>()) };
         w.OutputKind = WizardModel.Output.Node;
         w.Sacn = false;
-        w.Node = new ArtNetNode("2.0.0.20", "n", null, 2);
+        w.ChosenNodes = [new ArtNetNode("2.0.0.20", "n", null, 2)];
         w.Director = "openai";
         w.Compose(layout, [JSONValue.Of(new Dictionary<string, JSONValue> { ["id"] = "fuze1", ["fixture"] = "k", ["address"] = 1, ["x"] = 0.2, ["mount"] = "stand" })]);
         Assert.False(layout.ContainsKey("output"));
@@ -346,6 +385,9 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
         public IReadOnlyList<SetSummary> Sets { get; private set; } = ws.Sets();
         public IReadOnlyList<RigSummary> Rigs { get; private set; } = ws.Rigs();
         public void ReloadSets() { Sets = ws.Sets(); Rigs = ws.Rigs(); }
+        public Workspace? Workspace => ws;
+        public string? Editing;
+        public void Edit(string set) => Editing = set;
         public (string Rig, string Set)? Selected;
         public void Select(string rig, string set) => Selected = (rig, set);
     }
@@ -394,6 +436,7 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
             Assert.Equal("12ch", w.Planned.Single().Mode);  // the most channels first
             w.Name = "Wizard Test";
             w.Template = RigTemplate.Booth;
+            w.Planned.Single().Start = "1";  // the optional address of the row: the others follow one after another
             w.OutputKind = WizardModel.Output.Manual;
             w.ManualIP = "2.0.0.30";
             await w.Create(host);
@@ -409,29 +452,47 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
             await w.Create(host);
             Assert.Contains("already exists", w.Error);
 
-            // Add Fixtures…: two more, after what is patched; saved as the set alone
+            // Add Fixtures…: two more, without addresses; saved as the set alone
             var layout = SetLayout.Parse(ws.Composed("", "wizard-test"))!;
             var fixtures = SetLayout.Fixtures(layout);
             var patch = new Patch(fixtures, Patch.ChannelsFrom(ws.Definition));
             fixtures.AddRange(patch.NewFixtures("beamz/fuze75b-beam", "12ch", 2));
             await api.SaveSet(SetLayout.WithFixtures(layout, fixtures), "wizard-test");
             Assert.Equal(["fuze5", "fuze6"], ws.LoadSet("wizard-test")!.Fixtures.Skip(4).Select(f => f.Id));
-            Assert.Equal([49, 61], ws.LoadSet("wizard-test")!.Fixtures.Skip(4).Select(f => f.Address ?? 0));
+            Assert.All(ws.LoadSet("wizard-test")!.Fixtures.Skip(4), f => Assert.Null(f.Address));  // no address until you give one
 
-            // DMX Devices & Output: a node, universe 1 on its second output
+            // the address became a DMX device, universe 1 on its first output
+            Assert.Equal("→ node", ws.LoadSet("wizard-test")!.OutputText);
+
+            // the DMX Output page: another node, universe 1 on its second output
             var dmx = new DMXModel();
-            await dmx.Load(api, "wizard-test", "booth", "Art-Net → 2.0.0.30");
-            Assert.Equal("Art-Net → 2.0.0.30", dmx.Legacy);
+            await dmx.Load(api, "wizard-test", "booth", ws.LoadSet("wizard-test")!.OutputText);
+            Assert.Null(dmx.Legacy);  // mapped to a device already
+            Assert.Equal(new DMXModel.Route("node", 1), dmx.RouteOf(1));
+            Assert.Equal("Node 2.0.0.30", dmx.Device("node")!.Name);
             Assert.Equal([(1, 6)], dmx.Universes);
             dmx.Add(DMXModel.NewArtNet());
-            dmx.SetRoute(1, new DMXModel.Route("node", 2));
+            dmx.SetRoute(1, new DMXModel.Route("node-2", 2));
             Assert.True(await dmx.Save(api, showRunning: false));
             Assert.Equal("Saved.", dmx.Message);
-            Assert.Equal("→ node", ws.LoadSet("wizard-test")!.OutputText);
+            Assert.Equal("→ node-2", ws.LoadSet("wizard-test")!.OutputText);
             var again = new DMXModel();
             await again.Load(api, "wizard-test", "booth", null);
-            Assert.Equal(new DMXModel.Route("node", 2), again.RouteOf(1));
+            Assert.Equal(new DMXModel.Route("node-2", 2), again.RouteOf(1));
             Assert.Equal("Art-Net universe 1", again.Target(1));
+
+            // Save and Close: the planned fixtures as a set of their own (a free name), the output as devices
+            var later = new WizardModel(new Defaults(null, [])) { Name = "Wizard Test" };
+            await later.Add(fuze, api);
+            later.OutputKind = WizardModel.Output.Manual;
+            later.ManualIP = "2.0.0.30";
+            Assert.True(later.HasSomethingToSave);
+            var note = await later.SaveAndClose(host);
+            Assert.Null(later.Error);
+            Assert.Contains("**wizard-test-2**", note);
+            Assert.Equal("wizard-test-2", host.Editing);
+            Assert.Equal(4, ws.LoadSet("wizard-test-2")!.Fixtures.Count);
+            Assert.Equal("→ node", ws.LoadSet("wizard-test-2")!.OutputText);  // the device there already
         }
         finally
         {

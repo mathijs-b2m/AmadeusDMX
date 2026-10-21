@@ -30,7 +30,6 @@ struct Sidebar: View {
 /// The engine at a glance, at the bottom of the sidebar.
 struct EngineFooter: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let state = model.showState
@@ -64,12 +63,12 @@ struct EngineFooter: View {
                 Text("An engine started outside the app is running; the app shows its lights.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if let set = model.currentSet {
-                Button { openWindow(id: "dmx") } label: {
+                Button { model.section = .dmx } label: {
                     Label(set.isVirtual || !model.sendArtNet ? "Visualiser only" : set.outputText, systemImage: "cable.connector")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("DMX Devices & Output… (⇧⌘D)")
+                .help("DMX Output (⇧⌘D)")
             }
         }
         .padding(12)

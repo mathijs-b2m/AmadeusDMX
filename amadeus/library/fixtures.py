@@ -265,12 +265,19 @@ def has_wheel(defn: dict) -> bool:
 # ---------------------------------------------------------------- patching
 
 
+def patched(fx: dict) -> bool:
+    """Has a start address. A fixture added without one plays in the visualiser only until it gets one."""
+    return isinstance(fx.get("address"), int) and not isinstance(fx.get("address"), bool)
+
+
 def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) -> None:
-    """Write one rig fixture's channels into a 512-byte universe buffer.
+    """Write one rig fixture's channels into a 512-byte universe buffer (nothing without a start address).
 
     `states` maps element id → engine State (dimmer, r, g, b, white, pan, tilt, all 0..1). `limit`: the
     brightness limiter's ceiling (dmx/limiter.py; None: its saved level), applied here, last, to the light only.
     """
+    if not patched(fx):
+        return
     ceiling = limiter.level() if limit is None else min(max(limit, 0.0), 1.0)
     defn = get(fx["fixture"])
     chans = channels(defn, fx["mode"])
@@ -386,6 +393,8 @@ def test_light(buf: bytearray, fx: dict, level: float = 0.6, aim: tuple[float, f
     defn = get(fx["fixture"])
     if inert(defn) or defn["kind"] == "smoke":
         raise ValueError(test_refusal(defn))
+    if not patched(fx):
+        return
     from amadeus.engine.state import State
 
     pan, tilt = aim or (0.5, 0.5)
@@ -406,6 +415,8 @@ LIGHT_ATTRS = ("dimmer", "red", "green", "blue", "white", "uv", "amber", "lime",
 def test_raw(buf: bytearray, fx: dict, raw: list[int], light: set[int] = frozenset()) -> None:
     """The DMX mapper's values, as they are, on one fixture's channels; the ones that carry light (the definition's
     and `light`, the channels the mapper gives a light role) kept under the brightness limiter."""
+    if not patched(fx):
+        return
     chans = channels(get(fx["fixture"]), fx["mode"])
     ceiling = round(limiter.level() * 255)
     for off, v in enumerate(raw[: len(chans)]):
@@ -449,13 +460,25 @@ def footprint(fx: dict) -> int:
 
 
 def validate(rig: dict) -> list[str]:
-    """Overlapping or out-of-range addresses."""
-    problems, used = [], {}
+    """Out-of-range addresses: what a set can't be saved with. Overlaps are allowed while you patch (overlaps)."""
+    problems = []
     for fx in rig["fixtures"]:
+        if not patched(fx):
+            continue
         n = footprint(fx)
         if fx["address"] < 1 or fx["address"] + n - 1 > 512:
             problems.append(f"{fx['id']}: channels {fx['address']}–{fx['address'] + n - 1} don't fit in a universe")
-        for ch in range(fx["address"], fx["address"] + n):
+    return problems
+
+
+def overlaps(rig: dict) -> list[str]:
+    """Fixtures whose channels overlap: a warning, not a reason to refuse a save (moving fixtures around passes
+    through overlaps). Fixtures without a start address overlap nothing."""
+    problems, used = [], {}
+    for fx in rig["fixtures"]:
+        if not patched(fx):
+            continue
+        for ch in range(fx["address"], fx["address"] + footprint(fx)):
             other = used.get((fx["universe"], ch))
             if other:
                 problems.append(f"{fx['id']} overlaps {other} at universe {fx['universe']} channel {ch}")

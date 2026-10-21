@@ -1,15 +1,14 @@
-// DMX Devices & Output (Show menu, Ctrl+Shift+D): your DMX devices (Art-Net and sACN nodes, USB interfaces), apart
+// The DMX Output page (sidebar, Show menu, Ctrl+Shift+D): your DMX devices (Art-Net and sACN nodes, USB interfaces), apart
 // from the sets, and where each universe of the selected set goes: which device, which of its outputs. Replace a
 // node or play the set somewhere else: only the mapping changes (amadeus/dmx/devices.py). The model is the kit's
 // DMXModel (mac/Sources/AmadeusDMX/DMX/DMXWindow.swift).
-using Microsoft.UI.Windowing;
 using Windows.System;
 
 namespace AmadeusDMX;
 
-public sealed partial class DMXWindow : Window
+public sealed class DMXPage(AppModel model)
 {
-    readonly AppModel _model;
+    readonly AppModel _model = model;
     readonly DMXModel _dmx = new();
     readonly ContentControl _devices = Host(), _found = Host(), _editor = Host();
     readonly ListView _list = new() { SelectionMode = ListViewSelectionMode.Single };
@@ -20,27 +19,7 @@ public sealed partial class DMXWindow : Window
         HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, IsTabStop = false,
     };
 
-    public DMXWindow(AppModel model)
-    {
-        _model = model;
-        Title = "DMX Devices & Output";
-        var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "AmadeusDMX.ico");
-        if (File.Exists(icon)) AppWindow.SetIcon(icon);
-        SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
-        var scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0;  // Resize is in pixels
-        AppWindow.Resize(new Windows.Graphics.SizeInt32((int)(900 * scale), (int)(620 * scale)));
-        if (AppWindow.Presenter is OverlappedPresenter p)
-        {
-            p.PreferredMinimumWidth = 760;
-            p.PreferredMinimumHeight = 520;
-        }
-        Content = Build();
-    }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    static extern uint GetDpiForWindow(IntPtr hwnd);
-
-    FrameworkElement Build()
+    public FrameworkElement Build()
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(340), MinWidth = 300 });
@@ -56,14 +35,14 @@ public sealed partial class DMXWindow : Window
         grid.Children.Add(divider);
         grid.Children.Add(universes);
 
-        // the toolbar: Save (Ctrl+S)
+        // Save (Ctrl+S), in the page: the main window's toolbar is the app's
         var save = UI.Button("Save", () => _ = Save()).Prominent().Shortcut(VirtualKey.S)
             .Bind(_dmx, [nameof(DMXModel.HasChanges), nameof(DMXModel.Saving)], b =>
             {
                 b.Content = _dmx.Saving ? "Saving…" : "Save";
                 b.IsEnabled = _dmx.HasChanges && !_dmx.Saving;
             });
-        var bar = UI.HStack(8, UI.Text("DMX Devices & Output", Font.Headline), UI.Spacer(), save).Padding(16, 10);
+        var bar = UI.HStack(8, UI.Spacer(), save).Padding(16, 10);
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -82,7 +61,7 @@ public sealed partial class DMXWindow : Window
 
     async Task Load()
     {
-        if (!await _model.EnsureSetupService()) { _dmx.Message = SetupAPIException.NotRunningError().Message; return; }
+        if (!await _model.EnsureSetupService())  // a page: it may open before the setup service started { _dmx.Message = SetupAPIException.NotRunningError().Message; return; }
         await _dmx.Load(_model.Api, _model.SelectedSet, _model.SelectedRig, _model.CurrentSet?.OutputText);
         ShowEditor();
     }

@@ -1,4 +1,4 @@
-// Wizard: where the DMX goes (Art-Net / sACN node, USB interface or the visualiser only)
+// Wizard step 1: where the DMX goes, before the fixtures (Art-Net / sACN nodes, a USB interface or the visualiser only)
 // (mac/Sources/AmadeusDMX/Wizard/Steps/NetworkStep.swift).
 namespace AmadeusDMX;
 
@@ -18,12 +18,12 @@ public sealed class NetworkStep(AppModel model, WizardModel w)
             _ = Find();
         });
         var body = UI.Live(w, Body, nameof(WizardModel.OutputKind), nameof(WizardModel.Sacn), nameof(WizardModel.Nodes),
-                           nameof(WizardModel.Node), nameof(WizardModel.Discovering), nameof(WizardModel.DiscoverError),
+                           nameof(WizardModel.ChosenNodes), nameof(WizardModel.Discovering), nameof(WizardModel.DiscoverError),
                            nameof(WizardModel.Usb), nameof(WizardModel.UsbPort), nameof(WizardModel.SearchingUSB));
         _ = Find();
         return UI.VStack(16,
-            StepHeader.Build("cable.connector", "Connect the Lights",
-                "DMX goes to a network node (Art-Net or sACN) or a USB interface on this computer. No lights here? Run in the visualiser only."),
+            StepHeader.Build("cable.connector", "DMX Output",
+                "First where the DMX goes: a network node (Art-Net or sACN) or a USB interface on this computer. Your fixtures come next. No lights here? Run in the visualiser only."),
             picker,
             body);
     }
@@ -37,10 +37,11 @@ public sealed class NetworkStep(AppModel model, WizardModel w)
 
     UIElement Body() => w.OutputKind switch
     {
-        WizardModel.Output.Visualiser => Form.Note("eye", "The show runs on screen only. You can add an output later on the setup page.", null, Font.Body),
-        WizardModel.Output.Usb => UsbList(),
+        WizardModel.Output.Visualiser => Form.Note("eye", "The show runs on screen only. You can add an output later on the DMX Output page.", null, Font.Body),
+        WizardModel.Output.Usb => UI.VStack(12, UsbList(), LaterHint()),
         _ => UI.VStack(12, ProtocolPicker(), w.OutputKind == WizardModel.Output.Node ? NodeList()
-            : Form.Section(null, [Form.Row("Node IP address", UI.Field("Node IP address", w.ManualIP, v => w.ManualIP = v).MinWidth(180))])),
+            : UI.VStack(12, Form.Section(null, [Form.Row("Node IP address", UI.Field("Node IP address", w.ManualIP, v => w.ManualIP = v).MinWidth(180))]),
+                        LaterHint())),
     };
 
     UIElement ProtocolPicker()
@@ -63,14 +64,26 @@ public sealed class NetworkStep(AppModel model, WizardModel w)
                 UI.Button(w.Discovering ? "Searching…" : "Search the Network", () => _ = w.Discover(model.Api)).Disabled(w.Discovering),
                 w.Discovering ? UI.Spinner() : null),
             w.DiscoverError is { } e ? UI.Text(e, Font.Callout).Secondary().Wrap() : null);
+        if (w.Nodes.Count > 1)
+            s.Children.Add(UI.Text("Tick every node the set plays on: its universes go to them in this order.", Font.Callout).Secondary().Wrap());
         foreach (var n in w.Nodes)
+        {
+            var on = w.ChosenNodes.Contains(n);
+            var outputs = n.Outputs is { } o ? $" · {o} output{(o == 1 ? "" : "s")}" : "";
             s.Children.Add(ChoiceCard.Build(UI.HStack(10,
-                ChoiceCard.Radio(w.Node == n),
+                UI.Icon(on ? "checkmark.circle.fill" : "circle")
+                    .Foreground(on ? Tint.Brush(Tint.Accent) : Theme.Brush("TextFillColorSecondaryBrush")),
                 UI.VStack(1, UI.Text(n.Name.Length == 0 ? n.Ip : n.Name),
-                          UI.Text(n.Ip + (n.LongName is { } l ? $" · {l}" : ""), Font.Caption).Secondary()).Grow()),
-                () => w.Node = n));
+                          UI.Text(n.Ip + outputs + (n.LongName is { } l ? $" · {l}" : ""), Font.Caption).Secondary()).Grow()),
+                () => w.ChosenNodes = on ? [.. w.ChosenNodes.Where(x => x != n)]
+                                         : [.. w.Nodes.Where(x => w.ChosenNodes.Contains(x) || x == n)]));
+        }
+        s.Children.Add(LaterHint());
         return s;
     }
+
+    static UIElement LaterHint() =>
+        Form.Note("plus.circle", "More controllers later, or a node together with a USB interface: the DMX Output page in the sidebar (Ctrl+Shift+D).");
 
     UIElement UsbList()
     {

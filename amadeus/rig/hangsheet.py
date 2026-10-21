@@ -166,7 +166,7 @@ def layout(merged: dict) -> dict:
             "role": role(defn) if defn.get("kind") != "smoke" else "smoke",
             "mode": _mode(f, defn),
             "universe": int(f.get("universe", 1)),
-            "address": int(f.get("address", 1)),
+            "address": int(f["address"]) if fxlib.patched(f) else None,  # None: not given yet
             "channels": _channels(f, defn),
             "watts": int(defn.get("physical", {}).get("watts") or 0),
             "kg": float(defn.get("physical", {}).get("weight_kg") or 0),
@@ -202,7 +202,7 @@ def layout(merged: dict) -> dict:
     floor.sort(key=lambda r: (r["_key"], -r["y_m"]))
     for n, r in enumerate(floor, 1):
         r["label"] = f"{FLOOR} {n}"
-    rows.sort(key=lambda r: (r["universe"], r["address"]))
+    rows.sort(key=lambda r: (r["universe"], r["address"] or 513))  # no address yet: last
     return {"width_m": W, "structures": structures, "floor": floor, "waiting": waiting, "patch": rows}
 
 
@@ -348,6 +348,10 @@ def _strip_svg(st: dict) -> str:
     return "".join(out) + "</svg>"
 
 
+def _dmx(r: dict) -> str:
+    return f"U{r['universe']} · {r['address']}" if r["address"] else "no address yet"
+
+
 def _table(rows: list[dict], with_label: bool = True) -> str:
     head = ("<tr>" + ("<th>Label</th>" if with_label else "") + "<th>Name</th><th>Model</th><th>Where</th>"
             "<th>Which way round</th><th>DMX</th><th>Mode</th></tr>")  # fmt: skip
@@ -355,7 +359,7 @@ def _table(rows: list[dict], with_label: bool = True) -> str:
         "<tr>"
         + (f'<td class="lbl">{_e(r["label"])}</td>' if with_label else "")
         + f"<td>{_e(r['id'])}</td><td>{_e(r['model'])}</td><td>{_e(r['where'])}</td><td>{_e(r['facing'])}</td>"
-        f'<td class="dmx">U{r["universe"]} · {r["address"]}</td><td>{_e(_mode_text(r))}</td></tr>'
+        f'<td class="dmx">{_dmx(r)}</td><td>{_e(_mode_text(r))}</td></tr>'
         for r in rows
     )
     return f"<table>{head}{body}</table>"
@@ -485,9 +489,10 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
         "<th>Model</th><th>Mode</th></tr>"
     )
     for r in lay["patch"]:
-        end = r["address"] + r["channels"] - 1
-        p.append(f"<tr><td class='dmx'>{r['universe']}</td><td class='dmx'>{r['address']}</td>"
-                 f"<td>{r['address']}–{end}</td><td class='lbl'>{_e(r['label'])}</td><td>{_e(r['id'])}</td>"
+        a = r["address"]
+        span = f"{a}–{a + r['channels'] - 1}" if a else "no start address yet"
+        p.append(f"<tr><td class='dmx'>{r['universe']}</td><td class='dmx'>{a or '–'}</td>"
+                 f"<td>{span}</td><td class='lbl'>{_e(r['label'])}</td><td>{_e(r['id'])}</td>"
                  f"<td>{_e(r['model'])}</td><td>{_e(_mode_text(r))}</td></tr>")  # fmt: skip
     p.append("</table></section>")
     stickers = [r for st in lay["structures"] for r in st["fixtures"]] + lay["floor"]
@@ -524,6 +529,21 @@ def check_dir(fx: dict):
     x, y = fx_ * ahead - fy * left, fy * ahead + fx_ * left  # its front, and its left (the front turned a quarter)
     d = np.array([x, y, -z if geometry.mount_up(fx)[2] < -0.5 else z])
     return d / np.linalg.norm(d)
+
+
+def front_dir(fx: dict):
+    """Straight out to the audience, a little down for a hanging head (a little up for one standing): the rig
+    editor's test pose. World-fixed, so a head placed turned or mirrored in the app shows it at once."""
+    import numpy as np
+
+    d = np.array([0.0, 1.0, -0.25 if geometry.mount_up(fx)[2] < -0.5 else 0.25])
+    return d / np.linalg.norm(d)
+
+
+def front_aim(fx: dict, defn: dict) -> tuple[float, float]:
+    """The pan and tilt (0..1, as DMX) of the front test pose."""
+    phi, theta = geometry.ik(fx, defn, front_dir(fx), None)
+    return geometry.to_dmx(fx, defn, phi, theta)
 
 
 def check_aim(fx: dict, defn: dict) -> tuple[float, float]:
@@ -576,6 +596,33 @@ def check_steps(merged: dict) -> list[dict]:
                       "facing": r["facing"], "moving": moving, "expect": expect, "faults": faults, "dark": dark,
                       "dmx": f"U{r['universe']} · {r['address']}"})  # fmt: skip
     return steps
+
+
+SEEN = {"left": (-1.0, 0.0), "right": (1.0, 0.0), "back": (0.0, -1.0)}  # as the audience sees it (facing the stage)
+
+
+def fix_front(fx: dict, defn: dict, seen: str) -> dict:
+    """The rig editor's test sent the head straight out to the audience (front_aim), and the real beam went `seen`
+    instead ("left" / "right" as the audience sees it, or "back" at the stage): the calibration under which that
+    pose points where the real beam went, i.e. the head as it really stands. Its pan home a quarter or half a turn
+    on (amadeus bringup asked the same), or for "back" without the pan for that its tilt the other way."""
+    if seen not in SEEN:
+        raise ValueError(f"seen: one of {', '.join(SEEN)}")
+    aim = front_aim(fx, defn)
+    P, _, ph, _ = geometry._ranges(fx, defn)
+    options = [{"pan_home_deg": round(ph + d, 1)} for d in (90, -90, 180, -180) if P and 0 <= ph + d <= P]
+    if seen == "back":
+        options.append({"tilt_invert": not fx.get("tilt_invert", False)})
+    want, best, score = SEEN[seen], None, 0.5  # at least ~60° the right way
+    for o in options:
+        d = geometry.fk({**fx, **o}, defn, *aim)
+        flat = math.hypot(d[0], d[1]) or 1.0
+        s = (d[0] * want[0] + d[1] * want[1]) / flat
+        if s > score:
+            best, score = o, s
+    if best is None:
+        raise ValueError("No calibration of this head points that way: check it is placed standing or hanging as it really is")
+    return best
 
 
 def fix(fx: dict, defn: dict, what: str) -> dict:

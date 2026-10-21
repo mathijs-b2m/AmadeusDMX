@@ -1,4 +1,4 @@
-// SwiftUI's grouped Form, for the pages ported here (Settings, the Set page's inspector, DMX Devices, the wizard):
+// SwiftUI's grouped Form, for the pages ported here (Settings, the Set page's inspector, DMX Output, the wizard):
 // sections on cards with a header above and a footer below, rows of a label and its control (LabeledContent),
 // and the alerts and confirmation dialogs the Mac shows (ContentDialog here). Built on Shared/UI.cs.
 using Microsoft.UI.Xaml.Controls.Primitives;

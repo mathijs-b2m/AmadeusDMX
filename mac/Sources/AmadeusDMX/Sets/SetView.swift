@@ -22,26 +22,46 @@ struct SetView: View {
         @Bindable var model = model
         HSplitView {
             List(selection: Binding(get: { model.editingSet }, set: { if let v = $0 { model.editingSet = v } })) {
-                SwiftUI.Section("Sets") {
-                    ForEach(model.sets) { s in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(s.name).font(.headline)
-                            Text("\(s.fixtureCount) fixtures · \(s.isVirtual ? "visualiser only" : s.outputText)")
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        .tag(Optional(s.name))
+                SwiftUI.Section {
+                    ForEach(model.sets.filter { !$0.isExample }) { SetRow(set: $0) }
+                    if !model.sets.contains(where: { !$0.isExample }) {
+                        Text("None yet. Your fixtures go in a set of your own: make one with New Set…")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .selectionDisabled()
+                    }
+                } header: {
+                    HStack {  // as on the Rigs page: a + by the title, the big button under the list
+                        Text("Your Sets")
+                        Spacer()
+                        Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless)
+                            .disabled(model.engineRunning)
+                            .help("Make a new set with the set-up assistant")
+                    }
+                }
+                if model.sets.contains(where: \.isExample) {
+                    SwiftUI.Section {
+                        ForEach(model.sets.filter(\.isExample)) { SetRow(set: $0) }
+                    } header: {
+                        Text("Examples")
+                    } footer: {
+                        Text("To look around in and try the show.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
-                    .buttonStyle(.borderless).padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { openWindow(id: "wizard") } label: {
+                    Label("New Set…", systemImage: "plus").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .disabled(model.engineRunning)
+                .padding(10)
             }
             .frame(minWidth: 180, idealWidth: 220, maxWidth: 300, maxHeight: .infinity)
 
             VStack(spacing: 0) {
                 SetHeader(doc: doc, showAdd: $showAdd)
+                if editingSummary?.isExample ?? false { ExampleNotice() }
                 Divider()
                 if let doc, !doc.fixtures.isEmpty {
                     List(selection: $selection) {
@@ -49,10 +69,11 @@ struct SetView: View {
                             SwiftUI.Section {
                                 ForEach(g.fixtures) { f in
                                     FixtureRow(fixture: f, doc: doc, lit: lit.contains(f.id),
-                                               test: testRefusal(g.definition)) { toggleTest(f.id) }
+                                               test: f.address == nil ? "No start address yet: give it one first"
+                                                   : testRefusal(g.definition)) { toggleTest(f.id) }
                                 }
                             } header: {
-                                GroupHeader(group: g) { mapChannels(g.fixtures.first) }
+                                GroupHeader(group: g) { mapChannels(g.fixtures.first { $0.address != nil } ?? g.fixtures.first) }
                             }
                         }
                     }
@@ -97,7 +118,7 @@ struct SetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showAdd) { AddToSetSheet { load() }.environment(model) }
         .sheet(item: $mapTarget) { t in
-            MapperSheet(target: t, tryRefusal: tryRefusal) {
+            MapperSheet(target: t, tryRefusal: t.address == nil ? "Give \(t.fixture) a start address to try values on it" : tryRefusal) {
                 names[t.key] = model.workspace?.definition(t.key)
                 load()
                 flash("Mapped \(names[t.key]?.name ?? t.key) (\(t.mode)): every one in your sets plays by it")
@@ -129,7 +150,7 @@ struct SetView: View {
 
     private func groups(_ doc: RigDocument) -> [Group] {
         var order: [String] = [], by: [String: [PlacedFixture]] = [:]
-        for f in doc.fixtures.sorted(by: { ($0.universe, $0.address) < ($1.universe, $1.address) }) {
+        for f in doc.fixtures.sorted(by: { ($0.universe, $0.address ?? 513) < ($1.universe, $1.address ?? 513) }) {
             if by[f.key] == nil { order.append(f.key) }
             by[f.key, default: []].append(f)
         }
@@ -284,10 +305,12 @@ private struct SetHeader: View {
     @Binding var showAdd: Bool
     @State private var renaming: String?
     @State private var confirmDelete = false
+    @State private var confirmExample = false
     @State private var error: String?
 
     var body: some View {
         let set = model.sets.first { $0.name == model.editingSet }
+        let example = set?.isExample ?? false
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Menu {
@@ -306,21 +329,31 @@ private struct SetHeader: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
                 .disabled(model.engineRunning)
-                Text("your fixtures").foregroundStyle(.secondary)
+                Text(example ? "example" : "your fixtures").foregroundStyle(.secondary)
                 Spacer()
-                Button("Add Fixtures…", systemImage: "plus") { showAdd = true }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.engineRunning)
+                if example {
+                    Button("Add Fixtures…", systemImage: "plus") { confirmExample = true }
+                        .disabled(model.engineRunning)
+                } else {
+                    Button("Add Fixtures…", systemImage: "plus") { showAdd = true }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.engineRunning)
+                }
             }
             HStack(spacing: 18) {
                 Metric(value: "\(doc?.fixtures.count ?? 0)", label: "fixtures")
                 Metric(value: "\(Set(doc?.fixtures.map(\.key) ?? []).count)", label: "models")
                 Metric(value: "\(Set(doc?.fixtures.map(\.universe) ?? []).count)", label: "universes")
-                Button { openWindow(id: "dmx") } label: {
+                if let n = doc?.fixtures.filter({ $0.address == nil }).count, n > 0 {
+                    Metric(value: "\(n)", label: "without address")
+                        .foregroundStyle(.orange)
+                        .help("Fixtures without a start address play in the visualiser only: select one and give it the address set on the fixture")
+                }
+                Button { model.section = .dmx } label: {
                     Metric(value: set?.isVirtual ?? true ? "Visualiser" : (set?.outputText ?? "–"), label: "DMX output ›")
                 }
                 .buttonStyle(.plain)
-                .help("Where the set's universes go: DMX Devices & Output… (⇧⌘D)")
+                .help("Where the set's universes go: the DMX Output page (⇧⌘D)")
                 Spacer()
             }
         }
@@ -332,6 +365,13 @@ private struct SetHeader: View {
                 run { try await model.api.renameSet(old, to: new); await MainActor.run { model.editingSet = new.lowercased() } }
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Add fixtures to the example “\(model.editingSet)”?", isPresented: $confirmExample, titleVisibility: .visible) {
+            Button("New Set…") { openWindow(id: "wizard") }
+            Button("Add to the Example") { showAdd = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The examples are there to look around in. Your own fixtures belong in a set of your own.")
         }
         .confirmationDialog("Delete the set “\(model.editingSet)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { let s = model.editingSet; run { try await model.api.deleteSet(s) } }
@@ -354,6 +394,43 @@ private struct SetHeader: View {
             do { try await op() } catch { self.error = error.localizedDescription }
             model.reloadSets()
         }
+    }
+}
+
+private struct SetRow: View {
+    let set: SetSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(set.name).font(.headline)
+            Text("\(set.fixtureCount) fixtures · \(set.isVirtual ? "visualiser only" : set.outputText)")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .tag(Optional(set.name))
+    }
+}
+
+/// Over an example set: it is not yours, and where yours go.
+private struct ExampleNotice: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill").font(.title2).foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("This is an example set").font(.headline)
+                Text("Look around and try the show with it. For the fixtures you own, make a set of your own.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.engineRunning)
+        }
+        .padding(12)
+        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 10))
+        .padding(.horizontal, 16).padding(.bottom, 12)
     }
 }
 
@@ -401,9 +478,16 @@ private struct FixtureRow: View {
         HStack {
             Text(fixture.id).font(.body.monospaced())
                 .frame(width: 110, alignment: .leading)
-            Text("\(fixture.universe).\(String(format: "%03d", fixture.address))").monospacedDigit().foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .leading)
-                .help("Universe.address: set this start address on the fixture's display")
+            Group {
+                if fixture.address != nil {
+                    Text(fixture.patchText).monospacedDigit().foregroundStyle(.secondary)
+                } else {
+                    Text("no address").foregroundStyle(.orange)
+                }
+            }
+            .frame(width: 80, alignment: .leading)
+            .help(fixture.address == nil ? "No start address yet: select it and give it one (the visualiser only until then)"
+                  : "Universe.address: set this start address on the fixture's display")
             Text(fixture.mode).font(.callout).foregroundStyle(.secondary)
             Spacer()
             Button(lit ? "On" : "Test", systemImage: lit ? "lightbulb.fill" : "lightbulb") { toggle() }

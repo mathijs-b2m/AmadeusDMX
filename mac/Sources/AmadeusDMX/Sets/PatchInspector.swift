@@ -15,13 +15,19 @@ struct PatchInspector: View {
     @State private var name = ""
     @State private var address = ""
     @State private var firstAddress = "1"
+    /// The text field being edited: what is typed there is saved on Return, on leaving it or on Save.
+    @FocusState private var focus: Field?
+    enum Field { case name, address }
+    @State private var sent = ""   // the last change sent ("id:address" or "id>name"): sent once, not on every blur
 
     private func string(_ f: [String: Any], _ k: String) -> String { f[k] as? String ?? "" }
     private func int(_ f: [String: Any], _ k: String, _ d: Int) -> Int { (f[k] as? NSNumber)?.intValue ?? d }
+    /// The start address, nil when it has none yet (added fixtures wait for you to give them one).
+    private func addr(_ f: [String: Any]) -> Int? { (f["address"] as? NSNumber)?.intValue }
 
     private var selected: [[String: Any]] {
         fixtures.filter { ids.contains(string($0, "id")) }
-            .sorted { (int($0, "universe", 1), int($0, "address", 1)) < (int($1, "universe", 1), int($1, "address", 1)) }
+            .sorted { (int($0, "universe", 1), addr($0) ?? 513) < (int($1, "universe", 1), addr($1) ?? 513) }
     }
 
     /// How many DMX channels a fixture takes.
@@ -33,8 +39,7 @@ struct PatchInspector: View {
     private func clashes(universe u: Int, from a: Int, count n: Int, except: Set<String>) -> [String] {
         fixtures.filter { f in
             let id = string(f, "id")
-            guard !except.contains(id), int(f, "universe", 1) == u else { return false }
-            let b = int(f, "address", 1)
+            guard !except.contains(id), int(f, "universe", 1) == u, let b = addr(f) else { return false }
             return b <= a + n - 1 && a <= b + footprint(f) - 1
         }.map { string($0, "id") }
     }
@@ -56,13 +61,31 @@ struct PatchInspector: View {
         }
         .formStyle(.grouped)
         .onAppear(perform: sync)
-        .onChange(of: ids) { sync() }
+        .onChange(of: ids) { old, _ in commit(old); sync() }   // another fixture picked: keep what was typed
+        .onChange(of: focus) { old, _ in if old != nil { commit(ids) } }
+    }
+
+    /// What is typed in the name and address fields, saved (for the one fixture `ids` holds).
+    private func commit(_ ids: Set<String>) {
+        guard ids.count == 1, let id = ids.first, let f = fixtures.first(where: { string($0, "id") == id }) else { return }
+        let typed = address.trimmingCharacters(in: .whitespaces)
+        if typed.isEmpty, addr(f) != nil, sent != "\(id):-" {  // cleared: no start address (until given one)
+            sent = "\(id):-"
+            apply("Clear Address") { all in Self.set(&all, id) { $0["address"] = nil } }
+        } else if let v = Int(typed), v != addr(f), sent != "\(id):\(v)" {
+            if (1...512).contains(v) {
+                sent = "\(id):\(v)"
+                apply("Change Address") { all in Self.set(&all, id) { $0["address"] = v } }
+            } else { address = addr(f).map(String.init) ?? "" }
+        }
+        let new = name.trimmingCharacters(in: .whitespaces)
+        if new.isEmpty { name = id } else if new != id, sent != "\(id)>\(new)" { sent = "\(id)>\(new)"; rename(id, new) }
     }
 
     private func sync() {
         if let f = selected.first, selected.count == 1 {
             name = string(f, "id")
-            address = String(int(f, "address", 1))
+            address = addr(f).map(String.init) ?? ""
         }
     }
 
@@ -71,11 +94,17 @@ struct PatchInspector: View {
     @ViewBuilder
     private func single(_ f: [String: Any]) -> some View {
         let id = string(f, "id"), key = string(f, "fixture"), def = definition(key)
-        let u = int(f, "universe", 1), a = int(f, "address", 1), n = footprint(f)
+        let u = int(f, "universe", 1), a = addr(f), n = footprint(f)
         SwiftUI.Section(def?.name ?? key) {
-            TextField("Name", text: $name)
-                .onSubmit { if name != id { rename(id, name) } }
-                .help("The fixture's name in the set (renaming keeps where it hangs on your rigs). Press Return to rename.")
+            HStack {
+                TextField("Name", text: $name)
+                    .focused($focus, equals: .name)
+                    .onSubmit { commit(ids) }
+                    .help("The fixture's name in the set (renaming keeps where it hangs on your rigs). Saved on Return or when you leave the field.")
+                if name != id {
+                    Button("Rename") { sent = ""; commit(ids) }.buttonStyle(.borderedProminent)
+                }
+            }
             Picker("DMX mode", selection: Binding(get: { string(f, "mode") }, set: { m in
                 apply("Change Mode") { all in Self.set(&all, id) { $0["mode"] = m } }
             })) {
@@ -88,30 +117,47 @@ struct PatchInspector: View {
             Stepper("Universe \(u)", value: Binding(get: { u }, set: { nu in
                 apply("Change Universe") { all in Self.set(&all, id) { $0["universe"] = nu } }
             }), in: 1...64)
+            let text = address.trimmingCharacters(in: .whitespaces)
+            let typed = Int(text).flatMap { (1...512).contains($0) ? $0 : nil }
+            let edited = text.isEmpty ? a != nil : typed != nil && typed != a
             HStack {
-                TextField("Start address", text: $address)
-                    .onSubmit {
-                        if let v = Int(address), (1...512).contains(v) {
+                TextField("Start address", text: $address, prompt: Text("not set"))
+                    .focused($focus, equals: .address)
+                    .onSubmit { commit(ids) }
+                    .help("The address set on the fixture itself. Saved on Return, when you leave the field, or with Save; empty: none yet")
+                if edited {
+                    Button("Save") { sent = ""; commit(ids) }.buttonStyle(.borderedProminent)
+                    Button("Revert") { address = a.map(String.init) ?? "" }
+                } else {
+                    Button("Next Free") {
+                        if let v = free(universe: u, count: n, except: [id]) {
+                            address = String(v)
                             apply("Change Address") { all in Self.set(&all, id) { $0["address"] = v } }
-                        } else { address = String(a) }
+                        }
                     }
-                Button("Next Free") {
-                    if let v = free(universe: u, count: n, except: [id]) {
-                        address = String(v)
-                        apply("Change Address") { all in Self.set(&all, id) { $0["address"] = v } }
-                    }
+                    .help("The first address in this universe where its \(n) channels fit")
                 }
-                .help("The first address in this universe where its \(n) channels fit")
             }
-            LabeledContent("Channels", value: "\(u).\(String(format: "%03d", a)) – \(u).\(String(format: "%03d", a + n - 1))")
-            if a + n - 1 > 512 {
-                Label("It doesn't fit in the universe: \(a + n - 1 - 512) channels past 512.", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+            if Int(address) != nil && typed == nil {
+                Label("A start address is 1 to 512.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
-            let c = clashes(universe: u, from: a, count: n, except: [id])
-            if !c.isEmpty {
-                Label("Overlaps \(c.joined(separator: ", "))", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+            if let shown = text.isEmpty ? nil : typed ?? a {   // what is typed, checked before it is saved
+                LabeledContent("Channels", value: "\(u).\(String(format: "%03d", shown)) – \(u).\(String(format: "%03d", shown + n - 1))"
+                               + (shown != a ? " (not saved yet)" : ""))
+                if shown + n - 1 > 512 {
+                    Label("It doesn't fit in the universe: \(shown + n - 1 - 512) channels past 512.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+                let c = clashes(universe: u, from: shown, count: n, except: [id])
+                if !c.isEmpty {
+                    Label("Overlaps \(c.joined(separator: ", ")). It is saved anyway, so you can move the others next.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Label("No start address yet: it plays in the visualiser only until it has one. Type the address set on the fixture, or Next Free.",
+                      systemImage: "info.circle")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
         if def?.isMoving == true {

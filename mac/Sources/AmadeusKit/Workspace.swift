@@ -157,8 +157,14 @@ public struct Workspace: Sendable, Equatable {
         let active = activeSet
         return setNames().compactMap { name in
             guard let rig = loadSet(name) else { return nil }
-            return SetSummary(name: name, rig: rig, isDefault: name == active)
+            return SetSummary(name: name, rig: rig, isDefault: name == active, isExample: isExampleSet(name))
         }
+    }
+
+    /// One of the sets a first run starts from (examples/sets): there to look around in, not for your own gear.
+    /// Renamed or duplicated, it is yours.
+    public func isExampleSet(_ name: String) -> Bool {
+        FileManager.default.fileExists(atPath: root.appending(path: "examples/sets/\(name).json").path)
     }
 
     // MARK: rigs (venues)
@@ -328,10 +334,12 @@ public struct SetSummary: Sendable, Identifiable, Hashable {
     public var director: String
     public var hasScreen: Bool
     public var isDefault: Bool
+    /// One of the shipped example sets (Workspace.isExampleSet).
+    public var isExample: Bool
 
     public var id: String { name }
 
-    init(name: String, rig: RigFile, isDefault: Bool) {
+    init(name: String, rig: RigFile, isDefault: Bool, isExample: Bool = false) {
         self.name = name
         description = rig.description ?? ""
         fixtureCount = rig.fixtures.count
@@ -347,10 +355,12 @@ public struct SetSummary: Sendable, Identifiable, Hashable {
         director = rig.director ?? "rules"
         hasScreen = rig.hasScreen
         self.isDefault = isDefault
+        self.isExample = isExample
     }
 
     public static func == (a: SetSummary, b: SetSummary) -> Bool {
         a.name == b.name && a.fixtureCount == b.fixtureCount && a.isDefault == b.isDefault && a.description == b.description
+            && a.isExample == b.isExample
     }
     public func hash(into h: inout Hasher) { h.combine(name) }
 

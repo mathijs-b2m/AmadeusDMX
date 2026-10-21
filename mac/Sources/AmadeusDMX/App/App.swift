@@ -8,6 +8,11 @@ struct AmadeusDMXApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
 
+    init() {
+        // tooltips (.help) after a quarter second instead of the system's second: the icon buttons explain themselves
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
+    }
+
     var body: some Scene {
         WindowGroup("Amadeus DMX", id: "main") {
             MainView()
@@ -18,12 +23,6 @@ struct AmadeusDMXApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .commands { AppCommands(model: model) }
-
-        Window("DMX Devices & Output", id: "dmx") {
-            DMXWindow()
-                .environment(model)
-        }
-        .defaultSize(width: 900, height: 620)
 
         Window("Set Up a Rig", id: "wizard") {
             WizardView()
@@ -102,7 +101,7 @@ struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(model.workspace == nil || model.engineRunning)
             Divider()
-            Button("DMX Devices & Output…") { openWindow(id: "dmx") }
+            Button("DMX Output") { model.section = .dmx }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
                 .disabled(model.workspace == nil)
             Divider()

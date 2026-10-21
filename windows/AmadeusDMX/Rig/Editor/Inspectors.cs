@@ -384,7 +384,7 @@ public sealed class FixtureInspector(RigEditorModel editor, string id)
         s.Children.Add(EditorUI.Section(null,
             UI.HStack(10, UI.Icon(EditorUI.FixtureSymbol(def?.Kind), 22).Foreground(Tint.Accent),
                       UI.VStack(2, UI.Text(fixture.Id, Font.Headline), UI.Text(def?.Name ?? fixture.Key, Font.Caption).Secondary())),
-            EditorUI.Labeled("Patch", $"{fixture.Universe}.{fixture.Address:000} · {fixture.Mode}")));
+            EditorUI.Labeled("Patch", $"{fixture.PatchText} · {fixture.Mode}")));
 
         var mounting = new List<UIElement?>
         {

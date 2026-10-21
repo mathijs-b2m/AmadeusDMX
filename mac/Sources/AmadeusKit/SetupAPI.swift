@@ -35,8 +35,10 @@ public struct ArtNetNode: Decodable, Sendable, Identifiable, Hashable {
     public var name: String
     public var longName: String?
     public var outputs: Int?
+    /// The Art-Net universes of its outputs, as the node reports them (its first output's tells where it counts from).
+    public var universes: [Int]?
     public var id: String { ip }
-    enum CodingKeys: String, CodingKey { case ip, name, longName = "long_name", outputs }
+    enum CodingKeys: String, CodingKey { case ip, name, longName = "long_name", outputs, universes }
 }
 
 public struct USBInterface: Decodable, Sendable, Identifiable, Hashable {
@@ -326,6 +328,11 @@ public struct SetupAPI: Sendable {
         try await post("api/test-light", ["fixture": fixture, "rig": layout, "on": on, "point": point])
     }
 
+    /// The rig editor's test: a moving head straight out to the audience (the reply's `dir`), whatever its placing.
+    public func testLightFront(fixture: String, on: Bool, layout: [String: Any]) async throws -> LightTest {
+        try await post("api/test-light", ["fixture": fixture, "rig": layout, "on": on, "point": "front"])
+    }
+
     /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
     public func hangCheck(layout: [String: Any]) async throws -> [HangCheckStep] {
         struct R: Decodable { var steps: [HangCheckStep] }
@@ -417,15 +424,28 @@ public struct LightTest: Decodable, Sendable {
     public var output: String           // the set's output, in words ("Art-Net → 192.168.2.18:6454")
     public var universe: Int
     public var wireUniverse: Int?       // the Art-Net / sACN universe it goes out as
-    public var channels: [Int]          // first and last DMX channel
+    public var channels: [Int]          // first and last DMX channel (empty: no start address)
+    public var dir: SIMD3<Float>?       // a pointed head: where its beam goes (world, as the feed's)
 
     enum CodingKeys: String, CodingKey {
-        case on, seconds, output, universe, wireUniverse = "wire_universe", channels
+        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        on = try c.decode(Bool.self, forKey: .on)
+        seconds = try c.decode(Double.self, forKey: .seconds)
+        output = try c.decode(String.self, forKey: .output)
+        universe = try c.decode(Int.self, forKey: .universe)
+        wireUniverse = try c.decodeIfPresent(Int.self, forKey: .wireUniverse)
+        channels = try c.decodeIfPresent([Int].self, forKey: .channels) ?? []  // null: a fixture without an address
+        dir = try c.decodeIfPresent([Float].self, forKey: .dir).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
     }
 
     /// "universe 1, channels 43–50 · Art-Net → 192.168.2.18:6454 (universe 1 on the wire)"
     public var summary: String {
-        let first = channels.first ?? 0, last = channels.last ?? first
+        guard let first = channels.first else { return "universe \(universe), no start address · \(output)" }
+        let last = channels.last ?? first
         var s = "universe \(universe), channels \(first)–\(last) · \(output)"
         if let w = wireUniverse { s += " (universe \(w) on the wire)" }
         return s

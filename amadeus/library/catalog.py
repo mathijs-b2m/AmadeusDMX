@@ -185,7 +185,7 @@ def suggest_addresses(rig: dict, footprint: int, count: int = 1, universe: int =
     used = {
         ch
         for f in rig.get("fixtures", [])
-        if f.get("universe", 1) == universe
+        if f.get("universe", 1) == universe and fxlib.patched(f)
         for ch in range(f["address"], f["address"] + fxlib.footprint(f))
     }
     out = {}

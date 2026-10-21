@@ -1,4 +1,4 @@
-// The main window: the menu in the title bar, a sidebar (Show, Sets, Rigs, Engine, Settings), the set on the rig
+// The main window: the menu in the title bar, a sidebar (Show, DMX Output, Sets, Rigs, Engine, Settings), the set on the rig
 // and the engine controls in the toolbar above the page.
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml.Media;
@@ -141,6 +141,8 @@ public sealed partial class MainWindow : Window
             case Section.Rig:
                 return m.Rigs.FirstOrDefault(r => r.Name == m.EditingRig) is { } r
                     ? r.Summary + (m.EditingRigSet.Length == 0 ? "" : $" · {m.EditingRigSet} on it") : "";
+            case Section.Dmx:
+                return $"set “{m.SelectedSet}”";
             case Section.Engine or Section.Settings:
                 return "";
         }
@@ -160,6 +162,7 @@ public sealed partial class MainWindow : Window
             page = section switch
             {
                 Section.Show => new ShowView(_model).Build(),
+                Section.Dmx => new DMXPage(_model).Build(),
                 Section.Rig => new RigView(_model).Build(),
                 Section.Set => new SetView(_model, this).Build(),
                 Section.Engine => new EngineView(_model).Build(),
@@ -179,12 +182,16 @@ public sealed partial class MainWindow : Window
         if (_askedOnce) return;
         _askedOnce = true;
         if (_model.NeedsSetup || _model.Sets.Count == 0 || Defaults.Standard.Bool("wizard")) OpenWizard();
+        switch (Defaults.Standard.String("openWindow"))  // -openWindow wizard (screenshots); dmx is a page now
+        {
+            case "dmx": OpenDMX(); break;
+            case "wizard": OpenWizard(); break;
+        }
     }
 
     // MARK: other windows and dialogs
 
     WizardWindow? _wizard;
-    DMXWindow? _dmx;
 
     public void OpenWizard()
     {
@@ -196,15 +203,11 @@ public sealed partial class MainWindow : Window
         _wizard.Activate();
     }
 
+    /// The DMX Output page (it was a window of its own).
     public void OpenDMX()
     {
         if (_model.Workspace is null) return;
-        if (_dmx is null)
-        {
-            _dmx = new DMXWindow(_model);
-            _dmx.Closed += (_, _) => _dmx = null;
-        }
-        _dmx.Activate();
+        _model.Section = Section.Dmx;
     }
 
     public XamlRoot? Root => Content?.XamlRoot;

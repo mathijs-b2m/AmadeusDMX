@@ -6,6 +6,7 @@ struct WizardView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var w = WizardModel()
+    @State private var savedNote: String?   // after Save and Close: what was saved, where to go on
 
     var body: some View {
         HStack(spacing: 0) {
@@ -28,6 +29,11 @@ struct WizardView: View {
         }
         .frame(width: 820, height: 600)
         .task(id: w.step) { await enter(w.step) }
+        .alert("Saved. Continue Later", isPresented: Binding(get: { savedNote != nil }, set: { if !$0 { savedNote = nil } })) {
+            Button("Close") { model.section = w.planned.isEmpty ? .dmx : .set; dismiss() }
+        } message: {
+            Text(LocalizedStringKey(savedNote ?? ""))
+        }
     }
 
     @ViewBuilder
@@ -53,6 +59,16 @@ struct WizardView: View {
                 Label(e, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.red).lineLimit(2)
             }
             Spacer()
+            if ![.welcome, .engine, .review, .done].contains(w.step) {
+                // never trapped: what is chosen so far is saved, the pages take it from there
+                Button(w.hasSomethingToSave ? "Save and Close" : "Close") {
+                    guard w.hasSomethingToSave else { dismiss(); return }
+                    Task { if let note = await w.saveAndClose(model) { savedNote = note } }
+                }
+                .disabled(w.creating)
+                .help(w.hasSomethingToSave ? "Save the DMX output and the fixtures chosen so far, and go on later on the pages" : "Close the assistant")
+                Spacer().frame(width: 12)
+            }
             if w.step != .welcome && w.step != .done {
                 Button("Back") { w.step = WizardStep(rawValue: w.step.rawValue - 1) ?? .welcome }
                     .disabled(w.creating)
@@ -81,7 +97,7 @@ struct WizardView: View {
 
     private func next() {
         var s = WizardStep(rawValue: w.step.rawValue + 1) ?? .done
-        if s == .engine, model.workspace?.isValid == true, w.step == .welcome, !model.sets.isEmpty { s = .fixtures }
+        if s == .engine, model.workspace?.isValid == true, w.step == .welcome, !model.sets.isEmpty { s = .network }
         w.step = s
     }
 

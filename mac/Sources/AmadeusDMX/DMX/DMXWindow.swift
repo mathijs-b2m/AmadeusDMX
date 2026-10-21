@@ -1,4 +1,4 @@
-// DMX Devices & Output (Show menu, ⇧⌘D): your DMX devices (Art-Net and sACN nodes, USB interfaces), apart
+// The DMX Output page (sidebar, Show menu, ⇧⌘D): your DMX devices (Art-Net and sACN nodes, USB interfaces), apart
 // from the sets, and where each universe of the selected set goes: which device, which of its outputs.
 // Replace a node or play the set somewhere else: only the mapping changes (amadeus/dmx/devices.py).
 import AmadeusKit
@@ -33,6 +33,7 @@ final class DMXModel {
         loading = true
         defer { loading = false }
         do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }  // a page: may open first
             let d = try await model.api.dmxDevices()
             devices = d.devices
             usb = d.usb
@@ -90,7 +91,7 @@ final class DMXModel {
 
     func addNode(_ n: ArtNetNode) {
         var d = DMXDevice(id: Self.slug(n.name), name: n.longName?.isEmpty == false ? n.longName! : n.name, type: "artnet")
-        d.ip = n.ip; d.firstUniverse = 0; d.outputs = n.outputs ?? 2
+        d.ip = n.ip; d.firstUniverse = n.universes?.min() ?? 0; d.outputs = n.outputs ?? 2
         add(d)
     }
 
@@ -145,7 +146,7 @@ final class DMXModel {
     }
 }
 
-struct DMXWindow: View {
+struct DMXPage: View {
     @Environment(AppModel.self) private var model
     @State private var dmx = DMXModel()
 
@@ -154,7 +155,6 @@ struct DMXWindow: View {
             devicesPane.frame(minWidth: 300, idealWidth: 340)
             universesPane.frame(minWidth: 380)
         }
-        .frame(minWidth: 760, minHeight: 520)
         .task(id: model.selectedSet + "|" + model.selectedRig) { await dmx.load(model) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -163,7 +163,6 @@ struct DMXWindow: View {
                     .keyboardShortcut("s", modifiers: .command)
             }
         }
-        .navigationTitle("DMX Devices & Output")
     }
 
     // MARK: your devices

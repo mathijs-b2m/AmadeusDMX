@@ -1,4 +1,4 @@
-// DMX Devices & Output, the model behind the window (mac/Sources/AmadeusDMX/DMX/DMXWindow.swift DMXModel): your DMX
+// The DMX Output page's model (mac/Sources/AmadeusDMX/DMX/DMXWindow.swift DMXModel): your DMX
 // devices (Art-Net and sACN nodes, USB interfaces), apart from the sets, and where each universe of the selected
 // set goes: which device, which of its outputs. Replace a node or play the set somewhere else: only the mapping
 // changes (amadeus/dmx/devices.py).
@@ -137,7 +137,7 @@ public sealed class DMXModel : Observable
     public void AddNode(ArtNetNode n) =>
         Add(new DMXDevice(Slug(n.Name), n.LongName is { Length: > 0 } l ? l : n.Name, "artnet")
         {
-            Ip = n.Ip, FirstUniverse = 0, Outputs = n.Outputs ?? 2,
+            Ip = n.Ip, FirstUniverse = n.Universes is { Count: > 0 } u ? u.Min() : 0, Outputs = n.Outputs ?? 2,
         });
 
     public void AddUSB(USBInterface i) =>

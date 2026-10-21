@@ -6,11 +6,12 @@ import Observation
 import Security
 
 enum Section: String, CaseIterable, Identifiable, Hashable {
-    case show, set, rig, engine, settings
+    case show, set, rig, engine, dmx, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .show: "Show"
+        case .dmx: "DMX Output"
         case .rig: "Rigs"
         case .set: "Sets"
         case .engine: "Engine"
@@ -20,6 +21,7 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .show: "sparkles.tv"
+        case .dmx: "cable.connector"
         case .rig: "square.split.bottomrightquarter"
         case .set: "light.overhead.right"
         case .engine: "terminal"
@@ -30,6 +32,7 @@ enum Section: String, CaseIterable, Identifiable, Hashable {
     var help: String {
         switch self {
         case .show: "The show: the stage, the music and the director"
+        case .dmx: "Your DMX devices (Art-Net and sACN nodes, USB interfaces), and where each universe of the set goes (⇧⌘D)"
         case .rig: "Your rigs (the venues: trusses, stage, zones), and the sets placed on them"
         case .set: "Your sets of fixtures: their DMX patch and where the DMX goes"
         case .engine: "The engine's log"

@@ -90,7 +90,7 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
             {
                 Content = UI.Label("cable.connector", set.IsVirtual || !model.SendArtNet ? "Visualiser only" : set.OutputText, Font.Caption).Secondary(),
                 Padding = new Thickness(0),
-            }.Tooltip("DMX Devices & Output… (Ctrl+Shift+D)");
+            }.Tooltip("DMX Output (Ctrl+Shift+D)");
             output.Click += (_, _) => window.OpenDMX();
             rows.Add(output);
         }
