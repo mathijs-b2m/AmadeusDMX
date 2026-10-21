@@ -358,7 +358,7 @@ struct FixtureInspector: View {
                     Text(def?.name ?? fixture.key).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            LabeledContent("Patch", value: "\(fixture.universe).\(String(format: "%03d", fixture.address)) · \(fixture.mode)")
+            LabeledContent("Patch", value: "\(fixture.patchText) · \(fixture.mode)")
         }
         SwiftUI.Section("Mounting") {
             Picker("Truss", selection: Binding(get: { fixture.truss ?? "" }, set: { editor.attach(fixture.id, to: $0.isEmpty ? nil : $0) })) {

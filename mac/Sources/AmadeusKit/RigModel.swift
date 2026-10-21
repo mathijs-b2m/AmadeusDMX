@@ -224,11 +224,14 @@ public struct FixtureDefinition: Decodable, Sendable {
 }
 
 public struct PlacedFixture: Identifiable, Equatable, Sendable {
+    /// "1.033", or what it is without a start address.
+    public var patchText: String { address.map { "\(universe).\(String(format: "%03d", $0))" } ?? "no address" }
+
     public var id: String
     public var key: String
     public var mode: String
     public var universe: Int
-    public var address: Int
+    public var address: Int?      // nil: no start address yet (the visualiser only until you give it one)
     public var mount: String
     public var x: Double          // fraction of the stage width
     public var yM: Double
@@ -253,7 +256,7 @@ public struct PlacedFixture: Identifiable, Equatable, Sendable {
 
     public func position(width: Double) -> SIMD3<Double> { SIMD3(x * width, yM, zM) }
 
-    public init(id: String, key: String, mode: String, universe: Int, address: Int, mount: String, x: Double, yM: Double,
+    public init(id: String, key: String, mode: String, universe: Int, address: Int?, mount: String, x: Double, yM: Double,
                 zM: Double, rotDeg: Double, aim: SIMD2<Double>?, truss: String?, trussPos: Double?, side: String? = nil,
                 mountRoll: Double? = nil) {
         self.id = id; self.key = key; self.mode = mode; self.universe = universe; self.address = address
@@ -317,7 +320,7 @@ public struct RigDocument: Equatable {
             let d = mounts[mount] ?? (-0.6, 1.8)
             let aim = o["aim"]?.array.flatMap { a in a.count == 2 ? SIMD2(a[0].number ?? 0, a[1].number ?? 0) : nil }
             var f = PlacedFixture(id: id, key: key, mode: o["mode"]?.string ?? "", universe: Int(o["universe"]?.number ?? 1),
-                                  address: Int(o["address"]?.number ?? 1), mount: mount, x: o["x"]?.number ?? 0.5,
+                                  address: o["address"]?.number.map { Int($0) }, mount: mount, x: o["x"]?.number ?? 0.5,
                                   yM: o["y_m"]?.number ?? d.0, zM: o["z_m"]?.number ?? d.1, rotDeg: o["rot_deg"]?.number ?? 0,
                                   aim: aim, truss: o["truss"]?.string, trussPos: o["truss_pos_m"]?.number,
                                   side: o["truss_side"]?.string, mountRoll: o["mount_roll_deg"]?.number)
@@ -392,12 +395,12 @@ public struct RigDocument: Equatable {
                 o.merge(spot) { _, new in new }
                 o[Self.unplacedKey] = .object(spot)
                 o["id"] = .string(f.id); o["fixture"] = .string(f.key); o["mode"] = .string(f.mode)
-                o["universe"] = .number(Double(f.universe)); o["address"] = .number(Double(f.address))
+                o["universe"] = .number(Double(f.universe)); o["address"] = f.address.map { .number(Double($0)) }
                 return .object(o)
             }
             o[Self.unplacedKey] = nil
             o["id"] = .string(f.id); o["fixture"] = .string(f.key); o["mode"] = .string(f.mode)
-            o["universe"] = .number(Double(f.universe)); o["address"] = .number(Double(f.address))
+            o["universe"] = .number(Double(f.universe)); o["address"] = f.address.map { .number(Double($0)) }
             o["mount"] = .string(f.mount)
             o["x"] = .number(r(f.x, 10000)); o["y_m"] = .number(r(f.yM, 1000)); o["z_m"] = .number(r(f.zM, 1000))
             o["rot_deg"] = f.rotDeg == 0 ? nil : .number(r(f.rotDeg, 10))

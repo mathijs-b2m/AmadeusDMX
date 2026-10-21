@@ -12,6 +12,14 @@ struct PlannedFixture: Identifiable, Hashable {
     var modes: [String]
     var count: Int
     var channels: [String: Int] = [:]   // mode → channels (empty: not known)
+    var start = ""                      // from this address, one after another; empty: given later, on the Sets page
+
+    /// The start addresses of its fixtures (nil each when none was typed, or past 512).
+    var addresses: [Int?] {
+        guard let s = Int(start.trimmingCharacters(in: .whitespaces)), (1...512).contains(s) else { return Array(repeating: nil, count: count) }
+        let n = max(footprint, 1)
+        return (0..<count).map { i in s + i * n + n - 1 <= 512 ? s + i * n : nil }
+    }
 
     var footprint: Int { channels[mode] ?? 0 }
 }
@@ -241,15 +249,17 @@ final class WizardModel {
                                         screen: ledWall)
             }
             var layout = try await api.rig(rig: rig, set: setName)
-            var items: [[String: Any]] = []
+            var items: [[String: Any]] = [], starts: [Int?] = []
             for p in planned {
                 progress = "Adding \(p.count)× \(p.entry.model)…"
                 let key = p.entry.isLocal ? p.entry.key : try await api.addToLibrary(p.entry.key)
                 for _ in 0..<p.count { items.append(["fixture": key, "mode": p.mode, "universe": 1]) }
+                starts += p.addresses
             }
             progress = "Patching addresses…"
             let placementKeys = Set(RigDocument.placementKeys)
             layout["fixtures"] = try await autopatch(api, items).compactMap { ($0 as? [String: Any])?.filter { !placementKeys.contains($0.key) } }
+                .enumerated().map { i, f in var f = f; if i < starts.count, let a = starts[i] { f["address"] = a }; return f }
             var artnet = layout["artnet"] as? [String: Any] ?? ["port": 6454, "fps": 40]
             artnet["ip"] = artnetIP
             layout["artnet"] = artnet
@@ -358,15 +368,17 @@ final class WizardModel {
                 while model.sets.contains(where: { $0.name == setName }) { i += 1; setName = "\(Self.safe(name))-\(i)" }
                 progress = "The set…"
                 try await api.createSet(name: setName)
-                var items: [[String: Any]] = []
+                var items: [[String: Any]] = [], starts: [Int?] = []
                 for p in planned {
                     progress = "Adding \(p.count)× \(p.entry.model)…"
                     let key = p.entry.isLocal ? p.entry.key : try await api.addToLibrary(p.entry.key)
                     for _ in 0..<p.count { items.append(["fixture": key, "mode": p.mode, "universe": 1]) }
+                starts += p.addresses
                 }
                 progress = "Patching addresses…"
                 let placementKeys = Set(RigDocument.placementKeys)
                 let fixtures = try await autopatch(api, items).compactMap { ($0 as? [String: Any])?.filter { !placementKeys.contains($0.key) } }
+                .enumerated().map { i, f in var f = f; if i < starts.count, let a = starts[i] { f["address"] = a }; return f }
                 var layout = model.workspace?.composed(rig: "", set: setName)
                     .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
                 layout["fixtures"] = fixtures
@@ -395,7 +407,8 @@ final class WizardModel {
         var req = URLRequest(url: api.base.appending(path: "api/autopatch"))
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["fixtures": items])
+        // ids and a layout, no start addresses: a guess is usually wrong (the typed ones are put in afterwards)
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["fixtures": items, "addresses": false])
         let (data, _) = try await URLSession.shared.data(for: req)
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         if let e = obj?["error"] as? String { throw SetupAPIError.server(e) }

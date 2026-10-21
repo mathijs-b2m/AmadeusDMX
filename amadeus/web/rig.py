@@ -29,7 +29,7 @@ def save_rig(req):
             name = store.safe_name(req.query["set"])
             set_doc, _ = store.split(rig, name, {})
             store.sets.save(name, set_doc)
-        return {"saved": not problems, "problems": problems}
+        return {"saved": not problems, "problems": problems, "warnings": fxlib.overlaps(rig)}
     if req.query.get("structure") and req.query.get("rig"):  # the rig alone (no set placed on it)
         name = store.safe_name(req.query["rig"])
         doc = store.rigs.load(name)
@@ -43,7 +43,7 @@ def save_rig(req):
     problems = fxlib.validate(rig) + outputs.validate(rig)
     if not problems:
         req.show.save(rig)
-    return {"saved": not problems, "problems": problems}
+    return {"saved": not problems, "problems": problems, "warnings": fxlib.overlaps(rig)}
 
 
 def directors(req=None) -> list[dict]:
@@ -310,17 +310,20 @@ def hang_check_fix(req):
 
 
 def autopatch(req):
-    """Non-overlapping addresses and a stage layout for the posted fixtures."""
+    """Non-overlapping addresses and a stage layout for the posted fixtures. `"addresses": false`: ids and the
+    layout only, no start addresses (the apps: you give them, a guess is usually wrong)."""
     from amadeus.dmx.discover import assign_addresses, layout, new_ids
 
-    fixtures = req.body()["fixtures"]
+    body = req.body()
+    fixtures = body["fixtures"]
     for f in fixtures:
         f.pop("address", None)
         f.pop("x", None)
         f.setdefault("universe", 1)
         f.setdefault("mode", fxlib.default_mode(fxlib.get(f["fixture"])))
     new_ids(fixtures)
-    assign_addresses(fixtures)
+    if body.get("addresses", True):
+        assign_addresses(fixtures)
     layout(fixtures)
     return {"fixtures": fixtures}
 
@@ -399,6 +402,8 @@ def test_light(req):
     refusal = fxlib.test_refusal(defn) or (raw is not None and defn["kind"] == "laser" and "Lasers aren't driven raw.")
     if on and refusal:
         return {"error": refusal}, 400
+    if on and not fxlib.patched(fx):
+        return {"error": f"{fixture_id} has no start address yet: give it one first"}, 400
     with _test_lock:
         ids = {f["id"] for f in rig["fixtures"]}
         _test["lit"] = {fid: until for fid, until in _test["lit"].items() if fid in ids}  # another set's: dark
@@ -429,7 +434,7 @@ def test_light(req):
         "output": outputs.describe(rig),
         "universe": fx["universe"],
         "wire_universe": outputs.wire_universe(rig, fx["universe"]),
-        "channels": [fx["address"], fx["address"] + fxlib.footprint(fx) - 1],
+        "channels": [fx["address"], fx["address"] + fxlib.footprint(fx) - 1] if fxlib.patched(fx) else None,
     }
 
 

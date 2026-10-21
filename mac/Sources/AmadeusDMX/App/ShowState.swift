@@ -6,7 +6,7 @@ import Observation
 import Security
 
 enum Section: String, CaseIterable, Identifiable, Hashable {
-    case show, dmx, set, rig, engine, settings
+    case show, set, rig, engine, dmx, settings
     var id: String { rawValue }
     var title: String {
         switch self {

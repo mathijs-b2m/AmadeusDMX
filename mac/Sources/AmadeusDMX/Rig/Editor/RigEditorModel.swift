@@ -405,32 +405,20 @@ final class RigEditorModel: StageEditing {
         }
     }
 
-    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. Addresses are
-    /// filled in after the last used channel, universe by universe.
+    /// Adds fixtures to the set: spread along the selected truss, or in a row on the stage floor. No start
+    /// addresses: you give them on the Sets page (a guess is usually wrong, and then they overlap).
     func addFixtures(key: String, mode: String, count: Int) {
         guard let def = definition(key), count > 0 else { return }
-        let footprint = max(1, def.channels(mode))
         let base = key.split(separator: "/").last.map { String($0.prefix { $0.isLetter }) }.flatMap { $0.isEmpty ? nil : $0 } ?? "fx"
         change("Add \(count) × \(def.model)") { d in
-            var used: [Int: [ClosedRange<Int>]] = [:]
-            for f in d.fixtures {
-                let n = definition(f.key)?.channels(f.mode) ?? 1
-                used[f.universe, default: []].append(f.address...(f.address + max(1, n) - 1))
-            }
-            func free(_ u: Int, _ a: Int) -> Bool {
-                a + footprint - 1 <= 512 && !(used[u] ?? []).contains { $0.overlaps(a...(a + footprint - 1)) }
-            }
             let truss: Truss? = if case .truss(let id) = selection { d.trusses.first { $0.id == id } } else { nil }
             var newIDs: [String] = []
             for k in 0..<count {
-                var u = 1, a = 1
-                while !free(u, a) { a += 1; if a > 512 { a = 1; u += 1 } }
-                used[u, default: []].append(a...(a + footprint - 1))
                 var n = 1
                 while d.fixtures.contains(where: { $0.id == "\(base)\(n)" }) || newIDs.contains("\(base)\(n)") { n += 1 }
                 let id = "\(base)\(n)"
                 newIDs.append(id)
-                var f = PlacedFixture(id: id, key: key, mode: mode, universe: u, address: a, mount: "floor",
+                var f = PlacedFixture(id: id, key: key, mode: mode, universe: 1, address: nil, mount: "floor",
                                       x: (Double(k) + 1) / Double(count + 1), yM: -0.6, zM: 0.25, rotDeg: 0, aim: nil,
                                       truss: nil, trussPos: nil)
                 if let t = truss {

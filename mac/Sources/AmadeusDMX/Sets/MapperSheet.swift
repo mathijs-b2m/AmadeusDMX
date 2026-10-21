@@ -11,7 +11,7 @@ struct MapTarget: Identifiable {
     var key: String
     var mode: String
     var fixture: String      // the one tried on the lights
-    var address: Int
+    var address: Int?        // nil: no start address yet (nothing can be tried)
     var universe: Int
     var id: String { "\(key)|\(mode)" }
 }
@@ -94,7 +94,7 @@ struct MapperSheet: View {
     private func channels(_ m: FixtureMapping) -> some View {
         List {
             ForEach(m.channels.indices, id: \.self) { i in
-                ChannelRow(channel: binding(i), roles: m.roles, address: target.address + i, universe: target.universe) {
+                ChannelRow(channel: binding(i), roles: m.roles, address: target.address.map { $0 + i }, universe: target.universe) {
                     valuesChanged()
                 }
             }
@@ -189,7 +189,7 @@ struct MapperSheet: View {
 private struct ChannelRow: View {
     @Binding var channel: FixtureMapping.Channel
     let roles: [FixtureMapping.Role]
-    let address: Int
+    let address: Int?
     let universe: Int
     let changed: () -> Void
 
@@ -199,7 +199,7 @@ private struct ChannelRow: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(channel.n)").font(.body.monospacedDigit().weight(.semibold))
-                Text("\(universe).\(String(format: "%03d", address))").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                Text(address.map { "\(universe).\(String(format: "%03d", $0))" } ?? "–").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             }
             .frame(width: 44, alignment: .leading)
 

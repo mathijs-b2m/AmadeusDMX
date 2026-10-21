@@ -57,12 +57,17 @@ struct FixturesStep: View {
                                     .labelsHidden().frame(width: 90)
                             }
                             Stepper("\(p.count)×", value: $p.count, in: 1...120).monospacedDigit()
+                            TextField("Address", text: $p.start, prompt: Text("address"))
+                                .frame(width: 64).multilineTextAlignment(.trailing)
+                                .help("The start address set on the first of them; the others follow one after another. Empty: give them later on the Sets page.")
                             Button { w.planned.removeAll { $0.id == p.id } } label: { Image(systemName: "minus.circle.fill") }
                                 .buttonStyle(.borderless).foregroundStyle(.secondary)
                         }
                         .padding(10)
                         .background(.background.secondary, in: .rect(cornerRadius: 10))
                     }
+                    Text("Addresses are optional here: type the one set on the first fixture of a row, or leave it empty and give them later on the Sets page. Fixtures without one play in the visualiser only.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     capacity
                 }
             } else if w.results.isEmpty {

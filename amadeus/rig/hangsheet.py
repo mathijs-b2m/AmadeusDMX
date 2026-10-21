@@ -166,7 +166,7 @@ def layout(merged: dict) -> dict:
             "role": role(defn) if defn.get("kind") != "smoke" else "smoke",
             "mode": _mode(f, defn),
             "universe": int(f.get("universe", 1)),
-            "address": int(f.get("address", 1)),
+            "address": int(f["address"]) if fxlib.patched(f) else None,  # None: not given yet
             "channels": _channels(f, defn),
             "watts": int(defn.get("physical", {}).get("watts") or 0),
             "kg": float(defn.get("physical", {}).get("weight_kg") or 0),
@@ -202,7 +202,7 @@ def layout(merged: dict) -> dict:
     floor.sort(key=lambda r: (r["_key"], -r["y_m"]))
     for n, r in enumerate(floor, 1):
         r["label"] = f"{FLOOR} {n}"
-    rows.sort(key=lambda r: (r["universe"], r["address"]))
+    rows.sort(key=lambda r: (r["universe"], r["address"] or 513))  # no address yet: last
     return {"width_m": W, "structures": structures, "floor": floor, "waiting": waiting, "patch": rows}
 
 
@@ -348,6 +348,10 @@ def _strip_svg(st: dict) -> str:
     return "".join(out) + "</svg>"
 
 
+def _dmx(r: dict) -> str:
+    return f"U{r['universe']} · {r['address']}" if r["address"] else "no address yet"
+
+
 def _table(rows: list[dict], with_label: bool = True) -> str:
     head = ("<tr>" + ("<th>Label</th>" if with_label else "") + "<th>Name</th><th>Model</th><th>Where</th>"
             "<th>Which way round</th><th>DMX</th><th>Mode</th></tr>")  # fmt: skip
@@ -355,7 +359,7 @@ def _table(rows: list[dict], with_label: bool = True) -> str:
         "<tr>"
         + (f'<td class="lbl">{_e(r["label"])}</td>' if with_label else "")
         + f"<td>{_e(r['id'])}</td><td>{_e(r['model'])}</td><td>{_e(r['where'])}</td><td>{_e(r['facing'])}</td>"
-        f'<td class="dmx">U{r["universe"]} · {r["address"]}</td><td>{_e(_mode_text(r))}</td></tr>'
+        f'<td class="dmx">{_dmx(r)}</td><td>{_e(_mode_text(r))}</td></tr>'
         for r in rows
     )
     return f"<table>{head}{body}</table>"
@@ -485,9 +489,10 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
         "<th>Model</th><th>Mode</th></tr>"
     )
     for r in lay["patch"]:
-        end = r["address"] + r["channels"] - 1
-        p.append(f"<tr><td class='dmx'>{r['universe']}</td><td class='dmx'>{r['address']}</td>"
-                 f"<td>{r['address']}–{end}</td><td class='lbl'>{_e(r['label'])}</td><td>{_e(r['id'])}</td>"
+        a = r["address"]
+        span = f"{a}–{a + r['channels'] - 1}" if a else "no start address yet"
+        p.append(f"<tr><td class='dmx'>{r['universe']}</td><td class='dmx'>{a or '–'}</td>"
+                 f"<td>{span}</td><td class='lbl'>{_e(r['label'])}</td><td>{_e(r['id'])}</td>"
                  f"<td>{_e(r['model'])}</td><td>{_e(_mode_text(r))}</td></tr>")  # fmt: skip
     p.append("</table></section>")
     stickers = [r for st in lay["structures"] for r in st["fixtures"]] + lay["floor"]

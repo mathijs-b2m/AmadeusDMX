@@ -22,12 +22,21 @@ struct SetView: View {
         @Bindable var model = model
         HSplitView {
             List(selection: Binding(get: { model.editingSet }, set: { if let v = $0 { model.editingSet = v } })) {
-                SwiftUI.Section("Your Sets") {
+                SwiftUI.Section {
                     ForEach(model.sets.filter { !$0.isExample }) { SetRow(set: $0) }
                     if !model.sets.contains(where: { !$0.isExample }) {
                         Text("None yet. Your fixtures go in a set of your own: make one with New Set…")
                             .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                             .selectionDisabled()
+                    }
+                } header: {
+                    HStack {  // as on the Rigs page: a + by the title, the big button under the list
+                        Text("Your Sets")
+                        Spacer()
+                        Button("New Set…", systemImage: "plus") { openWindow(id: "wizard") }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless)
+                            .disabled(model.engineRunning)
+                            .help("Make a new set with the set-up assistant")
                     }
                 }
                 if model.sets.contains(where: \.isExample) {
@@ -60,10 +69,11 @@ struct SetView: View {
                             SwiftUI.Section {
                                 ForEach(g.fixtures) { f in
                                     FixtureRow(fixture: f, doc: doc, lit: lit.contains(f.id),
-                                               test: testRefusal(g.definition)) { toggleTest(f.id) }
+                                               test: f.address == nil ? "No start address yet: give it one first"
+                                                   : testRefusal(g.definition)) { toggleTest(f.id) }
                                 }
                             } header: {
-                                GroupHeader(group: g) { mapChannels(g.fixtures.first) }
+                                GroupHeader(group: g) { mapChannels(g.fixtures.first { $0.address != nil } ?? g.fixtures.first) }
                             }
                         }
                     }
@@ -108,7 +118,7 @@ struct SetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showAdd) { AddToSetSheet { load() }.environment(model) }
         .sheet(item: $mapTarget) { t in
-            MapperSheet(target: t, tryRefusal: tryRefusal) {
+            MapperSheet(target: t, tryRefusal: t.address == nil ? "Give \(t.fixture) a start address to try values on it" : tryRefusal) {
                 names[t.key] = model.workspace?.definition(t.key)
                 load()
                 flash("Mapped \(names[t.key]?.name ?? t.key) (\(t.mode)): every one in your sets plays by it")
@@ -140,7 +150,7 @@ struct SetView: View {
 
     private func groups(_ doc: RigDocument) -> [Group] {
         var order: [String] = [], by: [String: [PlacedFixture]] = [:]
-        for f in doc.fixtures.sorted(by: { ($0.universe, $0.address) < ($1.universe, $1.address) }) {
+        for f in doc.fixtures.sorted(by: { ($0.universe, $0.address ?? 513) < ($1.universe, $1.address ?? 513) }) {
             if by[f.key] == nil { order.append(f.key) }
             by[f.key, default: []].append(f)
         }
@@ -334,6 +344,11 @@ private struct SetHeader: View {
                 Metric(value: "\(doc?.fixtures.count ?? 0)", label: "fixtures")
                 Metric(value: "\(Set(doc?.fixtures.map(\.key) ?? []).count)", label: "models")
                 Metric(value: "\(Set(doc?.fixtures.map(\.universe) ?? []).count)", label: "universes")
+                if let n = doc?.fixtures.filter({ $0.address == nil }).count, n > 0 {
+                    Metric(value: "\(n)", label: "without address")
+                        .foregroundStyle(.orange)
+                        .help("Fixtures without a start address play in the visualiser only: select one and give it the address set on the fixture")
+                }
                 Button { model.section = .dmx } label: {
                     Metric(value: set?.isVirtual ?? true ? "Visualiser" : (set?.outputText ?? "–"), label: "DMX output ›")
                 }
@@ -463,9 +478,16 @@ private struct FixtureRow: View {
         HStack {
             Text(fixture.id).font(.body.monospaced())
                 .frame(width: 110, alignment: .leading)
-            Text("\(fixture.universe).\(String(format: "%03d", fixture.address))").monospacedDigit().foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .leading)
-                .help("Universe.address: set this start address on the fixture's display")
+            Group {
+                if fixture.address != nil {
+                    Text(fixture.patchText).monospacedDigit().foregroundStyle(.secondary)
+                } else {
+                    Text("no address").foregroundStyle(.orange)
+                }
+            }
+            .frame(width: 80, alignment: .leading)
+            .help(fixture.address == nil ? "No start address yet: select it and give it one (the visualiser only until then)"
+                  : "Universe.address: set this start address on the fixture's display")
             Text(fixture.mode).font(.callout).foregroundStyle(.secondary)
             Spacer()
             Button(lit ? "On" : "Test", systemImage: lit ? "lightbulb.fill" : "lightbulb") { toggle() }

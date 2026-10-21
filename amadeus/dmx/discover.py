@@ -80,7 +80,7 @@ def write_rig(items: list[dict], show, artnet: dict | None = None) -> dict:
 
 def print_patch(items: list[dict]) -> None:
     print(f"\n  {'id':<10} {'fixture':<24} {'mode':>5}  {'universe':>8}  {'address':>7}  channels")
-    for it in sorted(items, key=lambda i: (i["universe"], i["address"])):
+    for it in sorted(items, key=lambda i: (i["universe"], i.get("address") or 0)):
         d = fxlib.get(it["fixture"])
         n = fxlib.footprint(it)
         print(
@@ -261,7 +261,7 @@ def discover(target: tuple[str, int] | None, show, readdress: bool, write: bool)
         return
 
     new_ids(items)
-    problems = fxlib.validate({"fixtures": items})
+    problems = fxlib.validate({"fixtures": items}) + fxlib.overlaps({"fixtures": items})
     if problems:
         print("\nAddress conflicts:")
         for p in problems:
@@ -280,7 +280,7 @@ def discover(target: tuple[str, int] | None, show, readdress: bool, write: bool)
                 now = struct.unpack(">H", back)[0] if back else None
                 done = ok is not None and now == it["address"]
                 print(f"  {it['id']:<10} → {it['address']:<4} {'✓' if done else '✗ failed'}")
-            problems = fxlib.validate({"fixtures": items})
+            problems = fxlib.validate({"fixtures": items}) + fxlib.overlaps({"fixtures": items})
 
     for it in items:
         it.pop("_uid"), it.pop("_pa")

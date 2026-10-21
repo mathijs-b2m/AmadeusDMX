@@ -26,8 +26,10 @@ def load_rig_dict(rig: dict) -> dict:
     for f in rig["fixtures"]:
         if fxlib.get(f["fixture"]).get("warning"):
             print(f"⚠ {f['id']}: {fxlib.get(f['fixture'])['warning']}")
-    for problem in fxlib.validate(rig):
+    for problem in fxlib.validate(rig) + fxlib.overlaps(rig):
         print(f"⚠ patch problem: {problem}")
+    if unpatched := [f["id"] for f in rig["fixtures"] if not fxlib.patched(f)]:
+        print(f"⚠ no start address yet (visualiser only): {', '.join(unpatched)}")
     w = geometry.stage(rig)["width_m"]
     rig["elements"] = [e for f in rig["fixtures"] for e in fxlib.expand(f, w)]
     return rig

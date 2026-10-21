@@ -1,5 +1,6 @@
 // Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library), choose its mode and how
-// many. They get free DMX addresses. Where they hang is done on the Rigs page.
+// many. No start addresses: you give each the one set on the fixture (in the inspector). Where they hang is done
+// on the Rigs page.
 import AmadeusKit
 import SwiftUI
 
@@ -20,7 +21,7 @@ struct AddToSetSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Add Fixtures to \(model.editingSet)").font(.title2.weight(.semibold))
-            Text("Search by brand or model. They get free DMX addresses; where they hang is set on the Rigs page.")
+            Text("Search by brand or model. Then give each its start address (the one set on the fixture) on the right; where they hang is set on the Rigs page.")
                 .foregroundStyle(.secondary)
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -114,27 +115,13 @@ struct AddToSetSheet: View {
             guard await model.ensureSetupService(), let data = ws.composed(rig: "", set: set),
                   var layout = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw SetupAPIError.notRunning }
             var fixtures = layout["fixtures"] as? [[String: Any]] ?? []
-            // free addresses after what is patched, universe by universe
-            let footprint = max(1, definition.channels(mode))
-            var used: [Int: [ClosedRange<Int>]] = [:]
-            for f in fixtures {
-                let n = (f["fixture"] as? String).flatMap { ws.definition($0)?.channels(f["mode"] as? String ?? "") } ?? 1
-                let a = f["address"] as? Int ?? 1
-                used[f["universe"] as? Int ?? 1, default: []].append(a...(a + max(1, n) - 1))
-            }
             let base = key.split(separator: "/").last.map { String($0.prefix { $0.isLetter }) }.flatMap { $0.isEmpty ? nil : $0 } ?? "fx"
             var ids = Set(fixtures.compactMap { $0["id"] as? String })
-            for _ in 0..<count {
-                var u = 1, a = 1
-                while a + footprint - 1 > 512 || (used[u] ?? []).contains(where: { $0.overlaps(a...(a + footprint - 1)) }) {
-                    a += 1
-                    if a + footprint - 1 > 512 { a = 1; u += 1 }
-                }
-                used[u, default: []].append(a...(a + footprint - 1))
+            for _ in 0..<count {  // no start address: a guess is usually wrong, and then they overlap
                 var n = 1
                 while ids.contains("\(base)\(n)") { n += 1 }
                 ids.insert("\(base)\(n)")
-                fixtures.append(["id": "\(base)\(n)", "fixture": key, "mode": mode, "universe": u, "address": a])
+                fixtures.append(["id": "\(base)\(n)", "fixture": key, "mode": mode, "universe": 1])
             }
             layout["fixtures"] = fixtures
             try await model.api.saveSet(layout, set: set)

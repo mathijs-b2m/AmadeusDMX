@@ -146,12 +146,15 @@ The set-up assistant (first launch, or *New Set…*) follows the three steps: wh
   [DMX devices and output](#dmx-devices-and-output-the-dmx-output-page-d)).
 - **Sets:** a list of your sets of fixtures, your own under *Your Sets* and the two a first run starts from under
   *Examples* (adding fixtures to an example asks first: most who do meant to make their own set). Pick one to see every fixture, grouped by model, with its DMX
-  patch and mode. *Add Fixtures…* searches our library, QLC+ and the Open Fixture Library and gives free
-  addresses; right-click to identify fixtures on the real lights or remove them; the set's name is a menu to
+  patch and mode. *Add Fixtures…* searches our library, QLC+ and the Open Fixture Library; new fixtures get
+  **no start address** (a guess is usually wrong): give each the one set on the fixture, and until then it plays
+  in the visualiser only (the header counts them). Right-click to identify fixtures on the real lights or remove them; the set's name is a menu to
   duplicate, rename or delete it. **Select a fixture** to edit it on the right: its name (renaming keeps where it
   hangs on your rigs), DMX mode, universe and start address (checked against the 512 channels and the other
-  fixtures, with *Next Free*), and for moving heads invert pan / tilt. Select several to give them one mode or
-  universe, or *Patch in a Row* from an address. Every change is saved at once. Nothing about rigs here.
+  fixtures, with *Next Free*; an overlap is a warning, not a refusal, so you can move fixtures one by one; empty
+  clears it), and for moving heads invert pan / tilt. Select several to give them one mode or
+  universe, or *Patch in a Row* from an address. Every change is saved at once (a typed address or name on
+  Return, on leaving the field, or with *Save*). Nothing about rigs here.
 - **Rigs:** a list of your rigs (venues). Pick one to edit its structure in 3D. **On this rig** chooses what you
   edit: *the rig alone*, or one of the sets placed on it (where its fixtures hang). **Place a Set** puts another
   set on this rig, auto-mounted or to place by hand: that is the only place auto-mount is offered. *Take Off…*

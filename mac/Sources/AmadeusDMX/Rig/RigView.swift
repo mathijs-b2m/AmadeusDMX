@@ -67,7 +67,7 @@ private struct RigList: View {
             Button { model.showNewRig = true } label: {
                 Label("New Rig…", systemImage: "plus").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass).controlSize(.large)
+            .buttonStyle(.borderedProminent).controlSize(.large)
             .help("Make a new rig: start from an empty room or a template (⌥⌘N)")
             .padding(10)
         }
