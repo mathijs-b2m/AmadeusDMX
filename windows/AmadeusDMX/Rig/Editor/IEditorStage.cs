@@ -26,8 +26,8 @@ public interface IEditorStage
     /// The view to put in the editor (the SwapChainPanel's host). It takes keyboard focus on a click.
     FrameworkElement View { get; }
 
-    /// What to draw, asked every frame (Swift: `controller.input = { (editor.stageInput(), nil) }`): the editor's
-    /// StageInput and no live frame. A new `Key` means a new scene; `KeepCamera` leaves the camera where it is.
+    /// What to draw, asked every frame (Swift: `controller.input = { (editor.stageInput(), editor.testFrame()) }`): the
+    /// editor's StageInput and, while the light test is on, a still frame of the lit fixtures. A new `Key` means a new scene; `KeepCamera` leaves the camera where it is.
     /// Selected keys: "truss:ID", "fixture:ID", "zone:ID" (drawn selected; a selected horizontal truss shows a
     /// handle at each end, a selected tower one on top: the editor's Pick grabs them within 35 cm), "hover:KEY"
     /// (lit a little: what a click would pick).

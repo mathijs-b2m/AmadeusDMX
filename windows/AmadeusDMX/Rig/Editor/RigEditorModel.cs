@@ -226,6 +226,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (Same(Doc, before)) return;
         Version++;
         RegisterUndo(name, before);
+        ReaimTests();
     }
 
     void RegisterUndo(string name, RigDocument before)
@@ -624,6 +625,142 @@ public sealed class RigEditorModel : Observable, IStageEditing
     void CheckChanged() => Changed(nameof(Check));
 
     Dictionary<string, JSONValue> LayoutDict() => Doc.JsonObject();
+
+    // MARK: - the light test (as on the Sets page)
+
+    readonly HashSet<string> _lit = [];
+    /// Fixtures the light test keeps on, and their switch-off when the engine's time runs out.
+    public IReadOnlySet<string> Lit => _lit;
+    readonly Dictionary<string, CancellationTokenSource> _testOff = [];
+    readonly Dictionary<string, Vector3> _testDirs = [];
+    /// Where each lit head's beam goes (straight out to the audience): drawn on the stage, to compare with the real one.
+    public IReadOnlyDictionary<string, Vector3> TestDirs => _testDirs;
+    IRigEditorHost? _testHost;
+    CancellationTokenSource? _retest;
+    Task _retesting = Task.CompletedTask;
+    /// The heads being aimed again after a change (the tests wait for it).
+    public Task Retesting => _retesting;
+
+    void LitChanged() => Changed(nameof(Lit));
+
+    /// The lit fixtures as a still frame for the stage (nil: none lit).
+    public AmadeusKit.Frame? TestFrame()  // AmadeusKit's: the app's global usings bring WinUI's Frame too
+    {
+        if (_lit.Count == 0) return null;
+        var els = RigElements.Elements(Doc, Definition);
+        var on = els.Select(e => _lit.Contains(e.Fixture ?? e.Id)).ToArray();
+        return new AmadeusKit.Frame(on.Select(o => o ? new float[] { 1, 1, 1, 1, 0, 0.5f, 0.5f } : [0, 0, 0, 0, 0, 0.5f, 0.5f]).ToArray(),
+                         els.Zip(on, (e, o) => o && _testDirs.TryGetValue(e.Fixture ?? e.Id, out var d) ? d : (Vector3?)null).ToArray());
+    }
+
+    /// The fixture moved or turned while lit: its head aimed again from the new placing (the real one moves, the
+    /// beam on the stage stays pointing at the audience: they agree once it is placed the way it hangs).
+    void ReaimTests()
+    {
+        if (_lit.Count == 0 || _testHost is not { } host) return;
+        _retest?.Cancel();
+        var cts = _retest = new CancellationTokenSource();
+        _retesting = Reaim(host, cts.Token);
+    }
+
+    async Task Reaim(IRigEditorHost host, CancellationToken ct)
+    {
+        try { await Task.Delay(150, ct); }
+        catch (TaskCanceledException) { return; }
+        var layout = LayoutDict();
+        foreach (var id in _lit.ToList())
+        {
+            try
+            {
+                if ((await host.Api.TestLightFront(id, true, layout)).Dir is { } d) _testDirs[id] = d;
+                else _testDirs.Remove(id);
+            }
+            catch (Exception e) when (e is not OutOfMemoryException) { }
+        }
+        Version++;
+    }
+
+    /// Why this fixture can't be lit on the real rig now (nil: it can).
+    public string? TestRefusal(IRigEditorHost host, PlacedFixture f)
+    {
+        if (host.IsVirtual(SetName)) return "This set only feeds the visualiser: give it a DMX output to test the real lights";
+        if (host.EngineRunning) return "Stop the show to test the lights";
+        if (f.Address is null) return "No start address yet: give it one on the Sets page";
+        if (Definition(f.Key) is { Inert.Length: > 0 } d) return $"Not tested: {d.Inert}";
+        if (Definition(f.Key)?.Kind == "smoke") return "Smoke machines fire only in the show or the hardware test";
+        return null;
+    }
+
+    /// The fixture on (the rest of the set dark, a head pointed straight out to the audience) until switched off again.
+    public async Task ToggleTest(IRigEditorHost host, string id)
+    {
+        var on = !_lit.Contains(id);
+        if (on) _lit.Add(id); else _lit.Remove(id);
+        LitChanged();
+        if (_testOff.Remove(id, out var old)) old.Cancel();
+        try
+        {
+            if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            _testHost = host;
+            var r = await host.Api.TestLightFront(id, on, LayoutDict());
+            if (on && r.Dir is { } d) _testDirs[id] = d; else _testDirs.Remove(id);
+            Version++;
+            if (on)
+            {
+                Message = $"{id} on: {r.Summary}";
+                SwitchOffLater(id, r.Seconds);
+            }
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            _lit.Remove(id);
+            _testDirs.Remove(id);
+            LitChanged();
+            Message = Error(e);
+        }
+    }
+
+    /// The engine switches a test off by itself after `seconds`: so does the editor.
+    async void SwitchOffLater(string id, double seconds)
+    {
+        var cts = new CancellationTokenSource();
+        _testOff[id] = cts;
+        try { await Task.Delay(TimeSpan.FromSeconds(seconds), cts.Token); }
+        catch (TaskCanceledException) { return; }
+        _testOff.Remove(id);
+        _lit.Remove(id);
+        _testDirs.Remove(id);
+        LitChanged();
+        Version++;
+    }
+
+    /// The real beam went `seen` ("left" / "right" as the audience sees it, "back") instead of to the audience: the
+    /// head's calibration put right in the set (its pan home, as amadeus bringup did), and aimed again to see.
+    public async Task FixFront(IRigEditorHost host, string id, string seen)
+    {
+        try
+        {
+            var fields = await host.Api.HangCheckFix(LayoutDict(), id, seen);
+            Change($"Calibrate {id}", d => d.Calibrate(id, fields));   // re-aims it (ReaimTests)
+            Message = $"{id} calibrated: its beam should come round to the audience now";
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            Message = Error(e);
+        }
+    }
+
+    public async Task SwitchOffTests(IRigEditorHost host)
+    {
+        var ids = _lit.ToList();
+        _lit.Clear();
+        _testDirs.Clear();
+        _retest?.Cancel();
+        foreach (var c in _testOff.Values) c.Cancel();
+        _testOff.Clear();
+        LitChanged();
+        foreach (var id in ids) await Quietly(() => host.Api.TestLight(id, false, LayoutDict(), false));
+    }
 
     public async Task StartCheck(IRigEditorHost host)
     {

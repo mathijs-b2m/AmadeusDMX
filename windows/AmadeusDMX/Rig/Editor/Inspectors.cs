@@ -64,7 +64,7 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             case { Kind: EditorSelectionKind.Truss, Id: var id }:
                 return d.Trusses.FirstOrDefault(t => t.Id == id) is { } t ? new TrussInspector(editor, t.Id).Build() : Overview();
             case { Kind: EditorSelectionKind.Fixture, Id: var id }:
-                return d.Fixtures.FirstOrDefault(f => f.Id == id) is { } f ? new FixtureInspector(editor, f.Id).Build() : Overview();
+                return d.Fixtures.FirstOrDefault(f => f.Id == id) is { } f ? new FixtureInspector(model, editor, _host, f.Id).Build() : Overview();
             case { Kind: EditorSelectionKind.Zone, Id: var id }:
                 return d.Zones.FirstOrDefault(z => z.Id == id) is { } z ? new ZoneInspector(editor, z.Id).Build() : Overview();
         }
@@ -82,7 +82,7 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
         {
             sections.Children.Add(EditorUI.Section(null,
                 UI.HStack(8, UI.Icon("building.2").Secondary(),
-                          UI.Text("The rig alone: its structure. Choose a set under “On this rig” to arrange its fixtures here.", Font.Callout).Secondary().Wrap()),
+                          UI.Text("The rig alone: its structure. Choose a set under “Showing” to arrange its fixtures here.", Font.Callout).Secondary().Wrap()),
                 Unsaved()));
         }
         else
@@ -361,7 +361,7 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
     };
 }
 
-public sealed class FixtureInspector(RigEditorModel editor, string id)
+public sealed class FixtureInspector(AppModel model, RigEditorModel editor, IRigEditorHost host, string id)
 {
     PlacedFixture F => editor.Doc.Fixtures.FirstOrDefault(f => f.Id == id) ?? new PlacedFixture(id, "", "", 1, 1, "floor", 0, 0, 0, 0, null, null, null);
 
@@ -384,7 +384,8 @@ public sealed class FixtureInspector(RigEditorModel editor, string id)
         s.Children.Add(EditorUI.Section(null,
             UI.HStack(10, UI.Icon(EditorUI.FixtureSymbol(def?.Kind), 22).Foreground(Tint.Accent),
                       UI.VStack(2, UI.Text(fixture.Id, Font.Headline), UI.Text(def?.Name ?? fixture.Key, Font.Caption).Secondary())),
-            EditorUI.Labeled("Patch", $"{fixture.PatchText} · {fixture.Mode}")));
+            EditorUI.Labeled("Patch", $"{fixture.PatchText} · {fixture.Mode}"),
+            LightTest(def)));
 
         var mounting = new List<UIElement?>
         {
@@ -461,4 +462,29 @@ public sealed class FixtureInspector(RigEditorModel editor, string id)
         ], "The fixture stays in the set; to remove it from your gear, use the Set page."));
         return s;
     }
+
+    /// The light test on the real rig: on until switched off, a head pointed at the audience; while a head is lit,
+    /// where its real beam went instead (its calibration put right). Rebuilt when it is switched or refused.
+    UIElement LightTest(FixtureDefinition? def) => EditorUI.Keyed([editor, model],
+        () => $"{editor.Lit.Contains(id)}|{editor.TestRefusal(host, F)}", () =>
+    {
+        var refusal = editor.TestRefusal(host, F);
+        var on = editor.Lit.Contains(id);
+        var test = UI.Button(on ? "On: Click to Switch Off" : "Test on the Lights", () => _ = editor.ToggleTest(host, id), on ? "lightbulb.fill" : "lightbulb")
+            .Disabled(refusal is not null && !on)
+            .Tooltip(refusal ?? (on ? "Switch it off again"
+                                 : "Light it on the real rig until you switch it off (a minute at most), a head aimed as here: is it patched, connected and hung the way it is placed?"));
+        if (on) test.Foreground(Tint.Yellow);
+        var rows = UI.VStack(8, test);
+        if (refusal is not null) rows.Children.Add(UI.Text(refusal, Font.Caption).Secondary().Wrap());
+        if (on && def?.IsMoving == true)
+        {
+            Button Fix(string title, string symbol, string seen) => UI.Button(title, () => _ = editor.FixFront(host, id, seen), symbol)
+                .Tooltip("Left and right as seen from the audience, facing the stage. The head's calibration is put right in the set and it is aimed again: pressed the wrong one, it ends up the other way; press that one");
+            rows.Children.Add(UI.VStack(6,
+                UI.Text("Its beam should point at the audience, as on the stage here. Where does the real one point?", Font.Caption).Secondary().Wrap(),
+                UI.HStack(8, Fix("Left", "arrow.left", "left"), Fix("Right", "arrow.right", "right"), Fix("Back", "arrow.uturn.down", "back"))));
+        }
+        return rows;
+    });
 }

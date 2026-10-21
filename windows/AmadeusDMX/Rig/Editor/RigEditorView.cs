@@ -52,10 +52,11 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
         root.Bind(model, nameof(AppModel.ConfigVersion), _ => editor.ReloadIfClean());
         root.Bind(editor, nameof(RigEditorModel.Message), _ => ClearLater(editor.Message));
-        root.Unloaded += async (_, _) =>
+        root.Unloaded += async (_, _) =>  // the lights go off
         {
             if (root.IsLoaded) return;
-            if (editor.Check is not null) await editor.StopCheck(_host);  // the light goes off
+            if (editor.Check is not null) await editor.StopCheck(_host);
+            if (editor.Lit.Count > 0) await editor.SwitchOffTests(_host);
         };
         _root = root;
         return root;

@@ -596,6 +596,21 @@ public static class Modifiers
         return b;
     }
 
+    /// A menu button in the accent colour (SwiftUI's `Menu` with `.menuStyle(.button).buttonStyle(.borderedProminent)`):
+    /// AccentButtonStyle would drop its chevron, so its own template gets the accent brushes (lightweight styling).
+    public static DropDownButton Prominent(this DropDownButton b)
+    {
+        foreach (var (key, brush) in new[]
+                 {
+                     ("ButtonBackground", "AccentFillColorDefaultBrush"), ("ButtonBackgroundPointerOver", "AccentFillColorSecondaryBrush"),
+                     ("ButtonBackgroundPressed", "AccentFillColorTertiaryBrush"), ("ButtonForeground", "TextOnAccentFillColorPrimaryBrush"),
+                     ("ButtonForegroundPointerOver", "TextOnAccentFillColorPrimaryBrush"), ("ButtonForegroundPressed", "TextOnAccentFillColorSecondaryBrush"),
+                     ("ButtonBorderBrush", "AccentControlElevationBorderBrush"), ("ButtonBorderBrushPointerOver", "AccentControlElevationBorderBrush"),
+                 })
+            b.Resources[key] = Theme.Brush(brush);
+        return b;
+    }
+
     /// A keyboard shortcut: Ctrl (⌘ on the Mac) + key, with Shift / Alt (⌥) if asked.
     public static T Shortcut<T>(this T e, VirtualKey key, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control) where T : UIElement
     {
