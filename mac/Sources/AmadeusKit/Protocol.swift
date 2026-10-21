@@ -346,6 +346,12 @@ public struct Frame: Decodable, Sendable {
 
     enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, decks, laserGuard = "guard", link, lite, fog, arc }
 
+    /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
+    public init(fx: [[Float]], dirs: [SIMD3<Float>?]) {
+        t = 0; phrase = 0; bp = nil; self.fx = fx; bands = []; beam = dirs.map { $0 == nil ? nil : "open" }
+        self.dirs = dirs; lz = fx.map { _ in nil }; decks = nil; laserGuard = nil; link = nil; lite = false; fog = [:]; arc = nil
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         t = try c.decodeIfPresent(Double.self, forKey: .t) ?? 0

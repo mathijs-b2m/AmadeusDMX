@@ -387,7 +387,8 @@ def test_light(req):
     connected. Says where its DMX goes. With "raw": [v, …] its channels get those values as they are (the DMX
     mapper: what does this channel do?); "light": [channel index, …] the ones it plays light on, kept under the
     brightness limiter with the definition's own. With "point": true a moving head points its beam the way the
-    check after hanging says (rig/hangsheet.py check_aim) instead of straight out."""
+    check after hanging says (rig/hangsheet.py check_aim) instead of straight out; "point": "front" straight out to
+    the audience (front_aim: the rig editor's test). Then "dir" says where the beam goes (world, as the feed's)."""
     from amadeus.dmx import outputs
     from amadeus.rig.loader import load_rig_dict
 
@@ -404,6 +405,7 @@ def test_light(req):
         return {"error": refusal}, 400
     if on and not fxlib.patched(fx):
         return {"error": f"{fixture_id} has no start address yet: give it one first"}, 400
+    pointed = None  # where a pointed head's beam goes
     with _test_lock:
         ids = {f["id"] for f in rig["fixtures"]}
         _test["lit"] = {fid: until for fid, until in _test["lit"].items() if fid in ids}  # another set's: dark
@@ -414,9 +416,11 @@ def test_light(req):
         if on:
             _test["lit"][fixture_id] = time.monotonic() + TEST_SECONDS
             if body.get("point") and fxlib.is_moving(defn):  # the check after hanging: its beam a known way
-                from amadeus.rig import hangsheet
+                from amadeus.rig import geometry, hangsheet
 
-                _test["aim"][fixture_id] = hangsheet.check_aim(fx, defn)
+                aim = (hangsheet.front_aim if body["point"] == "front" else hangsheet.check_aim)(fx, defn)
+                _test["aim"][fixture_id] = aim
+                pointed = [round(float(v), 3) for v in geometry.fk(fx, defn, *aim)]
             if raw is not None:
                 light = {int(i) for i in body.get("light", []) if isinstance(i, int)}
                 _test["raw"][fixture_id] = (raw[: fxlib.footprint(fx)], light)
@@ -435,6 +439,7 @@ def test_light(req):
         "universe": fx["universe"],
         "wire_universe": outputs.wire_universe(rig, fx["universe"]),
         "channels": [fx["address"], fx["address"] + fxlib.footprint(fx) - 1] if fxlib.patched(fx) else None,
+        "dir": pointed,
     }
 
 

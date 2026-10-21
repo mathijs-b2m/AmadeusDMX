@@ -531,6 +531,21 @@ def check_dir(fx: dict):
     return d / np.linalg.norm(d)
 
 
+def front_dir(fx: dict):
+    """Straight out to the audience, a little down for a hanging head (a little up for one standing): the rig
+    editor's test pose. World-fixed, so a head placed turned or mirrored in the app shows it at once."""
+    import numpy as np
+
+    d = np.array([0.0, 1.0, -0.25 if geometry.mount_up(fx)[2] < -0.5 else 0.25])
+    return d / np.linalg.norm(d)
+
+
+def front_aim(fx: dict, defn: dict) -> tuple[float, float]:
+    """The pan and tilt (0..1, as DMX) of the front test pose."""
+    phi, theta = geometry.ik(fx, defn, front_dir(fx), None)
+    return geometry.to_dmx(fx, defn, phi, theta)
+
+
 def check_aim(fx: dict, defn: dict) -> tuple[float, float]:
     """The check's pan and tilt (0..1, as DMX) for a moving head."""
     phi, theta = geometry.ik(fx, defn, check_dir(fx), None)

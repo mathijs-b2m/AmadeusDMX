@@ -328,6 +328,11 @@ public struct SetupAPI: Sendable {
         try await post("api/test-light", ["fixture": fixture, "rig": layout, "on": on, "point": point])
     }
 
+    /// The rig editor's test: a moving head straight out to the audience (the reply's `dir`), whatever its placing.
+    public func testLightFront(fixture: String, on: Bool, layout: [String: Any]) async throws -> LightTest {
+        try await post("api/test-light", ["fixture": fixture, "rig": layout, "on": on, "point": "front"])
+    }
+
     /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
     public func hangCheck(layout: [String: Any]) async throws -> [HangCheckStep] {
         struct R: Decodable { var steps: [HangCheckStep] }
@@ -420,9 +425,10 @@ public struct LightTest: Decodable, Sendable {
     public var universe: Int
     public var wireUniverse: Int?       // the Art-Net / sACN universe it goes out as
     public var channels: [Int]          // first and last DMX channel (empty: no start address)
+    public var dir: SIMD3<Float>?       // a pointed head: where its beam goes (world, as the feed's)
 
     enum CodingKeys: String, CodingKey {
-        case on, seconds, output, universe, wireUniverse = "wire_universe", channels
+        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir
     }
 
     public init(from decoder: Decoder) throws {
@@ -433,6 +439,7 @@ public struct LightTest: Decodable, Sendable {
         universe = try c.decode(Int.self, forKey: .universe)
         wireUniverse = try c.decodeIfPresent(Int.self, forKey: .wireUniverse)
         channels = try c.decodeIfPresent([Int].self, forKey: .channels) ?? []  // null: a fixture without an address
+        dir = try c.decodeIfPresent([Float].self, forKey: .dir).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
     }
 
     /// "universe 1, channels 43–50 · Art-Net → 192.168.2.18:6454 (universe 1 on the wire)"

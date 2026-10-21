@@ -18,7 +18,7 @@ struct RigEditorView: View {
                     .onAppear {
                         stage.workLight = 1
                         stage.editor = editor
-                        stage.input = { [editor] in (editor.stageInput(), nil) }
+                        stage.input = { [editor] in (editor.stageInput(), editor.testFrame()) }
                         stage.preset = .drone
                         editor.undoManager = undoManager
                     }

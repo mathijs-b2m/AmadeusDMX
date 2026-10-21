@@ -146,6 +146,7 @@ final class RigEditorModel: StageEditing {
         guard doc != before else { return }
         version += 1
         registerUndo(name, before)
+        reaimTests()
     }
 
     private func registerUndo(_ name: String, _ before: RigDocument) {
@@ -497,6 +498,34 @@ final class RigEditorModel: StageEditing {
     /// Fixtures the light test keeps on, and their switch-off when the engine's time runs out.
     var lit = Set<String>()
     private var testOff: [String: Task<Void, Never>] = [:]
+    /// Where each lit head's beam goes (straight out to the audience): drawn on the stage, to compare with the real one.
+    var testDirs: [String: SIMD3<Float>] = [:]
+    private weak var testModel: AppModel?
+    private var retest: Task<Void, Never>?
+
+    /// The lit fixtures as a still frame for the stage (nil: none lit).
+    func testFrame() -> Frame? {
+        guard !lit.isEmpty else { return nil }
+        let els = RigElements.elements(doc) { [unowned self] in definition($0) }
+        let on = els.map { e in lit.contains(e.fixture ?? e.id) }
+        return Frame(fx: on.map { $0 ? [1, 1, 1, 1, 0, 0.5, 0.5] : [0, 0, 0, 0, 0, 0.5, 0.5] },
+                     dirs: zip(els, on).map { e, on in on ? testDirs[e.fixture ?? e.id] : nil })
+    }
+
+    /// The fixture moved or turned while lit: its head aimed again from the new placing (the real one moves, the
+    /// beam on the stage stays pointing at the audience: they agree once it is placed the way it hangs).
+    private func reaimTests() {
+        guard !lit.isEmpty, let model = testModel else { return }
+        retest?.cancel()
+        retest = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard let self, !Task.isCancelled, let layout = try? layoutDict() else { return }
+            for id in lit {
+                if let r = try? await model.api.testLightFront(fixture: id, on: true, layout: layout) { testDirs[id] = r.dir }
+            }
+            version += 1
+        }
+    }
 
     /// Why this fixture can't be lit on the real rig now (nil: it can).
     func testRefusal(_ model: AppModel, _ f: PlacedFixture) -> String? {
@@ -517,17 +546,20 @@ final class RigEditorModel: StageEditing {
         testOff[id]?.cancel()
         do {
             guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
-            let moving = doc.fixtures.first { $0.id == id }.flatMap { definition($0.key)?.isMoving } ?? false
-            let r = try await model.api.testLight(fixture: id, on: on, layout: try layoutDict(), point: on && moving)
+            testModel = model
+            let r = try await model.api.testLightFront(fixture: id, on: on, layout: try layoutDict())
+            testDirs[id] = on ? r.dir : nil
+            version += 1
             if on {
                 message = "\(id) on: \(r.summary)"
                 testOff[id] = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(r.seconds))
-                    if !Task.isCancelled { self?.lit.remove(id) }
+                    if !Task.isCancelled { self?.lit.remove(id); self?.testDirs[id] = nil; self?.version += 1 }
                 }
             }
         } catch {
             lit.remove(id)
+            testDirs[id] = nil
             message = error.localizedDescription
         }
     }
@@ -535,6 +567,8 @@ final class RigEditorModel: StageEditing {
     func switchOffTests(_ model: AppModel) async {
         let ids = lit
         lit = []
+        testDirs = [:]
+        retest?.cancel()
         testOff.values.forEach { $0.cancel() }
         testOff = [:]
         for id in ids { _ = try? await model.api.testLight(fixture: id, on: false, layout: try layoutDict(), point: false) }
