@@ -68,7 +68,9 @@ TEMPLATES = {
     "spot-9": {
         "label": "LED spot, 9 channels",
         "type": "spot",
-        "about": "The usual cheap 30–100 W LED spot: pan, tilt, colour wheel, gobo, strobe, dimmer, speed, programs, reset.",
+        "about": (
+            "The usual cheap 30–100 W LED spot: pan, tilt, colour wheel, gobo, strobe, dimmer, speed, programs, reset."
+        ),
         "channels": [
             _c("pan", "Pan"),
             _c("tilt", "Tilt"),
@@ -160,7 +162,9 @@ TEMPLATES = {
     "beam-16": {
         "label": "Beam (7R / 230 W), 16 channels",
         "type": "beam",
-        "about": "The 230 W lamp beam head, laid out like the beam it copies: colour first, pan and tilt in the middle.",
+        "about": (
+            "The 230 W lamp beam head, laid out like the beam it copies: colour first, pan and tilt in the middle."
+        ),
         "channels": [
             _c("color_wheel", "Colour wheel", ranges=WHEEL),
             _c("shutter", "Shutter / strobe", 12, SHUTTER),
@@ -293,7 +297,9 @@ def create(
         },
     }
     if watts > 0:
-        defn["physical"].update({"watts": watts, "lumens": watts * 20, "_lumens_note": "estimated from the power (20 lm/W)"})
+        defn["physical"].update(
+            {"watts": watts, "lumens": watts * 20, "_lumens_note": "estimated from the power (20 lm/W)"}
+        )
     if "color_wheel" in attrs:
         defn["color_wheel"] = wheel()
     if any(c["attr"] == "gobo" for c in chans):

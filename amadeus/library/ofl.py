@@ -5,8 +5,8 @@ itself is downloaded into .cache/ofl only to rebuild that or for a fixture newer
 adds is saved into fixtures/<manufacturer>/<model>.json, after which it is a normal library fixture.
 
 Conversion rules (safety first): channels the engine drives get an attribute (dimmer, red/green/
-blue/white, pan/tilt + fine, color_wheel, gobo (one wheel; its rotation), prism, frost, zoom); every other channel gets a default
-that keeps the fixture quiet: shutter "Open", programs/effects/macros "no function".
+blue/white, pan/tilt + fine, color_wheel, gobo (one wheel; its rotation), prism, frost, zoom); every other channel gets
+a default that keeps the fixture quiet: shutter "Open", programs/effects/macros "no function".
 """
 
 from __future__ import annotations

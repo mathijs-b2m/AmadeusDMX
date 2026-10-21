@@ -16,7 +16,11 @@ def _fuze(**place):
 
 
 def test_the_beam_points_at_the_audience_however_it_is_placed():
-    for place in ({"z_m": 3.0, "mount": "hang"}, {"z_m": 0.25, "mount": "floor"}, {"z_m": 3.0, "mount": "hang", "rot_deg": 90}):
+    for place in (
+        {"z_m": 3.0, "mount": "hang"},
+        {"z_m": 0.25, "mount": "floor"},
+        {"z_m": 3.0, "mount": "hang", "rot_deg": 90},
+    ):
         f, d = _fuze(**place)
         beam = geometry.fk(f, d, *hangsheet.front_aim(f, d))
         assert np.allclose(beam, hangsheet.front_dir(f), atol=0.02)

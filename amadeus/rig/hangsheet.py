@@ -621,7 +621,9 @@ def fix_front(fx: dict, defn: dict, seen: str) -> dict:
         if s > score:
             best, score = o, s
     if best is None:
-        raise ValueError("No calibration of this head points that way: check it is placed standing or hanging as it really is")
+        raise ValueError(
+            "No calibration of this head points that way: check it is placed standing or hanging as it really is"
+        )
     return best
 
 
