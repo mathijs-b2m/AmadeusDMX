@@ -155,9 +155,9 @@ The set-up assistant (first launch, or *New Set…*) follows the three steps: wh
   clears it), and for moving heads invert pan / tilt. Select several to give them one mode or
   universe, or *Patch in a Row* from an address. Every change is saved at once (a typed address or name on
   Return, on leaving the field, or with *Save*). Nothing about rigs here.
-- **Rigs:** a list of your rigs (venues). Pick one to edit its structure in 3D. **On this rig** chooses what you
-  edit: *the rig alone*, or one of the sets placed on it (where its fixtures hang). **Place a Set** puts another
-  set on this rig, auto-mounted or to place by hand: that is the only place auto-mount is offered. *Take Off…*
+- **Rigs:** a list of your rigs (venues). Pick one to edit its structure in 3D. It opens showing a set placed on
+  it (the one you last looked at there); **Showing** switches between its sets, or *the rig alone* (last in the
+  list). **Place a Set** (with no set on it yet) or **Place Another Set** puts a set on this rig, auto-mounted or to place by hand: that is the only place auto-mount is offered. *Take Off…*
   removes a set from the rig. **New Rig…** (the big button under the list, the + by "Rigs", or File › New Rig… ⌥⌘N) offers templates with a sketch of each (an empty room,
   two stands, a truss over the booth, a club, a concert stage), sized with sliders.
 - **Show:** the toolbar picker lists the **combinations**: the sets placed on rigs. A show runs one of those;

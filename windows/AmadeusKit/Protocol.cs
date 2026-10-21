@@ -550,6 +550,17 @@ public sealed class Frame
     /// The show arc (live mode).
     public ArcStatus? Arc { get; init; }
 
+    public Frame() { }
+
+    /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
+    public Frame(float[][] fx, Vector3?[] dirs)
+    {
+        Fx = fx;
+        Beam = dirs.Select(d => d is null ? null : "open").ToArray();
+        Dirs = dirs;
+        Lz = new LaserBeam[]?[fx.Length];
+    }
+
     static Vector3? Direction(JsonElement e)
     {
         if (e.ValueKind == JsonValueKind.Null) return null;

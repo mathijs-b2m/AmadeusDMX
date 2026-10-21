@@ -56,6 +56,9 @@ public sealed class FakeHost : IRigEditorHost, IRigEditorAPI
     public IRigEditorAPI Api => this;
     public void ReloadSets() => Reloads++;
     public void Open(string path) => Calls.Add($"open {Path.GetFileName(path)}");
+    public bool Running, Virtual;
+    public bool EngineRunning => Running;
+    public bool IsVirtual(string set) => Virtual;
 
     public Task<(Dictionary<string, Dictionary<string, JSONValue>> Placements, Truss[]? Trusses)> AutomountPlacements(
         IReadOnlyDictionary<string, JSONValue> layout, IReadOnlyList<string>? ids, bool all)
@@ -68,10 +71,27 @@ public sealed class FakeHost : IRigEditorHost, IRigEditorAPI
     public Task<byte[]> HangSheet(IReadOnlyDictionary<string, JSONValue> layout, string set, string rig) =>
         Task.FromResult("<html></html>"u8.ToArray());
     public Task<HangCheckStep[]> HangCheck(IReadOnlyDictionary<string, JSONValue> layout) => Task.FromResult(Array.Empty<HangCheckStep>());
-    public Task<LightTest> TestLight(string fixture, bool on, IReadOnlyDictionary<string, JSONValue> layout, bool point) =>
-        Task.FromResult(new LightTest { On = on, Output = "Art-Net", Universe = 1, Channels = [1, 8] });
-    public Task<Dictionary<string, JSONValue>> HangCheckFix(IReadOnlyDictionary<string, JSONValue> layout, string fixture, string fix) =>
-        Task.FromResult(new Dictionary<string, JSONValue> { ["pan_invert"] = true });
+    public Task<LightTest> TestLight(string fixture, bool on, IReadOnlyDictionary<string, JSONValue> layout, bool point)
+    {
+        Calls.Add($"test {fixture} {(on ? "on" : "off")}");
+        return Task.FromResult(new LightTest { On = on, Output = "Art-Net", Universe = 1, Channels = [1, 8] });
+    }
+    public double TestSeconds = 60;
+    public Task<LightTest> TestLightFront(string fixture, bool on, IReadOnlyDictionary<string, JSONValue> layout)
+    {
+        Calls.Add($"front {fixture} {(on ? "on" : "off")}");
+        LastLayout = layout;
+        return Task.FromResult(new LightTest { On = on, Seconds = TestSeconds, Output = "Art-Net", Universe = 1, Channels = [1, 8],
+                                               Dir = on ? new Vector3(0, -1, 0) : null });
+    }
+    public string? LastFix;
+    public Task<Dictionary<string, JSONValue>> HangCheckFix(IReadOnlyDictionary<string, JSONValue> layout, string fixture, string fix)
+    {
+        LastFix = fix;
+        return Task.FromResult(fix is "left" or "right" or "back"
+            ? new Dictionary<string, JSONValue> { ["pan_home_deg"] = fix == "back" ? 180 : fix == "left" ? 90 : -90 }
+            : new Dictionary<string, JSONValue> { ["pan_invert"] = true });
+    }
     public Task<Dictionary<string, Dictionary<string, JSONValue>>> InOrderPlacements(IReadOnlyDictionary<string, JSONValue> layout) =>
         Task.FromResult(new Dictionary<string, Dictionary<string, JSONValue>>());
 
@@ -532,6 +552,73 @@ public class RigEditorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task TheLightTestPointsAHeadAtTheAudienceAndDrawsItsBeam()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var host = new FakeHost();
+        var head = Fx(e, "sharpy1");
+        Assert.Null(e.TestFrame());
+        // refused: a set without DMX, a running show, no start address
+        host.Virtual = true;
+        Assert.StartsWith("This set only feeds the visualiser", e.TestRefusal(host, head));
+        host.Virtual = false;
+        host.Running = true;
+        Assert.Equal("Stop the show to test the lights", e.TestRefusal(host, head));
+        host.Running = false;
+        Assert.Null(e.TestRefusal(host, head));
+        var unpatched = head.Clone();
+        unpatched.Address = null;
+        Assert.Equal("No start address yet: give it one on the Sets page", e.TestRefusal(host, unpatched));
+
+        await e.ToggleTest(host, "sharpy1");
+        Assert.Contains("sharpy1", e.Lit);
+        Assert.Equal("front sharpy1 on", host.Calls[^1]);
+        Assert.Equal("sharpy1 on: universe 1, channels 1–8 · Art-Net", e.Message);
+        var frame = e.TestFrame()!;
+        var els = RigElements.Elements(e.Doc, e.Definition);
+        var i = els.ToList().FindIndex(x => (x.Fixture ?? x.Id) == "sharpy1");
+        Assert.Equal(1f, frame.Fx[i][0]);
+        Assert.Equal(new Vector3(0, -1, 0), frame.Dirs[i]);
+        Assert.Equal("open", frame.Beam[i]);
+        Assert.All(Enumerable.Range(0, els.Count).Where(j => (els[j].Fixture ?? els[j].Id) != "sharpy1"), j => Assert.Equal(0f, frame.Fx[j][0]));
+
+        // the real beam went left: calibrated (undoable) and aimed again
+        await e.FixFront(host, "sharpy1", "left");
+        Assert.Equal("left", host.LastFix);
+        Assert.Equal(JSONValue.Of(90), e.Doc.RawFixture("sharpy1")["pan_home_deg"]);
+        Assert.Equal("Calibrate sharpy1", e.UndoManager!.UndoActionName);
+        await e.Retesting;
+        Assert.Equal("front sharpy1 on", host.Calls[^1]);
+        Assert.Equal(JSONValue.Of(90), host.LastLayout is { } l ? Calibrated(l) : null);
+
+        await e.SwitchOffTests(host);
+        Assert.Empty(e.Lit);
+        Assert.Null(e.TestFrame());
+        Assert.Equal("test sharpy1 off", host.Calls[^1]);
+    }
+
+    /// sharpy1's pan home in a layout sent to the engine.
+    static JSONValue? Calibrated(IReadOnlyDictionary<string, JSONValue> layout) =>
+        layout["fixtures"].Array!.First(f => f["id"]?.String == "sharpy1")["pan_home_deg"];
+
+    [Fact]
+    public async Task TheLightTestGoesOffWhenTheEnginesTimeRunsOut()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var host = new FakeHost { TestSeconds = 0.05 };
+        await e.ToggleTest(host, "sharpy1");
+        Assert.Contains("sharpy1", e.Lit);
+        for (var n = 0; n < 100 && e.Lit.Count > 0; n++) await Task.Delay(20);
+        Assert.Empty(e.Lit);
+        Assert.Empty(e.TestDirs);
+        host.Up = false;
+        await e.ToggleTest(host, "sharpy1");  // the setup service doesn't come up: not lit
+        Assert.Empty(e.Lit);
+    }
+
+    [Fact]
     public void TheUndoManagerGroupsAndForgetsTheRedo()
     {
         var u = new UndoManager();
@@ -620,5 +707,7 @@ public class RigEditorTests(ITestOutputHelper output)
         public IRigEditorAPI Api { get; } = new SetupEditorAPI(api);
         public void ReloadSets() { }
         public void Open(string path) { }
+        public bool EngineRunning => false;
+        public bool IsVirtual(string set) => true;  // the self test lights nothing
     }
 }

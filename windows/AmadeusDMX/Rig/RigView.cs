@@ -52,8 +52,7 @@ sealed class RigList(AppModel model)
         list.SelectionChanged += (_, _) =>
         {
             if (_quiet || list.SelectedItem is not ListViewItem { Tag: (string name, string _) }) return;
-            model.EditingRig = name;
-            model.EditingRigSet = "";
+            model.EditingRig = name;  // it opens showing a set on it (AppModel.RigSetDefault)
         };
         list.Bind(model, [nameof(AppModel.Rigs), nameof(AppModel.Sets), nameof(AppModel.EditingRig)], l =>
         {
@@ -133,13 +132,28 @@ sealed class PlacementBar(AppModel model)
         var rig = model.EditingRig;
         var on = model.SetsOn(rig);
         var off = model.Sets.Select(s => s.Name).Where(s => !on.Contains(s)).ToList();
-        List<string> choices = ["", .. on];
-        var picker = UI.Picker(choices, model.EditingRigSet, s => s.Length == 0 ? "The rig alone" : s, s => model.EditingRigSet = s)
-            .Tooltip("Edit the rig alone, or where a set's fixtures hang on it");
-        var place = UI.MenuButton(UI.Label("plus", "Place a Set"), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
-            .Tooltip("Put one of your sets on this rig: a combination the show can run");
-        place.IsEnabled = !(off.Count == 0 || model.EngineRunning || _busy);
-        var row = UI.HStack(10, UI.Text("On this rig").Secondary(), picker, place);
+        var row = UI.HStack(10);
+        if (on.Count == 0)
+        {
+            var place = UI.MenuButton(UI.Label("plus", "Place a Set"), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
+                .Prominent().Tooltip("Put one of your sets on this rig, to hang its fixtures: a combination the show can run");
+            place.IsEnabled = !(off.Count == 0 || model.EngineRunning || _busy);
+            row.Children.Add(UI.Text("No set on this rig yet").Secondary());
+            row.Children.Add(place);
+        }
+        else
+        {
+            // the sets on it, then (after a divider on the Mac) the rig alone, last
+            List<string> choices = [.. on, ""];
+            var picker = UI.Picker(choices, model.EditingRigSet, s => s.Length == 0 ? "No set: the rig alone" : s, s => model.EditingRigSet = s)
+                .Tooltip("Which of the sets on this rig you see and hang; or the rig alone (its trusses, no fixtures)");
+            var place = UI.MenuButton(UI.Label("plus", "Place Another Set"), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
+                .Tooltip(off.Count == 0 ? "Every set is on this rig already" : "Put another of your sets on this rig: another combination the show can run");
+            place.IsEnabled = !(off.Count == 0 || model.EngineRunning || _busy);
+            row.Children.Add(UI.Text("Showing").Secondary());
+            row.Children.Add(picker);
+            row.Children.Add(place);
+        }
         if (model.EditingRigSet.Length > 0)
             row.Children.Add(UI.Button("Take Off…", TakeOff, "minus.circle").Disabled(model.EngineRunning || _busy)
                 .Tooltip("Take this set off the rig: where its fixtures hang here is forgotten"));

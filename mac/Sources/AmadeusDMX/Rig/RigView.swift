@@ -41,7 +41,7 @@ private struct RigList: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        List(selection: Binding(get: { model.editingRig }, set: { if let v = $0 { model.editingRig = v; model.editingRigSet = "" } })) {
+        List(selection: Binding(get: { model.editingRig }, set: { if let v = $0 { model.editingRig = v } })) {  // it opens showing a set on it (rigSetDefault)
             SwiftUI.Section {
                 ForEach(model.rigs) { r in
                     VStack(alignment: .leading, spacing: 2) {

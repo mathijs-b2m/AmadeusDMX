@@ -204,6 +204,37 @@ public class ProtocolTests
         Assert.False(d.Confidence.ContainsKey("x"));
         Assert.Equal(0.7, d.Probabilities["palette"]["warm"]);
     }
+
+    [Fact]
+    public void TheLightTestSaysWhereAPointedHeadsBeamGoes()
+    {
+        static LightTest Decode(string json) => LightTest.From(J.ParseElement(Encoding.UTF8.GetBytes(json)));
+        var lit = Decode("""
+            {"on": true, "seconds": 60, "output": "Art-Net", "universe": 1, "wire_universe": 0, "channels": [43, 50], "dir": [0.0, -0.966, -0.259]}
+            """);
+        Assert.Equal(new System.Numerics.Vector3(0, -0.966f, -0.259f), lit.Dir);
+        Assert.Equal("universe 1, channels 43–50 · Art-Net (universe 0 on the wire)", lit.Summary);
+        // switched off, a fixture without an address, not a head: null channels and no dir
+        var off = Decode("""{"on": false, "seconds": 60, "output": "Art-Net", "universe": 1, "channels": null, "dir": null}""");
+        Assert.Empty(off.Channels);
+        Assert.Null(off.Dir);
+        Assert.Null(Decode("""{"on": true, "seconds": 60, "output": "", "universe": 1, "dir": [1, 2]}""").Dir);  // too short
+    }
+
+    [Fact]
+    public void AStillFrameFromTheAppLightsAndPoints()
+    {
+        var f = new Frame([[1, 1, 1, 1, 0, 0.5f, 0.5f], [0, 0, 0, 0, 0, 0.5f, 0.5f]], [new System.Numerics.Vector3(0, -1, 0), null]);
+        Assert.Equal(2, f.Fx.Length);
+        Assert.Equal("open", f.Beam[0]);
+        Assert.Null(f.Beam[1]);
+        Assert.Equal(new System.Numerics.Vector3(0, -1, 0), f.Dirs[0]);
+        Assert.Null(f.Dirs[1]);
+        Assert.Equal(2, f.Lz.Length);
+        Assert.All(f.Lz, Assert.Null);
+        Assert.False(f.Lite);
+        Assert.Empty(f.Bands);
+    }
 }
 
 static class TestHelpers

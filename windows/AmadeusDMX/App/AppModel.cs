@@ -64,9 +64,46 @@ public sealed class AppModel : Observable
     string _editingSet = "";
     public string EditingSet { get => _editingSet; set => Set(ref _editingSet, value); }
     /// The Rigs page edits this rig, and the set placed on it whose placement is shown ("": the rig alone).
+    /// Opening a rig shows a set on it (RigSetDefault), not the bare rig: that is what you came to see.
     string _editingRig = "", _editingRigSet = "";
-    public string EditingRig { get => _editingRig; set => Set(ref _editingRig, value); }
-    public string EditingRigSet { get => _editingRigSet; set => Set(ref _editingRigSet, value); }
+    public string EditingRig
+    {
+        get => _editingRig;
+        set
+        {
+            if (_editingRig == value) return;
+            _editingRig = value;
+            RememberRigSet(RigSetDefault(value));  // the set with it, before either is announced (no editor for the old pair)
+            Changed(nameof(EditingRig), nameof(EditingRigSet));
+        }
+    }
+    public string EditingRigSet
+    {
+        get => _editingRigSet;
+        set { if (RememberRigSet(value)) Changed(); }
+    }
+
+    /// Swift's editingRigSet didSet: the choice remembered per rig (settings' "rigEditorSet").
+    bool RememberRigSet(string set)
+    {
+        if (_editingRigSet == set) return false;
+        _editingRigSet = set;
+        if (_editingRig.Length == 0) return true;
+        var chosen = Defaults.Standard.Object("rigEditorSet")?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
+        chosen[_editingRig] = set;
+        Defaults.Standard.Set("rigEditorSet", JSONValue.Of(chosen));
+        return true;
+    }
+
+    /// The set a rig opens with: the one last shown on it ("" too, when you chose the rig alone), else the show's
+    /// set when it is on this rig, else the first one placed on it.
+    public string RigSetDefault(string rig)
+    {
+        var on = SetsOn(rig);
+        if (Defaults.Standard.Object("rigEditorSet")?[rig]?.String is { } last && (last.Length == 0 || on.Contains(last))) return last;
+        if (on.Contains(SelectedSet)) return SelectedSet;
+        return on.FirstOrDefault() ?? "";
+    }
 
     /// A set placed on a rig: what a show runs. Made on the Rigs page; the show picks one of these.
     public readonly record struct Combination(string Rig, string Set)
@@ -275,7 +312,8 @@ public sealed class AppModel : Observable
         }
         if (EditingSet.Length == 0 || Sets.All(s => s.Name != EditingSet)) EditingSet = SelectedSet;
         if (EditingRig.Length == 0 || Rigs.All(r => r.Name != EditingRig)) EditingRig = SelectedRig;
-        if (EditingRigSet.Length > 0 && !SetsOn(EditingRig).Contains(EditingRigSet)) EditingRigSet = "";
+        if (EditingRigSet.Length > 0 && !SetsOn(EditingRig).Contains(EditingRigSet) || EditingRigSet.Length == 0)
+            EditingRigSet = RigSetDefault(EditingRig);  // also once the rigs are read: a rig opens with a set on it
         _previewCache = null;
         ConfigVersion++;
         Derived();
@@ -366,6 +404,7 @@ public sealed class AppModel : Observable
     public void StartLive(string? dj = null, string? code = null, string? source = null)
     {
         if (Workspace is not { } ws || SelectedSet.Length == 0) return;
+        Section = Section.Show;  // starting a show: watch it
         PlayingFile = null;
         RemoteDJ = dj;
         _remoteCode = code;
@@ -386,6 +425,7 @@ public sealed class AppModel : Observable
     public void Play(string file, double from = 0)
     {
         if (Workspace is not { } ws || SelectedSet.Length == 0) return;
+        Section = Section.Show;  // starting a show: watch it
         PlayingFile = file;
         WatchFirewall(null);
         _runningWithDMX = SendArtNet;

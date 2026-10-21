@@ -4,6 +4,7 @@
 // Request bodies are plain objects (anonymous types, dictionaries, JSONValue), serialised as they are; layouts (a
 // set on a rig) go as the JSONValue dictionaries RigDocument and `Rig()` work with.
 using System.Net.Http.Headers;
+using System.Numerics;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -349,11 +350,17 @@ public sealed class SetupAPI
                                      CancellationToken ct = default) =>
         Post("api/test-light", new { fixture, rig = layout, on, point }, LightTest.From, ct: ct);
 
+    /// The rig editor's test: a moving head straight out to the audience (the reply's `Dir`), whatever its placing.
+    public Task<LightTest> TestLightFront(string fixture, bool on, IReadOnlyDictionary<string, JSONValue> layout,
+                                          CancellationToken ct = default) =>
+        Post("api/test-light", new { fixture, rig = layout, on, point = "front" }, LightTest.From, ct: ct);
+
     /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
     public Task<HangCheckStep[]> HangCheck(IReadOnlyDictionary<string, JSONValue> layout, CancellationToken ct = default) =>
         Post("api/hangcheck", new { rig = layout }, c => J.Req(c, "steps", J.ArrayOf(HangCheckStep.From)), ct: ct);
 
-    /// The calibration that puts a head right the check found hung wrong ("mirrored", "turned", "both").
+    /// The calibration that puts a head right the check found hung wrong ("mirrored", "turned", "both"), or the rig
+    /// editor's front test saw its beam go "left", "right" or "back" instead.
     public Task<Dictionary<string, JSONValue>> HangCheckFix(IReadOnlyDictionary<string, JSONValue> layout, string fixture, string fix,
                                                            CancellationToken ct = default) =>
         Post("api/hangcheck/fix", new { rig = layout, fixture, fix }, c => J.Req(c, "fields", AnyObject), ct: ct);
@@ -483,12 +490,14 @@ public sealed record LightTest
     public int Universe { get; init; }
     public int? WireUniverse { get; init; }           // the Art-Net / sACN universe it goes out as
     public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel (empty: no start address)
+    public Vector3? Dir { get; init; }                // a pointed head: where its beam goes (world, as the feed's)
 
     public static LightTest From(JsonElement c) => new()
     {
         On = J.Req(c, "on", J.Bool), Seconds = J.Req(c, "seconds", J.Double), Output = J.Req(c, "output", J.String),
         Universe = J.Req(c, "universe", J.Int), WireUniverse = J.Val(c, "wire_universe", J.Int),
         Channels = J.Ref(c, "channels", J.ArrayOf(J.Int)) ?? [],  // null: no start address (switching off one)
+        Dir = J.Ref(c, "dir", J.ArrayOf(J.Float)) is { Length: >= 3 } d ? new Vector3(d[0], d[1], d[2]) : null,
     };
 
     /// "universe 1, channels 43–50 · Art-Net → 2.0.0.10:6454 (universe 1 on the wire)"

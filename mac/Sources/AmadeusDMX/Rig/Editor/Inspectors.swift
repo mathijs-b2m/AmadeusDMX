@@ -34,7 +34,7 @@ struct EditorInspector: View {
         let waiting = editor.doc.waitingCount
         if editor.setName.isEmpty {  // the rig alone
             SwiftUI.Section {
-                Label("The rig alone: its structure. Choose a set under “On this rig” to arrange its fixtures here.",
+                Label("The rig alone: its structure. Choose a set under “Showing” to arrange its fixtures here.",
                       systemImage: "building.2")
                     .font(.callout).foregroundStyle(.secondary)
                 if editor.isDirty { Label("Unsaved changes", systemImage: "circle.fill").foregroundStyle(.orange).font(.callout) }

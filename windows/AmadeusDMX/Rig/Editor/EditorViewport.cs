@@ -1,6 +1,6 @@
 // The editor's stage: the seam to the renderer (IEditorStage.cs). It sets the stage up the way RigEditorView.swift
-// does on appear (work light on, the editor first for the pointer, the editor's scene as the input, the drone's
-// view) and wakes it whenever the editor changes something the stage shows.
+// does on appear (work light on, the editor first for the pointer, the editor's scene and its light test as the input,
+// the drone's view) and wakes it whenever the editor changes something the stage shows.
 namespace AmadeusDMX;
 
 public sealed class EditorViewport
@@ -25,7 +25,7 @@ public sealed class EditorViewport
         Stage = stage;
         Stage.WorkLight = 1;
         Stage.Editor = editor;
-        Stage.Input = () => (editor.StageInput(), null);
+        Stage.Input = () => (editor.StageInput(), editor.TestFrame());  // the light test's beams too
         Stage.Preset = "Drone";
     }
 
