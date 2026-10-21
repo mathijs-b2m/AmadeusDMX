@@ -299,10 +299,21 @@ def hang_check(req):
 
 def hang_check_fix(req):
     """{"rig": <combined dict>, "fixture": id, "fix": "mirrored"|"turned"|"both"}: the calibration fields that put
-    that head right (they go into the set)."""
+    that head right (they go into the set). "fix": "left"|"right"|"back": the rig editor's front test went there
+    instead (hangsheet.fix_front)."""
     from amadeus.rig import hangsheet
+    from amadeus.rig.loader import load_rig_dict
 
     b = req.body()
+    if b.get("fix") in hangsheet.SEEN:
+        rig = load_rig_dict(b["rig"])
+        fx = next((f for f in rig["fixtures"] if f["id"] == b["fixture"]), None)
+        if fx is None:
+            return {"error": f"The set has no fixture called {b['fixture']}"}, 400
+        try:
+            return {"fields": hangsheet.fix_front(fx, fxlib.get(fx["fixture"]), b["fix"])}
+        except ValueError as e:
+            return {"error": str(e)}, 400
     fx = next((f for f in b["rig"].get("fixtures", []) if f["id"] == b["fixture"]), None)
     if fx is None:
         return {"error": f"The set has no fixture called {b['fixture']}"}, 400

@@ -319,6 +319,7 @@ final class AppModel {
     /// Start live mode: the lights follow the DJ software on this Mac (VirtualDJ, Mixxx, …) or on a DJ laptop.
     func startLive(dj: String? = nil, code: String? = nil, source: String? = nil) {
         guard let ws = workspace, !selectedSet.isEmpty else { return }
+        section = .show  // starting a show: watch it
         playingFile = nil
         remoteDJ = dj
         remoteCode = code
@@ -337,6 +338,7 @@ final class AppModel {
     /// Play a track with the engine itself (no VirtualDJ): to try a set or a look.
     func play(_ file: URL, from start: Double = 0) {
         guard let ws = workspace, !selectedSet.isEmpty else { return }
+        section = .show  // starting a show: watch it
         playingFile = file
         runningWithDMX = sendArtNet
         var args = ["play", file.path, "--set", selectedSet, "--rig", selectedRig]

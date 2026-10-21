@@ -598,6 +598,33 @@ def check_steps(merged: dict) -> list[dict]:
     return steps
 
 
+SEEN = {"left": (-1.0, 0.0), "right": (1.0, 0.0), "back": (0.0, -1.0)}  # as the audience sees it (facing the stage)
+
+
+def fix_front(fx: dict, defn: dict, seen: str) -> dict:
+    """The rig editor's test sent the head straight out to the audience (front_aim), and the real beam went `seen`
+    instead ("left" / "right" as the audience sees it, or "back" at the stage): the calibration under which that
+    pose points where the real beam went, i.e. the head as it really stands. Its pan home a quarter or half a turn
+    on (amadeus bringup asked the same), or for "back" without the pan for that its tilt the other way."""
+    if seen not in SEEN:
+        raise ValueError(f"seen: one of {', '.join(SEEN)}")
+    aim = front_aim(fx, defn)
+    P, _, ph, _ = geometry._ranges(fx, defn)
+    options = [{"pan_home_deg": round(ph + d, 1)} for d in (90, -90, 180, -180) if P and 0 <= ph + d <= P]
+    if seen == "back":
+        options.append({"tilt_invert": not fx.get("tilt_invert", False)})
+    want, best, score = SEEN[seen], None, 0.5  # at least ~60° the right way
+    for o in options:
+        d = geometry.fk({**fx, **o}, defn, *aim)
+        flat = math.hypot(d[0], d[1]) or 1.0
+        s = (d[0] * want[0] + d[1] * want[1]) / flat
+        if s > score:
+            best, score = o, s
+    if best is None:
+        raise ValueError("No calibration of this head points that way: check it is placed standing or hanging as it really is")
+    return best
+
+
 def fix(fx: dict, defn: dict, what: str) -> dict:
     """The calibration that puts a head right that the check found "mirrored" (its pan the other way), "turned"
     (turned round, or its tilt the wrong way) or "both". Returns the set's fields to change on the fixture."""

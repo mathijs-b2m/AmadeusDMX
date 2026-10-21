@@ -26,3 +26,17 @@ def test_the_beam_points_at_the_audience_however_it_is_placed():
 def test_turned_in_the_app_it_takes_another_pan():
     straight, turned = _fuze(z_m=3.0, mount="hang"), _fuze(z_m=3.0, mount="hang", rot_deg=90)
     assert hangsheet.front_aim(*straight)[0] != hangsheet.front_aim(*turned)[0]
+
+
+def test_where_the_real_beam_went_gives_the_calibration():
+    """A Fuze standing a quarter turned: its pan home 90° on (what `amadeus bringup` stored as pan_home_deg 360),
+    and with it the front pose points where the real beam went; told again, it points front."""
+    f, d = _fuze(z_m=0.25, mount="floor")
+    for seen, (x, y) in hangsheet.SEEN.items():
+        fields = hangsheet.fix_front(f, d, seen)
+        beam = geometry.fk({**f, **fields}, d, *hangsheet.front_aim(f, d))
+        assert beam[0] * x + beam[1] * y > 0.9, seen
+    real = {**f, "pan_home_deg": 360}  # the unit as it really stands
+    went = geometry.fk(real, d, *hangsheet.front_aim(f, d))
+    seen = "left" if went[0] < 0 else "right"
+    assert hangsheet.fix_front(f, d, seen) == {"pan_home_deg": 360}

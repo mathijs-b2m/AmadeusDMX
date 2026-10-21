@@ -564,6 +564,18 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    /// The real beam went `seen` ("left" / "right" as the audience sees it, "back") instead of to the audience: the
+    /// head's calibration put right in the set (its pan home, as amadeus bringup did), and aimed again to see.
+    func fixFront(_ model: AppModel, _ id: String, seen: String) async {
+        do {
+            let fields = try await model.api.hangCheckFix(layout: try layoutDict(), fixture: id, fix: seen)
+            change("Calibrate \(id)") { d in d.calibrate(id, fields) }   // re-aims it (reaimTests)
+            message = "\(id) calibrated: its beam should come round to the audience now"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
     func switchOffTests(_ model: AppModel) async {
         let ids = lit
         lit = []

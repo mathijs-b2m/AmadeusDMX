@@ -372,6 +372,19 @@ struct FixtureInspector: View {
             if let refusal {
                 Text(refusal).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
+            if on && def?.isMoving == true {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Its beam should point at the audience, as on the stage here. Where does the real one point?")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("Left", systemImage: "arrow.left") { fix("left") }
+                        Button("Right", systemImage: "arrow.right") { fix("right") }
+                        Button("Back", systemImage: "arrow.uturn.down") { fix("back") }
+                    }
+                    .controlSize(.small)
+                    .help("Left and right as seen from the audience, facing the stage. The head's calibration is put right in the set and it is aimed again: pressed the wrong one, it ends up the other way; press that one")
+                }
+            }
         }
         SwiftUI.Section("Mounting") {
             Picker("Truss", selection: Binding(get: { fixture.truss ?? "" }, set: { editor.attach(fixture.id, to: $0.isEmpty ? nil : $0) })) {
@@ -467,6 +480,8 @@ struct FixtureInspector: View {
     private func binding(_ kp: WritableKeyPath<PlacedFixture, Double?>, default d: Double) -> Binding<Double> {
         Binding(get: { fixture[keyPath: kp] ?? d }, set: { v in editor.updateFixture(fixture.id, "Move Fixture") { $0[keyPath: kp] = v } })
     }
+
+    private func fix(_ seen: String) { Task { await editor.fixFront(model, fixture.id, seen: seen) } }
 
     private func icon(_ kind: String?) -> String { FixtureIcon.symbol(kind) }
 }
