@@ -254,10 +254,14 @@ public sealed class SetView(AppModel model, MainWindow window)
             if (dark)
                 row.Children.Add(UI.Label("exclamationmark.triangle.fill", "Plays nothing", Font.Caption).Foreground(Tint.Orange)
                     .Tooltip("The show finds no dimmer or colour channel in this mode: map its channels by hand"));
-            var b = UI.Button(dark ? "Map Channels…" : "Channels…", () => MapChannels(tried), "slider.vertical.3").Font(Font.Caption).Padding(8, 3)
+            else if (d.NeedsCheck)
+                row.Children.Add(UI.Label("exclamationmark.triangle.fill", "Not checked yet", Font.Caption).Foreground(Tint.Orange)
+                    .Tooltip("Made from a common layout: check its channels one by one on the fixture"));
+            var b = UI.Button(dark ? "Map Channels…" : d.NeedsCheck ? "Check Channels…" : "Channels…", () => MapChannels(tried), "slider.vertical.3")
+                .Font(Font.Caption).Padding(8, 3)
                 .Disabled(model.EngineRunning)
                 .Tooltip("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture");
-            if (dark) b.Foreground(Tint.Orange);
+            if (dark || d.NeedsCheck) b.Foreground(Tint.Orange);
             row.Children.Add(b);
         }
         return row;

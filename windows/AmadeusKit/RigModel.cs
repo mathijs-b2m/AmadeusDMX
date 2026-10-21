@@ -176,6 +176,8 @@ public sealed class FixtureDefinition
     public string Inert { get; init; } = "";
     /// Something the user must do for it to be safe (a laser DMX can't keep off).
     public string? Warning { get; init; }
+    /// Made here from a common layout and not yet checked channel by channel on the fixture.
+    public bool NeedsCheck { get; init; }
 
     public static FixtureDefinition From(JsonElement c)
     {
@@ -193,6 +195,7 @@ public sealed class FixtureDefinition
             Physical = J.Ref(c, "physical", PhysicalInfo.From),
             Modes = modes,
             Warning = warning,
+            NeedsCheck = J.Try(() => J.Val(c, "made", m => !(J.Val(m, "checked", J.Bool) ?? false))) ?? false,
             Inert = reason.Length > 0 ? reason
                 : kind == "smoke" && !modes.Values.SelectMany(m => m).Any(ch => ch.GetValueOrDefault("attr")?.String == "fog")
                     ? "a smoke machine whose output channel isn’t known: the show never fires it"

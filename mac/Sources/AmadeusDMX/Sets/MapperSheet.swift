@@ -29,6 +29,12 @@ struct MapperSheet: View {
     @State private var trying = false
     @State private var sending: Task<Void, Never>?
     @State private var saving = false
+    // the check, channel by channel on the fixture
+    @State private var checking: Int?        // the channel being checked
+    @State private var probe = 0
+    @State private var sweeping = true
+    @State private var checkLoop: Task<Void, Never>?
+    @State private var checkedAll = false    // every channel was checked: saved as checked
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,6 +43,13 @@ struct MapperSheet: View {
             if let m = mapping {
                 if !m.refusal.isEmpty {
                     ContentUnavailableView("Not Mapped Here", systemImage: "exclamationmark.triangle", description: Text(m.refusal))
+                } else if let i = checking {
+                    ChannelCheck(mapping: Binding(get: { mapping! }, set: { mapping = $0 }),
+                                 index: Binding(get: { i }, set: { checking = $0 }),
+                                 probe: $probe, sweeping: $sweeping) {
+                        checkedAll = true
+                        stopCheck()
+                    }
                 } else {
                     channels(m)
                 }
@@ -50,7 +63,7 @@ struct MapperSheet: View {
         }
         .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 640)
         .task { await load() }
-        .onDisappear { stopTrying() }
+        .onDisappear { stopTrying(); stopCheck() }
     }
 
     // MARK: parts
@@ -77,16 +90,34 @@ struct MapperSheet: View {
                         .font(.callout).foregroundStyle(m.plays ? Color.secondary : Color.orange)
                 }
                 Spacer()
-                Toggle(isOn: Binding(get: { trying }, set: { $0 ? startTrying() : stopTrying() })) {
-                    Label("Try on the Lights", systemImage: trying ? "lightbulb.fill" : "lightbulb")
+                if checking == nil {
+                    Toggle(isOn: Binding(get: { trying }, set: { $0 ? startTrying() : stopTrying() })) {
+                        Label("Try on the Lights", systemImage: trying ? "lightbulb.fill" : "lightbulb")
+                    }
+                    .toggleStyle(.button)
+                    .tint(trying ? .yellow : nil)
+                    .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false))
+                    .help(tryRefusal ?? "Send these values as they are to \(target.fixture) (the rest of the set dark, a running show paused), to see what each channel does")
                 }
-                .toggleStyle(.button)
-                .tint(trying ? .yellow : nil)
+                Button(checking == nil ? "Check Channels" : "Stop Checking",
+                       systemImage: checking == nil ? "checklist" : "stop.fill") {
+                    checking == nil ? startCheck() : stopCheck()
+                }
+                .buttonStyle(.bordered)
+                .tint(needsCheck && checking == nil ? .orange : nil)
                 .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false))
-                .help(tryRefusal ?? "Send these values as they are to \(target.fixture) (the rest of the set dark, a running show paused), to see what each channel does")
+                .help(tryRefusal ?? "Go through the channels one by one on \(target.fixture): each sweeps while you say what the fixture does")
             }
-            Text("Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every \(mapping?.name ?? "fixture of this model") in your sets plays by it.")
-                .font(.caption).foregroundStyle(.secondary)
+            if needsCheck && !checkedAll && checking == nil {
+                Label("Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(.orange)
+            } else if checkedAll && checking == nil {
+                Label("Every channel checked: save it.", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
+            } else {
+                Text("Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every \(mapping?.name ?? "fixture of this model") in your sets plays by it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .padding(16)
     }
@@ -143,19 +174,56 @@ struct MapperSheet: View {
         saving = true
         defer { saving = false }
         do {
-            problems = try await model.api.saveMapping(m)
+            problems = try await model.api.saveMapping(m, checked: checkedAll)
             if problems.isEmpty { stopTrying(); saved(); dismiss() }
         } catch { problems = [error.localizedDescription] }
+    }
+
+    // MARK: the check
+
+    private var needsCheck: Bool { (mapping?.made ?? false) && !(mapping?.checked ?? true) }
+
+    private func startCheck() {
+        stopTrying()
+        checking = 0
+        probe = 0
+        sweeping = true
+        checkLoop?.cancel()
+        let id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        checkLoop = Task {
+            var up = true
+            while !Task.isCancelled, let i = checking, let m = mapping {
+                if sweeping {  // 0 → 255 → 0 in about 8 s
+                    probe = up ? min(probe + 6, 255) : max(probe - 6, 0)
+                    if probe == 255 || probe == 0 { up.toggle() }
+                }
+                do {
+                    _ = try await model.api.testLight(fixture: id, on: true, raw: m.checkValues(probe: i, value: probe),
+                                                      light: m.lightChannels, rig: rig, set: set)
+                } catch {
+                    problems = [error.localizedDescription]
+                    checking = nil
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(90))
+            }
+        }
+    }
+
+    private func stopCheck() {
+        guard checking != nil || checkLoop != nil else { return }
+        checking = nil
+        checkLoop?.cancel()
+        checkLoop = nil
+        let id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        Task { _ = try? await model.api.testLight(fixture: id, on: false, rig: rig, set: set) }
     }
 
     // MARK: trying on the lights
 
     private var raw: [Int] { mapping?.channels.map(\.value) ?? [] }
     /// The channels given a light role: the engine keeps them under the brightness limiter.
-    private var light: [Int] {
-        let roles = Set((mapping?.roles ?? []).filter { $0.group != "Position" }.map(\.role))
-        return (mapping?.channels ?? []).enumerated().filter { roles.contains($0.element.role) }.map(\.offset)
-    }
+    private var light: [Int] { mapping?.lightChannels ?? [] }
 
     private func startTrying() {
         trying = true

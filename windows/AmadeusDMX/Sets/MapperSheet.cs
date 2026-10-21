@@ -2,8 +2,9 @@
 // their library file (effect lights, colour macros, numbered or unnamed channels). Each channel is played (a
 // dimmer, a colour, pan or tilt, optionally for one cell of a bar) or held at a value. "Try on the Lights" sends
 // the values as they are to one fixture of the set, so you can find what a channel does; the library's names and
-// ranges are shown where QLC+ or the Open Fixture Library has them. Saved into your copy of the definition
-// (amadeus/library/mapper.py): every fixture of that model plays by it (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
+// ranges are shown where QLC+ or the Open Fixture Library has them. "Check Channels" goes through them one by one on
+// the fixture (ChannelCheck.cs). Saved into your copy of the definition (amadeus/library/mapper.py): every fixture
+// of that model plays by it (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
 namespace AmadeusDMX;
 
 /// `Fixture`: the one tried on the lights; `Address` null: it has no start address yet (nothing can be tried).
@@ -25,6 +26,11 @@ public sealed class MapperSheet
     bool _trying, _saving;
     CancellationTokenSource? _sending;
     IReadOnlyList<string> _problemList = [];
+    // the check, channel by channel on the fixture
+    readonly ChannelCheckState _check = new();
+    bool _checking;                      // a channel is being checked (_check.Index)
+    CancellationTokenSource? _checkLoop;
+    bool _checkedAll;                    // every channel was checked: saved as checked
 
     static ContentControl Host() => new()
     {
@@ -60,7 +66,7 @@ public sealed class MapperSheet
             try { if (await Save()) _dialog.Hide(); }
             finally { deferral.Complete(); }
         };
-        _dialog.Closed += (_, _) => StopTrying();
+        _dialog.Closed += (_, _) => { StopTrying(); StopCheck(); };
         var grid = new Grid { MinWidth = 760, Height = 540 };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -93,24 +99,40 @@ public sealed class MapperSheet
                             k => _m.SetKind(k.Kind))
                     .Tooltip("What it is, when its channels don't say: pan and tilt make a moving head, cells a bar")
                 : null);
-        var tryIt = Form.ToggleButton(UI.Label(_trying ? "lightbulb.fill" : "lightbulb", "Try on the Lights"), _trying, on =>
+        Microsoft.UI.Xaml.Controls.Primitives.ToggleButton? tryIt = null;
+        if (!_checking)
         {
-            if (on) StartTrying(); else StopTrying();
-            Header();
-        });
-        tryIt.IsEnabled = _tryRefusal is null && _m.Editable;
-        if (_trying) tryIt.Foreground(Tint.Yellow);
-        tryIt.Tooltip(_tryRefusal ?? $"Send these values as they are to {_target.Fixture} (the rest of the set dark, a running show paused), to see what each channel does");
+            tryIt = Form.ToggleButton(UI.Label(_trying ? "lightbulb.fill" : "lightbulb", "Try on the Lights"), _trying, on =>
+            {
+                if (on) StartTrying(); else StopTrying();
+                Header();
+            });
+            tryIt.IsEnabled = _tryRefusal is null && _m.Editable;
+            if (_trying) tryIt.Foreground(Tint.Yellow);
+            tryIt.Tooltip(_tryRefusal ?? $"Send these values as they are to {_target.Fixture} (the rest of the set dark, a running show paused), to see what each channel does");
+        }
+        var check = UI.Button(_checking ? "Stop Checking" : "Check Channels", () =>
+        {
+            if (_checking) StopCheck(); else StartCheck();
+        }, _checking ? "stop.fill" : "checklist")
+            .Disabled(_tryRefusal is not null || !_m.Editable)
+            .Tooltip(_tryRefusal ?? $"Go through the channels one by one on {_target.Fixture}: each sweeps while you say what the fixture does");
+        if (_m.NeedsCheck && !_checking) check.Foreground(Tint.Orange);
         var line = UI.HStack(14,
             UI.Text($"Mode {_target.Mode}", Font.Callout).Secondary(),
             m is null ? null
                 : m.Plays ? UI.Label("checkmark.circle", "The show plays it", Font.Callout).Secondary()
                 : UI.Label("exclamationmark.triangle.fill", "The show plays nothing in this mode yet", Font.Callout).Foreground(Tint.Orange),
             UI.Spacer(),
-            tryIt);
-        _header.Content = UI.VStack(8, title, line,
-            UI.Text($"Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every {m?.Name ?? "fixture of this model"} in your sets plays by it.",
-                    Font.Caption).Secondary().Wrap()).Margin(0, 0, 0, 10);
+            tryIt,
+            check);
+        UIElement note = _m.NeedsCheck && !_checkedAll && !_checking
+            ? Form.Note("exclamationmark.triangle.fill", "Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong.", Tint.Orange)
+            : _checkedAll && !_checking
+                ? Form.Note("checkmark.circle.fill", "Every channel checked: save it.", Tint.Green)
+                : UI.Text($"Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every {m?.Name ?? "fixture of this model"} in your sets plays by it.",
+                          Font.Caption).Secondary().Wrap();
+        _header.Content = UI.VStack(8, title, line, note).Margin(0, 0, 0, 10);
     }
 
     void Body()
@@ -118,6 +140,15 @@ public sealed class MapperSheet
         if (_m.Mapping is { } m)
         {
             if (m.Refusal.Length > 0) { _body.Content = UI.Unavailable("exclamationmark.triangle", "Not Mapped Here", m.Refusal); return; }
+            if (_checking)
+            {
+                _body.Content = new ChannelCheck(_m, _check, () =>
+                {
+                    _checkedAll = true;
+                    StopCheck();
+                }).Build();
+                return;
+            }
             var list = UI.VStack(0);
             for (var i = 0; i < m.Channels.Count; i++)
             {
@@ -157,7 +188,7 @@ public sealed class MapperSheet
         Footer();
         try
         {
-            _problemList = await _model.Api.SaveMapping(m);
+            _problemList = await _model.Api.SaveMapping(m, _checkedAll);
             if (_problemList.Count == 0)
             {
                 StopTrying();
@@ -172,6 +203,63 @@ public sealed class MapperSheet
             Footer();
         }
         return false;
+    }
+
+    // MARK: the check
+
+    /// Channel by channel from the first: the checked one sweeps 0 → 255 → 0 (about 8 s), the others hold the light
+    /// on and the head in the middle, sent as they are about 10 times a second.
+    async void StartCheck()
+    {
+        StopTrying();
+        _check.Index = 0;
+        _check.Probe = 0;
+        _check.Sweeping = true;
+        _checking = true;
+        _checkLoop?.Cancel();
+        var cts = _checkLoop = new CancellationTokenSource();
+        Header();
+        Body();
+        var (id, rig, set) = (_target.Fixture, _model.SelectedRig, _model.EditingSet);
+        var up = true;
+        while (!cts.IsCancellationRequested && _checking && _m.Mapping is { } m)
+        {
+            if (_check.Sweeping)
+            {
+                _check.Probe = up ? Math.Min(_check.Probe + 6, 255) : Math.Max(_check.Probe - 6, 0);
+                if (_check.Probe is 255 or 0) up = !up;
+            }
+            try { await _model.Api.TestLight(id, true, m.CheckValues(_check.Index, _check.Probe), m.LightChannels, rig, set); }
+            catch (Exception e) when (SetView.IsApiError(e))
+            {
+                if (cts.IsCancellationRequested) break;
+                _problemList = [e.Message];
+                _checking = false;
+                _checkLoop = null;
+                Header();
+                Body();
+                Footer();
+                break;
+            }
+            try { await Task.Delay(90, cts.Token); }
+            catch (TaskCanceledException) { break; }
+        }
+    }
+
+    void StopCheck()
+    {
+        if (!_checking && _checkLoop is null) return;
+        _checking = false;
+        _checkLoop?.Cancel();
+        _checkLoop = null;
+        var (id, rig, set) = (_target.Fixture, _model.SelectedRig, _model.EditingSet);
+        _ = Task.Run(async () =>
+        {
+            try { await _model.Api.TestLight(id, false, rig: rig, set: set); }
+            catch (Exception e) when (SetView.IsApiError(e)) { }
+        });
+        Header();
+        Body();
     }
 
     // MARK: trying on the lights

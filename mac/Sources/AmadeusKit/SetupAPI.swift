@@ -352,12 +352,55 @@ public struct SetupAPI: Sendable {
         try await get("api/fixture/map", query: ["key": key, "mode": mode])
     }
 
-    /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it).
-    public func saveMapping(_ m: FixtureMapping) async throws -> [String] {
-        let chans = m.channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value] as [String: Any] }
-        let r: SaveResult = try await post("api/fixture/map", ["key": m.key, "mode": m.mode, "kind": m.kind, "channels": chans])
+    /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it). `checked`:
+    /// every channel was checked on the fixture, and the colour wheel's slots named then are saved with it.
+    public func saveMapping(_ m: FixtureMapping, checked: Bool = false) async throws -> [String] {
+        let chans = m.channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value, "attr": $0.attr] as [String: Any] }
+        var body: [String: Any] = ["key": m.key, "mode": m.mode, "kind": m.kind, "channels": chans, "checked": checked]
+        if checked, m.channels.contains(where: { $0.role == "color_wheel" }), !m.wheel.isEmpty {
+            body["wheel"] = m.wheel.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
+        }
+        let r: SaveResult = try await post("api/fixture/map", body)
         return r.problems ?? []
     }
+
+    /// The common layouts a fixture without a brand is made from, the closest to `type` and `channels` first.
+    public func fixtureTemplates(type: String = "", channels: Int = 0) async throws -> FixtureTemplates {
+        try await get("api/fixture/templates", query: ["type": type, "channels": String(channels)])
+    }
+
+    /// Makes a fixture in your library from a template; returns its key and mode, or the problems.
+    public func newFixture(manufacturer: String, model: String, template: String, channels: Int, type: String,
+                           watts: Int, panDeg: Int, tiltDeg: Int) async throws -> NewFixture {
+        try await post("api/fixture/new", ["manufacturer": manufacturer, "model": model, "template": template,
+                                           "channels": channels, "type": type, "watts": watts,
+                                           "pan_deg": panDeg, "tilt_deg": tiltDeg])
+    }
+}
+
+/// The layouts a new fixture is made from (amadeus/library/generic.py).
+public struct FixtureTemplates: Decodable, Sendable {
+    public struct Kind: Decodable, Sendable, Hashable {
+        public var type: String
+        public var label: String
+        public var kind: String
+    }
+    public struct Template: Decodable, Sendable, Identifiable, Hashable {
+        public var id: String
+        public var label: String
+        public var type: String
+        public var about: String
+        public var channels: [String]
+        public var count: Int
+    }
+    public var types: [Kind]
+    public var templates: [Template]
+}
+
+public struct NewFixture: Decodable, Sendable {
+    public var key: String?
+    public var mode: String?
+    public var problems: [String]?
 }
 
 /// A fixture mode as the DMX mapper shows it (amadeus/library/mapper.py).
@@ -367,6 +410,27 @@ public struct FixtureMapping: Decodable, Sendable {
         public var label: String
         public var group: String
         public var cell: Bool
+        public var light: Bool?   // it carries light: kept under the brightness limiter when tried
+        public var check: Int?    // its value while another channel is checked (the light on, the head centred)
+    }
+    /// An answer in the channel-by-channel check: what the channel did, and what that makes it.
+    public struct Answer: Decodable, Sendable, Hashable {
+        public var answer: String
+        public var role: String
+        public var attr: String?
+        public var value: Int?
+    }
+    /// A colour of the wheel: its DMX values and how it looks.
+    public struct Slot: Decodable, Sendable, Hashable, Identifiable {
+        public var name: String
+        public var from: Int
+        public var to: Int
+        public var rgb: [Double]
+        public var id: Int { from }
+        public var mid: Int { (from + to) / 2 }
+        public init(name: String, from: Int, to: Int, rgb: [Double]) {
+            self.name = name; self.from = from; self.to = to; self.rgb = rgb
+        }
     }
     /// What a range of a channel's values does, from the QLC+ or OFL file.
     public struct Range: Decodable, Sendable, Hashable {
@@ -397,6 +461,64 @@ public struct FixtureMapping: Decodable, Sendable {
     public var plays: Bool
     public var mapped: Bool
     public var refusal: String
+    public var made: Bool                // made here from a template: it wants the check on the fixture
+    public var checked: Bool
+    public var check: [Answer]
+    public var wheel: [Slot]
+
+    enum CodingKeys: String, CodingKey {
+        case key, name, mode, kind, kinds, roles, channels, plays, mapped, refusal, made, checked, check, wheel
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        name = try c.decode(String.self, forKey: .name)
+        mode = try c.decode(String.self, forKey: .mode)
+        kind = try c.decode(String.self, forKey: .kind)
+        kinds = try c.decode([String: String].self, forKey: .kinds)
+        roles = try c.decode([Role].self, forKey: .roles)
+        channels = try c.decode([Channel].self, forKey: .channels)
+        plays = try c.decode(Bool.self, forKey: .plays)
+        mapped = try c.decode(Bool.self, forKey: .mapped)
+        refusal = try c.decode(String.self, forKey: .refusal)
+        made = try c.decodeIfPresent(Bool.self, forKey: .made) ?? false
+        checked = try c.decodeIfPresent(Bool.self, forKey: .checked) ?? true
+        check = try c.decodeIfPresent([Answer].self, forKey: .check) ?? []
+        wheel = try c.decodeIfPresent([Slot].self, forKey: .wheel) ?? []
+    }
+
+    /// The values sent while channel `probe` is checked at `value`: the others hold the light on and the head in
+    /// the middle (their role's check value), held ones at their value.
+    public func checkValues(probe: Int, value: Int) -> [Int] {
+        channels.indices.map { i in
+            if i == probe { return value }
+            let ch = channels[i]
+            return roles.first { $0.role == ch.role }?.check ?? ch.value
+        }
+    }
+
+    /// The channels that carry light (kept under the brightness limiter when tried).
+    public var lightChannels: [Int] {
+        let lit = Set(roles.filter { $0.light ?? ($0.group != "Position") }.map(\.role))
+        return channels.indices.filter { lit.contains(channels[$0].role) }
+    }
+
+    /// What the check found channel `i` does.
+    public mutating func answer(_ a: Answer, for i: Int) {
+        channels[i].role = a.role
+        if let attr = a.attr { channels[i].attr = attr } else if a.role == "hold" { channels[i].attr = "channel_\(channels[i].n)" }
+        if let v = a.value { channels[i].value = v }
+        if a.role != "hold" { channels[i].cell = 0 }
+        if a.role == "color_wheel", wheel.isEmpty {  // the usual cheap wheel until its colours are named
+            wheel = Self.usualWheel
+        }
+    }
+
+    public static let usualWheel: [Slot] = [
+        ("open", [1, 1, 1]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
+        ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("orange", [1, 0.45, 0]),
+    ].enumerated().map { i, s in Slot(name: s.0, from: i * 16, to: i * 16 + 15, rgb: s.1) }
 }
 
 /// Where a tested fixture's DMX goes.

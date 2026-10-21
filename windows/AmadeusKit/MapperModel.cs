@@ -48,14 +48,31 @@ public sealed class MapperModel : Observable
     /// The values as they are, channel by channel (what "Try on the Lights" sends).
     public IReadOnlyList<int> Raw => Mapping?.Channels.Select(c => c.Value).ToList() ?? [];
 
-    /// The channels given a light role (not a position): the engine keeps them under the brightness limiter.
-    public IReadOnlyList<int> Light
+    /// The channels given a light role: the engine keeps them under the brightness limiter.
+    public IReadOnlyList<int> Light => Mapping?.LightChannels ?? [];
+
+    // MARK: the check, channel by channel on the fixture
+
+    /// Made from a common layout and not checked on the fixture yet.
+    public bool NeedsCheck => Mapping is { Made: true, Checked: false };
+
+    /// What the check found channel `index` does.
+    public void Answer(FixtureMapping.Answer a, int index)
     {
-        get
-        {
-            if (Mapping is not { } m) return [];
-            var roles = m.Roles.Where(r => r.Group != "Position").Select(r => r.RoleName).ToHashSet();
-            return m.Channels.Select((c, i) => (c, i)).Where(p => roles.Contains(p.c.Role)).Select(p => p.i).ToList();
-        }
+        if (Mapping is { } m) Mapping = m.Answered(a, index);
+    }
+
+    /// The colour wheel's slots, as named in the check.
+    public void SetWheel(IReadOnlyList<FixtureMapping.Slot> slots)
+    {
+        if (Mapping is { } m) Mapping = m with { Wheel = slots };
+    }
+
+    public void SetSlot(int index, Func<FixtureMapping.Slot, FixtureMapping.Slot> change)
+    {
+        if (Mapping is not { } m || index < 0 || index >= m.Wheel.Count) return;
+        var list = m.Wheel.ToList();
+        list[index] = change(list[index]);
+        Mapping = m with { Wheel = list };
     }
 }
