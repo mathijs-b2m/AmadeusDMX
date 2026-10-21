@@ -8,6 +8,11 @@ struct AmadeusDMXApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
 
+    init() {
+        // tooltips (.help) after a quarter second instead of the system's second: the icon buttons explain themselves
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
+    }
+
     var body: some Scene {
         WindowGroup("Amadeus DMX", id: "main") {
             MainView()
