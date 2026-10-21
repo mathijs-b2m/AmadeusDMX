@@ -41,6 +41,8 @@ public sealed class AppWizardHost(AppModel model) : IWizardHost
     public IReadOnlyList<SetSummary> Sets => model.Sets;
     public IReadOnlyList<RigSummary> Rigs => model.Rigs;
     public void ReloadSets() => model.ReloadSets();
+    public Workspace? Workspace => model.Workspace;
+    public void Edit(string set) => model.EditingSet = set;
 
     public void Select(string rig, string set)
     {
@@ -62,7 +64,8 @@ public sealed class WizardView(AppModel model, WizardModel w, Action dismiss)
         };
         var scroll = UI.Scroll(_content.Padding(new Thickness(36, 40, 36, 20)));
         var bottom = UI.Live(w, BottomBar, nameof(WizardModel.Step), nameof(WizardModel.Creating), nameof(WizardModel.Error),
-                             nameof(WizardModel.Progress), nameof(WizardModel.CanContinue), nameof(WizardModel.AutoMount))
+                             nameof(WizardModel.Progress), nameof(WizardModel.CanContinue), nameof(WizardModel.AutoMount),
+                             nameof(WizardModel.HasSomethingToSave))
             .Bind(model, nameof(AppModel.Workspace), c => c.Content = BottomBar());
         var right = new Grid();
         right.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -116,6 +119,17 @@ public sealed class WizardView(AppModel model, WizardModel w, Action dismiss)
         else if (w.Error is { } e)
             row.Children.Add(Form.Note("exclamationmark.triangle.fill", e, Tint.Red).Grow());
         row.Children.Add(UI.Spacer());
+        if (w.Step is not (WizardStep.Welcome or WizardStep.Engine or WizardStep.Review or WizardStep.Done))
+        {
+            // never trapped: what is chosen so far is saved, the pages take it from there
+            var close = UI.Button(w.HasSomethingToSave ? "Save and Close" : "Close", () =>
+            {
+                if (!w.HasSomethingToSave) { dismiss(); return; }
+                _ = SaveAndClose();
+            }).Disabled(w.Creating)
+              .Tooltip(w.HasSomethingToSave ? "Save the DMX output and the fixtures chosen so far, and go on later on the pages" : "Close the assistant");
+            row.Children.Add(close.Margin(0, 0, 12, 0));
+        }
         if (w.Step is not WizardStep.Welcome and not WizardStep.Done)
             row.Children.Add(UI.Button("Back", () => w.Step = w.PreviousStep).Disabled(w.Creating));
         Button main;
@@ -140,6 +154,33 @@ public sealed class WizardView(AppModel model, WizardModel w, Action dismiss)
         main.Prominent();
         row.Children.Add(main);
         return row;
+    }
+
+    /// Saves what is chosen so far; then where to go on, and the Sets (or DMX Output) page when it's closed.
+    async Task SaveAndClose()
+    {
+        if (await w.SaveAndClose(new AppWizardHost(model)) is not { } note || _content.XamlRoot is not { } root) return;
+        await Dialogs.Show(new ContentDialog
+        {
+            XamlRoot = root, Title = "Saved. Continue Later", Content = Rich(note), CloseButtonText = "Close",
+            DefaultButton = ContentDialogButton.Close,
+        });
+        model.Section = w.Planned.Count == 0 ? Section.Dmx : Section.Set;
+        dismiss();
+    }
+
+    /// The note with its **bold** parts (the Mac's LocalizedStringKey markdown).
+    static TextBlock Rich(string text)
+    {
+        var t = new TextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+        var parts = text.Split("**");
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var run = new Microsoft.UI.Xaml.Documents.Run { Text = parts[i] };
+            if (i % 2 == 1) t.Inlines.Add(new Microsoft.UI.Xaml.Documents.Bold { Inlines = { run } });
+            else t.Inlines.Add(run);
+        }
+        return t;
     }
 
     void Next() => w.Step = w.NextStep(model.Workspace?.IsValid == true, model.Sets.Count > 0);

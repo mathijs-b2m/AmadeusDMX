@@ -53,12 +53,13 @@ public sealed record CatalogDetails
         Modes.Select(p => (p.Key, p.Value.Array?.Count ?? (int)(p.Value.Number ?? 0))).OrderByDescending(m => m.Item2).ToList();
 }
 
-public sealed record ArtNetNode(string Ip, string Name, string? LongName, int? Outputs)
+public sealed record ArtNetNode(string Ip, string Name, string? LongName, int? Outputs, IReadOnlyList<int>? Universes = null)
 {
     public string Id => Ip;
 
     public static ArtNetNode From(JsonElement c) =>
-        new(J.Req(c, "ip", J.String), J.Req(c, "name", J.String), J.Ref(c, "long_name", J.String), J.Val(c, "outputs", J.Int));
+        new(J.Req(c, "ip", J.String), J.Req(c, "name", J.String), J.Ref(c, "long_name", J.String), J.Val(c, "outputs", J.Int),
+            c.TryGetProperty("universes", out var u) && u.ValueKind == JsonValueKind.Array ? u.EnumerateArray().Select(e => e.GetInt32()).ToList() : null);
 }
 
 public sealed record USBInterface(string Port, string? Description, string? Manufacturer, bool? Pro, string? WidgetSerial, string? Firmware)

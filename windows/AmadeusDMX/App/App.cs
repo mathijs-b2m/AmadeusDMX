@@ -93,7 +93,7 @@ public static class AppCommands
             .Follow(model, [nameof(AppModel.EngineRunning), nameof(AppModel.Workspace)],
                     i => i.IsEnabled = model.Workspace is not null && !model.EngineRunning));
         show.Items.Add(new MenuFlyoutSeparator());
-        show.Items.Add(Command("DMX Devices & Output…", window.OpenDMX, VirtualKey.D, Ctrl | Shift)
+        show.Items.Add(Command("DMX Output", window.OpenDMX, VirtualKey.D, Ctrl | Shift)
             .Follow(model, [nameof(AppModel.Workspace)], i => i.IsEnabled = model.Workspace is not null));
         show.Items.Add(new MenuFlyoutSeparator());
         foreach (var m in ShowModes.All)

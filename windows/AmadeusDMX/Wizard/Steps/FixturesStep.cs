@@ -1,4 +1,4 @@
-// Wizard step 1: the set, your fixtures: search the libraries, choose the mode and how many of each
+// Wizard step 2: the set, your fixtures (after the DMX output): search the libraries, choose the mode and how many of each
 // (mac/Sources/AmadeusDMX/Wizard/Steps/FixturesStep.swift).
 namespace AmadeusDMX;
 
@@ -63,7 +63,7 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
     UIElement? Planned()
     {
         if (w.Planned.Count == 0) return w.Results.Count == 0 ? UI.Text("No fixtures yet.").Secondary() : null;
-        return UI.VStack(8, [.. w.Planned.Select(p =>
+        var list = UI.VStack(8, [.. w.Planned.Select(p =>
         {
             var row = UI.HStack(10,
                 UI.Icon(AddToSetSheet.Icon(p.Entry)).Foreground(Tint.Accent).Frame(width: 22),
@@ -73,5 +73,21 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
                 UI.IconButton("minus.circle.fill", "Remove", () => w.Remove(p)));
             return (UIElement)UI.Card(row, padding: 10);
         })]);
+        if (Capacity() is { } c) list.Children.Add(c);
+        return list;
+    }
+
+    /// The universes the fixtures take against what the DMX output carries.
+    UIElement? Capacity()
+    {
+        var need = w.UniversesNeeded;
+        if (w.UniversesAvailable is { } have && need > have)
+            return Form.Note("exclamationmark.triangle.fill",
+                $"{need} universes needed, {w.OutputText} carries {have}. The fixtures past universe {have} stay dark: take fewer, a smaller mode, or go back and tick another node.",
+                Tint.Orange);
+        if (need > 0)
+            return Form.Note("cable.connector", $"{need} universe{(need == 1 ? "" : "s")}"
+                + (w.UniversesAvailable is { } a ? $" of the {a} on {w.OutputText}" : w.OutputKind == WizardModel.Output.Visualiser ? " (visualiser only)" : ""));
+        return null;
     }
 }

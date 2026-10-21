@@ -1,7 +1,7 @@
 // The app's pages, the show's state, and what a show does with the computer (the mode).
 namespace AmadeusDMX;
 
-public enum Section { Show, Set, Rig, Engine, Settings }
+public enum Section { Show, Dmx, Set, Rig, Engine, Settings }
 
 public static class SectionExtensions
 {
@@ -11,13 +11,14 @@ public static class SectionExtensions
 
     public static Section? Parse(string? raw) => raw switch
     {
-        "show" => Section.Show, "set" or "sets" => Section.Set, "rig" => Section.Rig, "engine" => Section.Engine,
+        "show" => Section.Show, "dmx" => Section.Dmx, "set" or "sets" => Section.Set, "rig" => Section.Rig, "engine" => Section.Engine,
         "settings" => Section.Settings, _ => null,
     };
 
     public static string Title(this Section s) => s switch
     {
         Section.Show => "Show",
+        Section.Dmx => "DMX Output",
         Section.Rig => "Rigs",
         Section.Set => "Sets",
         Section.Engine => "Engine",
@@ -27,6 +28,7 @@ public static class SectionExtensions
     public static string Symbol(this Section s) => s switch
     {
         Section.Show => "sparkles.tv",
+        Section.Dmx => "cable.connector",
         Section.Rig => "square.split.bottomrightquarter",
         Section.Set => "light.overhead.right",
         Section.Engine => "terminal",
@@ -37,6 +39,7 @@ public static class SectionExtensions
     public static string Help(this Section s) => s switch
     {
         Section.Show => "The show: the stage, the music and the director",
+        Section.Dmx => "Your DMX devices (Art-Net and sACN nodes, USB interfaces), and where each universe of the set goes (Ctrl+Shift+D)",
         Section.Rig => "Your rigs (the venues: trusses, stage, zones), and the sets placed on them",
         Section.Set => "Your sets of fixtures: their DMX patch and where the DMX goes",
         Section.Engine => "The engine's log",

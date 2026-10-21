@@ -27,7 +27,7 @@ public static class Symbols
         ["cable.connector"] = "", ["cable.connector.slash"] = "", ["shippingbox"] = "", ["shippingbox.fill"] = "",
         ["link.circle.fill"] = "",
         // common actions
-        ["plus"] = "", ["minus"] = "", ["minus.circle"] = "", ["minus.circle.fill"] = "",
+        ["plus"] = "", ["plus.circle"] = "\uECC8", ["minus"] = "", ["minus.circle"] = "", ["minus.circle.fill"] = "",
         ["checkmark"] = "", ["checkmark.circle"] = "", ["checkmark.circle.fill"] = "", ["checkmark.seal.fill"] = "",
         ["checklist"] = "", ["xmark.circle.fill"] = "", ["trash"] = "", ["pencil"] = "",
         ["folder"] = "", ["printer"] = "", ["magnifyingglass"] = "", ["key"] = "", ["key.fill"] = "",

@@ -518,7 +518,7 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
         {
             Content = Metric(set?.IsVirtual ?? true ? "Visualiser" : set?.OutputText ?? "–", "DMX output ›"),
             Background = Tint.Brush(Tint.Black, 0), BorderThickness = new Thickness(0), Padding = new Thickness(0),
-        }.Tooltip("Where the set's universes go: DMX Devices & Output… (Ctrl+Shift+D)");
+        }.Tooltip("Where the set's universes go: the DMX Output page (Ctrl+Shift+D)");
         output.Click += (_, _) => window.OpenDMX();
         var fixtures = doc?.Fixtures ?? [];
         return UI.VStack(12,

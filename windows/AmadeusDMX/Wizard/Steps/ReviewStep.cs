@@ -22,8 +22,8 @@ public static class ReviewStep
             Form.Section("1 · The set",
             [
                 Form.Row("Set name", name),
+                Value("DMX output", w.OutputText),
                 Form.Row("Fixtures", fixtures),
-                Value("Lights", w.OutputText),
                 Value("Director", w.Directors.FirstOrDefault(d => d.Value == w.Director)?.Label ?? w.Director),
             ]),
             Form.Section("2 · The rig", rig),
