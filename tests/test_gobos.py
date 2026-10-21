@@ -62,7 +62,14 @@ def test_the_qlc_converter_drives_one_wheel_and_turns_its_gobos():
     assert set(d["beam_fx"]["gobo_rotate"]) == {"gobo", "gobo_rotation"}
     assert all(k.startswith("qlc/") for k in d["gobo_images"]["gobo"])
     buf = bytearray(512)
-    fx = {"id": "h", "fixture": "chauvet/intimidator-spot-375z-irc", "mode": "15ch", "universe": 1, "address": 1, "x": 0}
+    fx = {
+        "id": "h",
+        "fixture": "chauvet/intimidator-spot-375z-irc",
+        "mode": "15ch",
+        "universe": 1,
+        "address": 1,
+        "x": 0,
+    }
     fxlib.patch(buf, fx, {"h": State(dimmer=1, fx="gobo", gobo=1)})
     rot = attrs.index("gobo_rotation")
     still = buf[rot]

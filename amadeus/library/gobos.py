@@ -218,7 +218,9 @@ def features(t: np.ndarray) -> dict:
     # concentric: how much of the picture's light varies with the radius only
     rs, angles = np.linspace(0.04, 0.92, 32), np.linspace(-np.pi, np.pi, 128, endpoint=False)
     rr, aa = np.meshgrid(rs, angles, indexing="ij")
-    polar = ndimage.map_coordinates(t, [(rr * np.sin(aa) + 1) * n / 2 - 0.5, (rr * np.cos(aa) + 1) * n / 2 - 0.5], order=1)
+    polar = ndimage.map_coordinates(
+        t, [(rr * np.sin(aa) + 1) * n / 2 - 0.5, (rr * np.cos(aa) + 1) * n / 2 - 0.5], order=1
+    )
     concentric = 1 - polar.std(axis=1).mean() / (polar.std() + 1e-6)
     swings = int(np.sum(np.abs(np.diff(polar.mean(axis=1) > 0.5))))
     # the holes: how big, how round, where, and how far they reach from the centre outwards
