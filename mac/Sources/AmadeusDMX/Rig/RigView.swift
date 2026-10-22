@@ -63,12 +63,19 @@ private struct RigList: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            // a real button, full width under the list: the first place you look for a new rig
-            Button { model.showNewRig = true } label: {
-                Label("New Rig…", systemImage: "plus").frame(maxWidth: .infinity)
+            // real buttons, full width under the list: the first place you look for a new rig
+            VStack(spacing: 8) {
+                Button { model.showNewRig = true } label: {
+                    Label("New Rig…", systemImage: "plus").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .help("Make a new rig: start from an empty room or a template (⌥⌘N)")
+                Button { model.showImport = true } label: {
+                    Label("Import from Documents…", systemImage: "doc.badge.arrow.up").frame(maxWidth: .infinity)
+                }
+                .controlSize(.large)
+                .help("Build a set and a rig from a venue's documents: an MVR file, patch sheets, or PDFs (patch lists, riders, light plots) read with AI")
             }
-            .buttonStyle(.borderedProminent).controlSize(.large)
-            .help("Make a new rig: start from an empty room or a template (⌥⌘N)")
             .padding(10)
         }
     }

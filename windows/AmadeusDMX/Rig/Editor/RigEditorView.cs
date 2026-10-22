@@ -53,6 +53,12 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         Accelerator(root, VirtualKey.Y, VirtualKeyModifiers.Control, _undo.Redo, inText: false);
 
         root.Bind(model, nameof(AppModel.ConfigVersion), _ => editor.ReloadIfClean());
+        _ = editor.LoadDrawings(_host);  // the plans an import placed the fixtures from, under the rig
+        if (model.PendingSelection is { } ids)  // a line of the import's report: its fixtures selected once the rig is open
+        {
+            model.PendingSelection = null;
+            editor.Select(ids.Where(id => editor.Doc.Fixtures.Any(f => f.Id == id)).ToList());
+        }
         root.Bind(editor, nameof(RigEditorModel.Message), _ => ClearLater(editor.Message));
         root.Unloaded += async (_, _) =>  // the lights go off
         {
@@ -106,7 +112,8 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         {
             var d = editor.Doc;
             return string.Join("|", editor.Tool, editor.Busy, editor.IsDirty, d.WaitingCount, d.Fixtures.Count, editor.SelectedFixtures.Count,
-                               d.Set, editor.Check is null, editor.ShowZones, editor.Snap, model.EditingRig, model.EngineRunning, model.Rigs.Count);
+                               d.Set, editor.Check is null, editor.ShowZones, editor.Snap, model.EditingRig, model.EngineRunning, model.Rigs.Count,
+                               editor.Drawings.Count);
         }
         var bar = EditorUI.Keyed([editor, model], Key, BuildToolbar);
         return new Border
@@ -186,6 +193,8 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
                 () => Run(() => editor.HangSheet(_host))).Disabled(editor.Busy || d.Fixtures.Count == 0));
         }
 
+        if (editor.Drawings.Count > 0) row.Children.Add(DrawingsMenu());
+
         row.Children.Add(IconToggle(editor.ShowZones ? "eye" : "eye.slash", editor.ShowZones, v => editor.ShowZones = v,
                                     "Show or hide the zones (a selected zone always shows)"));
         row.Children.Add(IconToggle("squareshape.split.3x3", editor.Snap, v => editor.Snap = v,
@@ -239,6 +248,88 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         b.Click += (_, _) => Run(() => editor.AutoMount(_host, all: editor.Doc.WaitingCount == 0));
         b.IsEnabled = !(editor.Busy || d.Fixtures.Count == 0);
         return b;
+    }
+
+    // MARK: the drawings under the rig
+
+    /// Drawings: show or hide each one, how opaque, line one up again, take one away. With one drawing those are
+    /// direct items.
+    FrameworkElement DrawingsMenu()
+    {
+        MenuFlyout Menu()
+        {
+            var drawings = editor.Drawings;
+            var items = new List<MenuFlyoutItemBase?>();
+            if (drawings.Count > 1) items.Add(UI.Note("Show"));
+            foreach (var u in drawings)
+            {
+                var shown = new ToggleMenuFlyoutItem { Text = drawings.Count == 1 ? $"Show “{u.Name}”" : u.Name, IsChecked = editor.IsShown(u) };
+                shown.Click += (_, _) => editor.SetShown(u, shown.IsChecked);
+                items.Add(shown.Tooltip(u.Source));
+            }
+            items.Add(UI.Separator());
+            items.Add(UI.Note("Opacity"));
+            foreach (var o in RigEditorModel.Opacities)
+                items.Add(UI.Choice($"{o * 100:0} %", "drawingOpacity", Math.Abs(editor.DrawingOpacity - o) < 0.01, () => editor.DrawingOpacity = o));
+            items.Add(UI.Separator());
+            if (drawings.Count == 1)
+            {
+                var u = drawings[0];
+                items.Add(UI.Item("Line Up…", () => LineUp(u), "ruler"));
+                items.Add(UI.Item("Remove…", () => RemoveDrawing(u), "trash"));
+            }
+            else
+            {
+                items.Add(UI.SubMenu("Line Up", [.. drawings.Select(u => UI.Item($"{u.Name}…", () => LineUp(u)))]));
+                items.Add(UI.SubMenu("Remove", [.. drawings.Select(u => UI.Item($"{u.Name}…", () => RemoveDrawing(u)))]));
+            }
+            return UI.Menu([.. items]);
+        }
+        var b = UI.MenuButton(UI.Label("doc.richtext", "Drawings"), Menu)
+            .Tooltip("The venue's drawings under the rig (from the import): show or hide them, line one up with the stage, remove one. Best seen from Plan view");
+        b.IsEnabled = !editor.Busy;
+        return b;
+    }
+
+    /// Line Up…: two clicks on the page; unsaved changes are saved or discarded first (the engine saves the rig).
+    async void LineUp(Underlay u)
+    {
+        var root = _root?.XamlRoot;
+        if (root is null) return;
+        if (editor.Picture(u) is not { } picture)
+        {
+            await EditorUI.Alert(root, "Couldn’t Show the Drawing", "Its page isn’t there yet: the engine's setup service may still be starting. Try again in a moment.");
+            return;
+        }
+        if (editor.IsDirty)
+        {
+            var ask = new ContentDialog
+            {
+                XamlRoot = root, Title = "Save your changes first?",
+                Content = UI.Text("Lining up a drawing moves its fixtures and trusses in the saved rig, and the editor reads it again: changes not saved are lost.").Wrap(),
+                PrimaryButtonText = "Save", SecondaryButtonText = "Discard", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary,
+            };
+            switch (await Dialogs.Show(ask))
+            {
+                case ContentDialogResult.Primary:
+                    try { await editor.Save(_host); }
+                    catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(root, "Couldn’t Save", e.Message); return; }
+                    break;
+                case ContentDialogResult.Secondary:
+                    editor.Revert();
+                    break;
+                default:
+                    return;
+            }
+        }
+        if (await new LineUpSheet(u, picture, editor.Doc.Width).Show(root) is { } r)
+            await editor.LineUp(_host, u, r.A, r.B, r.WidthM);
+    }
+
+    async void RemoveDrawing(Underlay u)
+    {
+        if (await EditorUI.Confirm(_root?.XamlRoot, $"Remove the drawing “{u.Name}”?", "It is taken away from under the rig; the fixtures stay where they are.", "Remove"))
+            await editor.RemoveDrawing(_host, u);
     }
 
     // MARK: under the stage
@@ -320,6 +411,7 @@ public sealed class RigMenu(AppModel model, RigEditorModel editor)
                 var r = model.EditingRig;
                 Run(() => model.Api.CreateRig(Unique(r + "-copy"), copyOf: r));
             }, "plus.square.on.square"),
+            UI.Item("Import from Documents…", () => model.ShowImport = true, "doc.badge.arrow.up"),
             UI.Item("Rename…", Rename, "pencil"),
             UI.Item("Show in File Explorer", () =>
             {

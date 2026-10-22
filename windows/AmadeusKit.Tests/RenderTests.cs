@@ -77,6 +77,28 @@ public class RenderTests
     }
 
     [Fact]
+    public void ARaisedStageIsAPlatformAndTheCameraLooksAtItsFloor()
+    {
+        // no height: a big rig's 15 cm deck as before, a small one none
+        Assert.Equal((-0.5f, 12.5f, -3f, -0.2f, 0.15f), new Scenery([], new Stage(12), false).Deck);
+        Assert.Null(new Scenery([], new Stage(4), false).Deck);
+        // 1.5 m: a platform that high up to the stage's front edge, its face to the audience; a small stage too
+        foreach (var w in new[] { 12.0, 4.0 })
+        {
+            var s = new Scenery([], new Stage(w) { DeckM = 1.5 }, false);
+            var (x0, x1, _, y1, top) = s.Deck!.Value;
+            Assert.Equal((-0.5f, (float)w + 0.5f, 0f, 1.5f), (x0, x1, y1, top));
+            Assert.Contains(s.Vertices, v => v.Normal == new Vector3(0, 1, 0) && v.Pos.Y == 0 && v.Pos.Z == 1.5f);   // its front face
+            Assert.Contains(s.Vertices, v => v.Normal == new Vector3(0, 1, 0) && v.Pos.Y == 0 && v.Pos.Z == 0);
+            Assert.True(s.DjHead.Z > 1.5f + 1.5f);   // the DJ stands on it
+        }
+        // what frames the stage's floor looks that much higher
+        Assert.Equal(1.5f, CameraPreset.Plan.Pose(12, 4, -6, 8, deck: 1.5f).Target.Z, 4);
+        Assert.Equal(2.5f, CameraPreset.Drone.Pose(12, 4, -6, 8, deck: 1.5f).Target.Z, 4);
+        Assert.Equal(CameraPreset.Dj.Pose(12, 4, -6, 8).Eye.Z + 1.5f, CameraPreset.Dj.Pose(12, 4, -6, 8, deck: 1.5f).Eye.Z, 3);
+    }
+
+    [Fact]
     public void RayThroughTheMiddleLooksAtTheTarget()
     {
         var r = Renderer(SceneSamples.Club());
@@ -131,6 +153,9 @@ public class RenderTests
         Assert.Equal(SolidVertex.ColorOffset, (int)Marshal.OffsetOf<SolidVertex>(nameof(SolidVertex.Color)));
         Assert.Equal(WallVertex.Size, Marshal.SizeOf<WallVertex>());
         Assert.Equal(WallVertex.UvOffset, (int)Marshal.OffsetOf<WallVertex>(nameof(WallVertex.Uv)));
+        Assert.Equal(UnderlayVertex.Size, Marshal.SizeOf<UnderlayVertex>());
+        Assert.Equal(UnderlayVertex.UvOffset, (int)Marshal.OffsetOf<UnderlayVertex>(nameof(UnderlayVertex.Uv)));
+        Assert.Equal(UnderlayVertex.AlphaOffset, (int)Marshal.OffsetOf<UnderlayVertex>(nameof(UnderlayVertex.Alpha)));
         foreach (var s in new[] { Uniforms.Size, WallParams.Size, BlurParams.Size }) Assert.Equal(0, s % 16);   // cbuffers
     }
 
@@ -193,6 +218,7 @@ public class RenderTests
         ("GoboBeam.hlsl", ["gobo_beam_vertex", "gobo_beam_fragment"]),
         ("GoboDecal.hlsl", ["gobo_decal_vertex", "gobo_decal_fragment"]),
         ("Wall.hlsl", ["wall_vertex", "wall_fragment"]),
+        ("Underlay.hlsl", ["underlay_vertex", "underlay_fragment"]),
         ("Post.hlsl", ["fullscreen_vertex", "composite_fragment", "downsample_fragment", "blur_fragment"]),
     ];
 

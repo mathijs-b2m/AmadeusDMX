@@ -43,6 +43,7 @@ struct MainView: View {
                  : "The show restarts without sending to the lights: the lights black out.")
         }
         .sheet(isPresented: $model.showNewRig) { NewRigSheet().environment(model) }
+        .sheet(isPresented: $model.showImport) { ImportSheet().environment(model) }
         .navigationTitle(model.section == .show ? (model.showState.isActive ? model.feed.hello?.title ?? "Show" : "Show")
                          : model.section.title)
         .navigationSubtitle(subtitle)

@@ -73,9 +73,11 @@ public struct SaveResult: Decodable, Sendable {
 public enum SetupAPIError: LocalizedError {
     case server(String)
     case notRunning
+    /// An import's name is a set or rig already (POST /api/import answers 409).
+    case nameTaken(String)
     public var errorDescription: String? {
         switch self {
-        case .server(let s): s
+        case .server(let s), .nameTaken(let s): s
         case .notRunning: "The engine's setup service is not running."
         }
     }
@@ -98,6 +100,21 @@ public struct SetupAPI: Sendable {
         var req = URLRequest(url: comps.url!)
         req.timeoutInterval = 30
         return try decode(try await URLSession.shared.data(for: req).0)
+    }
+
+    /// A GET whose answer is not JSON (a PDF): the bytes, or the engine's error.
+    func data(_ path: String, query: [String: String] = [:]) async throws -> Data {
+        var comps = URLComponents(url: base.appending(path: path), resolvingAgainstBaseURL: false)!
+        if !query.isEmpty { comps.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) } }
+        var req = URLRequest(url: comps.url!)
+        req.timeoutInterval = 30
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200,
+              http.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("application/json") != true else {
+            let _: [String: JSONValue] = try decode(data)  // throws the engine's error
+            throw SetupAPIError.server("The engine sent nothing.")
+        }
+        return data
     }
 
     func post<T: Decodable>(_ path: String, _ body: Any, query: [String: String] = [:], timeout: TimeInterval = 60) async throws -> T {
@@ -223,6 +240,64 @@ public struct SetupAPI: Sendable {
 
     public func renameRig(_ name: String, to new: String) async throws {
         let _: [String: JSONValue] = try await post("api/rigs", ["rename": name, "to": new])
+    }
+
+    // MARK: importing a venue's documents (amadeus/web/importer.py)
+
+    /// Starts building a set and a rig (of the same name) from documents: MVR files and patch sheets, PDFs read with
+    /// AI. Returns the job to follow; a name already taken (and not `replace`) throws `.nameTaken`.
+    public func startImport(name: String, files: [(name: String, data: Data)], replace: Bool) async throws -> String {
+        var req = URLRequest(url: base.appending(path: "api/import"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = 300  // a few MB of base64
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let list = files.map { ["name": $0.name, "data": $0.data.base64EncodedString()] }
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["name": name, "files": list, "replace": replace] as [String: Any])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if (resp as? HTTPURLResponse)?.statusCode == 409 {
+            let e = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+            throw SetupAPIError.nameTaken(e ?? "A set or rig called “\(name)” exists already")
+        }
+        struct R: Decodable { var job: String }
+        let r: R = try decode(data)
+        return r.job
+    }
+
+    /// Where an import is: its step while it runs, the report when it is done.
+    public func importStatus(_ job: String) async throws -> ImportJob {
+        try await get("api/import", query: ["job": job])
+    }
+
+    /// Stop an import at its next step; nothing is saved.
+    public func cancelImport(_ job: String) async throws -> ImportJob {
+        try await post("api/import/cancel", ["job": job])
+    }
+
+    /// The drawings under a rig (a venue's light plots), each with its corners on the rig.
+    public func underlays(rig: String) async throws -> [Underlay] {
+        struct R: Decodable { var underlays: [Underlay] }
+        let r: R = try await get("api/underlays", query: ["rig": rig])
+        return r.underlays
+    }
+
+    /// One drawing's page, as a one-page PDF.
+    public func underlayPage(file: String) async throws -> Data {
+        try await data("api/underlay/page", query: ["file": file])
+    }
+
+    /// Lines a drawing up again: `a` and `b` (page fractions) are the stage's front edge at stage left and stage
+    /// right, `widthM` apart. The rig is saved: the drawing's fixtures (and their trusses) move with it.
+    public func alignUnderlay(rig: String, id: String, a: [Double], b: [Double], widthM: Double) async throws -> Underlay {
+        struct R: Decodable { var underlay: Underlay }
+        let r: R = try await post("api/underlay/align", ["rig": rig, "id": id, "a": a, "b": b, "width_m": widthM])
+        return r.underlay
+    }
+
+    /// Takes a drawing away from under the rig (the fixtures stay where they are); the ones left come back.
+    public func removeUnderlay(rig: String, id: String) async throws -> [Underlay] {
+        struct R: Decodable { var underlays: [Underlay] }
+        let r: R = try await post("api/underlay/remove", ["rig": rig, "id": id])
+        return r.underlays
     }
 
     private func pair(_ rig: String?, _ set: String?) -> [String: String] {
@@ -376,6 +451,74 @@ public struct SetupAPI: Sendable {
         try await post("api/fixture/new", ["manufacturer": manufacturer, "model": model, "template": template,
                                            "channels": channels, "type": type, "watts": watts,
                                            "pan_deg": panDeg, "tilt_deg": tiltDeg])
+    }
+}
+
+/// An import from a venue's documents (GET /api/import): running, then done or failed with its report.
+public struct ImportJob: Decodable, Sendable {
+    /// A line of the report: what was found (ok), what to look at (check), what is missing.
+    public struct Note: Decodable, Sendable, Hashable {
+        public var level: String          // ok | check | missing
+        public var text: String
+        public var ids: [String]?         // the fixtures it is about
+    }
+    public var state: String              // running | done | failed
+    public var step: String?
+    public var notes: [Note]
+    public var name: String?
+    public var fixtures: Int?
+    public var trusses: Int?
+    public var underlays: Int?
+    public var error: String?
+
+    enum CodingKeys: String, CodingKey { case state, step, notes, name, fixtures, trusses, underlays, error }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        state = try c.decode(String.self, forKey: .state)
+        step = try c.decodeIfPresent(String.self, forKey: .step)
+        notes = try c.decodeIfPresent([Note].self, forKey: .notes) ?? []
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        fixtures = try c.decodeIfPresent(Int.self, forKey: .fixtures)
+        trusses = try c.decodeIfPresent(Int.self, forKey: .trusses)
+        underlays = try c.decodeIfPresent(Int.self, forKey: .underlays)
+        error = try c.decodeIfPresent(String.self, forKey: .error)
+    }
+}
+
+/// A drawing under a rig (a page of a venue's light plot, rig/importer/underlay.py): where it lies on the rig.
+public struct Underlay: Decodable, Sendable, Identifiable, Hashable {
+    public var id: String
+    public var title: String
+    public var source: String?
+    public var file: String               // its page (GET /api/underlay/page)
+    public var set: String?               // the set it was imported with
+    public var a: [Double]?               // the stage's front edge on the page (fractions from the top left): stage left
+    public var b: [Double]?               // … and stage right
+    public var fixtures: [String: [Double]]  // where it shows each fixture (page fractions)
+    /// The plan's part of the page (a page can hold several plans): x0, y0, x1, y1 in page fractions from the top
+    /// left; [0, 0, 1, 1] when the whole page.
+    public var crop: [Double]
+    /// That part's top-left, top-right, bottom-right and bottom-left corners on the rig (metres: x from stage left,
+    /// y towards the audience), the frame trusses are in.
+    public var corners: [SIMD2<Double>]
+
+    enum CodingKeys: String, CodingKey { case id, title, source, file, set, a, b, fixtures, crop, corners }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
+        source = try c.decodeIfPresent(String.self, forKey: .source)
+        file = try c.decode(String.self, forKey: .file)
+        set = try c.decodeIfPresent(String.self, forKey: .set)
+        a = try c.decodeIfPresent([Double].self, forKey: .a)
+        b = try c.decodeIfPresent([Double].self, forKey: .b)
+        fixtures = try c.decodeIfPresent([String: [Double]].self, forKey: .fixtures) ?? [:]
+        crop = (try c.decodeIfPresent([Double].self, forKey: .crop)).flatMap { $0.count == 4 ? $0 : nil } ?? [0, 0, 1, 1]
+        corners = (try c.decodeIfPresent([[Double]].self, forKey: .corners) ?? []).compactMap { p in
+            p.count >= 2 ? SIMD2(p[0], p[1]) : nil
+        }
     }
 }
 

@@ -62,8 +62,9 @@ enum CameraPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The pose for a room (fits the rig, like the web visualiser's camera).
-    func pose(width W: Float, top: Float, back: Float, ceiling: Float) -> CameraPose {
+    /// The pose for a room (fits the rig, like the web visualiser's camera); `deck`: the stage's height above the
+    /// hall floor (what looks at the stage floor looks that much higher, the DJ stands on it).
+    func pose(width W: Float, top: Float, back: Float, ceiling: Float, deck: Float = 0) -> CameraPose {
         let cx = W / 2
         let roomH = max(top + 1, min(ceiling, top + 4))
         let tz = max(1.3, roomH * 0.5)
@@ -74,14 +75,14 @@ enum CameraPreset: String, CaseIterable, Identifiable {
         case .crowd:
             return .from(eye: [cx - W * 0.12, dist * 0.45, 1.7], target: [cx, back / 2, tz * 1.15])
         case .drone:
-            return .from(eye: [cx + W * 0.45, dist * 1.25, roomH + dist * 0.75], target: [cx, back / 2.5, 1.0])
+            return .from(eye: [cx + W * 0.45, dist * 1.25, roomH + dist * 0.75], target: [cx, back / 2.5, deck + 1.0])
         case .side:
             return .from(eye: [cx + W * 0.5 + dist * 0.75, dist * 0.35, roomH * 0.55], target: [cx, back / 3, tz])
         case .dj:
-            return .from(eye: [cx, back + 1.6, 2.6], target: [cx, 8, 1.8])
+            return .from(eye: [cx, back + 1.6, deck + 2.6], target: [cx, 8, 1.8])
         case .plan:  // top-down (almost: straight down has no "up" for the camera)
             let span = max(W + 6, -back + 8)
-            return CameraPose(target: [cx, back / 2 + 1, 0], yaw: 0, pitch: 1.45, distance: span * 1.25)
+            return CameraPose(target: [cx, back / 2 + 1, deck], yaw: 0, pitch: 1.45, distance: span * 1.25)
         }
     }
 }

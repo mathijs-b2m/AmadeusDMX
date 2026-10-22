@@ -68,6 +68,11 @@ machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 }
 ```
 
+`stage.deck_m` is the stage's height above the hall floor (default 0: the stage is the floor). Heights (`z_m`, a
+truss's `z_m`, `ceiling_m`) count from the hall floor, so on a 1.5 m stage a fixture standing on it has `z_m` 1.5;
+auto-mount puts its floor rows on the deck, beams land on it, and the hang sheet gives a stage truss's height above
+the stage as well.
+
 `stage.outdoor: true` is an open-air stage: there is no ceiling (`ceiling_m` and the ceiling guard are ignored),
 the sky aim goes higher and wider, the directors aim at the sky far more often (the AI is told it is an outdoor
 show), and smoke clears in about a minute instead of five. Indoors nothing changes: the ceiling guard keeps
@@ -156,6 +161,35 @@ order along the rig, the hang sheet's order (top1 at the first place from stage 
 count along a truss like the places do; *Auto-Mount › Put in Name Order* does the same for a rig mounted before,
 on the spots its fixtures already take. Fixtures that are already mounted keep
 their place, and their room on a truss is left free.
+
+## Import from a venue's documents
+
+`amadeus rig NAME --import FILE…` builds a set and a rig `NAME` from what a venue sends (`amadeus/rig/importer/`):
+
+- **MVR** (Vectorworks, Capture, grandMA3, Depence): every fixture with its position, the way it hangs and
+  points, its GDTF type and mode, and its patch; the drawn trusses. Read as drawn with the audience at the
+  bottom of the plan (+Y upstage), the origin at downstage centre on the stage floor.
+- **Patch sheets** (CSV, Excel): a header row naming at least the fixture type and its address; mode, universe,
+  id, position, quantity and x/y/z columns are used when they are there. "1.141", "1/141", "U1 141" and dimmer
+  ranges ("1.013 > 1.019": one conventional light per channel) are understood.
+
+Each type is found in the libraries (ours, QLC+, the Open Fixture Library); a match must name the same model
+numbers, and its mode is the one as long as the document's footprint (or the spacing of the patch). Nothing
+close: a conventional light plays on one dimmer channel, anything else is made from a generic template.
+Hanging fixtures go on the drawn trusses, else on trusses found from their rows; fixtures without a position
+are auto-mounted. The report says what was assumed (the frame, the stage size), what is a guess to check (a
+near match, a mode the documents don't name, fixed lights pointing at a wall or the ceiling) and what is
+missing (no patch).
+
+- **PDFs** (patch lists, the technical rider, light plots) are read with AI and need **your own OpenAI API key**
+  (Settings › OpenAI in the app, or `OPENAI_API_KEY` in `.env`); without one nothing is sent and the report
+  says so. Every page of every PDF is read: the text pages together (every patched fixture, the modes the notes
+  name, the stage's size and heights, house lights left out), each drawing on its own (its plans, the audience
+  side, the stage's edges or the hall's walls for the scale, every fixture symbol and its label, the trusses).
+  The patch says what the fixtures are; a plan places them, matched by number or address. The scale of a plan
+  comes from the sizes the rider gives (the median of what agrees); a plan that doesn't show the stage, like a
+  hall plot, gets a rough scale and the report asks to check it. Answers are cached (`.cache/import`), so
+  importing the same files again costs nothing.
 
 ## Hang sheet
 

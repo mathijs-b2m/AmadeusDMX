@@ -106,6 +106,17 @@ public struct WallVertex(Vector3 pos, Vector2 uv)
     public const int Size = 20, UvOffset = 12;
 }
 
+/// A drawing under the rig (Underlay.hlsl): where on the floor, where on its page, how opaque.
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
+public struct UnderlayVertex(Vector3 pos, Vector2 uv, float alpha)
+{
+    public Vector3 Pos = pos;
+    public Vector2 Uv = uv;
+    public float Alpha = alpha;
+
+    public const int Size = 24, UvOffset = 12, AlphaOffset = 20;
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
 public struct WallParams
 {

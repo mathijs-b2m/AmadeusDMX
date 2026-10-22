@@ -131,7 +131,12 @@ public sealed class SetupAPI
     }
 
     async Task<byte[]> Send(HttpMethod method, string path, object? body, IReadOnlyDictionary<string, string>? query, double timeout,
-                            CancellationToken ct)
+                            CancellationToken ct) =>
+        (await Exchange(method, path, body, query, timeout, ct)).Data;
+
+    /// A request and the whole answer: its status, its content type and its bytes.
+    async Task<(int Status, string? Type, byte[] Data)> Exchange(HttpMethod method, string path, object? body,
+                                                                IReadOnlyDictionary<string, string>? query, double timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(timeout));
@@ -142,7 +147,7 @@ public sealed class SetupAPI
             req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         }
         using var resp = await Http.SendAsync(req, cts.Token);
-        return await resp.Content.ReadAsByteArrayAsync(cts.Token);
+        return ((int)resp.StatusCode, resp.Content.Headers.ContentType?.MediaType, await resp.Content.ReadAsByteArrayAsync(cts.Token));
     }
 
     internal async Task<T> Get<T>(string path, Func<JsonElement, T> decode, IReadOnlyDictionary<string, string>? query = null,
@@ -404,6 +409,57 @@ public sealed class SetupAPI
             manufacturer, model, template, channels, type, watts, pan_deg = panDeg, tilt_deg = tiltDeg,
         }, AmadeusKit.NewFixture.From, ct: ct);
 
+    // MARK: importing a venue's documents (amadeus/web/importer.py)
+
+    /// Starts building a set and a rig `name` from a venue's files (PDFs, MVR, patch sheets): the job to follow with
+    /// ImportStatus. Null when a set or rig of that name exists already and not `replace` (the engine's 409).
+    /// Generous time: the files go up whole, in base64.
+    public async Task<string?> StartImport(string name, IEnumerable<(string Name, byte[] Data)> files, bool replace = false,
+                                           CancellationToken ct = default)
+    {
+        var body = new
+        {
+            name, replace, files = files.Select(f => new { name = f.Name, data = Convert.ToBase64String(f.Data) }).ToList(),
+        };
+        var (status, _, data) = await Exchange(HttpMethod.Post, "api/import", body, null, 300, ct);
+        if (status == 409 && !replace) return null;
+        return Decode(data, c => J.Req(c, "job", J.String));
+    }
+
+    /// How an import goes: its step while it runs, the report when it is done or failed.
+    public Task<ImportStatus> ImportStatus(string job, CancellationToken ct = default) =>
+        Get("api/import", AmadeusKit.ImportStatus.From, new Dictionary<string, string> { ["job"] = job }, ct);
+
+    /// Stops an import at its next step; nothing is saved.
+    public Task<ImportStatus> CancelImport(string job, CancellationToken ct = default) =>
+        Post("api/import/cancel", new { job }, AmadeusKit.ImportStatus.From, ct: ct);
+
+    /// The drawings under a rig (the plans an import placed its fixtures from), each with its corners on the rig.
+    public Task<Underlay[]> Underlays(string rig, CancellationToken ct = default) =>
+        Get("api/underlays", c => J.Req(c, "underlays", J.ArrayOf(Underlay.From)), new Dictionary<string, string> { ["rig"] = rig }, ct);
+
+    /// A drawing's page: a one-page PDF.
+    public async Task<byte[]> UnderlayPage(string file, CancellationToken ct = default)
+    {
+        var (_, type, data) = await Exchange(HttpMethod.Get, "api/underlay/page", null, new Dictionary<string, string> { ["file"] = file }, 60, ct);
+        if (type?.StartsWith("application/pdf", StringComparison.Ordinal) != true)
+        {
+            Decode(data, AnyObject);  // throws the engine's error
+            throw SetupAPIException.Server("The engine sent no page.");
+        }
+        return data;
+    }
+
+    /// Lines a drawing up again: `a` and `b` (page fractions from its top left) are the stage's front edge at stage
+    /// left and at stage right, `widthM` apart. The rig file is saved, its fixtures and their trusses moved.
+    public Task<Underlay> AlignUnderlay(string rig, string id, Vec2 a, Vec2 b, double widthM, CancellationToken ct = default) =>
+        Post("api/underlay/align", new { rig, id, a = new[] { a.X, a.Y }, b = new[] { b.X, b.Y }, width_m = widthM },
+            c => J.Req(c, "underlay", Underlay.From), ct: ct);
+
+    /// Takes a drawing away (the fixtures stay where they are); the drawings left.
+    public Task<Underlay[]> RemoveUnderlay(string rig, string id, CancellationToken ct = default) =>
+        Post("api/underlay/remove", new { rig, id }, c => J.Req(c, "underlays", J.ArrayOf(Underlay.From)), ct: ct);
+
     // MARK: DMX devices (config/devices.json)
 
     /// Your DMX devices, and the USB DMX interfaces plugged in now.
@@ -414,6 +470,98 @@ public sealed class SetupAPI
     public Task<string[]> SaveDMXDevices(IEnumerable<DMXDevice> devices, CancellationToken ct = default) =>
         Post("api/devices", new { devices = devices.Select(d => d.Json).ToList() },
             c => { J.Req(c, "ok", J.Bool); return J.Req(c, "problems", J.ArrayOf(J.String)); }, ct: ct);
+}
+
+/// What an import of a venue's documents says about itself (GET /api/import?job=…).
+public sealed record ImportStatus
+{
+    /// A line of the report: "ok" (✓), "check" (? a guess to check), "missing" (✗); `Ids` the fixtures it is about.
+    public sealed record Note(string Level, string Text, IReadOnlyList<string> Ids)
+    {
+        public static Note From(JsonElement c) =>
+            new(J.Req(c, "level", J.String), J.Req(c, "text", J.String), J.Ref(c, "ids", J.ArrayOf(J.String)) ?? []);
+    }
+
+    public string State { get; init; } = "running";   // running | done | failed | cancelled
+    public string Step { get; init; } = "";
+    public IReadOnlyList<Note> Notes { get; init; } = [];
+    public string Name { get; init; } = "";
+    public int? Fixtures { get; init; }
+    public int? Trusses { get; init; }
+    public int? Underlays { get; init; }
+    public string? Error { get; init; }
+
+    public bool Running => State == "running";
+    public bool Done => State == "done";
+    public bool Failed => State == "failed";
+
+    public static ImportStatus From(JsonElement c) => new()
+    {
+        State = J.Req(c, "state", J.String), Step = J.Ref(c, "step", J.String) ?? "", Notes = J.Ref(c, "notes", J.ArrayOf(Note.From)) ?? [],
+        Name = J.Ref(c, "name", J.String) ?? "", Fixtures = J.Val(c, "fixtures", J.Int), Trusses = J.Val(c, "trusses", J.Int),
+        Underlays = J.Val(c, "underlays", J.Int), Error = J.Ref(c, "error", J.String),
+    };
+
+    /// The report in the order it is read: what is missing first, then what to check, then what went right.
+    public IReadOnlyList<Note> Report =>
+        Notes.Select((n, i) => (n, i)).OrderBy(p => p.n.Level switch { "missing" => 0, "check" => 1, _ => 2 }).ThenBy(p => p.i)
+            .Select(p => p.n).ToList();
+}
+
+/// A drawing under a rig (amadeus/rig/importer/underlay.py): a plan's page, and where it lies on the rig.
+/// `A`/`B` and `Fixtures` are page fractions (0..1, from the page's top left): the stage's front edge at stage left and
+/// stage right, and where each of its fixtures was drawn. `Crop`: the part of the page that is this plan ([x0, y0, x1,
+/// y1], page fractions: a page can hold several). `Corners`: that part's top-left, top-right, bottom-right and
+/// bottom-left corners on the rig, in rig metres (x from stage left, y towards the audience: the trusses' frame).
+public sealed record Underlay
+{
+    public string Id { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Source { get; init; } = "";
+    public string File { get; init; } = "";
+    public double W { get; init; }
+    public double H { get; init; }
+    public string Set { get; init; } = "";
+    public Vec2 A { get; init; }
+    public Vec2 B { get; init; }
+    public Vec2 AM { get; init; }
+    public Vec2 BM { get; init; }
+    public IReadOnlyDictionary<string, Vec2> Fixtures { get; init; } = new Dictionary<string, Vec2>();
+    public IReadOnlyList<Vec2> Corners { get; init; } = [];
+    public IReadOnlyList<double> Crop { get; init; } = WholePage;
+
+    /// The crop of a page that is one plan.
+    public static readonly IReadOnlyList<double> WholePage = [0, 0, 1, 1];
+
+    static Vec2 Point(JsonElement e)
+    {
+        var a = J.Array(e, J.Double);
+        if (a.Length < 2) throw new JsonException("a point is [x, y]");
+        return new(a[0], a[1]);
+    }
+
+    public static Underlay From(JsonElement c) => new()
+    {
+        Id = J.Req(c, "id", J.String), Title = J.Ref(c, "title", J.String) ?? "", Source = J.Ref(c, "source", J.String) ?? "",
+        File = J.Req(c, "file", J.String), W = J.Val(c, "w", J.Double) ?? 0, H = J.Val(c, "h", J.Double) ?? 0,
+        Set = J.Ref(c, "set", J.String) ?? "",
+        A = J.Val(c, "a", Point) ?? new(0, 0), B = J.Val(c, "b", Point) ?? new(1, 0),
+        AM = J.Val(c, "a_m", Point) ?? new(0, 0), BM = J.Val(c, "b_m", Point) ?? new(0, 0),
+        Fixtures = J.Ref(c, "fixtures", J.DictOf(Point)) ?? [],
+        Corners = J.Ref(c, "corners", J.ArrayOf(Point)) ?? [],
+        Crop = J.Ref(c, "crop", J.ArrayOf(J.Double)) is { Length: 4 } crop ? crop : WholePage,
+    };
+
+    /// The name to show: its title, else where it came from.
+    public string Name => Title.Length > 0 ? Title : Source.Length > 0 ? Source : Id;
+
+    /// The distance between its two reference points on the rig (m): the stage width it was lined up with.
+    public double WidthM => (BM - AM).Length;
+
+    public bool Equals(Underlay? o) => o is not null && Id == o.Id && File == o.File && Set == o.Set && A == o.A && B == o.B
+                                       && AM == o.AM && BM == o.BM && Corners.SequenceEqual(o.Corners)
+                                       && Crop.SequenceEqual(o.Crop);
+    public override int GetHashCode() => HashCode.Combine(Id, File);
 }
 
 /// A fixture mode as the DMX mapper shows it (amadeus/library/mapper.py).

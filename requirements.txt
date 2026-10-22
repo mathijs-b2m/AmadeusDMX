@@ -5,3 +5,4 @@ sounddevice==0.5.6
 soundfile==0.14.0
 websockets==17.2
 pyserial==3.5
+pypdf==6.21.2

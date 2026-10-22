@@ -82,7 +82,12 @@ sealed class RigList(AppModel model)
         var add = UI.Button("New Rig…", () => model.ShowNewRig = true, "plus").Prominent().Tooltip("Make a new rig: start from an empty room or a template (Ctrl+Alt+N)");
         add.HorizontalAlignment = HorizontalAlignment.Stretch;
         add.Padding = new Thickness(10);
-        add.Margin = new Thickness(10);
+        // and one built from what a venue sends: its patch lists, rider and light plots
+        var import = UI.Button("Import from Documents…", () => model.ShowImport = true, "doc.badge.arrow.up")
+            .Tooltip("Build a set and a rig from a venue's documents: MVR files, patch sheets, PDFs of patch lists, riders and light plots");
+        import.HorizontalAlignment = HorizontalAlignment.Stretch;
+        import.Padding = new Thickness(10);
+        var buttons = UI.VStack(8, add, import).Padding(10);
 
         var root = new Grid
         {
@@ -94,10 +99,10 @@ sealed class RigList(AppModel model)
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(header, 0);
         Grid.SetRow(list, 1);
-        Grid.SetRow(add, 2);
+        Grid.SetRow(buttons, 2);
         root.Children.Add(header);
         root.Children.Add(list);
-        root.Children.Add(add);
+        root.Children.Add(buttons);
         return root;
     }
 

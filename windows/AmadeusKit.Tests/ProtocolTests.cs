@@ -45,6 +45,21 @@ public class ProtocolTests
         Assert.Equal(Room.Surface.Air, room.Hit(new(0, 0, 2), new(0, 0, 1)).Surface);  // straight up: no ceiling
     }
 
+    [Fact]
+    public void ARaisedStageRoundTripsAndBeamsLandOnIt()
+    {
+        var st = Stage.From(JSONValue.Parse("""{"width_m": 12, "deck_m": 1.5}""").ToJson().Let(b => J.ParseElement(b)));
+        Assert.Equal(1.5, st.DeckM);
+        Assert.Equal(1.5, st.ToJSON()["deck_m"]?.Number);
+        Assert.Equal(0, Stage.From(JSONValue.Parse("""{"width_m": 12}""").ToJson().Let(b => J.ParseElement(b))).DeckM);
+        var room = new Room(st, []);
+        // straight down on the stage: on its deck, 1.5 m above the hall floor; in front of it: on the hall floor
+        Assert.Equal(2.5f, room.Hit(new(6, -2, 4), new(0, 0, -1)).T, 4);
+        Assert.Equal(Room.Surface.Floor, room.Hit(new(6, -2, 4), new(0, 0, -1)).Surface);
+        Assert.Equal(4f, room.Hit(new(6, 2, 4), new(0, 0, -1)).T, 4);
+        Assert.Equal(4f, new Room(new Stage(), []).Hit(new(6, -2, 4), new(0, 0, -1)).T, 4);
+    }
+
     [Theory]
     [InlineData("small", 6)]
     [InlineData("laser-zones", 0)]

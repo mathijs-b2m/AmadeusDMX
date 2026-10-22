@@ -1,0 +1,197 @@
+"""Build a set and a rig from a venue's documents: an MVR scene, patch sheets (CSV, Excel), PDFs.
+
+`build(files, name)` reads every file into one draft (`draft.Item` per fixture), finds each type in the library
+(`resolve`), hangs what has a position (`layout`), auto-mounts the rest, and checks the result. It returns the
+set, the rig and a report: what was assumed, what was guessed and should be checked, what is missing. Nothing
+is saved until `save`. MVR files and patch sheets need no AI and no account; PDFs (patch lists, riders, light
+plots) are read with AI and need the user's own OpenAI API key (`pdf`).
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from amadeus.library import fixtures as fxlib
+from amadeus.rig import geometry, store
+from amadeus.rig.automount import automount
+from amadeus.rig.importer import layout, mvr, pdf, resolve, sheet, underlay
+from amadeus.rig.importer.draft import Draft, Note
+
+READERS = {
+    ".mvr": mvr.read,
+    ".csv": sheet.read,
+    ".tsv": sheet.read,
+    ".txt": sheet.read,
+    ".xlsx": sheet.read,
+    ".xlsm": sheet.read,
+}
+
+
+@dataclass
+class Result:
+    set_doc: dict
+    rig_doc: dict
+    notes: list[Note] = field(default_factory=list)
+    pages: dict[str, bytes] = field(default_factory=dict)  # the drawings under the rig, by file name
+
+    def report(self) -> list[dict]:
+        return [{"level": n.level, "text": n.text, "ids": n.ids} for n in self.notes]
+
+
+def read(files: list[Path], client=None, progress=None) -> Draft:
+    """Every file into one draft; the PDFs together (a patch in one, its drawings in another)."""
+    draft = Draft()
+    pdfs = [p for p in files if p.suffix.lower() == ".pdf"]
+    if pdfs:
+        try:
+            draft.merge(pdf.read(pdfs, client, progress))
+        except (OSError, ValueError, KeyError) as e:
+            draft.note("missing", f"{', '.join(p.name for p in pdfs)}: couldn't be read ({e})")
+    for p in files:
+        if p in pdfs:
+            continue
+        reader = READERS.get(p.suffix.lower())
+        if reader is None:
+            draft.note("missing", f"{p.name}: can't read this kind of file (MVR, PDF, CSV and Excel can be read)")
+            continue
+        try:
+            draft.merge(reader(p))
+        except (OSError, ValueError, KeyError) as e:
+            draft.note("missing", f"{p.name}: couldn't be read ({e})")
+    return draft
+
+
+def build(files: list[Path], name: str, client=None, progress=None) -> Result:
+    """`progress(text)` hears each step (reading with AI takes a while)."""
+    draft = read(files, client, progress)
+    if progress and draft.items:
+        progress("Finding the fixtures in the libraries and hanging them…")
+    if not draft.items:
+        return Result({"fixtures": []}, {"trusses": [], "placements": {}}, draft.notes)
+    choices = resolve.resolve(draft)
+    set_doc, rig_doc = layout.build(draft, choices, name)
+    pages = underlays(draft, set_doc, rig_doc, name)
+    by_id = {f["id"]: i for i, f in enumerate(set_doc["fixtures"])}
+    for c in {id(c): c for c in choices.values()}.values():
+        who = [f["id"] for f in set_doc["fixtures"] if choices[by_id[f["id"]]] is c]
+        model = fxlib.get(c.key)
+        text = f"{len(who)} × {model['manufacturer']} {model['model']}, mode {c.mode} ({c.footprint} ch)"
+        draft.note("ok" if c.sure else "check", text + (f": {c.why}" if c.why else ""), who)
+    if any(it.pos for it in draft.items) and not draft.stage.get("width_m"):
+        st = rig_doc["stage"]
+        draft.note(
+            "check",
+            f"Stage {st['width_m']:g} m wide and the room {st['room_depth_m']:g} m deep, judged from "
+            "where the fixtures hang (the documents don't give it): set the real size in the rig editor",
+        )
+    merged = store.compose(set_doc, rig_doc, name)
+    waiting = [f["id"] for f in merged["fixtures"] if f.get("_unplaced")]
+    if waiting:
+        had_trusses = bool(rig_doc["trusses"])
+        rig_doc["placements"][name].update(mount_waiting(merged, waiting, draft, set_doc))
+        rig_doc["trusses"] = merged["trusses"]
+        where = "on the trusses found" if had_trusses else "on a standard structure for the stage"
+        draft.note(
+            "check",
+            f"{len(waiting)} fixtures had no position in the documents: auto-mounted {where}; "
+            "move them where they really hang",
+            waiting,
+        )
+    if not any(it.address for it in draft.items):
+        draft.note("missing", "No DMX patch in the documents: give the fixtures their addresses on the Set page")
+    draft.notes += checks(store.compose(set_doc, rig_doc, name))
+    return Result(set_doc, rig_doc, draft.notes, pages)
+
+
+FLOOR = re.compile(r"floor|vloer|deck", re.I)
+HALL = re.compile(r"hall|zaal|audience|publiek|foh|f\.o\.h|balcon|front|house", re.I)
+
+
+def mount_waiting(merged: dict, waiting: list[str], draft: Draft, set_doc: dict) -> dict[str, dict]:
+    """Auto-mount the fixtures the documents give no spot, where the patch says they hang: heads "on the stage
+    floor" in a row at the back of the stage, "hall"/"front"/"balcony" ones on the trusses over the crowd, the rest
+    on the stage's trusses (each group on all trusses when its own kind has none)."""
+    where = {f["id"]: it.where for f, it in zip(set_doc["fixtures"], draft.items)}
+    places: dict[str, dict] = {}
+    floor = [f for f in waiting if FLOOR.search(where.get(f, "")) and not HALL.search(where.get(f, ""))]
+    depth = float(draft.stage.get("depth_m") or 4.0)
+    for k, fid in enumerate(floor):  # spread along the back of the stage
+        places[fid] = {"x": round((k + 1) / (len(floor) + 1), 4), "y_m": round(-depth + 0.8, 2),
+                       "z_m": float(draft.stage.get("deck_m") or 0.0),
+                       "mount": "floor"}  # fmt: skip
+    rest = [f for f in waiting if f not in places]
+    groups = {
+        "hall": [f for f in rest if HALL.search(where.get(f, ""))],
+        "stage": [f for f in rest if not HALL.search(where.get(f, ""))],
+    }
+    everything = merged.get("trusses", [])
+    for zone, ids in groups.items():
+        if not ids:
+            continue
+        own = [t for t in everything if (t.get("y_m", 0.0) > 1.0) == (zone == "hall")]
+        if everything:
+            merged["trusses"] = own or everything
+        places.update(automount(merged, ids))
+        everything = everything or merged.get("trusses", [])  # a standard structure, when there was none
+        merged["trusses"] = everything
+    return places
+
+
+def underlays(draft: Draft, set_doc: dict, rig_doc: dict, name: str) -> dict[str, bytes]:
+    """The plans fixtures were placed from, as the rig's drawings (underlay.py); returns their pages by file."""
+    spots: dict[int, dict] = {}
+    for f, it in zip(set_doc["fixtures"], draft.items):
+        if it.page:
+            spots.setdefault(it.page[0], {})[f["id"]] = [round(it.page[1], 5), round(it.page[2], 5)]
+    pages, out = {}, []
+    for i, u in enumerate(draft.underlays):
+        if i not in spots or "a" not in u:
+            continue
+        file = underlay.page_name(u["pdf"])
+        pages[file] = u["pdf"]
+        out.append({"id": f"u{len(out) + 1}", "title": u["title"], "source": u["source"], "file": file,
+                    "w": u["w"], "h": u["h"], "set": name, "a": u["a"], "b": u["b"], "a_m": u["a_m"],
+                    "b_m": u["b_m"], "fixtures": spots[i]})  # fmt: skip
+        if u.get("crop"):
+            out[-1]["crop"] = u["crop"]
+    if out:
+        rig_doc["underlays"] = out
+    return pages
+
+
+def checks(merged: dict) -> list[Note]:
+    """What a person should look at in the result: patch problems, fixtures left over, fixed lights that point
+    out of the room (at a side wall, or up at the ceiling from under a truss)."""
+    out = [Note("missing", p) for p in fxlib.validate(merged)]
+    out += [Note("check", p) for p in fxlib.overlaps(merged)]
+    left = [f["id"] for f in merged["fixtures"] if f.get("_unplaced")]
+    if left:
+        out.append(Note("missing", f"{len(left)} fixtures have no place on the rig", left))
+    W = merged["stage"]["width_m"]
+    wall, up = [], []
+    for f in merged["fixtures"]:
+        kind = fxlib.get(f["fixture"])["kind"]
+        if kind in ("moving_head", "moving_bar", "smoke", "laser") or f.get("_unplaced"):
+            continue
+        d = geometry.static_dir(f, kind)
+        x = f.get("x", 0.5) * W
+        if abs(d[0]) > 0.5 and (x - W / 2) * d[0] > 0 and abs(x - W / 2) > W / 4:
+            wall.append(f["id"])
+        if f.get("mount") == "hang" and math.degrees(math.asin(max(-1.0, min(1.0, d[2])))) > 20:
+            up.append(f["id"])
+    if wall:
+        out.append(Note("check", f"{len(wall)} fixed lights near the sides point out at the wall", wall))
+    if up:
+        out.append(Note("check", f"{len(up)} hanging fixed lights point up at the ceiling", up))
+    return out
+
+
+def save(result: Result, name: str) -> None:
+    """Write the set and the rig as `name` (both)."""
+    for data in result.pages.values():
+        underlay.save_page(data)
+    store.sets.save(name, result.set_doc)
+    store.rigs.save(name, result.rig_doc)

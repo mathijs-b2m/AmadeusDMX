@@ -12,6 +12,7 @@ public sealed class AppEditorHost(AppModel model) : IRigEditorHost
     public void ReloadSets() => model.ReloadSets();
     public bool EngineRunning => model.EngineRunning;
     public bool IsVirtual(string set) => model.Sets.FirstOrDefault(s => s.Name == set)?.IsVirtual ?? true;
+    public Task<DrawingPicture?> PagePicture(string file) => DrawingPages.Picture(model.Api, file);
 
     /// Opened with the program Windows has for it (the browser, for the hang sheet's HTML).
     public void Open(string path)

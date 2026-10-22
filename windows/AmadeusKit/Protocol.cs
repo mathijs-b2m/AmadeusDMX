@@ -197,6 +197,8 @@ public sealed record Stage
     public double WidthM { get; set; } = 6;
     public double CeilingM { get; set; } = 4.5;
     public double RoomDepthM { get; set; } = 6;
+    /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
+    public double DeckM { get; set; }
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public bool CeilingGuard { get; set; } = true;
     public bool BackGuard { get; set; } = true;
@@ -213,6 +215,7 @@ public sealed record Stage
         WidthM = J.Val(c, "width_m", J.Double) ?? 6,
         CeilingM = J.Val(c, "ceiling_m", J.Double) ?? 4.5,
         RoomDepthM = J.Val(c, "room_depth_m", J.Double) ?? 6,
+        DeckM = J.Val(c, "deck_m", J.Double) ?? 0,
         CeilingGuard = J.Val(c, "ceiling_guard", J.Bool) ?? true,
         BackGuard = J.Val(c, "back_guard", J.Bool) ?? true,
         Outdoor = J.Val(c, "outdoor", J.Bool) ?? false,
@@ -220,8 +223,8 @@ public sealed record Stage
 
     public JSONValue ToJSON() => JSONValue.Of(new Dictionary<string, JSONValue>
     {
-        ["width_m"] = WidthM, ["ceiling_m"] = CeilingM, ["room_depth_m"] = RoomDepthM, ["ceiling_guard"] = CeilingGuard,
-        ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
+        ["width_m"] = WidthM, ["ceiling_m"] = CeilingM, ["room_depth_m"] = RoomDepthM, ["deck_m"] = DeckM,
+        ["ceiling_guard"] = CeilingGuard, ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
     });
 }
 

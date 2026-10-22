@@ -47,7 +47,7 @@ MilkDrop-style visuals in the web visualiser. License texts: `licenses/butterchu
 - **VirtualDJ SDK headers** (© Atomix Productions): downloaded by `vdj/build.sh` from virtualdj.com to build
   the AmadeusLink plugin; not redistributable, so not included.
 - **Python packages** (`pyproject.toml`): numpy, scipy (BSD), soundfile, sounddevice, websockets, pyserial
-  (BSD / MIT); optional openai (Apache-2.0), demucs (MIT), beat-this (MIT), torch / torchaudio (BSD). The apps'
+  (BSD / MIT), pypdf (BSD); optional openai (Apache-2.0), demucs (MIT), beat-this (MIT), torch / torchaudio (BSD). The apps'
   built-in Python also has aalink (GPL-3.0-or-later, as PyPI lists it; it wraps Ableton Link), on macOS
   python-rtmidi (MIT) and pyobjc (MIT), on Windows comtypes (MIT), zeroconf (LGPL-2.1-or-later, unmodified, as its
   own package) and ifaddr (MIT). Windows decodes M4A with its own Media Foundation, so no FFmpeg is shipped

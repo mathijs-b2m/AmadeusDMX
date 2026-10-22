@@ -140,6 +140,39 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// Swift's `rounded()`: halves away from zero.
     static double Rounded(double v) => Math.Round(v, MidpointRounding.AwayFromZero);
 
+    /// How high a fixture put on the floor stands (its middle): this much above what it stands on.
+    public const double FloorZ = 0.25;
+
+    /// (x, y) (metres) is on the stage: behind its front edge, within its width.
+    static bool OnStage(Stage stage, double xM, double yM) => yM <= 0 && xM >= 0 && xM <= stage.WidthM;
+
+    /// What a fixture on the floor at (x, y) (metres) stands on: the stage's deck on the stage (stage.deck_m, heights
+    /// count from the hall floor), else the hall floor.
+    public static double Ground(Stage stage, double xM, double yM) => stage.DeckM > 0 && OnStage(stage, xM, yM) ? stage.DeckM : 0;
+
+    /// How high a fixture put on the floor where it is stands: on the deck on the stage, in the hall on the floor.
+    public static double FloorHeight(Stage stage, PlacedFixture f) => FloorZ + Ground(stage, f.X * stage.WidthM, f.YM);
+
+    /// A fixture standing on the floor moved from (x0 as a share of the width, y0): it keeps its height above what it
+    /// stands on, stepping up onto the stage's deck or down into the hall.
+    static void FollowGround(Stage stage, PlacedFixture f, double x0, double y0)
+    {
+        if (f.Mount != "floor" || f.Truss is not null) return;
+        f.ZM += Ground(stage, f.X * stage.WidthM, f.YM) - Ground(stage, x0 * stage.WidthM, y0);
+    }
+
+    /// Where a ray reaches the floor: on the stage's deck where it lands on the stage, else on the hall floor.
+    static Vec3? FloorHit(Stage stage, Vec3 o, Vec3 d)
+    {
+        if (!(d.Z < -1e-4)) return null;
+        if (stage.DeckM > 0 && o.Z > stage.DeckM)
+        {
+            var onDeck = o + d * ((stage.DeckM - o.Z) / d.Z);
+            if (Ground(stage, onDeck.X, onDeck.Y) > 0) return onDeck;
+        }
+        return o + d * (-o.Z / d.Z);
+    }
+
     RigEditorModel(Workspace workspace, RigDocument d)
     {
         _workspace = workspace;
@@ -214,6 +247,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
             Key = $"edit:{Doc.Label}:{Version}", Fixtures = els, Stage = Doc.Stage with { }, Screen = Doc.HasScreen, Hello = null,
             Trusses = Doc.Trusses.Select(x => x with { }).ToList(), Selected = selected.ToHashSet(), KeepCamera = true,
             Zones = Doc.Zones.Where(z => ShowZones || Selection == EditorSelection.Zone(z.Id)).Select(z => z.Clone()).ToList(),
+            Drawings = Drawings.Where(IsShown).Select(u => Picture(u) is { } p ? new StageDrawing(u.File, p, u.Corners, (float)DrawingOpacity, u.Crop) : null)
+                .OfType<StageDrawing>().ToList(),
         };
     }
 
@@ -248,7 +283,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public void UpdateStage(Action<Stage> body) => UpdateStage("Change Stage", body);
 
-    public void UpdateStage(string name, Action<Stage> body) => Change(name, d =>
+    public void UpdateStage(string name, Action<Stage> body) => Change(name, d => PutStage(d, body));
+
+    static void PutStage(RigDocument d, Action<Stage> body)
     {
         var stage = d.Stage with { };
         body(stage);
@@ -257,6 +294,16 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var merged = d.Raw.GetValueOrDefault("stage")?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
         foreach (var (k, v) in d.Stage.ToJSON().Object!) merged[k] = v;
         d.Raw["stage"] = JSONValue.Of(merged);
+    }
+
+    /// How high the stage stands above the hall floor (stage.deck_m): what stands on its floor goes up or down with
+    /// it, the trusses stay where they hang (their heights count from the hall floor).
+    public void SetDeck(double m) => Change("Change Stage Height", d =>
+    {
+        var was = d.Stage.DeckM;
+        PutStage(d, s => s.DeckM = Math.Max(0, m));
+        foreach (var f in d.Fixtures.Where(f => f.Mount == "floor" && f.Truss is null && OnStage(d.Stage, f.X * d.Width, f.YM)))
+            f.ZM += d.Stage.DeckM - was;
     });
 
     public void SetScreen(bool on) => Change(on ? "Add LED Wall" : "Remove LED Wall", d =>
@@ -432,7 +479,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         else
         {
             f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null;
-            f.Mount = "floor"; f.ZM = 0.25;
+            f.Mount = "floor"; f.ZM = FloorHeight(Doc.Stage, f);
         }
     });
 
@@ -461,7 +508,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             waiting[k].X = (k + 1.0) / (waiting.Count + 1);
             waiting[k].YM = -0.3;
-            waiting[k].ZM = 0.25;
+            waiting[k].ZM = FloorHeight(d.Stage, waiting[k]);
             waiting[k].Mount = "floor";
         }
     }
@@ -517,9 +564,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
             f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null;
             f.Waiting = false;
             f.Mount = "floor";
-            f.ZM = 0.25;
             f.X = (p.X - span / 2 + Spacing * k) / d.Width;
             f.YM = p.Y;
+            f.ZM = FloorHeight(d.Stage, f);
         }
     }
 
@@ -541,7 +588,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 while (d.Fixtures.Any(f => f.Id == $"{prefix}{n}") || newIDs.Contains($"{prefix}{n}")) n++;
                 var id = $"{prefix}{n}";
                 newIDs.Add(id);
-                var f = new PlacedFixture(id, key, mode, 1, null, "floor", (k + 1.0) / (count + 1), -0.6, 0.25, 0, null, null, null);
+                var f = new PlacedFixture(id, key, mode, 1, null, "floor", (k + 1.0) / (count + 1), -0.6, FloorZ + d.Stage.DeckM, 0, null, null,
+                                          null);
                 if (truss is { } t)
                 {
                     var span = t.Vertical ? t.LengthM : t.LengthM * 0.9;
@@ -991,7 +1039,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                     foreach (var f in d.Fixtures.Where(f => f.Truss == sel.Id))
                     {
                         f.Truss = null; f.TrussPos = null;
-                        f.Mount = "floor"; f.ZM = 0.25;
+                        f.Mount = "floor"; f.ZM = FloorHeight(d.Stage, f);
                     }
                 });
                 break;
@@ -1064,7 +1112,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
                             Place(f, t, (f.TrussPos ?? 0) + dx, d.Width);
                         else
                         {
+                            var (x0, y0) = (f.X, f.YM);
                             f.X += dx / d.Width; f.YM += dy;
+                            FollowGround(d.Stage, f, x0, y0);
                         }
                     }
                 });
@@ -1106,6 +1156,119 @@ public sealed class RigEditorModel : Observable, IStageEditing
         return a;
     }
 
+    // MARK: - the drawings under the rig (an import's plans: amadeus/rig/importer/underlay.py)
+
+    IReadOnlyList<Underlay> _underlays = [];
+    /// Every drawing under the rig (all its sets'), as the engine has them.
+    public IReadOnlyList<Underlay> Underlays
+    {
+        get => _underlays;
+        private set { _underlays = value; Changed(nameof(Underlays), nameof(Drawings)); }
+    }
+    /// The drawings for what is showing: the set's, or all of them with the rig alone.
+    public IReadOnlyList<Underlay> Drawings => _underlays.Where(u => Doc.Set.Length == 0 || u.Set == Doc.Set).ToList();
+    readonly Dictionary<string, DrawingPicture> _pictures = [];
+    /// A drawing's page, once it is rendered.
+    public DrawingPicture? Picture(Underlay u) => _pictures.GetValueOrDefault(u.File);
+
+    /// Remembered per rig in the app's settings: the drawings hidden, how opaque they are.
+    const string HiddenKey = "rigDrawingsHidden", OpacityKey = "rigDrawingsOpacity";
+    public static readonly double[] Opacities = [0.25, 0.5, 0.75];
+
+    /// The rig's file has drawings (the engine is asked only then).
+    bool HasDrawings()
+    {
+        try { return JSONValue.ParseObject(File.ReadAllBytes(_workspace.RigURL(Doc.Rig)))?.GetValueOrDefault("underlays")?.Array is { Count: > 0 }; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return false; }
+    }
+
+    /// Reads the rig's drawings and renders their pages (once per file). Nothing to show when that fails: the rig
+    /// is the same without them.
+    public async Task LoadDrawings(IRigEditorHost host)
+    {
+        if (!HasDrawings()) { if (_underlays.Count > 0) { Underlays = []; Refresh(); } return; }
+        try
+        {
+            if (!await host.EnsureSetupService()) return;
+            Underlays = await host.Api.Underlays(Doc.Rig);
+            foreach (var u in Drawings)
+                if (!_pictures.ContainsKey(u.File) && await host.PagePicture(u.File) is { } p) _pictures[u.File] = p;
+            Refresh();
+        }
+        catch (Exception e) when (e is not OutOfMemoryException) { }
+    }
+
+    public bool IsShown(Underlay u) => Defaults.Standard.Object(HiddenKey)?[Doc.Rig]?.Array?.Any(v => v.String == u.Id) != true;
+
+    public void SetShown(Underlay u, bool on)
+    {
+        var all = Defaults.Standard.Object(HiddenKey)?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
+        var ids = (all.GetValueOrDefault(Doc.Rig)?.Array ?? []).Select(v => v.String).OfType<string>().Where(id => id != u.Id).ToList();
+        if (!on) ids.Add(u.Id);
+        if (ids.Count > 0) all[Doc.Rig] = JSONValue.Of(ids.Select(JSONValue.Of));
+        else all.Remove(Doc.Rig);
+        Defaults.Standard.Set(HiddenKey, JSONValue.Of(all));
+        Refresh();
+    }
+
+    /// How opaque the drawings are on the floor (25, 50 or 75 %; half by default).
+    public double DrawingOpacity
+    {
+        get => Defaults.Standard.Object(OpacityKey)?[Doc.Rig]?.Number ?? 0.5;
+        set
+        {
+            var all = Defaults.Standard.Object(OpacityKey)?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
+            all[Doc.Rig] = value;
+            Defaults.Standard.Set(OpacityKey, JSONValue.Of(all));
+            Changed();
+            Refresh();
+        }
+    }
+
+    /// Lines a drawing up again from two clicks on its page (`a`: the stage's front edge at stage left, `b`: at stage
+    /// right, page fractions) `widthM` apart. The engine moves its fixtures and their trusses and saves the rig; the
+    /// editor reads it again (unsaved changes here must be saved or discarded first).
+    public async Task<bool> LineUp(IRigEditorHost host, Underlay u, Vec2 a, Vec2 b, double widthM)
+    {
+        Busy = true;
+        try
+        {
+            if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            var lined = await host.Api.AlignUnderlay(Doc.Rig, u.Id, a, b, widthM);
+            Underlays = _underlays.Any(x => x.Id == lined.Id) ? _underlays.Select(x => x.Id == lined.Id ? lined : x).ToList() : [.. _underlays, lined];
+            Reload();
+            Refresh();   // the drawing's new corners, also when nothing else changed
+            host.ReloadSets();
+            var moved = lined.Fixtures.Keys.Count(id => Doc.Fixtures.Any(f => f.Id == id));
+            Message = $"Lined up: {moved} fixture{(moved == 1 ? "" : "s")} moved";
+            return true;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            Message = Error(e);
+            return false;
+        }
+        finally { Busy = false; }
+    }
+
+    /// Takes a drawing away from the rig (the fixtures stay where they are).
+    public async Task RemoveDrawing(IRigEditorHost host, Underlay u)
+    {
+        Busy = true;
+        try
+        {
+            if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            Underlays = await host.Api.RemoveUnderlay(Doc.Rig, u.Id);
+            Refresh();
+            Message = $"Removed the drawing {u.Name}";
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            Message = Error(e);
+        }
+        finally { Busy = false; }
+    }
+
     // MARK: - save / revert
 
     /// Saved through the engine's setup API: it splits the layout into the rig file and the set file.
@@ -1143,6 +1306,20 @@ public sealed class RigEditorModel : Observable, IStageEditing
             ChangedOnDisk = d;
             return;
         }
+        Load(d);
+    }
+
+    /// Reads the files again, whatever was changed here (after a line-up the engine saved, with the changes here
+    /// saved or discarded first).
+    public void Reload()
+    {
+        if (_workspace.Document(Doc.Rig, Doc.Set) is not { } d) return;
+        ChangedOnDisk = null;
+        Load(d);
+    }
+
+    void Load(RigDocument d)
+    {
         Doc = d;
         _saved = d.Clone();
         Selection = null;
@@ -1534,18 +1711,25 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 {
                     target = SnapXY(target);
                     var delta = new Vec2(target.X - g.Start.X, target.Y - g.Start.Y);
-                    if (f.Truss is not null) { f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null; f.Mount = "floor"; f.ZM = 0.25; }
+                    var (x0, y0) = (f.X, f.YM);
+                    var fell = f.Truss is not null;
+                    if (fell) { f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null; f.Mount = "floor"; }
                     f.X = target.X / Doc.Width;
                     f.YM = target.Y;
+                    if (fell) f.ZM = FloorHeight(Doc.Stage, f);
+                    else FollowGround(Doc.Stage, f, x0, y0);
                     foreach (var other in _group)  // the others move by as much, onto the floor
                     {
                         if (Doc.Fixtures.FirstOrDefault(x => x.Id == other) is not { } o2
                             || g.Before.Fixtures.FirstOrDefault(x => x.Id == other) is not { } was) continue;
                         var p = was.Position(Doc.Width);
                         o2.Waiting = false;
-                        o2.Truss = null; o2.TrussPos = null; o2.Side = null; o2.MountRoll = null; o2.Mount = "floor"; o2.ZM = 0.25;
+                        var (ox, oy, onFloor) = (o2.X, o2.YM, o2.Truss is null && o2.Mount == "floor");
+                        o2.Truss = null; o2.TrussPos = null; o2.Side = null; o2.MountRoll = null; o2.Mount = "floor";
                         o2.X = (p.X + delta.X) / Doc.Width;
                         o2.YM = was.Waiting ? f.YM : p.Y + delta.Y;
+                        if (onFloor) FollowGround(Doc.Stage, o2, ox, oy);
+                        else o2.ZM = FloorHeight(Doc.Stage, o2);
                     }
                 }
                 break;
@@ -1646,8 +1830,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             }
             else
             {
-                if (!(d.Z < -1e-4)) return false;
-                var hit = o + d * (-o.Z / d.Z);
+                if (FloorHit(Doc.Stage, o, d) is not { } hit) return false;
                 Change(ids.Count == 1 ? "Place Fixture" : $"Place {ids.Count} Fixtures", doc =>
                 {
                     LineUp(doc, ids, hit.XY);

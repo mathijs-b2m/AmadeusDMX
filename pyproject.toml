@@ -16,6 +16,7 @@ dependencies = [
     "soundfile>=0.13",
     "sounddevice>=0.5",
     "websockets>=14",
+    "pypdf>=6",  # venue PDFs for the import (amadeus/rig/importer/pdf.py)
 ]
 
 [project.optional-dependencies]

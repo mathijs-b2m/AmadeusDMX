@@ -293,6 +293,7 @@ public struct RigDocument: Equatable {
         let places = rig["placements"]?.object?[setName]?.object ?? [:]
         var fixtures = (out["fixtures"]?.array ?? []).compactMap(\.object)
         let waiting = fixtures.filter { places[$0["id"]?.string ?? ""] == nil }.count
+        let deck = out["stage"]?.object?["deck_m"]?.number ?? 0   // a raised stage: they wait on its deck (store.py)
         var k = 0
         for i in fixtures.indices {
             for key in placementKeys { fixtures[i][key] = nil }
@@ -300,7 +301,8 @@ public struct RigDocument: Equatable {
                 fixtures[i].merge(p) { _, new in new }
             } else {
                 let spot: [String: JSONValue] = ["x": .number(((Double(k) + 1) / Double(waiting + 1) * 10000).rounded() / 10000),
-                                                 "y_m": .number(-0.3), "z_m": .number(0.25), "mount": .string("floor")]
+                                                 "y_m": .number(-0.3), "z_m": .number(((0.25 + deck) * 1000).rounded() / 1000),
+                                                 "mount": .string("floor")]
                 fixtures[i].merge(spot) { _, new in new }
                 fixtures[i][unplacedKey] = .object(spot)
                 k += 1
@@ -318,6 +320,7 @@ public struct RigDocument: Equatable {
         trusses = (raw["trusses"]).flatMap { try? JSONDecoder().decode([Truss].self, from: JSONEncoder().encode($0)) } ?? []
         zones = (raw["zones"]).flatMap { try? JSONDecoder().decode([Zone].self, from: JSONEncoder().encode($0)) } ?? []
         let mounts: [String: (Double, Double)] = ["stand": (-0.6, 1.8), "hang": (-1.0, 3.0), "floor": (-0.4, 0.3)]
+        let deck = stage.deckM
         fixtures = (raw["fixtures"]?.array ?? []).compactMap { v in
             guard let o = v.object, let id = o["id"]?.string, let key = o["fixture"]?.string else { return nil }
             let mount = o["mount"]?.string ?? "stand"
@@ -329,6 +332,8 @@ public struct RigDocument: Equatable {
                                   aim: aim, truss: o["truss"]?.string, trussPos: o["truss_pos_m"]?.number,
                                   side: o["truss_side"]?.string, mountRoll: o["mount_roll_deg"]?.number)
             f.waiting = o[Self.unplacedKey] != nil
+            // a waiting spot the engine gave at the hall floor's height (store.py): on a raised stage, on its deck
+            if f.waiting, f.mount == "floor", f.zM < deck, Stage.onStage(x: f.x, yM: f.yM) { f.zM += deck }
             return f
         }
     }

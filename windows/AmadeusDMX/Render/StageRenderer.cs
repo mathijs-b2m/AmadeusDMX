@@ -79,7 +79,7 @@ public sealed partial class StageRenderer : IDisposable
     public ID3D11DeviceContext Context { get; private set; } = null!;
     public FeatureLevel FeatureLevel { get; private set; }
     Pipeline? solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, downsamplePipe, blurPipe;
-    Pipeline? goboBeamPipe, goboDecalPipe;
+    Pipeline? goboBeamPipe, goboDecalPipe, underlayPipe;
     ID3D11DepthStencilState? solidDepth, lightDepth;
     ID3D11RasterizerState? rasterizer;
     ID3D11SamplerState? sampler;
@@ -93,6 +93,9 @@ public sealed partial class StageRenderer : IDisposable
     ID3D11Buffer? sceneryBuffer, zoneBuffer, wallBuffer;
     int sceneryCount, zoneCount;
     int _uploadedScenery = -1;
+    // the rig editor's drawings: a texture per page file (kept while it is drawn), the triangles per drawing
+    readonly Dictionary<string, (ID3D11Texture2D Texture, ID3D11ShaderResourceView View)> _pages = [];
+    readonly List<(ID3D11Buffer Buffer, int Count, ID3D11ShaderResourceView View)> _drawings = [];
     ID3D11Texture2D? wallTexture;
     ID3D11ShaderResourceView? wallView;
     Target? hdr, halfA, halfB, halfT, quarterA, quarterB, quarterT;
@@ -172,10 +175,11 @@ public sealed partial class StageRenderer : IDisposable
     {
         ReleaseTargets();
         foreach (var p in new[] { solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, downsamplePipe, blurPipe,
-                                  goboBeamPipe, goboDecalPipe })
+                                  goboBeamPipe, goboDecalPipe, underlayPipe })
             p?.Dispose();
         solidPipe = beamPipe = spritePipe = decalPipe = linePipe = wallPipe = compositePipe = zonePipe = downsamplePipe = blurPipe = null;
-        goboBeamPipe = goboDecalPipe = null;
+        goboBeamPipe = goboDecalPipe = underlayPipe = null;
+        ReleaseDrawings(keep: null);
         solidDepth?.Dispose(); lightDepth?.Dispose(); rasterizer?.Dispose(); sampler?.Dispose(); additive?.Dispose(); premultiplied?.Dispose();
         solidDepth = lightDepth = null; rasterizer = null; sampler = null; additive = premultiplied = null;
         coneBuffer?.Dispose(); cappedConeBuffer?.Dispose(); sceneryBuffer?.Dispose(); zoneBuffer?.Dispose(); wallBuffer?.Dispose();
@@ -294,6 +298,18 @@ public sealed partial class StageRenderer : IDisposable
             ctx.PSSetShaderResource(0, wallView!);
             ctx.PSSetConstantBuffer(1, wallParamsBuffer);
             ctx.Draw(6, 0);
+        }
+        // the rig editor's drawings on the floor: over the floor and the deck, under everything standing on them
+        if (_drawings.Count > 0)
+        {
+            Use(underlayPipe!, lightDepth);
+            foreach (var (buffer, count, view) in _drawings)
+            {
+                ctx.IASetVertexBuffer(0, buffer, UnderlayVertex.Size);
+                ctx.PSSetShaderResource(0, view);
+                ctx.Draw((uint)count, 0);
+            }
+            UnbindShaderResources();
         }
         if (f.Decals.Count > 0) Instanced(decalPipe!, _decals, 6, f.Decals.Count);
         // gobos: the instances are read by the pixel shader too, the pictures are a texture array
@@ -453,6 +469,31 @@ public sealed partial class StageRenderer : IDisposable
         if (zoneCount > 0) zoneBuffer = Device.CreateBuffer((ReadOnlySpan<SolidVertex>)ZoneVertices.Span(), BindFlags.VertexBuffer);
         _zoneEdges.Upload(Device, Context, (ReadOnlySpan<LineInstance>)ZoneEdges.Span());
         if (WallVertices is { } wv) wallBuffer = Device.CreateBuffer((ReadOnlySpan<WallVertex>)wv, BindFlags.VertexBuffer);
+        UploadDrawings();
+    }
+
+    /// The drawings' triangles, and a texture for each page not on the GPU yet (one per file; gone when no longer drawn).
+    void UploadDrawings()
+    {
+        ReleaseDrawings(keep: DrawingQuads.Select(d => d.Key).ToHashSet());
+        foreach (var (key, picture, vertices) in DrawingQuads)
+        {
+            if (!_pages.TryGetValue(key, out var page)) _pages[key] = page = PageTexture(picture);
+            _drawings.Add((Device.CreateBuffer((ReadOnlySpan<UnderlayVertex>)vertices, BindFlags.VertexBuffer), vertices.Length, page.View));
+        }
+    }
+
+    /// The drawings' buffers, and the page textures not in `keep` (null: all of them).
+    void ReleaseDrawings(IReadOnlySet<string>? keep)
+    {
+        foreach (var d in _drawings) d.Buffer.Dispose();
+        _drawings.Clear();
+        foreach (var key in _pages.Keys.Where(k => keep is null || !keep.Contains(k)).ToList())
+        {
+            _pages[key].View.Dispose();
+            _pages[key].Texture.Dispose();
+            _pages.Remove(key);
+        }
     }
 
     /// Development: count invalid (NaN/inf) pixels in the light buffer → %TEMP%\gpu-stats.txt.

@@ -7,6 +7,7 @@ import AppKit
 import AmadeusKit
 import Foundation
 import Observation
+import PDFKit
 import simd
 
 enum EditorSelection: Hashable {
@@ -135,7 +136,8 @@ final class RigEditorModel: StageEditing {
         if let h = hovered, !selected.contains(h) { selected.append("hover:" + h) }
         return StageInput(key: "edit:\(doc.label):\(version)", fixtures: els, stage: doc.stage, screen: doc.hasScreen, hello: nil,
                           trusses: doc.trusses, selected: Set(selected), keepCamera: true,
-                          zones: doc.zones.filter { z in showZones || selection == .zone(z.id) })
+                          zones: doc.zones.filter { z in showZones || selection == .zone(z.id) },
+                          drawings: floorDrawings())
     }
 
     // MARK: - changes (all undoable)
@@ -166,13 +168,31 @@ final class RigEditorModel: StageEditing {
     func updateStage(_ name: String = "Change Stage", _ body: (inout Stage) -> Void) {
         change(name) { d in
             body(&d.stage)
-            // merged into what was there: the stage keeps the settings the editor doesn't show (eye safety…)
-            var merged = d.raw["stage"]?.object ?? [:]
-            if let o = (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage)))?.object {
-                merged.merge(o) { _, new in new }
-            }
-            d.raw["stage"] = .object(merged)
+            Self.keepStage(&d)
         }
+    }
+
+    /// The stage's height above the hall floor: what stands on the stage (on the floor or a stand, not on a truss)
+    /// goes up or down with it; trusses stay where they hang.
+    func setStageHeight(_ h: Double) {
+        change("Change Stage Height") { d in
+            let was = d.stage.deckM
+            d.stage.deckM = (h * 100).rounded() / 100
+            Self.keepStage(&d)
+            for i in d.fixtures.indices where d.fixtures[i].truss == nil && d.fixtures[i].mount != "hang"
+                && Stage.onStage(x: d.fixtures[i].x, yM: d.fixtures[i].yM) {
+                d.fixtures[i].zM = max(0, d.fixtures[i].zM + d.stage.deckM - was)
+            }
+        }
+    }
+
+    /// The stage merged into what was there: it keeps the settings the editor doesn't show (eye safety…).
+    private static func keepStage(_ d: inout RigDocument) {
+        var merged = d.raw["stage"]?.object ?? [:]
+        if let o = (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage)))?.object {
+            merged.merge(o) { _, new in new }
+        }
+        d.raw["stage"] = .object(merged)
     }
 
     func setScreen(_ on: Bool) {
@@ -320,6 +340,7 @@ final class RigEditorModel: StageEditing {
     }
 
     func attach(_ id: String, to trussID: String?) {
+        let stage = doc.stage
         updateFixture(id, trussID == nil ? "Take Off Truss" : "Put on Truss") { f in
             if let trussID {
                 f.truss = trussID
@@ -327,7 +348,7 @@ final class RigEditorModel: StageEditing {
                 if f.mount == "floor" { f.mount = "hang" }
             } else {
                 f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil
-                f.mount = "floor"; f.zM = 0.25
+                f.mount = "floor"; f.zM = 0.25 + stage.ground(x: f.x, yM: f.yM)
             }
         }
     }
@@ -346,13 +367,14 @@ final class RigEditorModel: StageEditing {
         group = []
     }
 
-    /// Waiting fixtures stand in a row on the floor at the front of the stage (as the engine puts them).
+    /// Waiting fixtures stand in a row on the floor at the front of the stage (as the engine puts them; on a raised
+    /// stage on its deck).
     private static func lineUpWaiting(_ d: inout RigDocument) {
         let waiting = d.fixtures.indices.filter { d.fixtures[$0].waiting }
         for (k, i) in waiting.enumerated() {
             d.fixtures[i].x = (Double(k) + 1) / Double(waiting.count + 1)
             d.fixtures[i].yM = -0.3
-            d.fixtures[i].zM = 0.25
+            d.fixtures[i].zM = 0.25 + d.stage.ground(x: d.fixtures[i].x, yM: -0.3)
             d.fixtures[i].mount = "floor"
         }
     }
@@ -400,9 +422,9 @@ final class RigEditorModel: StageEditing {
             d.fixtures[i].truss = nil; d.fixtures[i].trussPos = nil; d.fixtures[i].side = nil; d.fixtures[i].mountRoll = nil
             d.fixtures[i].waiting = false
             d.fixtures[i].mount = "floor"
-            d.fixtures[i].zM = 0.25
             d.fixtures[i].x = (p.x - span / 2 + spacing * Double(k)) / d.width
             d.fixtures[i].yM = p.y
+            d.fixtures[i].zM = 0.25 + d.stage.ground(x: d.fixtures[i].x, yM: p.y)
         }
     }
 
@@ -420,7 +442,7 @@ final class RigEditorModel: StageEditing {
                 let id = "\(base)\(n)"
                 newIDs.append(id)
                 var f = PlacedFixture(id: id, key: key, mode: mode, universe: 1, address: nil, mount: "floor",
-                                      x: (Double(k) + 1) / Double(count + 1), yM: -0.6, zM: 0.25, rotDeg: 0, aim: nil,
+                                      x: (Double(k) + 1) / Double(count + 1), yM: -0.6, zM: 0.25 + d.stage.deckM, rotDeg: 0, aim: nil,
                                       truss: nil, trussPos: nil)
                 if let t = truss {
                     let span = t.vertical ? t.lengthM : t.lengthM * 0.9
@@ -769,7 +791,7 @@ final class RigEditorModel: StageEditing {
                 d.trusses.removeAll { $0.id == id }
                 for i in d.fixtures.indices where d.fixtures[i].truss == id {
                     d.fixtures[i].truss = nil; d.fixtures[i].trussPos = nil
-                    d.fixtures[i].mount = "floor"; d.fixtures[i].zM = 0.25
+                    d.fixtures[i].mount = "floor"; d.fixtures[i].zM = 0.25 + d.stage.ground(x: d.fixtures[i].x, yM: d.fixtures[i].yM)
                 }
             }
         case .fixture:
@@ -861,6 +883,130 @@ final class RigEditorModel: StageEditing {
         if a > 180 { a -= 360 }
         if a <= -180 { a += 360 }
         return a
+    }
+
+    // MARK: - the drawings under the rig
+
+    /// The rig's drawings (a venue's light plots, from an import), each with its corners on the rig.
+    private(set) var underlays: [Underlay] = []
+    /// Their pages, rendered once (per page file, for every editor).
+    private static var pages: [String: CGImage] = [:]
+    /// Drawings you hid on this rig (remembered per rig).
+    private(set) var hiddenDrawings: Set<String> = []
+    /// How strongly the drawings show over the floor (remembered per rig).
+    var drawingOpacity = 0.5 {
+        didSet {
+            guard drawingOpacity != oldValue else { return }
+            Self.remember("rigDrawingsOpacity", rig: doc.rig, drawingOpacity)
+            refresh()
+        }
+    }
+
+    /// The drawings of the set showing (all of them when the rig is shown alone).
+    var drawings: [Underlay] {
+        underlays.filter { u in doc.set.isEmpty || (u.set ?? doc.set) == doc.set }
+    }
+
+    func page(_ u: Underlay) -> CGImage? { Self.pages[u.file] }
+
+    func isShown(_ u: Underlay) -> Bool { !hiddenDrawings.contains(u.id) }
+
+    func show(_ u: Underlay, _ on: Bool) {
+        if on { hiddenDrawings.remove(u.id) } else { hiddenDrawings.insert(u.id) }
+        Self.remember("rigDrawingsHidden", rig: doc.rig, hiddenDrawings.sorted())
+        refresh()
+    }
+
+    private static func remember(_ key: String, rig: String, _ value: Any) {
+        var all = UserDefaults.standard.dictionary(forKey: key) ?? [:]
+        all[rig] = value
+        UserDefaults.standard.set(all, forKey: key)
+    }
+
+    /// The drawings on the floor as the stage draws them: the shown ones whose page is there.
+    private func floorDrawings() -> [FloorDrawing] {
+        drawings.compactMap { u in
+            guard isShown(u), u.corners.count == 4, let img = Self.pages[u.file] else { return nil }
+            return FloorDrawing(key: u.file, image: img, corners: u.corners.map { SIMD2(Float($0.x), Float($0.y)) },
+                                crop: SIMD4(u.crop.map(Float.init)), opacity: Float(drawingOpacity))
+        }
+    }
+
+    /// Reads the rig's drawings from the engine, and renders the pages not seen yet.
+    func loadDrawings(_ model: AppModel) async {
+        let defaults = UserDefaults.standard
+        hiddenDrawings = Set((defaults.dictionary(forKey: "rigDrawingsHidden")?[doc.rig] as? [String]) ?? [])
+        drawingOpacity = (defaults.dictionary(forKey: "rigDrawingsOpacity")?[doc.rig] as? Double) ?? 0.5
+        guard await model.ensureSetupService(), let list = try? await model.api.underlays(rig: doc.rig) else { return }
+        underlays = list
+        refresh()
+        for file in Set(list.map(\.file)) where Self.pages[file] == nil {
+            guard let data = try? await model.api.underlayPage(file: file),
+                  let img = await Task.detached(operation: { Self.render(data) }).value else { continue }
+            Self.pages[file] = img
+            refresh()
+        }
+    }
+
+    /// A one-page PDF as a picture, about `longSide` pixels on its long side, on white.
+    nonisolated static func render(_ data: Data, longSide: CGFloat = 2048) -> CGImage? {
+        guard let pdf = PDFDocument(data: data), let page = pdf.page(at: 0) else { return nil }
+        let box = page.bounds(for: .cropBox)
+        let turned = page.rotation % 180 != 0
+        let size = turned ? CGSize(width: box.height, height: box.width) : box.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let k = longSide / max(size.width, size.height)
+        let w = Int((size.width * k).rounded()), h = Int((size.height * k).rounded())
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.interpolationQuality = .high
+        ctx.scaleBy(x: k, y: k)
+        withExtendedLifetime(pdf) { page.draw(with: .cropBox, to: ctx) }  // the page's own rotation applied
+        return ctx.makeImage()
+    }
+
+    /// Takes a drawing away from under the rig (the rig file is saved; the fixtures stay where they are).
+    func removeDrawing(_ model: AppModel, _ u: Underlay) async {
+        busy = true
+        defer { busy = false }
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            underlays = try await model.api.removeUnderlay(rig: doc.rig, id: u.id)
+            message = "Removed the drawing “\(u.title)”"
+            refresh()
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    /// Lines a drawing up again (`a`, `b`: the stage's front edge at stage left and stage right, page fractions,
+    /// `width` metres apart). The engine saves the rig with the drawing's fixtures and trusses moved; the editor
+    /// reads it again (unsaved changes here are gone: save them first).
+    func lineUp(_ model: AppModel, _ u: Underlay, a: SIMD2<Double>, b: SIMD2<Double>, width: Double) async throws {
+        busy = true
+        defer { busy = false }
+        guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+        let lined = try await model.api.alignUnderlay(rig: doc.rig, id: u.id, a: [a.x, a.y], b: [b.x, b.y], widthM: width)
+        if let i = underlays.firstIndex(where: { $0.id == lined.id }) { underlays[i] = lined }
+        reloadFromDisk()
+        model.reloadSets()
+        let mounted = Set(doc.fixtures.filter { !$0.waiting }.map(\.id))
+        let moved = doc.set == (lined.set ?? doc.set) ? lined.fixtures.keys.filter(mounted.contains).count : lined.fixtures.count
+        message = "Lined up: \(moved) fixture\(moved == 1 ? "" : "s") moved"
+    }
+
+    /// The rig as saved (the engine changed it): what is here is replaced, the undo history with it.
+    private func reloadFromDisk() {
+        guard let d = workspace.document(rig: doc.rig, set: doc.set) else { return }
+        doc = d
+        saved = d
+        selection = nil
+        group = []
+        undoManager?.removeAllActions(withTarget: self)
+        refresh()
     }
 
     // MARK: - save / revert
@@ -1221,9 +1367,12 @@ final class RigEditorModel: StageEditing {
             } else {
                 if snapOn { target.x = (target.x / grid).rounded() * grid; target.y = (target.y / grid).rounded() * grid }
                 let delta = SIMD2(target.x - g.start.x, target.y - g.start.y)
-                if f.truss != nil { f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil; f.mount = "floor"; f.zM = 0.25 }
+                let under = doc.stage.ground(x: f.x, yM: f.yM)
+                if f.truss != nil { f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil; f.mount = "floor"; f.zM = 0.25 + under }
                 f.x = target.x / doc.width
                 f.yM = target.y
+                // onto the stage or off it: it stands on what is under it now (a raised stage's deck or the hall floor)
+                if f.mount != "hang" { f.zM = max(0, f.zM + doc.stage.ground(x: f.x, yM: f.yM) - under) }
                 doc.fixtures[i] = f
                 for other in group {  // the others move by as much, onto the floor
                     guard let j = doc.fixtures.firstIndex(where: { $0.id == other }),
@@ -1231,9 +1380,10 @@ final class RigEditorModel: StageEditing {
                     var o2 = doc.fixtures[j]
                     let p = was.position(width: doc.width)
                     o2.waiting = false
-                    o2.truss = nil; o2.trussPos = nil; o2.side = nil; o2.mountRoll = nil; o2.mount = "floor"; o2.zM = 0.25
+                    o2.truss = nil; o2.trussPos = nil; o2.side = nil; o2.mountRoll = nil; o2.mount = "floor"
                     o2.x = (p.x + delta.x) / doc.width
                     o2.yM = (was.waiting ? f.yM : p.y + delta.y)
+                    o2.zM = 0.25 + doc.stage.ground(x: o2.x, yM: o2.yM)
                     doc.fixtures[j] = o2
                 }
             }
@@ -1317,7 +1467,10 @@ final class RigEditorModel: StageEditing {
             }
         } else {
             guard d.z < -1e-4 else { return false }
-            let hit = o + d * (-o.z / d.z)
+            var hit = o + d * (-o.z / d.z)
+            // a raised stage: the pointer on its deck where it is over the stage
+            let deck = doc.stage.deckM, on = o + d * ((deck - o.z) / d.z)
+            if deck > 0, o.z > deck, Stage.onStage(x: on.x / doc.width, yM: on.y) { hit = on }
             change(ids.count == 1 ? "Place Fixture" : "Place \(ids.count) Fixtures") { doc in
                 Self.lineUp(&doc, ids, at: SIMD2(hit.x, hit.y))
                 Self.lineUpWaiting(&doc)

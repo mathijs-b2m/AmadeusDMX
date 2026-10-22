@@ -78,7 +78,7 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
         for f in merged.get("fixtures", [])
         if f["id"] not in taken and not f.get("truss") and not f.get("_unplaced")
     ]
-    m = _Mounter(W, used, standing)
+    m = _Mounter(W, used, standing, deck=float(merged.get("stage", {}).get("deck_m", 0.0)))
 
     lasers = by_role["laser"]  # first: they need the high spots
     if lasers:
@@ -291,8 +291,9 @@ def mirrored(fixtures: list[dict], spots: list[float]) -> list[tuple[dict, float
 
 
 class _Mounter:
-    def __init__(self, width: float, used: dict, standing: list[dict] | None = None):
+    def __init__(self, width: float, used: dict, standing: list[dict] | None = None, deck: float = 0.0):
         self.W, self.used, self.out = width, used, {}
+        self.deck = deck  # the stage's height: the rows on it stand that much higher
         self.standing = standing or []  # fixtures already on the floor or on stands (that stay where they are)
 
     def _put(self, f: dict, t: dict, u: float, side: str):
@@ -402,6 +403,7 @@ class _Mounter:
         n = len(fixtures)
         if not n:
             return
+        z += self.deck
         near = [p["x"] for p in self.standing if abs(p["y_m"] - y) <= 0.4 and abs(p["z_m"] - z) <= 0.6]
         near += [p["x"] for p in self.out.values() if not p.get("truss") and abs(p["y_m"] - y) <= 0.4
                  and abs(p["z_m"] - z) <= 0.6]  # fmt: skip

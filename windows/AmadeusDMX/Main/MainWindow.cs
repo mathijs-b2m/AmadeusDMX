@@ -98,6 +98,7 @@ public sealed partial class MainWindow : Window
         // a mode change that needs the show restarted asks first; New Rig… opens its sheet
         root.Bind(_model, nameof(AppModel.PendingMode), _ => { if (_model.PendingMode is { } m) AskToSwitch(m); });
         root.Bind(_model, nameof(AppModel.ShowNewRig), _ => { if (_model.ShowNewRig) NewRigSheet.Present(_model, this); });
+        root.Bind(_model, nameof(AppModel.ShowImport), _ => { if (_model.ShowImport) ImportSheet.Present(_model, this); });
         return root;
     }
 
