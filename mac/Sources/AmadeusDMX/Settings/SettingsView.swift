@@ -267,19 +267,27 @@ struct StreamedSection: View {
 /// can then make and change your sets and rigs. Off until switched on; the engine writes Claude's config.
 struct AssistantSection: View {
     @Environment(AppModel.self) private var model
+    /// The switch as shown: it moves at once (the engine writes Claude's config meanwhile), then follows the config.
+    @State private var on = false
     @State private var busy = false
 
     var body: some View {
         let status = model.claudeDesktop
         SwiftUI.Section {
-            Toggle(isOn: Binding(get: { status?.on ?? false }, set: { on in
+            Toggle(isOn: Binding(get: { on }, set: { new in
+                guard !busy else { return }
+                on = new
                 busy = true
-                Task { await model.setClaudeDesktop(on); busy = false }
+                Task {
+                    await model.setClaudeDesktop(new)
+                    on = model.claudeDesktop?.on ?? false
+                    busy = false
+                }
             })) {
                 Text("Claude Desktop can work on your sets and rigs")
                 Text("Ask Claude to make a rig for a venue from its PDFs, add fixtures, mount them or check what is unfinished. It uses your own Claude subscription.")
             }
-            .disabled(busy || status == nil || status?.installed == false && status?.on == false)
+            .disabled(status == nil || status?.installed == false && !on)
             if let status {
                 if !status.problem.isEmpty {
                     Label(status.problem, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.orange)
@@ -300,7 +308,14 @@ struct AssistantSection: View {
         } footer: {
             Text("Everything it saves is checked as in the app, and before each change your sets and rigs are copied aside: ask it to undo. It can't delete sets or rigs, switch lights on or change a show that is running. An open rig editor shows its changes, or asks first when you have unsaved changes there.")
         }
-        .task(id: model.workspace) { await model.refreshClaudeDesktop() }
+        .onChange(of: model.claudeDesktop) { if !busy { on = model.claudeDesktop?.on ?? false } }
+        .task(id: model.workspace) {  // while it shows: Claude's config can change elsewhere (Claude, another app)
+            while !Task.isCancelled {
+                if !busy { await model.refreshClaudeDesktop() }
+                on = busy ? on : model.claudeDesktop?.on ?? false
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
     }
 }
 
