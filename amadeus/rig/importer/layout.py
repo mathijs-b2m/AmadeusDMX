@@ -23,6 +23,15 @@ ROW_SPAN_M = 4.0  # a truss never spans a longer gap than this without a fixture
 FACE_NEAR_M = 1.0  # fixed lights drawn this close beside a row of heads hang on the face of that truss
 HIGH_M = 1.8  # hanging higher than this: on a truss
 FLOOR_M = 0.6  # lower than this: on the floor
+FLOOR_LIFT = {"head": 0.3, "strobe": 0.25}  # a fixture's height is its centre (a head's: its tilt axis), this far
+FLOOR_LIFT_M = 0.15  # (else this far) above what it stands on, as automount puts it: the documents give the floor
+
+
+def lift(kind: str) -> float:
+    """How high the centre of a fixture of this kind stands above the floor it stands on."""
+    return FLOOR_LIFT.get(kind, FLOOR_LIFT_M)
+
+
 FRONT = re.compile(r"front|foh|f\.o\.h|follow|key ?light|dj", re.I)  # a fixed light there lights the stage
 
 
@@ -138,7 +147,8 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
     deck = float(draft.stage.get("deck_m") or 0.0)
     trusses, places = on_drawn_trusses(draft, high, W, mid)
     high = {fid: p for fid, p in high.items() if fid not in places and placed[fid].hanging is not False}
-    heads = {names[i] for i in range(len(names)) if role(fxlib.get(choices[i].key)) == "head"}
+    kinds = {names[i]: role(fxlib.get(choices[i].key)) for i in range(len(names))}
+    heads = {fid for fid, kind in kinds.items() if kind == "head"}
     runs = rows(high)
 
     def of_heads(run: list[str]) -> bool:  # a row of heads (a stray head among PARs drawn beside them is not)
@@ -205,6 +215,8 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
         x, y, z = xyz(it)
         ground = deck if y <= 0.5 else 0.0  # the stage's deck, or the hall floor
         mount = "floor" if z - ground < FLOOR_M else ("hang" if it.hanging is not False else "stand")
+        if mount == "floor":  # standing on it, not in it
+            z = max(z, ground + lift(kinds[fid]))
         places[fid] = {"x": round(x / W, 4), "y_m": round(y, 3), "z_m": round(max(z, 0.0), 3), "mount": mount}
     for i, it in enumerate(draft.items):
         fid = names[i]
@@ -222,7 +234,10 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
     stage = {
         "width_m": W,
         **({"deck_m": deck} if deck else {}),
-        "ceiling_m": float(draft.stage.get("ceiling_m") or round(max(zs + [4.0]) + 1.0, 1)),
+        # what the documents give, never under what hangs; without it, a metre over the highest
+        "ceiling_m": max(float(draft.stage["ceiling_m"]), round(max(zs, default=0.0) + 0.5, 1))
+        if draft.stage.get("ceiling_m")
+        else round(max(zs + [4.0]) + 1.0, 1),
         "eye_safety": True,
         "room_depth_m": round(max(15.0, max(ys + [0.0]) + 4.0), 1),
     }
