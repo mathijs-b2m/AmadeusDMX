@@ -1,0 +1,1269 @@
+{
+  "description": "Melkweg Max, Amsterdam: the house rig as patched for 2026/27. 30 Ayrton Diablo-S (12 stage, 12 hall, 6 floor), 40 Martin MAC Aura (16 stage, 24 hall), 10 Martin Atomic 3000, 6 High End Color Command, 24 Chauvet STRIKE Array 1 pods, PAR 64s and front light on dimmers, MDG haze and fog; the house's universes 1–7 (sACN at the venue); visualiser only",
+  "artnet": {
+    "ip": "127.0.0.1",
+    "port": 6454,
+    "fps": 40
+  },
+  "safety": {
+    "max_flash_hz": 3,
+    "master": 1.0,
+    "allow_fast_strobe": false
+  },
+  "director": "openai",
+  "fixtures": [
+    {
+      "id": "diablo101",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 1,
+      "address": 141
+    },
+    {
+      "id": "diablo102",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 1,
+      "address": 197
+    },
+    {
+      "id": "diablo103",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 1,
+      "address": 253
+    },
+    {
+      "id": "aura201",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 1,
+      "address": 309
+    },
+    {
+      "id": "aura202",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 1,
+      "address": 334
+    },
+    {
+      "id": "aura203",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 1,
+      "address": 359
+    },
+    {
+      "id": "aura204",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 1,
+      "address": 384
+    },
+    {
+      "id": "atomic701",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 3,
+      "address": 301
+    },
+    {
+      "id": "par34",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 34
+    },
+    {
+      "id": "par35",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 35
+    },
+    {
+      "id": "par36",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 36
+    },
+    {
+      "id": "par37",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 37
+    },
+    {
+      "id": "strike1_1",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 331
+    },
+    {
+      "id": "strike1_2",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 332
+    },
+    {
+      "id": "diablo104",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 1
+    },
+    {
+      "id": "diablo105",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 57
+    },
+    {
+      "id": "diablo106",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 113
+    },
+    {
+      "id": "aura205",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 1
+    },
+    {
+      "id": "aura206",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 26
+    },
+    {
+      "id": "aura207",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 51
+    },
+    {
+      "id": "aura208",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 76
+    },
+    {
+      "id": "atomic702",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 3,
+      "address": 306
+    },
+    {
+      "id": "par38",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 38
+    },
+    {
+      "id": "par39",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 39
+    },
+    {
+      "id": "par40",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 40
+    },
+    {
+      "id": "par41",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 41
+    },
+    {
+      "id": "strike1_3",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 333
+    },
+    {
+      "id": "strike1_4",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 334
+    },
+    {
+      "id": "diablo107",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 169
+    },
+    {
+      "id": "diablo108",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 225
+    },
+    {
+      "id": "diablo109",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 281
+    },
+    {
+      "id": "aura209",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 101
+    },
+    {
+      "id": "aura210",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 126
+    },
+    {
+      "id": "aura211",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 151
+    },
+    {
+      "id": "aura212",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 176
+    },
+    {
+      "id": "atomic703",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 3,
+      "address": 311
+    },
+    {
+      "id": "par42",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 42
+    },
+    {
+      "id": "par43",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 43
+    },
+    {
+      "id": "par44",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 44
+    },
+    {
+      "id": "par45",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 45
+    },
+    {
+      "id": "strike1_5",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 335
+    },
+    {
+      "id": "strike1_6",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 336
+    },
+    {
+      "id": "diablo110",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 337
+    },
+    {
+      "id": "diablo111",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 393
+    },
+    {
+      "id": "diablo112",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 2,
+      "address": 449
+    },
+    {
+      "id": "aura213",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 201
+    },
+    {
+      "id": "aura214",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 226
+    },
+    {
+      "id": "aura215",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 251
+    },
+    {
+      "id": "aura216",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 3,
+      "address": 276
+    },
+    {
+      "id": "atomic704",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 3,
+      "address": 316
+    },
+    {
+      "id": "par46",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 46
+    },
+    {
+      "id": "par47",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 47
+    },
+    {
+      "id": "par48",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 48
+    },
+    {
+      "id": "par49",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 49
+    },
+    {
+      "id": "strike1_7",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 337
+    },
+    {
+      "id": "strike1_8",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 338
+    },
+    {
+      "id": "cc401",
+      "fixture": "high-end-systems/color-command",
+      "mode": "5ch",
+      "universe": 1,
+      "address": 410
+    },
+    {
+      "id": "cc402",
+      "fixture": "high-end-systems/color-command",
+      "mode": "5ch",
+      "universe": 1,
+      "address": 415
+    },
+    {
+      "id": "cc403",
+      "fixture": "high-end-systems/color-command",
+      "mode": "5ch",
+      "universe": 1,
+      "address": 420
+    },
+    {
+      "id": "cc404",
+      "fixture": "high-end-systems/color-command",
+      "mode": "5ch",
+      "universe": 1,
+      "address": 425
+    },
+    {
+      "id": "cc405",
+      "fixture": "high-end-systems/color-command",
+      "mode": "5ch",
+      "universe": 1,
+      "address": 430
+    },
+    {
+      "id": "cc406",
+      "fixture": "high-end-systems/color-command",
+      "mode": "5ch",
+      "universe": 1,
+      "address": 435
+    },
+    {
+      "id": "par26",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 26
+    },
+    {
+      "id": "par27",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 27
+    },
+    {
+      "id": "par28",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 28
+    },
+    {
+      "id": "par29",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 29
+    },
+    {
+      "id": "par30",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 30
+    },
+    {
+      "id": "par31",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 31
+    },
+    {
+      "id": "par32",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 32
+    },
+    {
+      "id": "par33",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 33
+    },
+    {
+      "id": "atomic705",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 3,
+      "address": 321
+    },
+    {
+      "id": "atomic706",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 3,
+      "address": 326
+    },
+    {
+      "id": "strike2_1",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 377
+    },
+    {
+      "id": "strike2_2",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 378
+    },
+    {
+      "id": "strike2_3",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 379
+    },
+    {
+      "id": "strike2_4",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 380
+    },
+    {
+      "id": "strike2_5",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 381
+    },
+    {
+      "id": "strike2_6",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 382
+    },
+    {
+      "id": "strike2_7",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 383
+    },
+    {
+      "id": "strike2_8",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 384
+    },
+    {
+      "id": "diablo125",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 7,
+      "address": 1
+    },
+    {
+      "id": "diablo126",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 7,
+      "address": 57
+    },
+    {
+      "id": "diablo127",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 7,
+      "address": 113
+    },
+    {
+      "id": "diablo128",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 7,
+      "address": 169
+    },
+    {
+      "id": "diablo129",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 7,
+      "address": 225
+    },
+    {
+      "id": "diablo130",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 7,
+      "address": 281
+    },
+    {
+      "id": "aura218",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 4,
+      "address": 362
+    },
+    {
+      "id": "aura219",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 4,
+      "address": 387
+    },
+    {
+      "id": "aura220",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 4,
+      "address": 412
+    },
+    {
+      "id": "aura221",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 4,
+      "address": 437
+    },
+    {
+      "id": "diablo113",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 4,
+      "address": 1
+    },
+    {
+      "id": "diablo114",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 4,
+      "address": 57
+    },
+    {
+      "id": "diablo115",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 4,
+      "address": 113
+    },
+    {
+      "id": "diablo116",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 4,
+      "address": 169
+    },
+    {
+      "id": "diablo117",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 4,
+      "address": 225
+    },
+    {
+      "id": "diablo118",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 4,
+      "address": 281
+    },
+    {
+      "id": "aura224",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 5,
+      "address": 362
+    },
+    {
+      "id": "aura225",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 5,
+      "address": 387
+    },
+    {
+      "id": "aura226",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 5,
+      "address": 412
+    },
+    {
+      "id": "aura227",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 5,
+      "address": 437
+    },
+    {
+      "id": "atomic707",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 6,
+      "address": 301
+    },
+    {
+      "id": "atomic708",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 6,
+      "address": 306
+    },
+    {
+      "id": "diablo119",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 5,
+      "address": 1
+    },
+    {
+      "id": "diablo120",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 5,
+      "address": 57
+    },
+    {
+      "id": "diablo121",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 5,
+      "address": 113
+    },
+    {
+      "id": "diablo122",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 5,
+      "address": 169
+    },
+    {
+      "id": "diablo123",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 5,
+      "address": 225
+    },
+    {
+      "id": "diablo124",
+      "fixture": "ayrton/diablo-s",
+      "mode": "ext",
+      "universe": 5,
+      "address": 281
+    },
+    {
+      "id": "aura230",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 26
+    },
+    {
+      "id": "aura231",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 51
+    },
+    {
+      "id": "aura232",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 76
+    },
+    {
+      "id": "aura233",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 101
+    },
+    {
+      "id": "atomic709",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 6,
+      "address": 311
+    },
+    {
+      "id": "atomic710",
+      "fixture": "martin/atomic-3000",
+      "mode": "Mode3withColour",
+      "universe": 6,
+      "address": 316
+    },
+    {
+      "id": "aura236",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 176
+    },
+    {
+      "id": "aura237",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 201
+    },
+    {
+      "id": "aura238",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 226
+    },
+    {
+      "id": "aura239",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 251
+    },
+    {
+      "id": "front61",
+      "fixture": "adb/europe-c103",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 61
+    },
+    {
+      "id": "front62",
+      "fixture": "adb/europe-c103",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 62
+    },
+    {
+      "id": "front63",
+      "fixture": "adb/europe-c103",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 63
+    },
+    {
+      "id": "front64",
+      "fixture": "adb/europe-c103",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 64
+    },
+    {
+      "id": "front65",
+      "fixture": "adb/europe-c103",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 65
+    },
+    {
+      "id": "djfront66",
+      "fixture": "adb/europe-c103",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 66
+    },
+    {
+      "id": "aura217",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 4,
+      "address": 337
+    },
+    {
+      "id": "aura223",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 5,
+      "address": 337
+    },
+    {
+      "id": "aura229",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 1
+    },
+    {
+      "id": "aura235",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 151
+    },
+    {
+      "id": "aura222",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 4,
+      "address": 462
+    },
+    {
+      "id": "aura228",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 5,
+      "address": 462
+    },
+    {
+      "id": "aura234",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 126
+    },
+    {
+      "id": "aura240",
+      "fixture": "martin/mac-aura",
+      "mode": "Extended",
+      "universe": 6,
+      "address": 276
+    },
+    {
+      "id": "strike3_1",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 423
+    },
+    {
+      "id": "strike3_2",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 424
+    },
+    {
+      "id": "strike3_3",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 425
+    },
+    {
+      "id": "strike3_4",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 426
+    },
+    {
+      "id": "strike3_5",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 427
+    },
+    {
+      "id": "strike3_6",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 428
+    },
+    {
+      "id": "strike3_7",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 429
+    },
+    {
+      "id": "strike3_8",
+      "fixture": "chauvet/strike-array-1",
+      "mode": "1ch",
+      "universe": 3,
+      "address": 430
+    },
+    {
+      "id": "hallpar67",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 67
+    },
+    {
+      "id": "hallpar68",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 68
+    },
+    {
+      "id": "hallpar69",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 69
+    },
+    {
+      "id": "hallpar70",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 70
+    },
+    {
+      "id": "hallpar71",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 71
+    },
+    {
+      "id": "hallpar72",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 72
+    },
+    {
+      "id": "hallpar73",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 73
+    },
+    {
+      "id": "hallpar74",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 74
+    },
+    {
+      "id": "hallpar75",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 75
+    },
+    {
+      "id": "hallpar76",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 76
+    },
+    {
+      "id": "hallpar77",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 77
+    },
+    {
+      "id": "hallpar78",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 78
+    },
+    {
+      "id": "hallpar79",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 79
+    },
+    {
+      "id": "hallpar80",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 80
+    },
+    {
+      "id": "hallpar81",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 81
+    },
+    {
+      "id": "hallpar82",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 82
+    },
+    {
+      "id": "hallpar83",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 83
+    },
+    {
+      "id": "hallpar84",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 84
+    },
+    {
+      "id": "hallpar85",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 85
+    },
+    {
+      "id": "hallpar86",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 86
+    },
+    {
+      "id": "hallpar87",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 87
+    },
+    {
+      "id": "hallpar88",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 88
+    },
+    {
+      "id": "hallpar89",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 89
+    },
+    {
+      "id": "hallpar90",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 90
+    },
+    {
+      "id": "hallpar91",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 91
+    },
+    {
+      "id": "hallpar92",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 92
+    },
+    {
+      "id": "hallpar93",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 93
+    },
+    {
+      "id": "hallpar94",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 94
+    },
+    {
+      "id": "hallpar95",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 95
+    },
+    {
+      "id": "hallpar96",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 96
+    },
+    {
+      "id": "hallpar97",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 97
+    },
+    {
+      "id": "hallpar98",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 98
+    },
+    {
+      "id": "hallpar99",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 99
+    },
+    {
+      "id": "hallpar100",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 100
+    },
+    {
+      "id": "hallpar101",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 101
+    },
+    {
+      "id": "hallpar102",
+      "fixture": "generic/par-64",
+      "mode": "1ch",
+      "universe": 1,
+      "address": 102
+    },
+    {
+      "id": "haze",
+      "fixture": "mdg/atme",
+      "mode": "3ch",
+      "universe": 1,
+      "address": 501
+    },
+    {
+      "id": "fog",
+      "fixture": "mdg/me2",
+      "mode": "3ch",
+      "universe": 1,
+      "address": 504
+    },
+    {
+      "id": "foghall",
+      "fixture": "mdg/me2",
+      "mode": "3ch",
+      "universe": 1,
+      "address": 508
+    }
+  ]
+}

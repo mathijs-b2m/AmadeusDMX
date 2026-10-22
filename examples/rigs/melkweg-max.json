@@ -1,0 +1,2105 @@
+{
+  "description": "Melkweg Max, Amsterdam: stage 14 × 6.5 m (9.5 m usable), grid 7.5 m over the deck; four house trusses in two rows, side trusses, a front truss over the edge; the hall grid (5.5 m over the floor) with seven rows and the balcony edges. z is above the stage deck: the hall floor is 1.5 m lower.",
+  "stage": {
+    "width_m": 14.0,
+    "ceiling_m": 7.5,
+    "room_depth_m": 26,
+    "eye_safety": false,
+    "room_volume_m3": 4000,
+    "fog_clear_s": 240
+  },
+  "trusses": [
+    {
+      "id": "upL",
+      "type": "quatro",
+      "length_m": 4.6,
+      "x_m": 9.85,
+      "y_m": -5.95,
+      "z_m": 6.5
+    },
+    {
+      "id": "upR",
+      "type": "quatro",
+      "length_m": 4.6,
+      "x_m": 4.03,
+      "y_m": -5.95,
+      "z_m": 6.5
+    },
+    {
+      "id": "downL",
+      "type": "quatro",
+      "length_m": 4.6,
+      "x_m": 9.64,
+      "y_m": -3.85,
+      "z_m": 6.5
+    },
+    {
+      "id": "downR",
+      "type": "quatro",
+      "length_m": 4.6,
+      "x_m": 4.22,
+      "y_m": -3.85,
+      "z_m": 6.5
+    },
+    {
+      "id": "sideSR",
+      "type": "quatro",
+      "length_m": 3.6,
+      "x_m": 13.91,
+      "y_m": -4.64,
+      "z_m": 5.5,
+      "rot_deg": 90
+    },
+    {
+      "id": "sideSL",
+      "type": "quatro",
+      "length_m": 3.6,
+      "x_m": 0.09,
+      "y_m": -4.64,
+      "z_m": 5.5,
+      "rot_deg": 90
+    },
+    {
+      "id": "front",
+      "type": "quatro",
+      "length_m": 8.5,
+      "x_m": 7.0,
+      "y_m": 1.24,
+      "z_m": 5.0,
+      "aim": "audience"
+    },
+    {
+      "id": "hall1",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 2.29,
+      "z_m": 4.0
+    },
+    {
+      "id": "hall2",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 3.45,
+      "z_m": 4.0
+    },
+    {
+      "id": "hall3",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 8.13,
+      "z_m": 4.0
+    },
+    {
+      "id": "hall4",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 10.6,
+      "z_m": 4.0
+    },
+    {
+      "id": "hall5",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 14.03,
+      "z_m": 4.0
+    },
+    {
+      "id": "hall6",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 16.29,
+      "z_m": 4.0
+    },
+    {
+      "id": "hall7",
+      "type": "quatro",
+      "length_m": 9.5,
+      "x_m": 7.0,
+      "y_m": 18.62,
+      "z_m": 4.0
+    },
+    {
+      "id": "balconySR",
+      "type": "quatro",
+      "length_m": 17.0,
+      "x_m": 14.66,
+      "y_m": 9.87,
+      "z_m": 4.0,
+      "rot_deg": 90,
+      "aim": "down"
+    },
+    {
+      "id": "balconySL",
+      "type": "quatro",
+      "length_m": 17.0,
+      "x_m": -0.66,
+      "y_m": 9.87,
+      "z_m": 4.0,
+      "rot_deg": 90,
+      "aim": "down"
+    }
+  ],
+  "zones": [],
+  "placements": {
+    "melkweg-max": {
+      "diablo101": {
+        "truss": "upL",
+        "truss_pos_m": 1.118,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7834,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "diablo102": {
+        "truss": "upL",
+        "truss_pos_m": 0.064,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7081,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "diablo103": {
+        "truss": "upL",
+        "truss_pos_m": -0.973,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6341,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura201": {
+        "truss": "upL",
+        "truss_pos_m": 1.664,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.8224,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura202": {
+        "truss": "upL",
+        "truss_pos_m": 0.555,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7432,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura203": {
+        "truss": "upL",
+        "truss_pos_m": -0.573,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6626,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura204": {
+        "truss": "upL",
+        "truss_pos_m": -1.664,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5847,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "atomic701": {
+        "truss": "upL",
+        "truss_pos_m": 0.045,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.7068,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90
+      },
+      "par34": {
+        "truss": "upL",
+        "truss_pos_m": 1.664,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.8224,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par35": {
+        "truss": "upL",
+        "truss_pos_m": 0.555,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.7432,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par36": {
+        "truss": "upL",
+        "truss_pos_m": -0.573,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.6626,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par37": {
+        "truss": "upL",
+        "truss_pos_m": -1.664,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.5847,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "strike1_1": {
+        "truss": "upL",
+        "truss_pos_m": -1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.625,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "strike1_2": {
+        "truss": "upL",
+        "truss_pos_m": 1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.7821,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "diablo104": {
+        "truss": "upR",
+        "truss_pos_m": 1.209,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3742,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "diablo105": {
+        "truss": "upR",
+        "truss_pos_m": 0.155,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2989,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "diablo106": {
+        "truss": "upR",
+        "truss_pos_m": -0.882,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2249,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura205": {
+        "truss": "upR",
+        "truss_pos_m": 1.791,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4158,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura206": {
+        "truss": "upR",
+        "truss_pos_m": 0.645,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3339,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura207": {
+        "truss": "upR",
+        "truss_pos_m": -0.391,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2599,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "aura208": {
+        "truss": "upR",
+        "truss_pos_m": -1.482,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.182,
+        "y_m": -5.95,
+        "z_m": 6.08
+      },
+      "atomic702": {
+        "truss": "upR",
+        "truss_pos_m": 0.155,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.2989,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90
+      },
+      "par38": {
+        "truss": "upR",
+        "truss_pos_m": 1.791,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.4158,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par39": {
+        "truss": "upR",
+        "truss_pos_m": 0.645,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.3339,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par40": {
+        "truss": "upR",
+        "truss_pos_m": -0.391,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.2599,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par41": {
+        "truss": "upR",
+        "truss_pos_m": -1.482,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.182,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "strike1_3": {
+        "truss": "upR",
+        "truss_pos_m": -1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.2093,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "strike1_4": {
+        "truss": "upR",
+        "truss_pos_m": 1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.3664,
+        "y_m": -5.55,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "diablo107": {
+        "truss": "downL",
+        "truss_pos_m": 1.182,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.773,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "diablo108": {
+        "truss": "downL",
+        "truss_pos_m": 0.0,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6886,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "diablo109": {
+        "truss": "downL",
+        "truss_pos_m": -1.091,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6106,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura209": {
+        "truss": "downL",
+        "truss_pos_m": 1.727,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.8119,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura210": {
+        "truss": "downL",
+        "truss_pos_m": 0.582,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7301,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura211": {
+        "truss": "downL",
+        "truss_pos_m": -0.545,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6496,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura212": {
+        "truss": "downL",
+        "truss_pos_m": -1.636,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5717,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "atomic703": {
+        "truss": "downL",
+        "truss_pos_m": 0.0,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.6886,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90
+      },
+      "par42": {
+        "truss": "downL",
+        "truss_pos_m": 1.727,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.8119,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par43": {
+        "truss": "downL",
+        "truss_pos_m": 0.582,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.7301,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par44": {
+        "truss": "downL",
+        "truss_pos_m": -0.545,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.6496,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par45": {
+        "truss": "downL",
+        "truss_pos_m": -1.636,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.5717,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "strike1_5": {
+        "truss": "downL",
+        "truss_pos_m": -1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.61,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "strike1_6": {
+        "truss": "downL",
+        "truss_pos_m": 1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.7671,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "diablo110": {
+        "truss": "downR",
+        "truss_pos_m": 1.327,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3962,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "diablo111": {
+        "truss": "downR",
+        "truss_pos_m": 0.2,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3157,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "diablo112": {
+        "truss": "downR",
+        "truss_pos_m": -0.945,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2339,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura213": {
+        "truss": "downR",
+        "truss_pos_m": 1.873,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4352,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura214": {
+        "truss": "downR",
+        "truss_pos_m": 0.782,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3573,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura215": {
+        "truss": "downR",
+        "truss_pos_m": -0.309,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2794,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "aura216": {
+        "truss": "downR",
+        "truss_pos_m": -1.491,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.1949,
+        "y_m": -3.85,
+        "z_m": 6.08
+      },
+      "atomic704": {
+        "truss": "downR",
+        "truss_pos_m": 0.2,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.3157,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90
+      },
+      "par46": {
+        "truss": "downR",
+        "truss_pos_m": 1.873,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.4352,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par47": {
+        "truss": "downR",
+        "truss_pos_m": 0.782,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.3573,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par48": {
+        "truss": "downR",
+        "truss_pos_m": -0.309,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.2794,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "par49": {
+        "truss": "downR",
+        "truss_pos_m": -1.491,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.1949,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -60.0
+        ]
+      },
+      "strike1_7": {
+        "truss": "downR",
+        "truss_pos_m": -1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.2229,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "strike1_8": {
+        "truss": "downR",
+        "truss_pos_m": 1.1,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.38,
+        "y_m": -3.45,
+        "z_m": 6.5,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -10.0
+        ]
+      },
+      "cc401": {
+        "truss": "sideSR",
+        "truss_pos_m": -1.036,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.9936,
+        "y_m": -5.676,
+        "z_m": 5.08,
+        "rot_deg": 90,
+        "aim": [
+          0.0,
+          -70.0
+        ]
+      },
+      "cc402": {
+        "truss": "sideSR",
+        "truss_pos_m": 0.018,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.9936,
+        "y_m": -4.622,
+        "z_m": 5.08,
+        "rot_deg": 90,
+        "aim": [
+          0.0,
+          -70.0
+        ]
+      },
+      "cc403": {
+        "truss": "sideSR",
+        "truss_pos_m": 1.055,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.9936,
+        "y_m": -3.585,
+        "z_m": 5.08,
+        "rot_deg": 90,
+        "aim": [
+          0.0,
+          -70.0
+        ]
+      },
+      "cc404": {
+        "truss": "sideSL",
+        "truss_pos_m": -1.036,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.0064,
+        "y_m": -5.676,
+        "z_m": 5.08,
+        "rot_deg": 90,
+        "aim": [
+          0.0,
+          -70.0
+        ]
+      },
+      "cc405": {
+        "truss": "sideSL",
+        "truss_pos_m": 0.018,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.0064,
+        "y_m": -4.622,
+        "z_m": 5.08,
+        "rot_deg": 90,
+        "aim": [
+          0.0,
+          -70.0
+        ]
+      },
+      "cc406": {
+        "truss": "sideSL",
+        "truss_pos_m": 1.055,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.0064,
+        "y_m": -3.585,
+        "z_m": 5.08,
+        "rot_deg": 90,
+        "aim": [
+          0.0,
+          -70.0
+        ]
+      },
+      "par26": {
+        "truss": "sideSR",
+        "truss_pos_m": -1.491,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.965,
+        "y_m": -6.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par27": {
+        "truss": "sideSR",
+        "truss_pos_m": -0.491,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.965,
+        "y_m": -5.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par28": {
+        "truss": "sideSR",
+        "truss_pos_m": 0.509,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.965,
+        "y_m": -4.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par29": {
+        "truss": "sideSR",
+        "truss_pos_m": 1.509,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.965,
+        "y_m": -3.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par30": {
+        "truss": "sideSL",
+        "truss_pos_m": -1.491,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.035,
+        "y_m": -6.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par31": {
+        "truss": "sideSL",
+        "truss_pos_m": -0.491,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.035,
+        "y_m": -5.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par32": {
+        "truss": "sideSL",
+        "truss_pos_m": 0.509,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.035,
+        "y_m": -4.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "par33": {
+        "truss": "sideSL",
+        "truss_pos_m": 1.509,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.035,
+        "y_m": -3.131,
+        "z_m": 5.5,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -55.0
+        ]
+      },
+      "atomic705": {
+        "truss": "front",
+        "truss_pos_m": 2.036,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6454,
+        "y_m": 1.24,
+        "z_m": 4.58
+      },
+      "atomic706": {
+        "truss": "front",
+        "truss_pos_m": -2.036,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3546,
+        "y_m": 1.24,
+        "z_m": 4.58
+      },
+      "strike2_1": {
+        "truss": "front",
+        "truss_pos_m": -3.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.25,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_2": {
+        "truss": "front",
+        "truss_pos_m": -2.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.3214,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_3": {
+        "truss": "front",
+        "truss_pos_m": -1.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.3929,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_4": {
+        "truss": "front",
+        "truss_pos_m": -0.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.4643,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_5": {
+        "truss": "front",
+        "truss_pos_m": 0.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.5357,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_6": {
+        "truss": "front",
+        "truss_pos_m": 1.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.6071,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_7": {
+        "truss": "front",
+        "truss_pos_m": 2.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.6786,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike2_8": {
+        "truss": "front",
+        "truss_pos_m": 3.5,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 0.75,
+        "y_m": 1.64,
+        "z_m": 5.0,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "diablo125": {
+        "x": 0.1429,
+        "y_m": -6.0,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "diablo126": {
+        "x": 0.2857,
+        "y_m": -6.0,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "diablo127": {
+        "x": 0.4286,
+        "y_m": -6.0,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "diablo128": {
+        "x": 0.5714,
+        "y_m": -6.0,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "diablo129": {
+        "x": 0.7143,
+        "y_m": -6.0,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "diablo130": {
+        "x": 0.8571,
+        "y_m": -6.0,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "aura218": {
+        "truss": "hall1",
+        "truss_pos_m": 3.974,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7839,
+        "y_m": 2.29,
+        "z_m": 3.58
+      },
+      "aura219": {
+        "truss": "hall1",
+        "truss_pos_m": 1.091,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5779,
+        "y_m": 2.29,
+        "z_m": 3.58
+      },
+      "aura220": {
+        "truss": "hall1",
+        "truss_pos_m": -1.039,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4258,
+        "y_m": 2.29,
+        "z_m": 3.58
+      },
+      "aura221": {
+        "truss": "hall1",
+        "truss_pos_m": -3.922,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2199,
+        "y_m": 2.29,
+        "z_m": 3.58
+      },
+      "diablo113": {
+        "truss": "hall2",
+        "truss_pos_m": 3.974,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7839,
+        "y_m": 3.45,
+        "z_m": 3.58
+      },
+      "diablo114": {
+        "truss": "hall2",
+        "truss_pos_m": 2.545,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6818,
+        "y_m": 3.45,
+        "z_m": 3.58
+      },
+      "diablo115": {
+        "truss": "hall2",
+        "truss_pos_m": 1.091,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5779,
+        "y_m": 3.45,
+        "z_m": 3.58
+      },
+      "diablo116": {
+        "truss": "hall2",
+        "truss_pos_m": -1.039,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4258,
+        "y_m": 3.45,
+        "z_m": 3.58
+      },
+      "diablo117": {
+        "truss": "hall2",
+        "truss_pos_m": -2.468,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3237,
+        "y_m": 3.45,
+        "z_m": 3.58
+      },
+      "diablo118": {
+        "truss": "hall2",
+        "truss_pos_m": -3.922,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2199,
+        "y_m": 3.45,
+        "z_m": 3.58
+      },
+      "aura224": {
+        "truss": "hall3",
+        "truss_pos_m": 3.584,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.756,
+        "y_m": 8.13,
+        "z_m": 3.58
+      },
+      "aura225": {
+        "truss": "hall3",
+        "truss_pos_m": 1.091,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5779,
+        "y_m": 8.13,
+        "z_m": 3.58
+      },
+      "aura226": {
+        "truss": "hall3",
+        "truss_pos_m": -1.299,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4072,
+        "y_m": 8.13,
+        "z_m": 3.58
+      },
+      "aura227": {
+        "truss": "hall3",
+        "truss_pos_m": -3.766,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.231,
+        "y_m": 8.13,
+        "z_m": 3.58
+      },
+      "atomic707": {
+        "truss": "hall3",
+        "truss_pos_m": 2.545,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6818,
+        "y_m": 8.13,
+        "z_m": 3.58
+      },
+      "atomic708": {
+        "truss": "hall3",
+        "truss_pos_m": -2.545,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3182,
+        "y_m": 8.13,
+        "z_m": 3.58
+      },
+      "diablo119": {
+        "truss": "hall4",
+        "truss_pos_m": 3.974,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.7839,
+        "y_m": 10.6,
+        "z_m": 3.58
+      },
+      "diablo120": {
+        "truss": "hall4",
+        "truss_pos_m": 2.545,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6818,
+        "y_m": 10.6,
+        "z_m": 3.58
+      },
+      "diablo121": {
+        "truss": "hall4",
+        "truss_pos_m": 1.091,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5779,
+        "y_m": 10.6,
+        "z_m": 3.58
+      },
+      "diablo122": {
+        "truss": "hall4",
+        "truss_pos_m": -1.299,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4072,
+        "y_m": 10.6,
+        "z_m": 3.58
+      },
+      "diablo123": {
+        "truss": "hall4",
+        "truss_pos_m": -2.468,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3237,
+        "y_m": 10.6,
+        "z_m": 3.58
+      },
+      "diablo124": {
+        "truss": "hall4",
+        "truss_pos_m": -3.922,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.2199,
+        "y_m": 10.6,
+        "z_m": 3.58
+      },
+      "aura230": {
+        "truss": "hall5",
+        "truss_pos_m": 3.584,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.756,
+        "y_m": 14.03,
+        "z_m": 3.58
+      },
+      "aura231": {
+        "truss": "hall5",
+        "truss_pos_m": 1.299,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5928,
+        "y_m": 14.03,
+        "z_m": 3.58
+      },
+      "aura232": {
+        "truss": "hall5",
+        "truss_pos_m": -1.299,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4072,
+        "y_m": 14.03,
+        "z_m": 3.58
+      },
+      "aura233": {
+        "truss": "hall5",
+        "truss_pos_m": -3.766,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.231,
+        "y_m": 14.03,
+        "z_m": 3.58
+      },
+      "atomic709": {
+        "truss": "hall6",
+        "truss_pos_m": 2.545,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.6818,
+        "y_m": 16.29,
+        "z_m": 3.58
+      },
+      "atomic710": {
+        "truss": "hall6",
+        "truss_pos_m": -2.468,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.3237,
+        "y_m": 16.29,
+        "z_m": 3.58
+      },
+      "aura236": {
+        "truss": "hall7",
+        "truss_pos_m": 3.584,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.756,
+        "y_m": 18.62,
+        "z_m": 3.58
+      },
+      "aura237": {
+        "truss": "hall7",
+        "truss_pos_m": 1.299,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.5928,
+        "y_m": 18.62,
+        "z_m": 3.58
+      },
+      "aura238": {
+        "truss": "hall7",
+        "truss_pos_m": -1.299,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.4072,
+        "y_m": 18.62,
+        "z_m": 3.58
+      },
+      "aura239": {
+        "truss": "hall7",
+        "truss_pos_m": -3.766,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 0.231,
+        "y_m": 18.62,
+        "z_m": 3.58
+      },
+      "front61": {
+        "truss": "hall1",
+        "truss_pos_m": 3.247,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.7319,
+        "y_m": 1.89,
+        "z_m": 4.0,
+        "mount_roll_deg": 270,
+        "aim": [
+          180.0,
+          -25.0
+        ]
+      },
+      "front62": {
+        "truss": "hall1",
+        "truss_pos_m": 1.87,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.6336,
+        "y_m": 1.89,
+        "z_m": 4.0,
+        "mount_roll_deg": 270,
+        "aim": [
+          180.0,
+          -25.0
+        ]
+      },
+      "front63": {
+        "truss": "hall1",
+        "truss_pos_m": 0.0,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.5,
+        "y_m": 1.89,
+        "z_m": 4.0,
+        "mount_roll_deg": 270,
+        "aim": [
+          180.0,
+          -25.0
+        ]
+      },
+      "front64": {
+        "truss": "hall1",
+        "truss_pos_m": -1.87,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.3664,
+        "y_m": 1.89,
+        "z_m": 4.0,
+        "mount_roll_deg": 270,
+        "aim": [
+          180.0,
+          -25.0
+        ]
+      },
+      "front65": {
+        "truss": "hall1",
+        "truss_pos_m": -3.195,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.2718,
+        "y_m": 1.89,
+        "z_m": 4.0,
+        "mount_roll_deg": 270,
+        "aim": [
+          180.0,
+          -25.0
+        ]
+      },
+      "djfront66": {
+        "truss": "hall1",
+        "truss_pos_m": -0.9,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": 0.4357,
+        "y_m": 1.89,
+        "z_m": 4.0,
+        "mount_roll_deg": 270,
+        "aim": [
+          180.0,
+          -30.0
+        ]
+      },
+      "aura217": {
+        "truss": "balconySR",
+        "truss_pos_m": -7.58,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 1.0471,
+        "y_m": 2.29,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura223": {
+        "truss": "balconySR",
+        "truss_pos_m": -2.86,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 1.0471,
+        "y_m": 7.01,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura229": {
+        "truss": "balconySR",
+        "truss_pos_m": 2.52,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 1.0471,
+        "y_m": 12.39,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura235": {
+        "truss": "balconySR",
+        "truss_pos_m": 7.53,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": 1.0471,
+        "y_m": 17.4,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura222": {
+        "truss": "balconySL",
+        "truss_pos_m": -7.58,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": -0.0471,
+        "y_m": 2.29,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura228": {
+        "truss": "balconySL",
+        "truss_pos_m": -2.86,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": -0.0471,
+        "y_m": 7.01,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura234": {
+        "truss": "balconySL",
+        "truss_pos_m": 2.52,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": -0.0471,
+        "y_m": 12.39,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "aura240": {
+        "truss": "balconySL",
+        "truss_pos_m": 7.53,
+        "truss_side": "under",
+        "mount": "hang",
+        "x": -0.0471,
+        "y_m": 17.4,
+        "z_m": 3.58,
+        "rot_deg": 90
+      },
+      "strike3_1": {
+        "truss": "balconySR",
+        "truss_pos_m": -4.93,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 1.0186,
+        "y_m": 4.94,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_2": {
+        "truss": "balconySR",
+        "truss_pos_m": -1.3,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 1.0186,
+        "y_m": 8.57,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_3": {
+        "truss": "balconySR",
+        "truss_pos_m": 3.12,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 1.0186,
+        "y_m": 12.99,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_4": {
+        "truss": "balconySR",
+        "truss_pos_m": 6.75,
+        "truss_side": "front",
+        "mount": "hang",
+        "x": 1.0186,
+        "y_m": 16.62,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 90,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_5": {
+        "truss": "balconySL",
+        "truss_pos_m": -4.93,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": -0.0186,
+        "y_m": 4.94,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_6": {
+        "truss": "balconySL",
+        "truss_pos_m": -1.3,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": -0.0186,
+        "y_m": 8.57,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_7": {
+        "truss": "balconySL",
+        "truss_pos_m": 3.12,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": -0.0186,
+        "y_m": 12.99,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "strike3_8": {
+        "truss": "balconySL",
+        "truss_pos_m": 6.75,
+        "truss_side": "back",
+        "mount": "hang",
+        "x": -0.0186,
+        "y_m": 16.62,
+        "z_m": 4.0,
+        "rot_deg": 90,
+        "mount_roll_deg": 270,
+        "aim": [
+          0.0,
+          -15.0
+        ]
+      },
+      "hallpar67": {
+        "x": 0.5371,
+        "y_m": 4.62,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar68": {
+        "x": 0.4571,
+        "y_m": 4.62,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar69": {
+        "x": 0.7229,
+        "y_m": 6.05,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar70": {
+        "x": 0.565,
+        "y_m": 5.19,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar71": {
+        "x": 0.4386,
+        "y_m": 5.19,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar72": {
+        "x": 0.2721,
+        "y_m": 6.05,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar73": {
+        "x": 0.5557,
+        "y_m": 7.27,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar74": {
+        "x": 0.4386,
+        "y_m": 7.27,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar75": {
+        "x": 0.5371,
+        "y_m": 9.87,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar76": {
+        "x": 0.4571,
+        "y_m": 9.87,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar77": {
+        "x": 0.5557,
+        "y_m": 11.38,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar78": {
+        "x": 0.4386,
+        "y_m": 11.38,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar79": {
+        "x": 0.7229,
+        "y_m": 12.39,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar80": {
+        "x": 0.2721,
+        "y_m": 12.39,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar81": {
+        "x": 0.5557,
+        "y_m": 13.38,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar82": {
+        "x": 0.4386,
+        "y_m": 13.38,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar83": {
+        "x": 0.5371,
+        "y_m": 15.58,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar84": {
+        "x": 0.4571,
+        "y_m": 15.58,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar85": {
+        "x": 0.5557,
+        "y_m": 17.27,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar86": {
+        "x": 0.4386,
+        "y_m": 17.27,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar87": {
+        "x": 0.7229,
+        "y_m": 18.39,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar88": {
+        "x": 0.2721,
+        "y_m": 18.39,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar89": {
+        "x": 0.5557,
+        "y_m": 19.61,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar90": {
+        "x": 0.4386,
+        "y_m": 19.61,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar91": {
+        "x": 1.0471,
+        "y_m": 4.75,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar92": {
+        "x": 1.0471,
+        "y_m": 5.45,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar93": {
+        "x": -0.0471,
+        "y_m": 4.75,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar94": {
+        "x": -0.0471,
+        "y_m": 5.45,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar95": {
+        "x": 1.0471,
+        "y_m": 10.13,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar96": {
+        "x": 1.0471,
+        "y_m": 10.91,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar97": {
+        "x": -0.0471,
+        "y_m": 10.13,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar98": {
+        "x": -0.0471,
+        "y_m": 10.91,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar99": {
+        "x": 1.0471,
+        "y_m": 15.84,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar100": {
+        "x": 1.0471,
+        "y_m": 16.62,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar101": {
+        "x": -0.0471,
+        "y_m": 15.84,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "hallpar102": {
+        "x": -0.0471,
+        "y_m": 16.62,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          0.0,
+          -75.0
+        ]
+      },
+      "haze": {
+        "x": 0.8929,
+        "y_m": -6.2,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "fog": {
+        "x": 0.1071,
+        "y_m": -6.2,
+        "z_m": 0.0,
+        "mount": "floor"
+      },
+      "foghall": {
+        "x": 0.5,
+        "y_m": 20.78,
+        "z_m": 3.6,
+        "mount": "hang",
+        "aim": [
+          180.0,
+          -10.0
+        ]
+      }
+    }
+  }
+}
