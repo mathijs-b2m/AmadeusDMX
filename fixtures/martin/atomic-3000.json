@@ -1,0 +1,168 @@
+{
+  "kind": "strobe",
+  "manufacturer": "Martin",
+  "model": "Atomic 3000",
+  "modes": {
+    "Mode1": [
+      {
+        "attr": "shutter",
+        "default": 252
+      }
+    ],
+    "Mode1withColour": [
+      {
+        "attr": "shutter",
+        "default": 252
+      },
+      {
+        "attr": "colour",
+        "default": 0
+      }
+    ],
+    "Mode1withColourandFan": [
+      {
+        "attr": "shutter",
+        "default": 252
+      },
+      {
+        "attr": "colour",
+        "default": 0
+      },
+      {
+        "attr": "fan",
+        "default": 0
+      }
+    ],
+    "Mode2": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "duration",
+        "default": 0
+      },
+      {
+        "attr": "rate",
+        "default": 0
+      }
+    ],
+    "Mode2withColour": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "duration",
+        "default": 0
+      },
+      {
+        "attr": "rate",
+        "default": 0
+      },
+      {
+        "attr": "colour",
+        "default": 0
+      }
+    ],
+    "Mode2withColourandFan": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "duration",
+        "default": 0
+      },
+      {
+        "attr": "rate",
+        "default": 0
+      },
+      {
+        "attr": "colour",
+        "default": 0
+      },
+      {
+        "attr": "fan",
+        "default": 0
+      }
+    ],
+    "Mode3": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "duration",
+        "default": 0
+      },
+      {
+        "attr": "rate",
+        "default": 0
+      },
+      {
+        "attr": "effects",
+        "default": 0
+      }
+    ],
+    "Mode3withColour": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "duration",
+        "default": 0
+      },
+      {
+        "attr": "rate",
+        "default": 0
+      },
+      {
+        "attr": "effects",
+        "default": 0
+      },
+      {
+        "attr": "colour",
+        "default": 0
+      }
+    ],
+    "Mode3withColourandFan": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "duration",
+        "default": 0
+      },
+      {
+        "attr": "rate",
+        "default": 0
+      },
+      {
+        "attr": "effects",
+        "default": 0
+      },
+      {
+        "attr": "colour",
+        "default": 0
+      },
+      {
+        "attr": "fan",
+        "default": 0
+      }
+    ]
+  },
+  "physical": {
+    "_lumens_note": "estimated from the power (20 lm/W)",
+    "beam_deg": 110.0,
+    "lumens": 60000,
+    "size_mm": [
+      425,
+      245,
+      240
+    ],
+    "watts": 3000
+  },
+  "qlc": {
+    "converter": 8,
+    "key": "Martin/Martin-Atomic-3000.qxf",
+    "type": "Strobe"
+  },
+  "source": "QLC+ fixture library (Martin/Martin-Atomic-3000.qxf), converted automatically: check it once with `amadeus test`"
+}

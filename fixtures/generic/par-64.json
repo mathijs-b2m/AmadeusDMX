@@ -1,0 +1,30 @@
+{
+  "manufacturer": "Generic",
+  "model": "PAR 64 (on a dimmer)",
+  "kind": "par",
+  "source": "Written by hand: a 1000 W tungsten PAR 64 can on one dimmer channel",
+  "physical": {
+    "beam_deg": 24.0,
+    "size_mm": [
+      260,
+      260,
+      380
+    ],
+    "watts": 1000,
+    "lumens": 20000,
+    "_lumens_note": "a 1000 W CP62 lamp",
+    "light": "1000 W tungsten (3200 K)",
+    "colour_rgb": [
+      1.0,
+      0.78,
+      0.55
+    ]
+  },
+  "modes": {
+    "1ch": [
+      {
+        "attr": "dimmer"
+      }
+    ]
+  }
+}

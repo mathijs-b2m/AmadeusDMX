@@ -1,0 +1,30 @@
+{
+  "manufacturer": "Chauvet Professional",
+  "model": "STRIKE Array 1 (pod)",
+  "kind": "blinder",
+  "source": "Written by hand: one pod of a STRIKE Array 1 (a driver feeds up to eight pods), its dimmer only. The real personalities aren't in the QLC+ or Open Fixture libraries: check the manual and `amadeus test` before a show",
+  "physical": {
+    "beam_deg": 60.0,
+    "size_mm": [
+      200,
+      200,
+      120
+    ],
+    "watts": 100,
+    "lumens": 2500,
+    "_lumens_note": "estimated: one warm-white COB pod",
+    "light": "warm white COB",
+    "colour_rgb": [
+      1.0,
+      0.72,
+      0.42
+    ]
+  },
+  "modes": {
+    "1ch": [
+      {
+        "attr": "dimmer"
+      }
+    ]
+  }
+}

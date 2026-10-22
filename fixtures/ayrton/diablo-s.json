@@ -1,0 +1,678 @@
+{
+  "beam_fx": {
+    "frost": {
+      "frost": 255
+    },
+    "gobo": {
+      "gobo": [
+        14,
+        24,
+        34,
+        44,
+        54,
+        64,
+        73
+      ]
+    },
+    "gobo_rotate": {
+      "gobo": [
+        14,
+        24,
+        34,
+        44,
+        54,
+        64,
+        73
+      ],
+      "gobo_rotation": {
+        "range": [
+          189,
+          128
+        ],
+        "reverse": [
+          194,
+          255
+        ]
+      }
+    },
+    "gobo_shake": {
+      "gobo": [
+        85,
+        101,
+        117,
+        133,
+        149,
+        165,
+        181
+      ]
+    },
+    "gobo_spin": {
+      "gobo": {
+        "range": [
+          190,
+          221
+        ]
+      }
+    },
+    "open": {},
+    "prism": {
+      "prism": 191
+    }
+  },
+  "color_wheel": {
+    "_note": "Slot colours from the Open Fixture Library.",
+    "slots": [
+      {
+        "from": 0,
+        "name": "open",
+        "rgb": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "to": 3
+      },
+      {
+        "from": 4,
+        "name": "ctb",
+        "rgb": [
+          0.49,
+          0.69,
+          0.859
+        ],
+        "to": 7
+      },
+      {
+        "from": 8,
+        "name": "magenta",
+        "rgb": [
+          0.639,
+          0.388,
+          0.612
+        ],
+        "to": 11
+      },
+      {
+        "from": 12,
+        "name": "congo blue",
+        "rgb": [
+          0.102,
+          0.22,
+          0.522
+        ],
+        "to": 15
+      },
+      {
+        "from": 16,
+        "name": "green",
+        "rgb": [
+          0.0,
+          0.631,
+          0.231
+        ],
+        "to": 19
+      },
+      {
+        "from": 20,
+        "name": "orange",
+        "rgb": [
+          0.91,
+          0.471,
+          0.09
+        ],
+        "to": 23
+      },
+      {
+        "from": 24,
+        "name": "blue",
+        "rgb": [
+          0.0,
+          0.569,
+          0.98
+        ],
+        "to": 27
+      },
+      {
+        "from": 28,
+        "name": "red",
+        "rgb": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "to": 31
+      }
+    ],
+    "verified": true
+  },
+  "kind": "moving_head",
+  "manufacturer": "Ayrton",
+  "model": "Diablo-S",
+  "modes": {
+    "bas": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 246
+      },
+      {
+        "attr": "shutter_strobe",
+        "default": 15
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "chase_pattern",
+        "default": 0
+      },
+      {
+        "attr": "chase_speed",
+        "default": 0
+      },
+      {
+        "attr": "chase_fade",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "auto_focus",
+        "default": 0
+      },
+      {
+        "attr": "auto_focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "cyan",
+        "default": 0
+      },
+      {
+        "attr": "magenta",
+        "default": 0
+      },
+      {
+        "attr": "yellow",
+        "default": 0
+      },
+      {
+        "attr": "cto",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo_rotation",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel",
+        "default": 0
+      },
+      {
+        "attr": "iris",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism_rotation",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "blade_1a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_1b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_2a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_2b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_3a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_3b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_4a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_4b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_system_rotation",
+        "default": 0
+      },
+      {
+        "attr": "maintenance_programs",
+        "default": 0
+      }
+    ],
+    "ext": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 246
+      },
+      {
+        "attr": "shutter_strobe",
+        "default": 15
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "dimmer_fine",
+        "default": 0
+      },
+      {
+        "attr": "chase_pattern",
+        "default": 0
+      },
+      {
+        "attr": "chase_speed",
+        "default": 0
+      },
+      {
+        "attr": "chase_fade",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "zoom_fine",
+        "default": 0
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "auto_focus",
+        "default": 0
+      },
+      {
+        "attr": "auto_focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "color_wheel_fine",
+        "default": 0
+      },
+      {
+        "attr": "cyan",
+        "default": 0
+      },
+      {
+        "attr": "cyan_fine",
+        "default": 0
+      },
+      {
+        "attr": "magenta",
+        "default": 0
+      },
+      {
+        "attr": "magenta_fine",
+        "default": 0
+      },
+      {
+        "attr": "yellow",
+        "default": 0
+      },
+      {
+        "attr": "yellow_fine",
+        "default": 0
+      },
+      {
+        "attr": "cto",
+        "default": 0
+      },
+      {
+        "attr": "cto_fine",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo_rotation",
+        "default": 0
+      },
+      {
+        "attr": "gobo_rotation_fine",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel",
+        "default": 0
+      },
+      {
+        "attr": "iris",
+        "default": 0
+      },
+      {
+        "attr": "iris_fine",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism_rotation",
+        "default": 0
+      },
+      {
+        "attr": "prism_rotation_fine",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "blade_1a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_1a_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_1b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_1b_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_2a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_2a_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_2b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_2b_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_3a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_3a_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_3b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_3b_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_4a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_4a_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_4b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_4b_insertion_fine",
+        "default": 0
+      },
+      {
+        "attr": "blade_system_rotation",
+        "default": 0
+      },
+      {
+        "attr": "blade_system_rotation_fine",
+        "default": 0
+      },
+      {
+        "attr": "maintenance_programs",
+        "default": 0
+      }
+    ],
+    "std": [
+      {
+        "attr": "pan"
+      },
+      {
+        "attr": "pan_fine"
+      },
+      {
+        "attr": "tilt"
+      },
+      {
+        "attr": "tilt_fine"
+      },
+      {
+        "attr": "pan_tilt_speed",
+        "default": 246
+      },
+      {
+        "attr": "shutter_strobe",
+        "default": 15
+      },
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "chase_pattern",
+        "default": 0
+      },
+      {
+        "attr": "chase_speed",
+        "default": 0
+      },
+      {
+        "attr": "chase_fade",
+        "default": 0
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      },
+      {
+        "attr": "focus",
+        "default": 0
+      },
+      {
+        "attr": "auto_focus",
+        "default": 0
+      },
+      {
+        "attr": "auto_focus_fine",
+        "default": 0
+      },
+      {
+        "attr": "color_wheel"
+      },
+      {
+        "attr": "cyan",
+        "default": 0
+      },
+      {
+        "attr": "magenta",
+        "default": 0
+      },
+      {
+        "attr": "yellow",
+        "default": 0
+      },
+      {
+        "attr": "cto",
+        "default": 0
+      },
+      {
+        "attr": "gobo",
+        "default": 0
+      },
+      {
+        "attr": "gobo_rotation",
+        "default": 0
+      },
+      {
+        "attr": "animation_wheel",
+        "default": 0
+      },
+      {
+        "attr": "iris",
+        "default": 0
+      },
+      {
+        "attr": "prism",
+        "default": 0
+      },
+      {
+        "attr": "prism_rotation",
+        "default": 0
+      },
+      {
+        "attr": "frost",
+        "default": 0
+      },
+      {
+        "attr": "blade_1a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_1b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_2a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_2b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_3a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_3b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_4a_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_4b_insertion",
+        "default": 0
+      },
+      {
+        "attr": "blade_system_rotation",
+        "default": 0
+      },
+      {
+        "attr": "maintenance_programs",
+        "default": 0
+      }
+    ]
+  },
+  "motion": {
+    "_note": "Estimated; measure with `amadeus motion`.",
+    "accel_dps2": 800,
+    "estimated": true,
+    "pan_speed_dps": 200,
+    "tilt_speed_dps": 160
+  },
+  "ofl": {
+    "categories": [
+      "Moving Head",
+      "Color Changer"
+    ],
+    "converter": 5,
+    "key": "ayrton/diablo-s"
+  },
+  "physical": {
+    "beam_deg": 6.7,
+    "beam_deg_max": 53,
+    "lumens": 17500,
+    "pan_deg": 540,
+    "size_mm": [
+      364.9,
+      591.6,
+      210.6
+    ],
+    "tilt_deg": 270
+  },
+  "source": "Open Fixture Library (ayrton/diablo-s), converted automatically: check it once with `amadeus test`"
+}
