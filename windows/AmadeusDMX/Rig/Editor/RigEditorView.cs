@@ -26,7 +26,9 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
         var stage = new Grid { MinWidth = 520 };
         stage.Children.Add(_viewport.Build());
-        stage.Children.Add(Toolbar().Align(VerticalAlignment.Top).Margin(12, 12, 12, 0));
+        stage.Children.Add(UI.VStack(8, Toolbar(),
+            EditorUI.Keyed(editor, () => (editor.ChangedOnDisk is null).ToString(), () => editor.ChangedOnDisk is null ? null : ChangedOnDisk()))
+            .Align(VerticalAlignment.Top).Margin(12, 12, 12, 0));
         var bottom = UI.HStack(8,
             EditorUI.Keyed(editor, () => editor.Check is null ? "hint" : "check",
                            () => editor.Check is null ? Hint() : new HangCheckPanel(editor, _host).Build()),
@@ -119,6 +121,23 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             Child = bar, Padding = new Thickness(8), CornerRadius = new CornerRadius(12),
             Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"), BorderBrush = Theme.Brush("CardStrokeColorDefaultBrush"),
             BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+    }
+
+    /// Saved elsewhere (your AI assistant, the web setup page) while there are unsaved changes here: which to keep.
+    FrameworkElement ChangedOnDisk()
+    {
+        var row = UI.HStack(10,
+            UI.Label("exclamationmark.triangle", "Saved elsewhere while you were editing", Font.Callout)
+                .Tooltip("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours."),
+            UI.Button("Load Their Changes", editor.TakeChangesOnDisk).Prominent()
+                .Tooltip("Show the rig as it was saved elsewhere. Undo brings your changes back"),
+            UI.Button("Keep Mine", editor.KeepChangesHere).Tooltip("Keep your changes: saving puts them over the other ones"));
+        return new Border
+        {
+            Child = row, Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(12),
+            Background = Theme.Brush("SystemFillColorCautionBackgroundBrush"), BorderBrush = Theme.Brush("CardStrokeColorDefaultBrush"),
+            BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Center,
         };
     }
 
@@ -329,6 +348,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             text.Text = editor.Doc.WaitingCount > 0 && editor.Selection is null
                 ? $"{editor.Doc.WaitingCount} fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount"
                 : editor.Selection is null ? "Click to select · Shift-click for more · Ctrl+A all fixtures · drag empty space to turn the view"
+                    + (_viewport!.Stage.CanFly ? " · WASD walks · F flies" : "")
                 : n > 1 ? $"{n} selected: drag one and the rest come along · Delete unmounts them · R rotates"
                 : "Drag to move · R rotates 15° (Shift+R 90°) · arrows nudge · Delete unmounts or deletes · Alt-drag places freely";
         });
@@ -336,7 +356,15 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
     FrameworkElement CameraButtons()
     {
-        var row = UI.HStack(6);
+        var stage = _viewport!.Stage;
+        var hint = new Border
+        {
+            Child = UI.Text("WASD move · Q/E down/up · drag to look · Shift faster · Esc lands", Font.Caption).Secondary(),
+            Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(14),
+            Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"), VerticalAlignment = VerticalAlignment.Bottom,
+        };
+        hint.Bind(stage, nameof(IEditorStage.Fly), h => h.Visible(stage.Fly));
+        var row = UI.HStack(6, hint);
         var buttons = new List<ToggleButton>();
         foreach (var (preset, symbol) in EditorViewport.CameraPresets)
         {
@@ -352,6 +380,16 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             };
             buttons.Add(b);
             row.Children.Add(b);
+        }
+        if (stage.CanFly)
+        {
+            var fly = new ToggleButton
+            {
+                Content = UI.Icon("figure.walk.motion", 14), Padding = new Thickness(8, 6, 8, 6),
+                Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"),
+            }.Tooltip("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom.");
+            fly.Click += (_, _) => stage.Fly = !stage.Fly;
+            row.Children.Add(fly.Bind(stage, nameof(IEditorStage.Fly), f => f.IsChecked = stage.Fly));
         }
         row.VerticalAlignment = VerticalAlignment.Bottom;
         return row;

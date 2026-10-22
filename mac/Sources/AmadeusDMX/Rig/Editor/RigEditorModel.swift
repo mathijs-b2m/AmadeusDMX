@@ -1021,19 +1021,51 @@ final class RigEditorModel: StageEditing {
             try await model.api.saveRig(layout, rigName: doc.rig, setName: doc.set)
         }
         saved = doc
+        changedOnDisk = nil
         message = "Saved \(doc.rig)"
         model.reloadSets()
     }
 
-    /// The files changed (an auto-mount from elsewhere, a fixture added to the set): read them again, unless
-    /// there are unsaved changes here.
+    /// The files changed (an auto-mount from elsewhere, a fixture added to the set, your AI assistant): read them
+    /// again. With unsaved changes here, nothing is replaced: `changedOnDisk` asks which to keep.
     func reloadIfClean() {
-        guard !isDirty, let d = workspace.document(rig: doc.rig, set: doc.set), d != doc else { return }
+        guard let d = workspace.document(rig: doc.rig, set: doc.set) else { return }
+        if d == doc {  // what is here (just saved, or the same change made elsewhere)
+            saved = d
+            changedOnDisk = nil
+            return
+        }
+        guard d != saved else { return }
+        if isDirty {
+            changedOnDisk = d
+            return
+        }
         doc = d
         saved = d
         selection = nil
         group = []
         refresh()
+    }
+
+    /// The rig or its set as another program saved it, while there are unsaved changes here.
+    private(set) var changedOnDisk: RigDocument?
+
+    /// Takes what was saved elsewhere; the changes made here can come back with Undo.
+    func takeChangesOnDisk() {
+        guard let d = changedOnDisk else { return }
+        let before = doc
+        doc = d
+        saved = d
+        changedOnDisk = nil
+        refresh()
+        registerUndo("Reload", before)
+    }
+
+    /// Keeps the changes made here: Save puts them over what was saved elsewhere.
+    func keepChangesHere() {
+        guard let d = changedOnDisk else { return }
+        saved = d
+        changedOnDisk = nil
     }
 
     func revert() {
@@ -1449,6 +1481,8 @@ final class RigEditorModel: StageEditing {
     }
 
     func key(_ e: NSEvent) -> Bool {
+        // nothing selected: the arrows walk the camera, like in the show
+        if selection == nil, (123...126).contains(e.keyCode), e.modifierFlags.isDisjoint(with: [.command, .control]) { return false }
         let shift = e.modifierFlags.contains(.shift)
         let step = shift ? 0.5 : 0.1
         switch e.keyCode {

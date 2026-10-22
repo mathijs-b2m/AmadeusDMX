@@ -10,6 +10,7 @@ amadeus set [NAME] [--copy-of SET | --grid MODEL:COUNT]   your gear: list, switc
 amadeus rig [NAME] [--template T] [--automount] [--hang-sheet]   the venue: rigs; mount the set; print where it hangs
 amadeus library [WORDS] [--add KEY]                       fixture library: ours, QLC+, Open Fixture Library
 amadeus patch MODEL[:COUNT] …                             patch fixtures into the active set
+amadeus mcp [--guide]                                     your own AI assistant edits sets and rigs (MCP, stdio)
 
 A show runs with a set (your fixtures) placed on a rig (the trusses and stage): --set NAME --rig NAME, or
 the active ones (`amadeus set NAME`, `amadeus rig NAME`).
@@ -23,6 +24,8 @@ amadeus packs [install NAME]                                  optional packs: in
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 
 from amadeus import paths, shutdown, system
 from amadeus.cli import hardware, packs, rig, show
@@ -33,7 +36,8 @@ ANNOUNCE_SET = {"play", "live", "setup", "test", "discover", "patch"}
 
 def main(argv: list[str] | None = None):
     system.utf8_output()
-    shutdown.install()  # how an app stops the engine cleanly (amadeus/shutdown.py)
+    mcp = (sys.argv[1:] if argv is None else argv)[:1] == ["mcp"]  # its stdin is the conversation: never watched
+    shutdown.install({**os.environ, shutdown.ENV: "0"} if mcp else None)  # how an app stops the engine cleanly
     paths.load_dotenv()
     ap = argparse.ArgumentParser(prog="amadeus", description="AI-directed sound-to-light for DJ sets")
     sub = ap.add_subparsers(dest="cmd", required=True)

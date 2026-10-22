@@ -1,5 +1,6 @@
 // The rig editor on the 3D stage: Render's StageController and StageView behind IEditorStage, and the editor
 // handed to the stage view as its StageEditing (the keys translated to the editor's EditorKey).
+using System.ComponentModel;
 using System.Numerics;
 using Windows.Foundation;
 
@@ -11,7 +12,16 @@ public sealed class D3DEditorStage : IEditorStage
     readonly StageView _view;
     IStageEditing? _editor;
 
-    public D3DEditorStage() => _view = new StageView(_controller);
+    public D3DEditorStage()
+    {
+        _view = new StageView(_controller);
+        _controller.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(StageController.Fly)) PropertyChanged?.Invoke(this, new(nameof(Fly)));
+        };
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     static bool? _available;
     /// Direct3D 11 is there (tried once): else the editor uses the plan view.
@@ -37,6 +47,9 @@ public sealed class D3DEditorStage : IEditorStage
         get => _controller.Preset.RawValue();
         set { if (CameraPresets.FromRawValue(value) is { } p) _controller.Preset = p; }
     }
+
+    public bool Fly { get => _controller.Fly; set => _controller.Fly = value; }
+    public bool CanFly => true;
 
     public float WorkLight { get => _controller.WorkLight; set => _controller.WorkLight = value; }
 

@@ -27,7 +27,11 @@ struct RigEditorView: View {
                         selectAsked()
                     }
                     .task { await editor.loadDrawings(model) }
-                toolbar.padding(12)
+                VStack(spacing: 8) {
+                    toolbar
+                    if editor.changedOnDisk != nil { changedOnDisk }
+                }
+                .padding(12)
                 VStack {
                     Spacer()
                     HStack(alignment: .bottom) {
@@ -269,7 +273,7 @@ struct RigEditorView: View {
         let text = if editor.doc.waitingCount > 0 && editor.selection == nil {
             "\(editor.doc.waitingCount) fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount"
         } else if editor.selection == nil {
-            "Click to select · ⇧-click for more · ⌘A all fixtures · drag empty space to turn the view"
+            "Click to select · ⇧-click for more · ⌘A all fixtures · drag empty space to turn the view · WASD walks · F flies"
         } else if n > 1 {
             "\(n) selected: drag one and the rest come along · ⌫ unmounts them · R rotates"
         } else {
@@ -281,14 +285,27 @@ struct RigEditorView: View {
             .glassEffect(.regular, in: .capsule)
     }
 
+    /// Saved elsewhere (your AI assistant, the web setup page) while there are unsaved changes here: which to keep.
+    private var changedOnDisk: some View {
+        HStack(spacing: 10) {
+            Label("Saved elsewhere while you were editing", systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .help("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours.")
+            Button("Load Their Changes") { editor.takeChangesOnDisk() }
+                .buttonStyle(.glassProminent)
+                .help("Show the rig as it was saved elsewhere. Undo brings your changes back")
+            Button("Keep Mine") { editor.keepChangesHere() }
+                .buttonStyle(.glass)
+                .help("Keep your changes: saving puts them over the other ones")
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .glassEffect(.regular.tint(.orange.opacity(0.25)), in: .capsule)
+    }
+
     private var cameraButtons: some View {
         GlassEffectContainer(spacing: 6) {
             HStack(spacing: 6) {
-                ForEach([CameraPreset.plan, .drone, .frontOfHouse, .side], id: \.self) { p in
-                    Button { stage.preset = p } label: { Image(systemName: p.symbol).frame(width: 18, height: 18) }
-                        .buttonStyle(p == stage.preset ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
-                        .help(p.rawValue)
-                }
+                CameraButtons(stage: stage)
             }
         }
     }

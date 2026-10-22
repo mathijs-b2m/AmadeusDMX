@@ -146,6 +146,38 @@ final class AppModel {
         }
     }
 
+    /// Follows changes to the sets and rigs made outside the app (the web setup page, the command line, your AI
+    /// assistant through `amadeus mcp`): they are read again, and an open rig editor reloads (RigEditorModel).
+    private func watchConfig() {
+        configStamp = workspace?.configStamp() ?? ""
+        Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                guard let stamp = self.workspace?.configStamp(), stamp != self.configStamp else { continue }
+                self.configStamp = stamp
+                self.reloadSets()
+            }
+        }
+    }
+
+    /// Claude Desktop and the assistant server (Settings › Integrations): nil until read.
+    var claudeDesktop: ClaudeDesktopStatus?
+
+    /// Reads whether Claude Desktop starts the assistant server; when it does with an engine somewhere else (the
+    /// app moved, an update, another engine folder chosen), it is pointed at this one again.
+    func refreshClaudeDesktop() async {
+        guard let ws = workspace else { claudeDesktop = nil; return }
+        var s = await ws.claudeDesktop()
+        if let now = s, now.on, !now.current, now.problem.isEmpty { s = await ws.claudeDesktop("on") ?? s }
+        claudeDesktop = s
+    }
+
+    func setClaudeDesktop(_ on: Bool) async {
+        guard let ws = workspace else { return }
+        claudeDesktop = await ws.claudeDesktop(on ? "on" : "off") ?? claudeDesktop
+    }
+
     /// Open the rig editor.
     func editLayout() {
         section = .rig
@@ -155,6 +187,7 @@ final class AppModel {
     var setupReady = false
 
     @ObservationIgnored private var setupStartedAt: Date?
+    @ObservationIgnored private var configStamp = ""
     @ObservationIgnored private var previewCache: (key: String, input: StageInput)?
 
     /// Settings saved before the rename to Amadeus DMX (another bundle id): copied once, where not set here.
@@ -195,6 +228,8 @@ final class AppModel {
         feed.start()
         if let ws = workspace, ws.limiterLevel() < 1 { ws.setLimiterLevel(1) }
         watchLimiter()
+        watchConfig()
+        Task { await refreshClaudeDesktop() }
     }
 
     var needsSetup: Bool { workspace == nil }
@@ -205,6 +240,7 @@ final class AppModel {
         workspace = ws
         UserDefaults.standard.set(url.path, forKey: "engineRoot")
         reloadSets()
+        Task { await refreshClaudeDesktop() }
         return true
     }
 
@@ -225,6 +261,7 @@ final class AppModel {
         workspace = ws
         UserDefaults.standard.removeObject(forKey: "engineRoot")
         reloadSets()
+        Task { await refreshClaudeDesktop() }
     }
 
     /// Reads the sets and rigs again (after any change to them), and keeps a valid selection.
