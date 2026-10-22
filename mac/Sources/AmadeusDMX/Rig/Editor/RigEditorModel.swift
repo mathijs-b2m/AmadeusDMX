@@ -1328,6 +1328,8 @@ final class RigEditorModel: StageEditing {
     }
 
     func key(_ e: NSEvent) -> Bool {
+        // nothing selected: the arrows walk the camera, like in the show
+        if selection == nil, (123...126).contains(e.keyCode), e.modifierFlags.isDisjoint(with: [.command, .control]) { return false }
         let shift = e.modifierFlags.contains(.shift)
         let step = shift ? 0.5 : 0.1
         switch e.keyCode {

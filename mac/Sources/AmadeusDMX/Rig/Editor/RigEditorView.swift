@@ -194,7 +194,7 @@ struct RigEditorView: View {
         let text = if editor.doc.waitingCount > 0 && editor.selection == nil {
             "\(editor.doc.waitingCount) fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount"
         } else if editor.selection == nil {
-            "Click to select · ⇧-click for more · ⌘A all fixtures · drag empty space to turn the view"
+            "Click to select · ⇧-click for more · ⌘A all fixtures · drag empty space to turn the view · WASD walks · F flies"
         } else if n > 1 {
             "\(n) selected: drag one and the rest come along · ⌫ unmounts them · R rotates"
         } else {
@@ -226,11 +226,7 @@ struct RigEditorView: View {
     private var cameraButtons: some View {
         GlassEffectContainer(spacing: 6) {
             HStack(spacing: 6) {
-                ForEach([CameraPreset.plan, .drone, .frontOfHouse, .side], id: \.self) { p in
-                    Button { stage.preset = p } label: { Image(systemName: p.symbol).frame(width: 18, height: 18) }
-                        .buttonStyle(p == stage.preset ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
-                        .help(p.rawValue)
-                }
+                CameraButtons(stage: stage)
             }
         }
     }
