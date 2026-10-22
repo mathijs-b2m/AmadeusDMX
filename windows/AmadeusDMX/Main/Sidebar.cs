@@ -146,6 +146,7 @@ public sealed class VersionFooter(AppModel model)
         }.Tooltip(!u.IsAvailable ? "A development build: it updates with the code, not by itself"
             : u.State == UpdateState.Available ? $"{u.Newest} is available: you have {u.Version}. Click for the update settings."
             : "Updates: this version, the newest, and whether to check by itself");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(line, Line(u));  // its content is a stack: no name of its own
         line.Click += (_, _) => new Flyout { Content = Options(u), Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.RightEdgeAlignedBottom }.ShowAt(line);
         UIElement? action = u.State switch
         {
