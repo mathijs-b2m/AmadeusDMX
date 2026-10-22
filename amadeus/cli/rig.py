@@ -70,7 +70,10 @@ def add_commands(sub) -> dict:
     p.add_argument("--universe", type=int, default=0)
     p.add_argument("--mode", action="append", default=[], metavar="MODEL=MODE")
     add_set_args(p)
-    return {"setup": setup, "set": sets_command, "rig": rigs_command, "library": library, "patch": patch}
+
+    p = sub.add_parser("mcp", help="your own AI assistant works on your sets and rigs (an MCP server on stdio)")
+    p.add_argument("--guide", action="store_true", help="print the guide the assistant gets, and stop")
+    return {"setup": setup, "set": sets_command, "rig": rigs_command, "library": library, "patch": patch, "mcp": mcp}
 
 
 def setup(args):
@@ -195,3 +198,12 @@ def patch(args):
     from amadeus.dmx.discover import manual_patch
 
     manual_patch(args.specs, args.universe, dict(m.split("=", 1) for m in args.mode), args.show)
+
+
+def mcp(args):
+    from amadeus import mcp as server
+
+    if args.guide:
+        print(server.GUIDE.read_text(encoding="utf-8"))
+        return
+    server.serve()

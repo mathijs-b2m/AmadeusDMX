@@ -121,6 +121,8 @@ and labels for the fixtures or their cases. After hanging, the check lights the 
 sheet's order; a swapped pair or a head hung the wrong way round is put right in the app with one click. Stage
 left is the performer's left (x = 0). See [rig-format.md](rig-format.md#hang-sheet).
 
+**Your own AI assistant:** `amadeus mcp` is an MCP server on stdio. With it, Claude Desktop, Claude Code or Codex can create rigs, add and mount fixtures, check a set and undo its changes, and every save is checked as in the apps. `amadeus mcp --guide` prints the guide the assistant gets. Setup per client: [ai-assistants.md](ai-assistants.md).
+
 Sets from before rigs existed (fixtures with positions and the stage in one file) are split into a set and a rig of the same name the first time you run the engine or the Mac app; nothing changes for the show.
 
 **Test rigs:** `amadeus set NAME --grid qlc:Martin/Martin-MAC-Encore-Performance.qxf:60 --rows 3 --width 16 --height 7` (or `--layout concert --lasers 10`) makes a set of many fixtures and a rig they hang on (Art-Net to 127.0.0.1 only, so a test rig never drives your real lights). Head motion for big rigs is simulated for all heads at once (60 heads: ~1.5 s on first load) and cached in `.cache/trajectories/`.

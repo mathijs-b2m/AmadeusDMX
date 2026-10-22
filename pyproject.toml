@@ -61,3 +61,4 @@ testpaths = ["tests"]
 
 [tool.setuptools.package-data]
 "amadeus.show.sources" = ["*.json"]
+"amadeus.mcp" = ["guide.md"]
