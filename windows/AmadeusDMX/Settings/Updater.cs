@@ -54,6 +54,9 @@ public sealed class Updater : IUpdater
             // NetSparkle asks the app to quit (CloseApplicationAsync: it stops the engine and blacks out first) and the
             // installer waits until it has; off, it neither asks nor waits and installs beside the running app
             ShouldKillParentProcessWhenStartingInstaller = true,
+            // name the download after the feed's link (AmadeusDMX-Setup-1.3.1.exe): asking the server names it after
+            // where GitHub redirects, a bare id without .exe, and Windows can't run that, so nothing installs
+            CheckServerFileName = false,
         };
         _sparkle.Configuration = new NetSparkleUpdater.Configurations.JSONConfiguration(
             new BuildAccessor(_build, _version), Path.Combine(Workspace.DefaultDataFolder, "updates.json"));
