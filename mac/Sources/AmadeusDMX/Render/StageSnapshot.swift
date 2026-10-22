@@ -1,7 +1,8 @@
 // Development: draw the stage from recorded feed messages into pictures, without the app (-stageSnapshot DIR).
 // DIR holds hello.json and frame files (feed messages, e.g. from the engine); every frame-NAME.json becomes
 // NAME.png, drawn after a second of show time on that frame (gobos turn, the exposure settles). Optional:
-// -camera "Front of House" (a preset), -snapshotSize 1600x900. The app quits when done, before it starts anything.
+// -camera "Front of House" (a preset), -cameraYaw 180 (turned round the stage that many degrees from it),
+// -snapshotSize 1600x900. The app quits when done, before it starts anything.
 import AmadeusKit
 import AppKit
 import ImageIO
@@ -55,7 +56,10 @@ enum StageSnapshot {
                 now += 1.0 / 40
                 r.snapshot = (target, now)
                 r.draw(in: view)
-                if k == 0 { r.setPreset(preset, animated: false) }
+                if k == 0 {
+                    r.setPreset(preset, animated: false)
+                    if let yaw = UserDefaults.standard.string(forKey: "cameraYaw").flatMap(Float.init) { r.orbit(dx: -yaw * .pi / 180 / 0.005, dy: 0) }
+                }
             }
             guard let cmd = r.queue.makeCommandBuffer() else { continue }
             cmd.commit()

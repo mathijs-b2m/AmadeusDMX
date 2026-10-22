@@ -247,6 +247,34 @@ public class RenderTests
     }
 
     [Fact]
+    public void WhatStandsAtTheBackIsCutAwayWhileTheCameraIsBehindIt()
+    {
+        var inp = SceneSamples.Club();
+        var s = new Scenery(inp.Fixtures, inp.Stage, inp.Screen, inp.Trusses, inp.Selected);
+        var ranges = new List<(int Start, int Count)>();
+        int Drawn() => ranges.Sum(r => r.Count);
+        bool BackWallDrawn() => ranges.Any(r => Enumerable.Range(r.Start, r.Count)
+            .Any(i => s.Vertices[i].Pos.Y == s.Room.Back && s.Vertices[i].Normal == new Vector3(0, 1, 0)));
+        // from the audience: everything, the back wall and the LED wall too
+        var front = new Vector3(s.Room.Width / 2, 10, 3);
+        s.VisibleRanges(front, ranges);
+        Assert.Equal(s.Vertices.Count, Drawn());
+        Assert.True(BackWallDrawn());
+        Assert.False(s.ScreenCut(front) || s.BackCut(front));
+        // orbiting round behind the room: no back wall, no LED wall, the rest (the DJ, the rig) still there
+        var behind = new Vector3(s.Room.Width / 2, s.Room.Back - 5, 3);
+        s.VisibleRanges(behind, ranges);
+        Assert.False(BackWallDrawn());
+        Assert.True(s.ScreenCut(behind) && s.BackCut(behind));
+        Assert.True(Drawn() < s.Vertices.Count && Drawn() > s.Vertices.Count - 200);
+        // between the LED wall and the back wall: only the LED wall goes
+        var between = new Vector3(s.Room.Width / 2, (s.Room.Back + s.Wall!.Value.Center.Y - 0.35f) / 2, 3);
+        s.VisibleRanges(between, ranges);
+        Assert.True(BackWallDrawn());
+        Assert.True(s.ScreenCut(between) && !s.BackCut(between));
+    }
+
+    [Fact]
     public void AFrameLightsTheRig()
     {
         var inp = SceneSamples.Club();

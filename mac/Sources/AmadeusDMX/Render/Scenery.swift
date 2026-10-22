@@ -32,6 +32,9 @@ struct Scenery {
     var top: Float
     var djHead: SIMD3<Float> = .zero
     var models: FixtureModels
+    /// What stands at the back (the room's back wall, the LED wall and its frame): its vertices and the depth of its
+    /// back. While the camera is behind that (orbiting round the stage), it isn't drawn, so it doesn't hide the stage.
+    var cutaways: [(range: Range<Int>, y: Float)] = []
 
     init(fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss] = [], selected: Set<String> = []) {
         room = Room(stage: stage, fixtures: fixtures, trusses: trusses)
@@ -50,8 +53,10 @@ struct Scenery {
         let floorC: SIMD3<Float> = [0.030, 0.032, 0.040]
         quad([-room.side - 8, back - 4, 0], [W + room.side + 8, back - 4, 0], [W + room.side + 8, room.depth, 0],
              [-room.side - 8, room.depth, 0], floorC)
+        let wallAt = vertices.count
         quad([-room.side - 8, back, 0], [W + room.side + 8, back, 0], [W + room.side + 8, back, room.ceiling],
              [-room.side - 8, back, room.ceiling], [0.018, 0.019, 0.024], normal: [0, 1, 0])
+        cutaways.append((wallAt..<vertices.count, back))
 
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
@@ -99,11 +104,13 @@ struct Scenery {
             let sy = big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0
             let sz: Float = (big ? 1.4 : 1.15) + raised  // over the stage, as high as it stands
             wall = WallPlacement(center: [cx, sy, sz + sh / 2], width: sw, height: sh)
+            let screenAt = vertices.count
             box(cx - sw / 2 - 0.12, cx + sw / 2 + 0.12, sy - 0.35, sy - 0.02, sz - 0.12, sz + sh + 0.12, [0.03, 0.03, 0.035])
             if big {  // legs
                 box(cx - sw / 2 - 0.1, cx - sw / 2 + 0.1, sy - 0.3, sy - 0.1, 0, sz, [0.06, 0.06, 0.07])
                 box(cx + sw / 2 - 0.1, cx + sw / 2 + 0.1, sy - 0.3, sy - 0.1, 0, sz, [0.06, 0.06, 0.07])
             }
+            cutaways.append((screenAt..<vertices.count, sy - 0.35))
         }
 
         // trusses: the set's own (rig editor), else: hanging fixtures at the same depth and height share one bar
@@ -152,6 +159,24 @@ struct Scenery {
         models.addStatic(into: &mb)
         vertices += mb.v
     }
+
+    /// The parts of `vertices` to draw with the camera at `eye`: all but what stands at the back while the camera is
+    /// behind it.
+    func visibleRanges(eye: SIMD3<Float>) -> [Range<Int>] {
+        var out: [Range<Int>] = [], at = 0
+        for c in cutaways.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) where eye.y < c.y {
+            if c.range.lowerBound > at { out.append(at..<c.range.lowerBound) }
+            at = max(at, c.range.upperBound)
+        }
+        if at < vertices.count { out.append(at..<vertices.count) }
+        return out
+    }
+
+    /// Whether the room's back wall is cut away with the camera at `eye` (beams then leave no spot on it).
+    func backCut(eye: SIMD3<Float>) -> Bool { eye.y < room.back }
+
+    /// Whether the LED wall is cut away with the camera at `eye`.
+    func screenCut(eye: SIMD3<Float>) -> Bool { wall.map { eye.y < $0.center.y - 0.35 } ?? false }
 
     // MARK: building blocks
 

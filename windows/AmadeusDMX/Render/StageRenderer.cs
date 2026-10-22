@@ -282,7 +282,8 @@ public sealed partial class StageRenderer : IDisposable
         {
             Use(solidPipe!, solidDepth);
             ctx.IASetVertexBuffer(0, sceneryBuffer, SolidVertex.Size);
-            ctx.Draw((uint)sceneryCount, 0);
+            foreach (var (start, count) in f.SceneryRanges)
+                if (start + count <= sceneryCount) ctx.Draw((uint)count, (uint)start);
         }
         // the fixtures' moving parts and lenses: where the beams point, in the colours they play
         if (f.Parts.V.Count > 0)
@@ -291,7 +292,7 @@ public sealed partial class StageRenderer : IDisposable
             ctx.IASetVertexBuffer(0, _parts.Buffer!, SolidVertex.Size);
             ctx.Draw((uint)f.Parts.V.Count, 0);
         }
-        if (wallBuffer is not null)
+        if (wallBuffer is not null && !f.ScreenCut)
         {
             Use(wallPipe!, solidDepth);
             ctx.IASetVertexBuffer(0, wallBuffer, WallVertex.Size);

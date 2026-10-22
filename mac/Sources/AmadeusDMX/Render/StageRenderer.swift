@@ -401,11 +401,13 @@ final class StageRenderer: NSObject, MTKViewDelegate {
             enc.setCullMode(.none)
             enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.stride, index: 1)
             enc.setFragmentBytes(&u, length: MemoryLayout<Uniforms>.stride, index: 1)
-            if let sb = sceneryBuffer {
+            if let sb = sceneryBuffer, let s = scenery {
                 enc.setRenderPipelineState(solidPipe)
                 enc.setDepthStencilState(solidDepth)
                 enc.setVertexBuffer(sb, offset: 0, index: 0)
-                enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: sceneryCount)
+                for r in s.visibleRanges(eye: eye) where r.upperBound <= sceneryCount {
+                    enc.drawPrimitives(type: .triangle, vertexStart: r.lowerBound, vertexCount: r.count)
+                }
             }
             // the fixtures' moving parts and lenses: where the beams point, in the colours they play
             if let s = scenery, let inp {
@@ -417,7 +419,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                     enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: parts.count)
                 }
             }
-            if let wb = wallBuffer {
+            if let wb = wallBuffer, !(scenery?.screenCut(eye: eye) ?? false) {
                 enc.setRenderPipelineState(wallPipe)
                 enc.setDepthStencilState(solidDepth)
                 enc.setVertexBuffer(wb, offset: 0, index: 0)
