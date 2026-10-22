@@ -36,6 +36,33 @@ public sealed class TempWorkspace : IDisposable
 public class WorkspaceTests
 {
     [Fact]
+    public void TheConfigStampChangesWhenASetOrRigIsWrittenElsewhere()
+    {
+        using var t = new TempWorkspace();
+        t.Write("config/sets/gear.json", """{"fixtures": []}""");
+        t.Write("config/rigs/club.json", """{"stage": {"width_m": 8}}""");
+        var ws = t.Ws;
+        var before = ws.ConfigStamp();
+        Assert.Equal(before, ws.ConfigStamp());
+        t.Write("config/rigs/club.json", """{"stage": {"width_m": 10}}""");  // another program (amadeus mcp) saves
+        var after = ws.ConfigStamp();
+        Assert.NotEqual(before, after);
+        t.Write("config/rigs/venue.json", "{}");  // a new rig
+        Assert.NotEqual(after, ws.ConfigStamp());
+        after = ws.ConfigStamp();
+        t.Write("config/active-rig", "venue\n");  // switched
+        Assert.NotEqual(after, ws.ConfigStamp());
+    }
+
+    [Fact]
+    public void TheClaudeDesktopStatusReadsAsTheEngineWritesIt()
+    {
+        var s = J.Decode(J.Utf8("""{"installed": true, "on": true, "current": false, "config": "C:\\x.json", "problem": ""}"""),
+                         ClaudeDesktopStatus.From);
+        Assert.Equal(new ClaudeDesktopStatus(true, true, false, "C:\\x.json", ""), s);
+    }
+
+    [Fact]
     public void SetsAndRigsAreListed()
     {
         using var t = new TempWorkspace();

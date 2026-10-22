@@ -1119,21 +1119,60 @@ public sealed class RigEditorModel : Observable, IStageEditing
         else
             await host.Api.SaveRig(layout, Doc.Rig, Doc.Set);
         _saved = saving;
+        ChangedOnDisk = null;
         Changed(nameof(IsDirty));
         Message = $"Saved {Doc.Rig}";
         host.ReloadSets();
     }
 
-    /// The files changed (an auto-mount from elsewhere, a fixture added to the set): read them again, unless
-    /// there are unsaved changes here.
+    /// The files changed (an auto-mount from elsewhere, a fixture added to the set, your AI assistant): read them
+    /// again. With unsaved changes here, nothing is replaced: `ChangedOnDisk` asks which to keep.
     public void ReloadIfClean()
     {
-        if (IsDirty || _workspace.Document(Doc.Rig, Doc.Set) is not { } d || Same(d, Doc)) return;
+        if (_workspace.Document(Doc.Rig, Doc.Set) is not { } d) return;
+        if (Same(d, Doc))  // what is here (just saved, or the same change made elsewhere)
+        {
+            _saved = d;
+            ChangedOnDisk = null;
+            Changed(nameof(IsDirty));
+            return;
+        }
+        if (Same(d, _saved)) return;
+        if (IsDirty)
+        {
+            ChangedOnDisk = d;
+            return;
+        }
         Doc = d;
         _saved = d.Clone();
         Selection = null;
         Group = new HashSet<string>();
         Refresh();
+    }
+
+    /// The rig or its set as another program saved it, while there are unsaved changes here.
+    RigDocument? _changedOnDisk;
+    public RigDocument? ChangedOnDisk { get => _changedOnDisk; private set => Set(ref _changedOnDisk, value); }
+
+    /// Takes what was saved elsewhere; the changes made here can come back with Undo.
+    public void TakeChangesOnDisk()
+    {
+        if (ChangedOnDisk is not { } d) return;
+        var before = Doc;
+        Doc = d;
+        _saved = d.Clone();
+        ChangedOnDisk = null;
+        Refresh();
+        RegisterUndo("Reload", before);
+    }
+
+    /// Keeps the changes made here: Save puts them over what was saved elsewhere.
+    public void KeepChangesHere()
+    {
+        if (ChangedOnDisk is not { } d) return;
+        _saved = d;
+        ChangedOnDisk = null;
+        Changed(nameof(IsDirty));
     }
 
     public void Revert()

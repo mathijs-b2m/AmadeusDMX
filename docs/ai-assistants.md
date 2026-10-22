@@ -10,16 +10,23 @@ assistant starts it and gets a set of tools (below) and a guide to how sets and 
 before every change your sets and rigs are copied aside: "undo that" puts the last copy back.
 
 What it can't do: delete or rename sets and rigs, switch lights on, or change a show that is running (a running
-show keeps the set it started with; changes are there the next time it starts). If the rig editor is open on what
-the assistant changed, reopen it afterwards rather than saving what it still shows.
+show keeps the set it started with; changes are there the next time it starts).
 
 ## Connecting
 
 The server runs on the computer with Amadeus DMX, started by your assistant's desktop app.
 
-### Claude Desktop (Mac)
+### Claude Desktop
 
-Settings › Developer › Edit Config opens `claude_desktop_config.json`; add (replace `YOU` with your user name):
+In Amadeus DMX: **Settings › Integrations › Your AI assistant**, switch on *Claude Desktop can work on your sets and
+rigs*, then restart Claude Desktop. The app writes Claude's config for you (the rest of it stays as it is, and the
+file as it was is kept beside it as `claude_desktop_config.json.before-amadeus`), and points it at the app again
+after an update or when the app moved. From a terminal: `amadeus mcp --claude-desktop on` (`off`, `status`).
+
+An open rig editor follows what the assistant saves. With unsaved changes in the editor, it asks first: load the
+assistant's changes (Undo brings yours back) or keep yours (Save then puts them over the assistant's).
+
+By hand, on a Mac: Settings › Developer › Edit Config in Claude Desktop opens `claude_desktop_config.json`; add (replace `YOU` with your user name):
 
 ```json
 {
@@ -41,9 +48,7 @@ Settings › Developer › Edit Config opens `claude_desktop_config.json`; add (
 
 Restart Claude Desktop; *amadeus-dmx* shows up under the tools button in a new chat.
 
-### Claude Desktop (Windows)
-
-The same, with the paths of the Windows app (installed for you only, in `%LOCALAPPDATA%\Programs`; replace `YOU`):
+By hand, on Windows: the same, with the paths of the Windows app (installed for you only, in `%LOCALAPPDATA%\Programs`; replace `YOU`):
 
 ```json
 {

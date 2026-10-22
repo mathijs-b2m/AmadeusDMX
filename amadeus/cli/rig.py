@@ -73,6 +73,11 @@ def add_commands(sub) -> dict:
 
     p = sub.add_parser("mcp", help="your own AI assistant works on your sets and rigs (an MCP server on stdio)")
     p.add_argument("--guide", action="store_true", help="print the guide the assistant gets, and stop")
+    p.add_argument(
+        "--claude-desktop",
+        choices=["status", "on", "off"],
+        help="let Claude Desktop start this server (on), stop that (off), or say whether it does (JSON)",
+    )
     return {"setup": setup, "set": sets_command, "rig": rigs_command, "library": library, "patch": patch, "mcp": mcp}
 
 
@@ -205,5 +210,20 @@ def mcp(args):
 
     if args.guide:
         print(server.GUIDE.read_text(encoding="utf-8"))
+        return
+    if args.claude_desktop:
+        import json
+
+        from amadeus.mcp import claude_desktop
+
+        try:
+            r = (
+                claude_desktop.status()
+                if args.claude_desktop == "status"
+                else claude_desktop.switch(args.claude_desktop == "on")
+            )
+        except (OSError, ValueError) as e:  # a config that isn't JSON: left alone, said why
+            r = {**claude_desktop.status(), "problem": f"Claude Desktop's config wasn't changed: {e}"}
+        print(json.dumps(r))
         return
     server.serve()

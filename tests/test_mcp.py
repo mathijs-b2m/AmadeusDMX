@@ -135,3 +135,53 @@ def test_the_command_never_watches_stdin_for_a_stop(monkeypatch, capsys):
     cli.main(["mcp", "--guide"])
     assert "stage left" in capsys.readouterr().out
     assert not any(t.name == "stop-on-eof" for t in threading.enumerate())
+
+
+def test_claude_desktop_gets_our_server_and_keeps_its_own(tmp_path):
+    from amadeus.mcp import claude_desktop as cd
+
+    folder = tmp_path / "Claude"
+    folder.mkdir()
+    config = folder / cd.FILE
+    mine = {"mcpServers": {"other": {"command": "x"}}, "theme": "dark"}
+    config.write_text(json.dumps(mine), encoding="utf-8")
+    env = {"PYTHONNOUSERSITE": "1"}
+
+    assert cd.status(env, [folder]) == {"installed": True, "on": False, "current": False, "config": str(config),
+                                        "problem": ""}  # fmt: skip
+    on = cd.switch(True, env, [folder])
+    assert on["on"] and on["current"]
+    doc = json.loads(config.read_text(encoding="utf-8"))
+    assert doc["theme"] == "dark" and doc["mcpServers"]["other"] == {"command": "x"}
+    server = doc["mcpServers"][cd.NAME]
+    assert server["command"] == sys.executable and server["args"] == ["-m", "amadeus", "mcp"]
+    assert server["env"]["PYTHONNOUSERSITE"] == "1" and server["env"]["AMADEUS_DATA"]
+    assert json.loads((folder / (cd.FILE + ".before-amadeus")).read_text(encoding="utf-8")) == mine
+
+    server["command"] = "/an/app/that/moved/python3"  # the app moved: out of date until written again
+    config.write_text(json.dumps(doc), encoding="utf-8")
+    assert cd.status(env, [folder])["current"] is False
+    assert cd.switch(True, env, [folder])["current"] is True
+
+    assert cd.switch(False, env, [folder]) == {**on, "on": False, "current": False}
+    assert json.loads(config.read_text(encoding="utf-8")) == mine
+
+
+def test_a_claude_config_that_isnt_json_is_left_alone(tmp_path):
+    from amadeus.mcp import claude_desktop as cd
+
+    (tmp_path / cd.FILE).write_text("{ not json", encoding="utf-8")
+    assert cd.status({}, [tmp_path])["problem"]
+    with pytest.raises(ValueError):
+        cd.switch(True, {}, [tmp_path])
+    assert (tmp_path / cd.FILE).read_text(encoding="utf-8") == "{ not json"
+
+
+def test_windows_finds_the_store_apps_config_too(tmp_path):
+    from amadeus.mcp import claude_desktop as cd
+
+    env = {"APPDATA": str(tmp_path / "Roaming"), "LOCALAPPDATA": str(tmp_path / "Local")}
+    assert cd.folders(env, tmp_path, windows=True) == [tmp_path / "Roaming" / "Claude"]  # not installed: where it goes
+    store = tmp_path / "Local" / "Packages" / "Claude_pzs8sxrjxfjjc" / "LocalCache" / "Roaming" / "Claude"
+    store.mkdir(parents=True)
+    assert cd.folders(env, tmp_path, windows=True) == [store]

@@ -56,8 +56,7 @@ the rest when it loads the rig. If in doubt, let `automount` place it and adjust
 8. Every change can be undone: `undo_last_change` (again to go further back). Tell the user what you changed.
 
 The user's gear and the show's safety (`safety`: flash limits, strobe-free, smoke cap) are theirs: change them
-only when asked. A running show keeps the set it started with; changes are there the next time it starts. The
-apps read the files when they open a set or rig: if the user has the rig editor open on what you change, ask them
-to reopen it afterwards and not to save what it still shows (that would put the old layout back).
+only when asked. A running show keeps the set it started with; changes are there the next time it starts.  The
+apps show your changes at once; a rig editor with unsaved changes asks the user which to keep.
 
 `write_hang_sheet` makes the crew's paperwork (where each fixture hangs, its address, labels) as a printable page.

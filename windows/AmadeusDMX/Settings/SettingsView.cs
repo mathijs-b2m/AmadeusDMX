@@ -186,7 +186,55 @@ public sealed class DirectorSettings(AppModel model)
 public sealed class IntegrationSettings(AppModel model)
 {
     public FrameworkElement Build() =>
-        Form.Page(680, new VirtualDJSection(model).Build(), new MixxxSection().Build(), new StreamedSection(model).Build());
+        Form.Page(680, new VirtualDJSection(model).Build(), new MixxxSection().Build(), new StreamedSection(model).Build(),
+                  new AssistantSection(model).Build());
+}
+
+/// Your own AI assistant (amadeus mcp, docs/ai-assistants.md): Claude Desktop starts the engine's assistant server and
+/// can then make and change your sets and rigs. Off until switched on; the engine writes Claude's config.
+public sealed class AssistantSection(AppModel model)
+{
+    bool _busy;
+    readonly ContentControl _host = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
+
+    public FrameworkElement Build()
+    {
+        _host.Loaded += async (_, _) => { Show(); await model.RefreshClaudeDesktop(); };
+        _host.Bind(model, nameof(AppModel.ClaudeDesktop), _ => Show());
+        Show();
+        return _host;
+    }
+
+    void Show()
+    {
+        var status = model.ClaudeDesktop;
+        var toggle = UI.Toggle("", status?.On ?? false, v => _ = Switch(v))
+            .Disabled(_busy || status is null || status is { Installed: false, On: false });
+        var rows = new List<UIElement?>
+        {
+            Form.Row(UI.VStack(2, UI.Text("Claude Desktop can work on your sets and rigs"),
+                    UI.Text("Ask Claude to make a rig for a venue from its PDFs, add fixtures, mount them or check what is unfinished. It uses your own Claude subscription.", Font.Caption).Secondary().Wrap()),
+                toggle),
+        };
+        if (status is { Problem.Length: > 0 })
+            rows.Add(Form.Note("exclamationmark.triangle", status.Problem, Tint.Orange));
+        else if (status is { Installed: false })
+            rows.Add(Form.Note("info.circle", "Claude Desktop isn't installed (or hasn't been opened yet)."));
+        else if (status is { On: true })
+            rows.Add(Form.Note("checkmark.circle", "Restart Claude Desktop to pick this up (quit it from the notification area). In a new chat, amadeus-dmx is under the tools button."));
+        rows.Add(UI.HStack(0, UI.Spacer(), UI.Link("Other assistants (Claude Code, Codex)…", () => Dialogs.OpenURL(HelpLinks.Assistants)).Font(Font.Callout)));
+        _host.Content = Form.Section("Your AI assistant", rows,
+            "Everything it saves is checked as in the app, and before each change your sets and rigs are copied aside: ask it to undo. It can't delete sets or rigs, switch lights on or change a show that is running. An open rig editor shows its changes, or asks first when you have unsaved changes there.");
+    }
+
+    async Task Switch(bool on)
+    {
+        _busy = true;
+        Show();
+        await model.SetClaudeDesktop(on);
+        _busy = false;
+        Show();
+    }
 }
 
 /// Streamed tracks (Spotify in djay Pro and VirtualDJ, here or on a DJ laptop through Amadeus Link): a copy of the
