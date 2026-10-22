@@ -44,7 +44,8 @@ the rest when it loads the rig. If in doubt, let `automount` place it and adjust
    editing the combined dict. Edit the dict for what they don't cover: moving trusses, placing fixtures by hand,
    calibration, the stage size.
 3. Find fixtures with `search_fixtures` and use the `key` it returns; check modes with `fixture_details`. Ask the
-   user which DMX mode their fixtures are set to when it matters: a wrong mode drives the wrong channels.
+   user which DMX mode their fixtures are set to when it matters: a wrong mode drives the wrong channels. When
+   the library hasn't got the exact model, see below: never patch another one instead.
 4. After every change, `check_show`, and tell the user what it says: problems, overlapping addresses, fixtures
    not mounted or not patched, and fixtures the show keeps dark (converted lasers, smoke without a level).
 5. Keep a venue's rig symmetric where the room is: what hangs stage left mirrors stage right. Fixed lights
@@ -54,6 +55,32 @@ the rest when it loads the rig. If in doubt, let `automount` place it and adjust
 7. Don't invent addresses for gear that already hangs: the address is set on the fixture itself. For new gear,
    free addresses ending in 1 (the default of `add_fixtures`) are easiest to dial in.
 8. Every change can be undone: `undo_last_change` (again to go further back). Tell the user what you changed.
+
+## When the library hasn't got a fixture
+
+Every fixture is patched with the definition of **that exact model and mode**. Never use a lookalike: not a
+sibling model (a MAC Aura for a MAC Aura XB, a Rogue R1 Wash for an R1 BeamWash), not another mode with the same
+channel count, not a generic fixture. The same number of channels doesn't mean the same channels: it drives
+the wrong ones, and the show looks broken on site.
+
+1. Search more than once: the maker's name and the model, the model alone, without "Professional", with and
+   without spaces or dashes (`BeamWash`, `Beam Wash`), the product family. The library holds QLC+, the Open
+   Fixture Library and Amadeus DMX's own definitions.
+2. Not there: ask the user for a fixture file of that model (GDTF from GDTF Share or the maker's site, a QLC+
+   `.qxf`) and add it with `import_fixture_file`.
+3. No file: make it from the **DMX chart in the maker's manual** with `create_fixture` (the user can attach the
+   manual, or you read it from the maker's website). Take the mode the venue or the user uses, and every channel
+   of it in the chart's order:
+   - played by the show: dimmer (and fine), red/green/blue/white/UV, cyan/magenta/yellow, the colour wheel (with
+     its slots from the chart), pan/tilt (and fine); a bar's colours per cell;
+   - everything else held at the value the chart gives for the quiet, open state: shutter or strobe **open**
+     (light on, no strobe), gobo wheel open, prism and frost out, zoom and focus in the middle, colour macros
+     and programs off, reset and lamp "no function". A held shutter at 0 is a fixture that never lights.
+   Say where the chart is from (`source`). If the chart is unclear about a channel, ask rather than guess.
+4. Tell the user which fixtures were made from a chart: they are marked as not checked, and the Set page's
+   channel check (on the real fixture) confirms each channel before a show.
+
+Only leave a fixture out when the user agrees, and say so.
 
 The user's gear and the show's safety (`safety`: flash limits, strobe-free, smoke cap) are theirs: change them
 only when asked. A running show keeps the set it started with; changes are there the next time it starts.  The

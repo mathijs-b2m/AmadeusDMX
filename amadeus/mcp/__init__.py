@@ -86,6 +86,20 @@ class _Kept:
     def discard(self):
         shutil.rmtree(self.path, ignore_errors=True)
 
+    def made_fixtures(self, before: set[Path]):
+        """Fixture files the change made (`before`: _fixture_files() then): undo takes them away again."""
+        new = sorted(str(p) for p in _fixture_files() - before)
+        (self.path / "fixtures.json").write_text(json.dumps(new), encoding="utf-8")
+        return new
+
+
+def _fixture_files() -> set[Path]:
+    """Your fixture definitions (where fixtures.save writes)."""
+    from amadeus.library import fixtures as fxlib
+
+    folder = fxlib.USER_DIR or fxlib.LIB_DIR
+    return set(folder.glob("*/*.json"))
+
 
 def _keep_copy(what: str) -> Path:
     from amadeus.rig import store
@@ -122,6 +136,12 @@ def undo_last_change(a: dict) -> dict:
             shutil.copy(last / f.name, f)
         else:
             f.unlink(missing_ok=True)
+    if (last / "fixtures.json").exists():  # fixtures it made
+        from amadeus.library import fixtures as fxlib
+
+        for f in json.loads((last / "fixtures.json").read_text(encoding="utf-8")):
+            Path(f).unlink(missing_ok=True)
+        fxlib.library.cache_clear()
     what = (last / "what.txt").read_text(encoding="utf-8").strip() if (last / "what.txt").exists() else ""
     shutil.rmtree(last)
     return {"undone": what, "more_to_undo": len(copies) - 1}
@@ -256,6 +276,52 @@ def add_fixtures(a: dict) -> dict:
     }
 
 
+def create_fixture(a: dict) -> dict:
+    """A fixture the library doesn't have, made from the DMX chart in its manual (library/generic.py from_chart)."""
+    from amadeus.library import catalog, generic
+
+    before = _fixture_files()
+    with _change(f"create_fixture {a.get('manufacturer', '')} {a.get('model', '')}".strip()) as kept:
+        made = generic.from_chart(
+            str(a.get("manufacturer", "")), str(a.get("model", "")), str(a.get("type", "")),
+            list(a.get("channels") or []), str(a.get("mode", "")), a.get("colour_wheel") or None,
+            a.get("physical") or {}, str(a.get("source", "")),
+        )  # fmt: skip
+        if "problems" in made:
+            raise ValueError("Not made: " + "; ".join(made["problems"]))
+        kept.made_fixtures(before)
+    return {**made, "checked": False, "details": catalog.details(made["key"])}
+
+
+def import_fixture_file(a: dict) -> dict:
+    """A fixture file the user has into their library: GDTF (.gdtf), QLC+ (.qxf, also what the Open Fixture
+    Library exports)."""
+    from amadeus.library import catalog, qlc
+
+    path = Path(str(a["path"])).expanduser()
+    if not path.is_file():
+        raise ValueError(f"No file at {path}")
+    suffix = path.suffix.lower()
+    if suffix == ".gdtf":
+        try:
+            from amadeus.library import gdtf
+        except ImportError:
+            raise ValueError(
+                "GDTF files can't be read by this version yet: ask the maker or the Open Fixture "
+                "Library for a QLC+ file (.qxf), or make the fixture from its DMX chart"
+            ) from None
+        add = gdtf.add_file
+    elif suffix == ".qxf":
+        add = qlc.add_file
+    else:
+        raise ValueError(f"{path.name}: a .gdtf or .qxf file, please")
+    before = _fixture_files()
+    with _change(f"import_fixture_file {path.name}") as kept:
+        key = add(path)
+        kept.made_fixtures(before)
+    return {"key": key, "details": catalog.details(key)}
+
+
 def automount(a: dict) -> dict:
     from amadeus.rig import manage
 
@@ -302,6 +368,8 @@ def write_hang_sheet(a: dict) -> dict:
     path.write_text(hangsheet.html(show.load(), show.set, show.rig), encoding="utf-8")
     return {"written": str(path)}
 
+
+from amadeus.library.mapper import ROLES as _ROLES  # noqa: E402 - the roles a chart's channel can have
 
 _PAIR = {
     "set": {"type": "string", "description": "a set's name (default: the active set)"},
@@ -360,6 +428,43 @@ TOOLS = {
                          "easy_addresses": {"type": "boolean", "default": True,
                                             "description": "free addresses ending in 1 (1, 11, 21…), else packed"},
                          "mount": {"type": "boolean", "default": True}}, ("key",))),
+    "create_fixture": (create_fixture, False, "Make a fixture the library doesn't have, from the DMX chart in "
+                       "its manual: every channel of the mode in the chart's order, each played by the show (a "
+                       "role) or held at a value (shutter open, no strobe, gobo open, programs off). Only from the "
+                       "real chart of that exact model, never from a lookalike. It is marked not checked until "
+                       "the channel check on the real fixture.", _schema({
+                           "manufacturer": {"type": "string"},
+                           "model": {"type": "string", "description": "exactly as the maker names it"},
+                           "type": {"type": "string", "enum": ["spot", "wash", "beam", "par", "bar", "strobe",
+                                                               "blinder"]},
+                           "mode": {"type": "string", "description": "the mode's name in the chart (default: "
+                                    "\"<channels>ch\")"},
+                           "channels": {"type": "array", "items": {"type": "object", "properties": {
+                               "name": {"type": "string", "description": "as the chart names it"},
+                               "role": {"type": "string", "enum": [r["role"] for r in _ROLES] + ["hold"],
+                                        "description": "what the show plays on it, or hold"},
+                               "value": {"type": "integer", "minimum": 0, "maximum": 255,
+                                         "description": "hold: the value it stays at (from the chart)"},
+                               "cell": {"type": "integer", "description": "a bar: which cell (1…)"},
+                               "ranges": {"type": "array", "items": {"type": "array"},
+                                          "description": "the chart's ranges: [[from, to, what it does], …]"},
+                           }, "required": ["name", "role"]}},
+                           "colour_wheel": {"type": "array", "description": "the colour wheel's slots, open first",
+                                            "items": {"type": "object", "properties": {
+                                                "name": {"type": "string"}, "from": {"type": "integer"},
+                                                "to": {"type": "integer"},
+                                                "rgb": {"type": "array", "items": {"type": "number"}}}}},
+                           "physical": {"type": "object", "properties": {
+                               "watts": {"type": "number"}, "beam_deg": {"type": "number"},
+                               "beam_deg_max": {"type": "number"}, "pan_deg": {"type": "number"},
+                               "tilt_deg": {"type": "number"}}},
+                           "source": {"type": "string", "description": "where the chart is from: the manual's "
+                                      "name and page, or its web address"},
+                       }, ("manufacturer", "model", "type", "channels", "source"))),
+    "import_fixture_file": (import_fixture_file, False, "Add a fixture file the user has to their library: GDTF "
+                            "(.gdtf) or QLC+ (.qxf, also what the Open Fixture Library editor exports). Returns "
+                            "its key and modes.", _schema({"path": {"type": "string", "description": "the file "
+                                                                    "on this computer"}}, ("path",))),
     "automount": (automount, False, "Auto-mount the set's fixtures on the rig: the ones not mounted yet, the "
                   "given ids, or all (re-mount every one).", _schema({
                       **_PAIR, "ids": {"type": "array", "items": {"type": "string"}},

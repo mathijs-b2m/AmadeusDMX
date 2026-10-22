@@ -12,6 +12,13 @@ before every change your sets and rigs are copied aside: "undo that" puts the la
 What it can't do: delete or rename sets and rigs, switch lights on, or change a show that is running (a running
 show keeps the set it started with; changes are there the next time it starts).
 
+**A fixture the library hasn't got** is never swapped for a lookalike (a sibling model, or another fixture with
+as many channels: it would drive the wrong channels). The assistant asks you for a fixture file, or makes the
+fixture from the DMX chart in its manual: give it the manual, or let it read the maker's website. Each channel
+of the mode is either played by the show (dimmer, colours, pan and tilt) or held at the value that keeps the
+fixture quiet and open (shutter open, gobo open, programs off). Such a fixture is marked as not checked: run the
+Set page's channel check on the real fixture before a show.
+
 ## Connecting
 
 The server runs on the computer with Amadeus DMX, started by your assistant's desktop app.
@@ -104,6 +111,8 @@ can (above).
 | `place_set_on_rig`, `automount` | put a set on a rig and mount its fixtures |
 | `search_fixtures`, `fixture_details` | our library, QLC+ and the Open Fixture Library |
 | `add_fixtures` | add fixtures of one model at free (or given) addresses, mounted on the rig |
+| `create_fixture` | a fixture the library doesn't have, made from the DMX chart in its manual (not checked until the Set page's channel check) |
+| `import_fixture_file` | a fixture file you have: QLC+ `.qxf` (also what the Open Fixture Library exports); GDTF `.gdtf` once this version reads it |
 | `check_show` | problems, DMX overlaps, fixtures not mounted or not patched, fixtures the show keeps dark |
 | `write_hang_sheet` | the crew's paperwork as a printable HTML file |
 | `undo_last_change` | back to before the assistant's last change (the last 30 are kept, in `.cache/assistant-undo`) |
