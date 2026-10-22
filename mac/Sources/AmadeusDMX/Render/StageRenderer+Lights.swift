@@ -17,6 +17,9 @@ extension StageRenderer {
         let nHeads = max(1, inp.fixtures.filter { $0.kind == .head }.count)
         let density = min(1, 4 / Float(nHeads).squareRoot())
         var lightSum = SIMD3<Float>(repeating: 0)
+        // a spot lands where there's a surface to see: not on the back wall while it is cut away
+        let backCut = s.backCut(eye: eye)
+        func lands(_ surf: Room.Surface) -> Bool { surf != .air && !(backCut && surf == .back) }
 
         func beam(_ p: SIMD3<Float>, _ d: SIMD3<Float>, spreadDeg: Float, color: SIMD3<Float>, intensity: Float,
                   maxLen: Float = 30, spot: Bool = true) {
@@ -24,7 +27,7 @@ extension StageRenderer {
             let R = max(0.05, len * tan(spreadDeg * .pi / 360))
             beams.append(BeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, intensity),
                                       extra: [0.05, 0, 0, 0]))
-            if spot && surf != .air {
+            if spot && lands(surf) {
                 let n = Room.normal(surf)
                 let squash = surf == .floor ? max(1, min(3, 1 / max(0.25, abs(d.z)))) : 1
                 decals.append(DecalInstance(centerRadius: SIMD4(p + d * len, max(0.12, R * 1.3)), normal: SIMD4(n, Float(squash)),
@@ -38,7 +41,7 @@ extension StageRenderer {
             let r0 = wheel.w, R = max(r0 + 0.01, len * tan(spreadDeg * .pi / 360))
             goboBeams.append(GoboBeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, intensity),
                                               wheel: wheel, axis: axis))
-            if surf != .air {
+            if lands(surf) {
                 let n = Room.normal(surf)
                 let squash = max(1, min(3, 1 / max(0.25, abs(simd_dot(d, n)))))
                 goboDecals.append(GoboDecalInstance(centerRadius: SIMD4(p + d * len, max(0.12, R * 1.15)), normal: SIMD4(n, squash),
@@ -163,7 +166,7 @@ extension StageRenderer {
                     let end = p + d * len
                     lines.append(LineInstance(p0Width: SIMD4(p, 0.05 * thin), p1: SIMD4(end, 0), color: SIMD4(b.color, a * 0.22 * thin)))
                     lines.append(LineInstance(p0Width: SIMD4(p, 0.008), p1: SIMD4(end, 0), color: SIMD4(b.color, a * 2.6)))
-                    if surf != .air {
+                    if lands(surf) {
                         decals.append(DecalInstance(centerRadius: SIMD4(end, 0.06), normal: SIMD4(Room.normal(surf), 1),
                                                     color: SIMD4(b.color, a * 3)))
                     }

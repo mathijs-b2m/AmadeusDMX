@@ -42,6 +42,9 @@ public sealed class Scenery
     public float Top { get; }
     public Vector3 DjHead { get; private set; }
     public FixtureModels Models { get; }
+    /// What stands at the back (the room's back wall, the LED wall and its frame): its vertices and the depth of its
+    /// back. While the camera is behind that (orbiting round the stage), it isn't drawn, so it doesn't hide the stage.
+    public List<(int Start, int End, float Y)> Cutaways { get; } = [];
 
     static Vector3 V(float x, float y, float z) => new(x, y, z);
     static Vector3 V(double x, double y, double z) => new((float)x, (float)y, (float)z);
@@ -68,8 +71,10 @@ public sealed class Scenery
         var floorC = V(0.030f, 0.032f, 0.040f);
         Quad(V(-Room.Side - 8, back - 4, 0), V(W + Room.Side + 8, back - 4, 0), V(W + Room.Side + 8, Room.Depth, 0),
              V(-Room.Side - 8, Room.Depth, 0), floorC);
+        var wallAt = Vertices.Count;
         Quad(V(-Room.Side - 8, back, 0), V(W + Room.Side + 8, back, 0), V(W + Room.Side + 8, back, Room.Ceiling),
              V(-Room.Side - 8, back, Room.Ceiling), V(0.018f, 0.019f, 0.024f), normal: V(0, 1, 0));
+        Cutaways.Add((wallAt, Vertices.Count, back));
 
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
@@ -124,12 +129,14 @@ public sealed class Scenery
             var sy = Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
             var sz = (Big ? 1.4f : 1.15f) + raised;  // over the stage, as high as it stands
             Wall = new WallPlacement(V(cx, sy, sz + sh / 2), sw, sh);
+            var screenAt = Vertices.Count;
             Box(cx - sw / 2 - 0.12f, cx + sw / 2 + 0.12f, sy - 0.35f, sy - 0.02f, sz - 0.12f, sz + sh + 0.12f, V(0.03f, 0.03f, 0.035f));
             if (Big)  // legs
             {
                 Box(cx - sw / 2 - 0.1f, cx - sw / 2 + 0.1f, sy - 0.3f, sy - 0.1f, 0, sz, V(0.06f, 0.06f, 0.07f));
                 Box(cx + sw / 2 - 0.1f, cx + sw / 2 + 0.1f, sy - 0.3f, sy - 0.1f, 0, sz, V(0.06f, 0.06f, 0.07f));
             }
+            Cutaways.Add((screenAt, Vertices.Count, sy - 0.35f));
         }
 
         // trusses: the set's own (rig editor), else: hanging fixtures at the same depth and height share one bar
@@ -190,6 +197,27 @@ public sealed class Scenery
         Models.AddStatic(mb);
         Vertices.AddRange(mb.V);
     }
+
+    /// The parts of `Vertices` to draw with the camera at `eye` (start, count): all but what stands at the back while
+    /// the camera is behind it.
+    public void VisibleRanges(Vector3 eye, List<(int Start, int Count)> into)
+    {
+        into.Clear();
+        var at = 0;
+        foreach (var c in Cutaways.OrderBy(c => c.Start))
+        {
+            if (eye.Y >= c.Y) continue;
+            if (c.Start > at) into.Add((at, c.Start - at));
+            at = Math.Max(at, c.End);
+        }
+        if (at < Vertices.Count) into.Add((at, Vertices.Count - at));
+    }
+
+    /// Whether the room's back wall is cut away with the camera at `eye` (beams then leave no spot on it).
+    public bool BackCut(Vector3 eye) => eye.Y < Room.Back;
+
+    /// Whether the LED wall is cut away with the camera at `eye`.
+    public bool ScreenCut(Vector3 eye) => Wall is { } w && eye.Y < w.Center.Y - 0.35f;
 
     // MARK: building blocks
 

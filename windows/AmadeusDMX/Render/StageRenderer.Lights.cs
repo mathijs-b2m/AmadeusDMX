@@ -20,13 +20,16 @@ public sealed partial class StageRenderer
         var density = MathF.Min(1, 4 / MathF.Sqrt(nHeads));
         var lightSum = Vector3.Zero;
         var highlight = Highlight;
+        // a spot lands where there's a surface to see: not on the back wall while it is cut away
+        var backCut = s.BackCut(eye);
+        bool Lands(Room.Surface surf) => surf != Room.Surface.Air && !(backCut && surf == Room.Surface.Back);
 
         void Beam(Vector3 p, Vector3 d, float spreadDeg, Vector3 color, float intensity, float maxLen = 30, bool spot = true)
         {
             var (len, surf) = room.Hit(p, d, maxLen);
             var R = MathF.Max(0.05f, len * MathF.Tan(spreadDeg * MathF.PI / 360));
             beams.Add(new BeamInstance(new(p, len), new(d, R), new(color, intensity), new(0.05f, 0, 0, 0)));
-            if (spot && surf != Room.Surface.Air)
+            if (spot && Lands(surf))
             {
                 var n = Room.Normal(surf);
                 var squash = surf == Room.Surface.Floor ? MathF.Max(1, MathF.Min(3, 1 / MathF.Max(0.25f, MathF.Abs(d.Z)))) : 1;
@@ -39,7 +42,7 @@ public sealed partial class StageRenderer
             var (len, surf) = room.Hit(p, d, 30);
             float r0 = wheel.W, R = MathF.Max(r0 + 0.01f, len * MathF.Tan(spreadDeg * MathF.PI / 360));
             goboBeams.Add(new GoboBeamInstance(new(p, len), new(d, R), new(color, intensity), wheel, axis));
-            if (surf != Room.Surface.Air)
+            if (Lands(surf))
             {
                 var n = Room.Normal(surf);
                 var squash = MathF.Max(1, MathF.Min(3, 1 / MathF.Max(0.25f, MathF.Abs(Vector3.Dot(d, n)))));
@@ -191,7 +194,7 @@ public sealed partial class StageRenderer
                         var end = p + d * len;
                         lines.Add(new LineInstance(new(p, 0.05f * thin), new(end, 0), new(b.Color, a * 0.22f * thin)));
                         lines.Add(new LineInstance(new(p, 0.008f), new(end, 0), new(b.Color, a * 2.6f)));
-                        if (surf != Room.Surface.Air)
+                        if (Lands(surf))
                             decals.Add(new DecalInstance(new(end, 0.06f), new(Room.Normal(surf), 1), new(b.Color, a * 3)));
                         hot += b.Color * a / beamsLZ.Length;
                     }

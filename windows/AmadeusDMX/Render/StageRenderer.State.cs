@@ -21,6 +21,10 @@ public sealed class StageFrame
     public readonly List<GoboBeamInstance> GoboBeams = [];
     public readonly List<GoboDecalInstance> GoboDecals = [];
     public readonly MeshBuilder Parts = new();
+    /// The scenery to draw (start, count): all of it but what the camera is behind.
+    public readonly List<(int Start, int Count)> SceneryRanges = [];
+    /// The camera is behind the LED wall: it isn't drawn.
+    public bool ScreenCut;
     /// The wall's picture changed this frame (upload it to the wall texture).
     public bool WallPictureChanged;
     /// The scene's size in pixels (the window's, times the adaptive render scale).
@@ -375,6 +379,8 @@ public sealed partial class StageRenderer
         var ambient = Vector3.Zero;
         var t = (float)(now - _startTime);
         if (inp?.Hello?.Gobos is { } pics && (GoboPictures is null || !pics.Select(p => p.Key).SequenceEqual(GoboKeys))) SetGobos(pics);
+        if (Scenery is { } sc0) { sc0.VisibleRanges(eye, out_.SceneryRanges); out_.ScreenCut = sc0.ScreenCut(eye); }
+        else { out_.SceneryRanges.Clear(); out_.ScreenCut = false; }
         if (inp is not null && Scenery is { } s)
             BuildLights(inp, frame, s, eye, t, out_.Beams, out_.Sprites, out_.Decals, out_.Lines, out_.GoboBeams, out_.GoboDecals,
                         ref ambient);
