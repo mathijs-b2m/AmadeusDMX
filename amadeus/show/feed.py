@@ -204,7 +204,7 @@ class Feed:
         }
         if any(b[1] for b in beams.values()):  # a gobo in a beam: [picture, next, wheel turn, rotation, shake, prism]
             out["gobo"] = [beams[e][1] if e in beams else None for e in self.ids]
-        if any(b[2] is not None for b in beams.values()):  # zoom 0 (tightest) .. 1 (widest), heads that have one
+        if any(b[2] is not None for b in beams.values()):  # zoom 0 (tightest) .. 1 (widest), lights that have one
             out["zoom"] = [round(beams[e][2], 3) if e in beams and beams[e][2] is not None else None for e in self.ids]
         if lasers:
             out["lz"] = [lasers.get(e) for e in self.ids]

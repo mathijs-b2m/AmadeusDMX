@@ -505,7 +505,9 @@ function draw() {
       const d = fx.dir || [0, 0.18, 1], end = beamEnd(fx.pos, d, st);  // up-lighter, slightly towards the crowd
       // the cells of a bar share its light: many small beams, not many full-strength ones
       const cellK = fx.cells > 1 ? 1 / Math.sqrt(fx.cells) : 1;
-      drawBeam(P, fx.pos, end.p, Math.min(end.t, 3.5), Math.min(fx.beam_deg || 28, 40), c, dim * 0.8 * cellK);
+      const zoom = frame.zoom?.[i];  // a wash with a zoom opens as the show sends it
+      const lens = zoom != null ? fx.beam_deg + ((fx.beam_wide ?? fx.beam_deg) - fx.beam_deg) * zoom : Math.min(fx.beam_deg || 28, 40);
+      drawBeam(P, fx.pos, end.p, Math.min(end.t, 3.5), lens, c, dim * 0.8 * cellK);
       const p = P(fx.pos);
       if (p) {
         const r = 0.6 * p[3], g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], r);

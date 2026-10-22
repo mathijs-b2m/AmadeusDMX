@@ -188,8 +188,10 @@ extension StageRenderer {
                 // a bar's cells share its light: many small beams, not many full-strength ones
                 let cellK: Float = (fx.cells ?? 1) > 1 ? 1.6 / Float(fx.cells!) : 1
                 let pd = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 0.18, 1)
-                beam(p, simd_normalize(pd), spreadDeg: min(Float(fx.beamDeg), 40), color: col, intensity: dim * 0.8 * cellK,
-                     maxLen: 3.5)
+                // a wash with a zoom opens as the show sends it
+                let zoom = frame.flatMap { i < $0.zoom.count ? $0.zoom[i] : nil }
+                let lens = zoom.map { Float(fx.beamDeg) + Float(fx.beamWide - fx.beamDeg) * $0 } ?? min(Float(fx.beamDeg), 40)
+                beam(p, simd_normalize(pd), spreadDeg: lens, color: col, intensity: dim * 0.8 * cellK, maxLen: 3.5)
                 if (fx.cells ?? 1) <= 1 {   // a bar's cells glow in its model; a single par gets a soft halo
                     sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.16), color: SIMD4(col, dim * 0.35), extra: .zero))
                 }

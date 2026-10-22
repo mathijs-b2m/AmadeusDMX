@@ -26,9 +26,6 @@ XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 
 
 DROP_DARK_FROM = 0.35  # drop size (the show arc's knob) from which the breath of darkness comes in, full at 1
-# the zoom of a head that has one, per beam effect: beams tight and crisp (the default, 0); a gobo opens up enough
-# that its pattern reads on the floor and the walls; a frost wash fully open
-BEAM_ZOOM = {"gobo": 0.45, "gobo_shake": 0.45, "gobo_rotate": 0.45, "gobo_spin": 0.45, "frost": 1.0}
 PREDROP_BEATS = 2.0  # heads go dark and move to the drop's position/colour/gobo this many beats early
 
 
@@ -554,6 +551,9 @@ class LooksMixin:
                 col = _lerp(col, (1.0, 1.0, 1.0), 0.6 * progress**2)
                 dim = dim * (0.45 + 0.55 * progress) + 0.15 * progress
             st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
+            zoom = self._fixed_zoom(d, f["id"], progress)
+            if zoom is not None:
+                st.zoom = zoom
             if (d.dynamics == "impact" or rise) and not tac_voice:  # (the flash is on the kick: the boom's)
                 st.white = flash
             out[f["id"]] = st
@@ -619,7 +619,8 @@ class LooksMixin:
             if d.dynamics == "impact" and d.head_light != "off" and voice != "tac":  # (the flash: the boom's)
                 st.white = flash * (dim if role["movement"] == "pour" else 1.0)  # (a pour waits dark at the floor)
             st.fx = d.beam_fx
-            st.zoom = BEAM_ZOOM.get(d.beam_fx, 0.0)
+            featured = self._featured(d, j) if grouping in ("split", "solo") else None
+            st.zoom = self._head_zoom(d, f["id"], role, layer, featured, progress)
             group = self.gobo_groups[j].get(d.gobo_style) or self.gobo_all[j]
             st.gobo = group[(d.phrase + bar // 4) % len(group)] - 1  # next gobo of the style every four bars
             st.fx_speed = 0.3 + 0.2 * max(0, min(3, d.intensity))  # calm: slow rotation, drops: fast

@@ -221,8 +221,10 @@ public sealed partial class StageRenderer
                     // a bar's cells share its light: many small beams, not many full-strength ones
                     var cellK = (fx.Cells ?? 1) > 1 ? 1.6f / fx.Cells!.Value : 1;
                     var pd = fx.Dir?.ToFloat() ?? new Vector3(0, 0.18f, 1);
-                    Beam(p, Vector3.Normalize(pd), spreadDeg: MathF.Min((float)fx.BeamDeg, 40), color: col, intensity: dim * 0.8f * cellK,
-                         maxLen: 3.5f);
+                    // a wash with a zoom opens as the show sends it
+                    var zoom = frame is not null && i < frame.Zoom.Length ? frame.Zoom[i] : null;
+                    var lens = zoom is { } z ? (float)fx.BeamDeg + (float)(fx.BeamWide - fx.BeamDeg) * z : MathF.Min((float)fx.BeamDeg, 40);
+                    Beam(p, Vector3.Normalize(pd), spreadDeg: lens, color: col, intensity: dim * 0.8f * cellK, maxLen: 3.5f);
                     if ((fx.Cells ?? 1) <= 1)   // a bar's cells glow in its model; a single par gets a soft halo
                         sprites.Add(new SpriteInstance(new(p, 0.16f), new(col, dim * 0.35f), Vector4.Zero));
                     break;

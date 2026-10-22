@@ -60,7 +60,7 @@ picture or words). Frames point into this list.
 | `fx` | per element: `[dimmer, r, g, b, white, pan, tilt]` as the fixture really shows it |
 | `beam` | per element: the beam effect the head really plays (`open`, `gobo`, `prism`, …; what its mode can't play, the nearest it can) or null |
 | `gobo` | only when a gobo is in a beam: per element `[picture, next picture, slide 0..1, turns per second (± direction), shakes per second, prism 0/1]` or null; pictures index the hello's `gobos`, -1 is the wheel's open hole, slide is how far the wheel has turned from one to the next |
-| `zoom` | only when a head has a zoom: per element 0 (tightest) .. 1 (widest), as far as the zoom motor has got, or null |
+| `zoom` | only when a light has a zoom (a head, or a wash par): per element 0 (tightest) .. 1 (widest), as far as the zoom motor has got, or null |
 | `dirs` | per element: the head's beam direction (unit vector), computed back from its DMX pan/tilt |
 | `lz` | per element: the beams a laser draws, `[dx, dy, dz, r, g, b, brightness]` each |
 | `bands` | spectrum meters, 0..1 |

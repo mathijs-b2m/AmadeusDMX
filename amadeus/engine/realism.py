@@ -138,21 +138,27 @@ class Realism:
     def beams(self, states: dict, dt: float) -> dict[str, tuple[str, list | None, float | None]]:
         """Per moving head: the beam effect it really shows; its gobo as [picture, next picture, how far the wheel
         has turned towards it 0..1, rotation (turns per second, ± direction), shake (per second), prism 0/1]
-        (pictures index gobo_pictures(), -1 = the open hole), None without one; the zoom 0..1, None without one."""
+        (pictures index gobo_pictures(), -1 = the open hole), None without one; the zoom 0..1, None without one.
+        A fixed light with a zoom (a wash par) is in it too, with only its zoom: (None, None, zoom)."""
         out = {}
         for eid, h in self.heads.items():
             s = states[eid]
             fx = fxlib.beam_effect(h["defn"], h["chans"], s.fx)
             gobo = self._gobo_wheel(eid, h, fx, s, dt) if h["slots"] else None
-            zoom = None
-            if self.info[eid]["zoom"]:
-                now = self.zoom_now.get(eid, fxlib.zoom_of(s))
-                step = ZOOM_PER_S * dt
-                want = fxlib.zoom_of(s)
-                now = want if abs(want - now) <= step else now + math.copysign(step, want - now)
-                self.zoom_now[eid] = zoom = now
-            out[eid] = (fx, gobo, zoom)
+            out[eid] = (fx, gobo, self._zoom(eid, s, dt) if self.info[eid]["zoom"] else None)
+        for eid, info in self.info.items():
+            if info["zoom"] and eid not in self.heads and eid in states:
+                out[eid] = (None, None, self._zoom(eid, states[eid], dt))
         return out
+
+    def _zoom(self, eid: str, s, dt: float) -> float:
+        """Where the zoom motor has got: towards what the show sends, at ZOOM_PER_S."""
+        want = fxlib.zoom_of(s)
+        now = self.zoom_now.get(eid, want)
+        step = ZOOM_PER_S * dt
+        now = want if abs(want - now) <= step else now + math.copysign(step, want - now)
+        self.zoom_now[eid] = now
+        return now
 
     def _gobo_wheel(self, eid: str, h: dict, fx: str, s, dt: float) -> list | None:
         n = h["slots"] + 1  # the open hole and the gobos, round the wheel

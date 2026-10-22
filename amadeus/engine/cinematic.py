@@ -535,6 +535,9 @@ class CinematicMixin:
         room = self._at(self.cine_room, t)
         glow = self._at(self.cine_lowglow, t)
         fill = self._fill_at(t)
+        pad_ids = (
+            {eid for u in self.cine_sections[score["pad"]]["units"] for eid in u} if score["pad"] is not None else set()
+        )
         layer: dict[str, tuple[float, tuple]] = {}  # the held layers: melody and pad
         if fill > 0:
             if score["pad"] is not None:
@@ -571,6 +574,7 @@ class CinematicMixin:
                     if v > dim:
                         dim, col = v, c
             s = State(dimmer=min(1.0, dim), r=col[0], g=col[1], b=col[2])
+            s.zoom = self._cine_zoom(eid, pad_ids, score["rank"])
             if e["kind"] == "head" and before_impact:
                 s.dimmer = 0.0  # moving to the next picture in the dark
             if e["kind"] == "strobe":
