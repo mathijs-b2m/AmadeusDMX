@@ -34,6 +34,7 @@ def _director(monkeypatch, tmp_path, director="auto"):
 
 def test_a_set_on_openai_without_a_key_plays_with_the_rules(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(pipeline, "plan_path", lambda *a, **k: tmp_path / "none.plan.json")  # no AI plan made before
     assert _director(monkeypatch, tmp_path) == "rules"
 
 
