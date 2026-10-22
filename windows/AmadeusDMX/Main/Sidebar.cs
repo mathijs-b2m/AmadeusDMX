@@ -1,4 +1,4 @@
-// The sidebar: the pages, and the engine's state at the bottom.
+// The sidebar: the pages, and at the bottom the engine's state and this version with its updates.
 using System.Globalization;
 
 namespace AmadeusDMX;
@@ -15,7 +15,7 @@ public sealed class Sidebar(AppModel model, MainWindow window)
                 if (s == Section.Engine) i.InfoBadge = model.ShowState.Kind == ShowStateKind.Failed ? new InfoBadge { Value = -1 } : null;
             }));
 
-    public FrameworkElement Footer() => new EngineFooter(model, window).Build().Padding(10);
+    public FrameworkElement Footer() => UI.VStack(6, new EngineFooter(model, window).Build(), new VersionFooter(model).Build()).Padding(10);
 }
 
 /// The engine at a glance, at the bottom of the sidebar.
@@ -105,6 +105,92 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
             UI.Button(fw.Allowing ? "Allowing…" : "Allow the Engine…", () => _ = fw.Allow()).Disabled(fw.Allowing).Font(Font.Caption)
                 .Tooltip("Windows asks for an administrator."),
             fw.Note is { } note ? UI.Text(note, Font.Caption).Secondary().Wrap() : null);
+}
+
+/// This version and its updates, under the engine's card: not everybody looks in Settings. A newer one gets its
+/// one click here; the line opens the update settings. It checks by itself only when checking automatically is on,
+/// and never while a show runs.
+public sealed class VersionFooter(AppModel model)
+{
+    public FrameworkElement Build()
+    {
+        var view = UI.Live(model.Updates, Content).Padding(6, 0);
+        view.Loaded += (_, _) => Refresh();
+        return view.Bind(model, nameof(AppModel.EngineRunning), _ => { if (!model.EngineRunning) Refresh(); });
+    }
+
+    /// The sidebar's own check: only with checking automatically on (opt-in), never during a show.
+    void Refresh()
+    {
+        var u = model.Updates;
+        if (u.IsAvailable && u.ChecksAutomatically && !model.EngineRunning) u.Refresh();
+    }
+
+    UIElement Content()
+    {
+        var u = model.Updates;
+        var (symbol, color) = !u.IsAvailable ? ("info.circle", (Windows.UI.Color?)null) : u.State switch
+        {
+            UpdateState.Available => ("arrow.down.circle", Tint.Orange),
+            UpdateState.UpToDate => ("checkmark.circle.fill", Tint.Green),
+            UpdateState.Failed => ("exclamationmark.triangle.fill", Tint.Orange),
+            UpdateState.Installing => (u.WaitingForIdle ? "clock" : "arrow.triangle.2.circlepath", null),
+            _ => ("info.circle", null),
+        };
+        var icon = UI.Icon(symbol, 12);
+        if (color is { } c) icon.Foreground(c); else icon.Secondary();
+        var line = new HyperlinkButton
+        {
+            Content = UI.HStack(5, icon, UI.Text(Line(u), Font.Caption).Secondary()),
+            Padding = new Thickness(0),
+        }.Tooltip(!u.IsAvailable ? "A development build: it updates with the code, not by itself"
+            : u.State == UpdateState.Available ? $"{u.Newest} is available: you have {u.Version}. Click for the update settings."
+            : "Updates: this version, the newest, and whether to check by itself");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(line, Line(u));  // its content is a stack: no name of its own
+        line.Click += (_, _) => new Flyout { Content = Options(u), Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.RightEdgeAlignedBottom }.ShowAt(line);
+        UIElement? action = u.State switch
+        {
+            UpdateState.Available when u.IsAvailable => UI.Button($"Update to {u.Newest}", () => u.InstallNewest()).Prominent()
+                .Disabled(!u.CanCheck).Font(Font.Caption).Tooltip($"Downloads Amadeus DMX {u.Newest} and installs it; Amadeus DMX starts again"),
+            UpdateState.Downloading => UI.HStack(4, UI.Progress(u.Progress).Frame(width: 50),
+                UI.IconButton("xmark.circle.fill", "Stop the download", u.CancelInstall)),
+            _ => null,
+        };
+        var row = UI.HStack(6, line.Grow(), action);
+        row.Alignment = 0.5;
+        return row;
+    }
+
+    static string Line(Updates u)
+    {
+        if (!u.IsAvailable) return $"Amadeus DMX {u.Version} · development build";
+        return u.State switch
+        {
+            UpdateState.Available => u.Version,  // the button names the newer one
+            UpdateState.Downloading => $"Downloading {u.Newest}…",
+            UpdateState.Installing => u.WaitingForIdle ? $"{u.Newest} installs when the show stops" : $"Installing {u.Newest}…",
+            UpdateState.Checking => $"Amadeus DMX {u.Version} · checking…",
+            UpdateState.UpToDate => $"Amadeus DMX {u.Version} · up to date",
+            UpdateState.Failed => $"Amadeus DMX {u.Version} · couldn’t check",
+            _ => $"Amadeus DMX {u.Version}",
+        };
+    }
+
+    /// The flyout: the status with its one click, and whether to check and install by itself.
+    static FrameworkElement Options(Updates u)
+    {
+        if (!u.IsAvailable)
+            return UI.VStack(6, UI.Text($"Amadeus DMX {u.Version}", Font.Headline),
+                UI.Text("A development build: it updates with the code, not by itself.").Secondary().Wrap()).Frame(width: 340);
+        var toggles = UI.Live(u, () => UI.VStack(4,
+            UI.Row("Check for updates automatically", UI.Toggle("", u.ChecksAutomatically, v => u.ChecksAutomatically = v)),
+            UI.Row("Download and install updates by themselves",
+                UI.Toggle("", u.InstallsAutomatically, v => u.InstallsAutomatically = v).Disabled(!u.ChecksAutomatically))));
+        return UI.VStack(10,
+            UpdateStatusView.Build(u, "Amadeus DMX", "when the show stops"),
+            toggles,
+            UI.Text(UpdatesSection.Rules, Font.Caption).Secondary().Wrap()).Frame(width: 360);
+    }
 }
 
 /// What the show costs the computer: the lights against the 3D stage.
