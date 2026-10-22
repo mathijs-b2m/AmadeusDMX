@@ -1,0 +1,36 @@
+{
+  "manufacturer": "MDG",
+  "model": "Me2 fog generator",
+  "kind": "smoke",
+  "source": "Written by hand from a venue's patch notes for MDG units: channel 1 over 50% turns the unit on, channel 2 is the output, channel 3 over 50% lets it fog",
+  "physical": {
+    "beam_deg": 25,
+    "size_mm": [
+      300,
+      350,
+      750
+    ],
+    "watts": 1500,
+    "fog": {
+      "type": "fog",
+      "estimated": true,
+      "_note": "Output estimated from the power; set m3_min, max_burst_s and rest_s from the manual (engine/fog.py)."
+    }
+  },
+  "modes": {
+    "3ch": [
+      {
+        "attr": "unit_control",
+        "default": 255
+      },
+      {
+        "attr": "fog",
+        "on_from": 1
+      },
+      {
+        "attr": "haze_control",
+        "default": 255
+      }
+    ]
+  }
+}

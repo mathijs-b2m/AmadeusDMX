@@ -1,0 +1,45 @@
+{
+  "kind": "smoke",
+  "manufacturer": "MDG",
+  "model": "ATMe",
+  "modes": {
+    "3ch": [
+      {
+        "attr": "unit_control",
+        "default": 255,
+        "_note": "over 50%: the unit is on"
+      },
+      {
+        "attr": "fog",
+        "on_from": 1
+      },
+      {
+        "attr": "haze_control",
+        "default": 255,
+        "_note": "over 50%: haze on; the output channel sets how much"
+      }
+    ]
+  },
+  "ofl": {
+    "categories": [
+      "Hazer"
+    ],
+    "converter": 5,
+    "key": "mdg/atme"
+  },
+  "physical": {
+    "beam_deg": 25,
+    "fog": {
+      "_note": "Output estimated from the power; set m3_min (m\u00b3 per minute), max_burst_s and rest_s from the manual for better timing (engine/fog.py).",
+      "estimated": true,
+      "type": "haze"
+    },
+    "size_mm": [
+      180,
+      300,
+      685
+    ],
+    "watts": 1400
+  },
+  "source": "Open Fixture Library (mdg/atme), converted automatically: check it once with `amadeus test`"
+}

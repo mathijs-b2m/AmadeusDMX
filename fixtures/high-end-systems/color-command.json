@@ -1,0 +1,40 @@
+{
+  "manufacturer": "High End Systems",
+  "model": "Color Command",
+  "kind": "par",
+  "source": "Written by hand from the house patch of a venue that runs them (a dimmer, then cyan, magenta, yellow and zoom). On a desk the dimmer is often patched on a dimmer pack of its own: here it is the fixture's first channel. Check it once with `amadeus test`",
+  "physical": {
+    "beam_deg": 20.0,
+    "beam_deg_max": 40.0,
+    "size_mm": [
+      400,
+      400,
+      500
+    ],
+    "watts": 1000,
+    "lumens": 9000,
+    "_lumens_note": "estimated: a 1000 W discharge wash",
+    "light": "CMY dichroic colour mixing, 25-beam lens"
+  },
+  "modes": {
+    "5ch": [
+      {
+        "attr": "dimmer"
+      },
+      {
+        "attr": "cyan"
+      },
+      {
+        "attr": "magenta"
+      },
+      {
+        "attr": "yellow"
+      },
+      {
+        "attr": "zoom",
+        "tight": 0,
+        "wide": 255
+      }
+    ]
+  }
+}
