@@ -42,7 +42,11 @@ COLUMNS = {  # column → the header words that name it (lower case, compared wi
     "y": ("y", "y m", "pos y", "position y"),
     "z": ("z", "z m", "pos z", "position z", "height", "hoogte"),
 }
-CONVENTIONAL = re.compile(r"dimmer|\bpar ?64\b|\bpc\b|fresnel|profile|source ?4|\bcyc|\bbalk|non ?dim", re.I)
+CONVENTIONAL = re.compile(
+    r"dimmer|\bpar ?64\b|\bpc\b|fresnel|profile|source ?4|\bcyc|\bbalk|non ?dim"
+    r"|\b\d+(?:[.,]\d+)? ?k?w\b|\b\d{2,3} ?v\b",
+    re.I,
+)  # a lamp's wattage or voltage in its name: a conventional light on a dimmer
 
 
 def _key(text: str) -> str:

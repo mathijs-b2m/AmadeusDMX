@@ -21,6 +21,7 @@ import io
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from amadeus import paths
@@ -32,7 +33,9 @@ KEY_NOTE = (
     "{name}: PDFs are read with AI, which needs your own OpenAI API key (Settings › OpenAI in the app, or "
     "OPENAI_API_KEY in .env); nothing was sent. MVR files and patch sheets (CSV, Excel) import without one"
 )
-DRAWING_WORDS = 40  # a page with fewer words than this is a drawing
+DRAWING_WORDS = 40  # a page with fewer words than this is a drawing (not read as text)
+PARALLEL = 4  # pages read with AI at the same time
+SCALE = re.compile(r"(?:scale|schaal|ma(?:ß|ss)stab|échelle)\s*:?\s*1\s*:\s*(\d{2,4})\b", re.I)
 HALL = re.compile(r"hall|zaal|audience|publiek|foh|f\.o\.h|balcon|dance ?floor|house", re.I)  # where it hangs
 
 
@@ -69,7 +72,11 @@ TEXT_SCHEMA = _obj(
             "type": "array",
             "items": _obj(
                 {
-                    "number": {"type": "string", "description": "its id or number in the list (#101 → 101), or ''"},
+                    "number": {
+                        "type": "string",
+                        "description": "its fixture number or ID as printed (a #, ID, Fix, Unit or No column: #101 → "
+                        "101); drawings label fixtures by it, so copy it for every row that has one; '' only when none",
+                    },
                     "type": {"type": "string", "description": "the fixture type as written"},
                     "manufacturer": {"type": "string", "description": "the brand, when the text says it, else ''"},
                     "where": {"type": "string", "description": "the position/description column"},
@@ -112,7 +119,8 @@ TEXT_PROMPT = (
     "stays one entry with last_address 19; say whether such a range is a run of dimmer channels, one "
     "conventional light per channel, or the channels of one fixture). Addresses written 'u.aaa' are "
     "universe.address. Notes printed beside a table are notes, not part of the rows next to them. Mark house and "
-    "work lights, interior lights and network gear as house_only "
+    "work lights, interior lights, network gear and dimmer racks or packs themselves (the boxes, not the lights on "
+    "them) as house_only "
     "(a moving light, strobe or blinder never is). Give the DMX modes the notes name (e.g. "
     "'AYRTON DIABLO S EXTENDED 56 CHANNEL' → type Diablo S, mode Extended, 56 channels). From the rider: the "
     "stage's total and usable width, its depth, the height from the stage floor to the grid, the stage's own "
@@ -225,11 +233,14 @@ def read(files: list[Path], client=None, progress=None) -> Draft:
 
         client = OpenAI()
     text, drawings = [], []
-    for p in files:
+    printed: dict[tuple, float] = {}  # a plan's own "scale 1:100", read from its text (not by AI)
+    for p in files:  # every page with text is read as text, and every page as a drawing (a CAD plan has text too)
         for pg in pages(p):
-            if pg["drawing"]:
-                drawings.append((p, pg["page"]))
-            else:
+            drawings.append((p, pg["page"]))
+            m = SCALE.search(pg["text"])
+            if m:
+                printed[(p, pg["page"])] = float(m.group(1))
+            if not pg["drawing"]:
                 text.append(f"--- {p.name}, page {pg['page']} ---\n{pg['text']}")
         d.note("ok", f"{p.name}: read with AI")
     if not text:
@@ -258,22 +269,32 @@ def read(files: list[Path], client=None, progress=None) -> Draft:
         sizes=f"The venue's rider gives: {sizes}. " if sizes else "",
         labels=f" The patch has these numbers and addresses, look for each: {', '.join(labels)}." if labels else "",
     )
-    placed = 0
-    for k, (p, n) in enumerate(drawings, 1):
-        say(f"Reading drawing {k} of {len(drawings)} with AI…")
-        url, w, h = page_pdf(p, n)
+    placed, done = 0, 0
+    say(f"Looking for plans on {len(drawings)} pages with AI…")
+
+    def ask_page(pn):  # a few at a time: each page is its own request
+        nonlocal done
+        url, w, h = page_pdf(*pn)
         content = [
             {"type": "input_text", "text": prompt},
-            {"type": "input_file", "filename": f"{p.stem}-page{n}.pdf", "file_data": url},
+            {"type": "input_file", "filename": f"{pn[0].stem}-page{pn[1]}.pdf", "file_data": url},
         ]
         plans = _ask(client, content, PLOT_SCHEMA, "plot").get("plans", [])
+        done += 1
+        say(f"Looking for plans with AI: {done} of {len(drawings)} pages read…")
+        return url, w, h, plans
+
+    with ThreadPoolExecutor(PARALLEL) as pool:
+        answers = list(pool.map(ask_page, drawings))
+    for (p, n), (url, w, h, plans) in zip(drawings, answers):
         if not plans:
-            d.note("ok", f"{p.name} page {n}: no plan (a view or other drawing): not used for positions")
+            continue  # text, a 3D view or a photo: no plan on it
         page = base64.b64decode(url.split(",", 1)[1])
         for plan in plans:
             where = f"{p.name} page {n}" + (f" ({plan['title']})" if plan.get("title") else "")
             under = {"title": plan.get("title") or f"{p.stem} page {n}", "source": where, "pdf": page, "w": w, "h": h}
-            got = place(plan, w, h, stage, by_key, d, where, under, len(d.underlays))
+            got = place({**plan, "printed_scale": printed.get((p, n))}, w, h, stage, by_key, d, where, under,
+                        len(d.underlays))  # fmt: skip
             if got:
                 d.underlays.append(under)
             placed += got
@@ -288,7 +309,8 @@ def fixtures(patch: dict, d: Draft) -> list[Item]:
     modes = {m["type"].lower(): m for m in patch.get("modes", [])}
     items, house = [], []
     for row in patch.get("fixtures", []):
-        brand, kind = (row.get("manufacturer") or "").strip(), row["type"].strip()
+        brand = (row.get("manufacturer") or "").strip()
+        kind = re.sub(r"\s+#?\d{1,3}$", "", row["type"].strip()) or row["type"].strip()  # "110V 7": unit 7 of 110V
         name = kind if not brand or kind.lower().startswith(brand.lower()) else f"{brand} {kind}"
         if row.get("house_only"):
             house.append(name)
@@ -304,9 +326,13 @@ def fixtures(patch: dict, d: Draft) -> list[Item]:
             for k in range(last - it.address + 1):
                 items.append(Item(**{**it.__dict__, "address": it.address + k, "channels": 1, "label": ""}))
             continue
-        if it.address and last > it.address:
-            it.channels = it.channels or last - it.address + 1
-        it.count = max(1, row.get("count") or 1)
+        span = last - it.address + 1 if it.address and last > it.address else 0
+        count = max(1, row.get("count") or 1)
+        if span and it.channels and count > 1 and count * it.channels > span:
+            count = max(1, span // it.channels)  # "1–152" read as 152 units: those are channels, of 3-channel units
+        elif span and not it.channels:  # the range is the units side by side, else (a hazer "501 > 503") one's own
+            it.channels = span // count if count > 1 and span % count == 0 and span // count >= 2 else span
+        it.count = count
         items.append(it)
     if house:
         d.note("ok", f"Left out as house lights: {', '.join(sorted(set(house)))}")
@@ -394,7 +420,11 @@ def place(
         refs.append(stage["depth_m"] / abs(out(front, front) - out(back, back)))
     by_symbols = symbol_scale(plot, w, by_key)
     agree = len(refs) >= 2 and max(refs) <= 1.15 * min(refs)
-    if agree:  # two sizes the plan shows agree: they win (the AI judges symbol sizes less well)
+    paper = plot["printed_scale"] * 0.0254 / 72 if plot.get("printed_scale") else None  # 1:N on a page printed so
+    others = refs + ([by_symbols] if by_symbols else [])
+    if paper and any(abs(x / paper - 1) <= 0.2 for x in others):  # the printed scale, when something agrees
+        scales, agree = [paper], True
+    elif agree:  # two sizes the plan shows agree: they win (the AI judges symbol sizes less well)
         scales = refs
     elif by_symbols:  # else the fixtures drawn on it: plans are drawn to scale
         scales = [x for x in refs if abs(x / by_symbols - 1) <= 0.25] + [by_symbols]

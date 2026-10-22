@@ -222,7 +222,9 @@ class FakeAI:
     def create(self, model, input, text):
         name = text["format"]["name"]
         self.asked.append(name)
-        return type("R", (), {"output_text": json.dumps(self.answers[name])})()
+        files = [c.get("filename", "") for c in input[0]["content"] if c["type"] == "input_file"]
+        answer = {"plans": []} if any(f.startswith("patch") for f in files) else self.answers[name]  # text: no plan
+        return type("R", (), {"output_text": json.dumps(answer)})()
 
 
 def _pdf(path: Path, pages: list[str | None]) -> Path:
@@ -312,7 +314,7 @@ def test_without_a_key_nothing_is_sent_and_the_report_says_why(data, monkeypatch
 def test_a_patch_pdf_and_its_plan_build_the_rig(pdfs):
     ai = FakeAI(PATCH, [PLAN])
     res = importer.build(list(pdfs), "venue", ai)
-    assert ai.asked == ["patch", "plot"]  # every page read: the text together, the drawing on its own
+    assert sorted(ai.asked) == ["patch", "plot", "plot"]  # the text together, and every page for its plans
     fx = {f["id"]: f for f in res.set_doc["fixtures"]}
     assert fx["diablo101"]["mode"] == "ext" and fx["diablo101"]["universe"] == 2
     assert sorted(f["address"] for f in fx.values() if f["fixture"] == "generic/par-64") == [34, 35, 36, 37]

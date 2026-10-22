@@ -136,7 +136,7 @@ def _template(name: str) -> str:
 
 def make(name: str, channels: int) -> Choice:
     """A type nothing matches: a PAR 64 on a dimmer for a conventional light, else a fixture from a template."""
-    if channels == 1 or CONVENTIONAL.search(name):
+    if channels == 1 or (not channels and CONVENTIONAL.search(name)):  # several channels: never a plain dimmer
         return Choice(
             DIMMER_KEY, "1ch", 1, False, f"“{name}” isn't in any library: played as a light on one dimmer channel"
         )
