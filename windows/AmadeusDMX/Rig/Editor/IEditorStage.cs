@@ -8,6 +8,7 @@
 // `partial class StageView : IEditorStage`, or a thin adapter); until then the editor runs on PlaceholderStage, a
 // plan view drawn in 2D that behaves like the stage view towards the editor (it is also what the editor falls back
 // to when Direct3D isn't there). EditorViewport picks the stage (EditorViewport.MakeStage).
+using System.ComponentModel;
 using System.Numerics;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
@@ -21,7 +22,7 @@ using Windows.UI.Core;
 namespace AmadeusDMX;
 
 /// What the rig editor needs from the stage view (Swift: StageController + StageView + StageRenderer).
-public interface IEditorStage
+public interface IEditorStage : INotifyPropertyChanged
 {
     /// The view to put in the editor (the SwapChainPanel's host). It takes keyboard focus on a click.
     FrameworkElement View { get; }
@@ -37,14 +38,19 @@ public interface IEditorStage
     /// StageMTKView: on a press calls `Pick(ray, extend: Shift)`; if it grabbed, the moves call `Drag(ray, free:
     /// Alt)` and the release `EndDrag()` instead of turning the camera; if not, a single click calls `ClickedEmpty()`
     /// and the drag orbits (Alt / right button: pan; wheel: zoom; double click: back to the preset). Moves with no
-    /// button call `Hover(ray)`. KeyDown goes to `Key(EditorKeys.From(e))` first (handled: true → e.Handled); the
-    /// show's walking keys are off while there is an editor. Text dragged in (DataPackage text) goes to
+    /// button call `Hover(ray)`. KeyDown goes to `Key(EditorKeys.From(e))` first (handled: true → e.Handled), then
+    /// the show's walking and flying keys; while flying those come first. Text dragged in (DataPackage text) goes to
     /// `DropHover` / `Drop(text, ray)` / `DropEnded` (AllowDrop on the view; accept as Move).
     IStageEditing? Editor { get; set; }
 
     /// The camera preset, by Swift's CameraPreset raw value: "Plan", "Drone", "Front of House", "Side" (the editor's
     /// buttons; also "In the Crowd", "DJ"). Setting it glides the camera there (Swift: `controller.preset`).
     string Preset { get; set; }
+
+    /// Fly through the room: you are the camera (Swift: `controller.fly`; F and Esc on the stage change it too, and
+    /// say so through PropertyChanged). Only where CanFly: the plan view can't.
+    bool Fly { get; set; }
+    bool CanFly { get; }
 
     /// 0…1: the room lit for working (the editor sets 1; Swift: `controller.workLight`).
     float WorkLight { get; set; }
@@ -142,6 +148,9 @@ public sealed class PlaceholderStage : IEditorStage
     public Func<(StageInput? Input, AmadeusKit.Frame? Frame)>? Input { get; set; }
     public IStageEditing? Editor { get; set; }
     public string Preset { get; set; } = "Plan";
+    public bool Fly { get => false; set { } }
+    public bool CanFly => false;
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged { add { } remove { } }
     public float WorkLight { get; set; }
 
     public (Vector3 Origin, Vector3 Dir) Ray(Point p, Size size) =>

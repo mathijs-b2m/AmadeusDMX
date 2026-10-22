@@ -1,7 +1,8 @@
 // WinUI ↔ Direct3D: the stage view with mouse/touchpad camera control (mac/.../Render/StageView.swift).
 //   drag: orbit · Alt- or Ctrl-drag, right- or middle-drag: pan · wheel / pinch: zoom · two-finger touchpad scroll:
 //   orbit (with Ctrl or Alt: zoom) · double-click: back to the preset
-//   the show also walks and flies: WASD/arrows move, Q/E down/up, +/− zoom, F flies (drag looks around), Esc lands
+//   it also walks and flies: WASD/arrows move, Q/E down/up, +/− zoom, F flies (drag looks around), Esc lands
+//   (in the rig editor its own keys come first, except while flying: then the camera's do)
 //
 // A SwapChainPanel with a flip-model swap chain (DXGI composition swap chain, set through ISwapChainPanelNative),
 // sized in pixels (the panel's size × CompositionScaleX/Y; the inverse scale goes on the swap chain so the
@@ -399,17 +400,14 @@ public sealed partial class StageView : SwapChainPanel
     void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var key = new StageKey(e.Key, Code(e), IsDown(VirtualKey.Shift), IsDown(VirtualKey.Control), IsDown(VirtualKey.Menu), e.KeyStatus.WasKeyDown);
-        if (_controller.Editor is { } editor)
-        {
-            if (editor.Key(key)) e.Handled = true;
-            return;
-        }
+        if (_renderer?.Fly == true && FlyKey(key)) { e.Handled = true; return; }  // flying: the camera's keys first (Esc lands)
+        if (_controller.Editor?.Key(key) == true) { e.Handled = true; return; }
         if (FlyKey(key)) e.Handled = true;
     }
 
     void OnKeyUp(object sender, KeyRoutedEventArgs e) => _renderer?.KeyUp(Code(e));
 
-    /// The show's walking and flying keys (not the rig editor's: its keys edit the rig).
+    /// The walking and flying keys, the same in the show and the rig editor.
     bool FlyKey(StageKey e)
     {
         if (_renderer is not { } r || e.Control) return false;

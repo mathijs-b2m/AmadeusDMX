@@ -1623,6 +1623,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public bool Key(EditorKey e)
     {
+        // nothing selected: the arrows walk the camera, like in the show
+        if (Selection is null && !e.Control && e.Code is EditorKeyCode.Left or EditorKeyCode.Right or EditorKeyCode.Up or EditorKeyCode.Down) return false;
         var shift = e.Shift;
         var step = shift ? 0.5 : 0.1;
         switch (e.Code)

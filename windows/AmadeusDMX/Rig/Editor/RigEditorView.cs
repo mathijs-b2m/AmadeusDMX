@@ -238,6 +238,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             text.Text = editor.Doc.WaitingCount > 0 && editor.Selection is null
                 ? $"{editor.Doc.WaitingCount} fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount"
                 : editor.Selection is null ? "Click to select · Shift-click for more · Ctrl+A all fixtures · drag empty space to turn the view"
+                    + (_viewport!.Stage.CanFly ? " · WASD walks · F flies" : "")
                 : n > 1 ? $"{n} selected: drag one and the rest come along · Delete unmounts them · R rotates"
                 : "Drag to move · R rotates 15° (Shift+R 90°) · arrows nudge · Delete unmounts or deletes · Alt-drag places freely";
         });
@@ -245,7 +246,15 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
     FrameworkElement CameraButtons()
     {
-        var row = UI.HStack(6);
+        var stage = _viewport!.Stage;
+        var hint = new Border
+        {
+            Child = UI.Text("WASD move · Q/E down/up · drag to look · Shift faster · Esc lands", Font.Caption).Secondary(),
+            Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(14),
+            Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"), VerticalAlignment = VerticalAlignment.Bottom,
+        };
+        hint.Bind(stage, nameof(IEditorStage.Fly), h => h.Visible(stage.Fly));
+        var row = UI.HStack(6, hint);
         var buttons = new List<ToggleButton>();
         foreach (var (preset, symbol) in EditorViewport.CameraPresets)
         {
@@ -261,6 +270,16 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             };
             buttons.Add(b);
             row.Children.Add(b);
+        }
+        if (stage.CanFly)
+        {
+            var fly = new ToggleButton
+            {
+                Content = UI.Icon("figure.walk.motion", 14), Padding = new Thickness(8, 6, 8, 6),
+                Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"),
+            }.Tooltip("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom.");
+            fly.Click += (_, _) => stage.Fly = !stage.Fly;
+            row.Children.Add(fly.Bind(stage, nameof(IEditorStage.Fly), f => f.IsChecked = stage.Fly));
         }
         row.VerticalAlignment = VerticalAlignment.Bottom;
         return row;

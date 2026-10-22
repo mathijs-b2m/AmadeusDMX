@@ -9,9 +9,8 @@ public sealed class EditorViewport
     public static Func<IEditorStage> MakeStage { get; set; } =
         () => D3DEditorStage.Available ? new D3DEditorStage() : new PlaceholderStage();
 
-    /// The camera buttons under the stage (Swift: CameraPreset .plan, .drone, .frontOfHouse, .side and their symbols).
-    public static readonly (string Preset, string Symbol)[] CameraPresets =
-        [("Plan", "square.grid.3x3"), ("Drone", "airplane"), ("Front of House", "person.2"), ("Side", "arrow.left.and.right")];
+    /// The camera buttons under the stage: every CameraPreset, as in the show (Swift: CameraButtons).
+    public static IReadOnlyList<(string RawValue, string Symbol)> CameraPresets => StageSettings.Presets;
 
     readonly RigEditorModel _editor;
     public IEditorStage Stage { get; }

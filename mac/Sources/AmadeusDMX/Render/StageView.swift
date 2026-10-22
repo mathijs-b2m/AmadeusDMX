@@ -1,6 +1,7 @@
 // SwiftUI ↔ Metal: the stage view with trackpad/mouse camera control.
 //   drag: orbit · ⌥-drag or two-finger drag with ⌘: pan · scroll / pinch: zoom · double-click: back to the preset
-//   the show also walks and flies: WASD/arrows move, Q/E down/up, +/− zoom, F flies (drag looks around), Esc lands
+//   it also walks and flies: WASD/arrows move, Q/E down/up, +/− zoom, F flies (drag looks around), Esc lands
+//   (in the rig editor its own keys come first, except while flying: then the camera's do)
 import AppKit
 import AmadeusKit
 import MetalKit
@@ -117,8 +118,9 @@ final class StageMTKView: MTKView {
     }
 
     override func keyDown(with e: NSEvent) {
+        if renderer?.fly == true, flyKey(e) { return }  // flying: the camera's keys first (Esc lands)
         if editor?.key(e) == true { return }
-        if editor == nil, flyKey(e, down: true) { return }
+        if flyKey(e) { return }
         super.keyDown(with: e)
     }
 
@@ -132,8 +134,8 @@ final class StageMTKView: MTKView {
         return super.resignFirstResponder()
     }
 
-    /// The show's walking and flying keys (not the rig editor's: its keys edit the rig).
-    private func flyKey(_ e: NSEvent, down: Bool) -> Bool {
+    /// The walking and flying keys, the same in the show and the rig editor.
+    private func flyKey(_ e: NSEvent) -> Bool {
         guard let renderer, e.modifierFlags.isDisjoint(with: [.command, .control]) else { return false }
         if StageRenderer.Key.movement.contains(e.keyCode) {
             renderer.heldKeys.insert(e.keyCode)
