@@ -16,7 +16,7 @@ from pathlib import Path
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry, store
 from amadeus.rig.automount import automount
-from amadeus.rig.importer import layout, mvr, pdf, resolve, sheet
+from amadeus.rig.importer import layout, mvr, pdf, resolve, sheet, underlay
 from amadeus.rig.importer.draft import Draft, Note
 
 READERS = {
@@ -34,18 +34,19 @@ class Result:
     set_doc: dict
     rig_doc: dict
     notes: list[Note] = field(default_factory=list)
+    pages: dict[str, bytes] = field(default_factory=dict)  # the drawings under the rig, by file name
 
     def report(self) -> list[dict]:
         return [{"level": n.level, "text": n.text, "ids": n.ids} for n in self.notes]
 
 
-def read(files: list[Path], client=None) -> Draft:
+def read(files: list[Path], client=None, progress=None) -> Draft:
     """Every file into one draft; the PDFs together (a patch in one, its drawings in another)."""
     draft = Draft()
     pdfs = [p for p in files if p.suffix.lower() == ".pdf"]
     if pdfs:
         try:
-            draft.merge(pdf.read(pdfs, client))
+            draft.merge(pdf.read(pdfs, client, progress))
         except (OSError, ValueError, KeyError) as e:
             draft.note("missing", f"{', '.join(p.name for p in pdfs)}: couldn't be read ({e})")
     for p in files:
@@ -62,12 +63,16 @@ def read(files: list[Path], client=None) -> Draft:
     return draft
 
 
-def build(files: list[Path], name: str, client=None) -> Result:
-    draft = read(files, client)
+def build(files: list[Path], name: str, client=None, progress=None) -> Result:
+    """`progress(text)` hears each step (reading with AI takes a while)."""
+    draft = read(files, client, progress)
+    if progress and draft.items:
+        progress("Finding the fixtures in the libraries and hanging them…")
     if not draft.items:
         return Result({"fixtures": []}, {"trusses": [], "placements": {}}, draft.notes)
     choices = resolve.resolve(draft)
     set_doc, rig_doc = layout.build(draft, choices, name)
+    pages = underlays(draft, set_doc, rig_doc, name)
     by_id = {f["id"]: i for i, f in enumerate(set_doc["fixtures"])}
     for c in {id(c): c for c in choices.values()}.values():
         who = [f["id"] for f in set_doc["fixtures"] if choices[by_id[f["id"]]] is c]
@@ -98,7 +103,27 @@ def build(files: list[Path], name: str, client=None) -> Result:
     if not any(it.address for it in draft.items):
         draft.note("missing", "No DMX patch in the documents: give the fixtures their addresses on the Set page")
     draft.notes += checks(store.compose(set_doc, rig_doc, name))
-    return Result(set_doc, rig_doc, draft.notes)
+    return Result(set_doc, rig_doc, draft.notes, pages)
+
+
+def underlays(draft: Draft, set_doc: dict, rig_doc: dict, name: str) -> dict[str, bytes]:
+    """The plans fixtures were placed from, as the rig's drawings (underlay.py); returns their pages by file."""
+    spots: dict[int, dict] = {}
+    for f, it in zip(set_doc["fixtures"], draft.items):
+        if it.page:
+            spots.setdefault(it.page[0], {})[f["id"]] = [round(it.page[1], 5), round(it.page[2], 5)]
+    pages, out = {}, []
+    for i, u in enumerate(draft.underlays):
+        if i not in spots or "a" not in u:
+            continue
+        file = underlay.page_name(u["pdf"])
+        pages[file] = u["pdf"]
+        out.append({"id": f"u{len(out) + 1}", "title": u["title"], "source": u["source"], "file": file,
+                    "w": u["w"], "h": u["h"], "set": name, "a": u["a"], "b": u["b"], "a_m": u["a_m"],
+                    "b_m": u["b_m"], "fixtures": spots[i]})  # fmt: skip
+    if out:
+        rig_doc["underlays"] = out
+    return pages
 
 
 def checks(merged: dict) -> list[Note]:
@@ -130,5 +155,7 @@ def checks(merged: dict) -> list[Note]:
 
 def save(result: Result, name: str) -> None:
     """Write the set and the rig as `name` (both)."""
+    for data in result.pages.values():
+        underlay.save_page(data)
     store.sets.save(name, result.set_doc)
     store.rigs.save(name, result.rig_doc)

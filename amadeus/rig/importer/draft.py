@@ -25,6 +25,7 @@ class Item:
     hanging: bool | None = None  # upside down under a truss (None: the document doesn't say)
     where: str = ""  # a position the document names ("Truss 1", "hall", "floor")
     source: str = ""  # which file (and row or node), for the report
+    page: tuple[int, float, float] | None = None  # placed from a drawing: (its underlay, x, y on the page 0..1)
 
 
 @dataclass
@@ -42,6 +43,7 @@ class Draft:
     trusses: list[dict] = field(default_factory=list)  # named structure from the document: {name, s, y, z, dir}
     notes: list[Note] = field(default_factory=list)
     stage: dict = field(default_factory=dict)  # what the documents say: width_m, depth_m, ceiling_m (grid)
+    underlays: list[dict] = field(default_factory=list)  # the plans fixtures were placed from (underlay.py)
 
     def note(self, level: str, text: str, ids: list[str] | None = None) -> None:
         self.notes.append(Note(level, text, ids or []))
@@ -51,3 +53,8 @@ class Draft:
         self.trusses += other.trusses
         self.notes += other.notes
         self.stage.update({k: v for k, v in other.stage.items() if v})
+        n = len(self.underlays)
+        for it in other.items:
+            if it.page:
+                it.page = (it.page[0] + n, it.page[1], it.page[2])
+        self.underlays += other.underlays

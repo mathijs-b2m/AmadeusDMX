@@ -37,6 +37,10 @@ GET  /api/devices            your DMX devices (config/devices.json) and the USB 
 POST /api/devices            {"devices": [...]}: save them (a set maps its universes onto them: "dmx")
 GET  /api/limiter            the brightness limiter: {"level": 0.05..1} (1: off)
 POST /api/limiter            {"level": 0.7}: limit every light to that, in every running engine
+POST /api/import             {"name", "files": [{"name", "data"}]}: build a set and rig from documents (a job)
+GET  /api/import?job=…       how that import is going; its report when done
+GET  /api/underlays?rig=…    the drawings under a rig; /api/underlay/page?file=… one's page (PDF)
+POST /api/underlay/align     {"rig", "id", "a", "b", "width_m"}: line a drawing up (web/importer.py)
 """
 
 from __future__ import annotations
@@ -51,11 +55,11 @@ import time
 from urllib.parse import parse_qs, urlsplit
 
 from amadeus import paths
-from amadeus.web import library, placement, rig
+from amadeus.web import importer, library, placement, rig
 from amadeus.web.events import event
 
-GET = {**rig.GET, **library.GET, **placement.GET}
-POST = {**rig.POST, **library.POST, **placement.POST}
+GET = {**rig.GET, **library.GET, **placement.GET, **importer.GET}
+POST = {**rig.POST, **library.POST, **placement.POST, **importer.POST}
 QUIET = {"/api/log"}  # not logged as a request (they log themselves)
 
 
@@ -137,9 +141,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             ms = (time.monotonic() - getattr(self, "_t0", time.monotonic())) * 1000
             event(f"{self.client} {self.command} {self.path[:80]} -> {status} ({ms:.0f} ms) {_summary(obj)}")
         page = isinstance(obj, str)  # a page (the hang sheet), not JSON
-        data = obj.encode() if page else json.dumps(obj).encode()
+        pdf = isinstance(obj, bytes)  # a drawing's page (an underlay)
+        data = obj if pdf else obj.encode() if page else json.dumps(obj).encode()
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8" if page else "application/json")
+        kind = "application/pdf" if pdf else "text/html; charset=utf-8" if page else "application/json"
+        self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -152,6 +158,8 @@ def _summary(obj) -> str:
         return f"{len(obj)} items"
     if isinstance(obj, str):
         return f"{len(obj)} bytes of html"
+    if isinstance(obj, bytes):
+        return f"{len(obj)} bytes"
     return ""
 
 

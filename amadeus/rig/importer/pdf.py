@@ -216,8 +216,10 @@ def label_key(text: str) -> str:
     return re.sub(r"[^0-9a-z]", "", t.lower())
 
 
-def read(files: list[Path], client=None) -> Draft:
-    """Every PDF of an import together (a patch in one file, its drawings in another)."""
+def read(files: list[Path], client=None, progress=None) -> Draft:
+    """Every PDF of an import together (a patch in one file, its drawings in another). `progress(text)` hears
+    what is being read."""
+    say = progress or (lambda text: None)
     d = Draft()
     if not has_key():
         for p in files:
@@ -238,6 +240,7 @@ def read(files: list[Path], client=None) -> Draft:
     if not text:
         d.note("missing", "No patch list in the PDFs: the fixtures can't be known from drawings alone")
         return d
+    say("Reading the patch list and the rider with AI…")
     patch = _ask(
         client, [{"type": "input_text", "text": TEXT_PROMPT + "\n\n" + "\n\n".join(text)}], TEXT_SCHEMA, "patch"
     )
@@ -260,7 +263,8 @@ def read(files: list[Path], client=None) -> Draft:
         labels=f" The patch has these numbers and addresses, look for each: {', '.join(labels)}." if labels else "",
     )
     placed = 0
-    for p, n in drawings:
+    for k, (p, n) in enumerate(drawings, 1):
+        say(f"Reading drawing {k} of {len(drawings)} with AI…")
         url, w, h = page_pdf(p, n)
         content = [
             {"type": "input_text", "text": prompt},
@@ -269,9 +273,14 @@ def read(files: list[Path], client=None) -> Draft:
         plans = _ask(client, content, PLOT_SCHEMA, "plot").get("plans", [])
         if not plans:
             d.note("ok", f"{p.name} page {n}: no plan (a view or other drawing): not used for positions")
+        page = base64.b64decode(url.split(",", 1)[1])
         for plan in plans:
             where = f"{p.name} page {n}" + (f" ({plan['title']})" if plan.get("title") else "")
-            placed += place(plan, w, h, stage, by_key, d, where)
+            under = {"title": plan.get("title") or f"{p.stem} page {n}", "source": where, "pdf": page, "w": w, "h": h}
+            got = place(plan, w, h, stage, by_key, d, where, under, len(d.underlays))
+            if got:
+                d.underlays.append(under)
+            placed += got
     if drawings and not placed:
         d.note("check", "The drawings placed no fixtures (no labels matched the patch): they are auto-mounted")
     d.items += items
@@ -308,8 +317,20 @@ def fixtures(patch: dict, d: Draft) -> list[Item]:
     return items
 
 
-def place(plot: dict, w: float, h: float, stage: dict, by_key: dict[str, Item], d: Draft, where: str) -> int:
-    """Positions for the patch's fixtures from one plan; returns how many were placed."""
+def place(
+    plot: dict,
+    w: float,
+    h: float,
+    stage: dict,
+    by_key: dict[str, Item],
+    d: Draft,
+    where: str,
+    under: dict | None = None,
+    index: int = 0,
+) -> int:
+    """Positions for the patch's fixtures from one plan; returns how many were placed. `under` gets the plan's
+    two reference points (the stage's front edge at its ends) for the drawing under the rig (underlay.py), and
+    each placed item its spot on the page."""
     if plot.get("area") == "other" or not plot.get("symbols"):
         return 0
     aud = plot.get("audience", "bottom")
@@ -369,6 +390,7 @@ def place(plot: dict, w: float, h: float, stage: dict, by_key: dict[str, Item], 
         sx, sy = metres(s["x"], s["y"])
         z = 0.0 if s["floor"] else (hall if sy > 0.5 else grid) - 0.6
         it.pos, it.hanging = (round(sx, 3), round(sy, 3), round(z, 3)), not s["floor"]
+        it.page = (index, s["x"], s["y"])
         placed += 1
     if unknown:
         d.note("check", f"{where}: {unknown} symbols had a label that isn't in the patch")
@@ -386,6 +408,17 @@ def place(plot: dict, w: float, h: float, stage: dict, by_key: dict[str, Item], 
                     "dir": ((bx - ax) / n, (by - ay) / n),
                 }
             )
+    if placed and under is not None:
+
+        def page_at(s_m: float, y_m: float) -> list[float]:  # rig (to stage right of the centre, out) → page
+            a, o = centre - s_m / scale, edge_pt + y_m / scale
+            x, y = {"bottom": (a / w, o / h), "top": (1 - a / w, 1 - o / h),
+                    "left": (1 - o / w, a / h), "right": (o / w, 1 - a / h)}[aud]  # fmt: skip
+            return [round(x, 5), round(y, 5)]
+
+        W = float(width)
+        under.update(a=page_at(-W / 2, 0.0), b=page_at(W / 2, 0.0), a_m=[0.0, 0.0], b_m=[W, 0.0])
     if placed:
-        d.note("check", f"{where}: {placed} fixtures placed from the drawing (positions read by AI: check them)")
+        d.note("check", f"{where}: {placed} fixtures placed from the drawing (positions read by AI: check them; "
+               "line the drawing up in the rig editor if they are off)")  # fmt: skip
     return placed

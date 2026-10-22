@@ -364,3 +364,42 @@ def test_labels_match_however_they_are_written():
     assert label_key("2.169") == label_key("2. 169") == label_key("02.169") == "2.169"
     assert label_key("1.034") == "1.34"
     assert label_key("6.301 / 6.305") == "6.301"
+
+
+def test_a_plan_is_kept_under_the_rig_and_two_clicks_line_it_up(pdfs, monkeypatch):
+    from amadeus.rig.importer import underlay
+
+    monkeypatch.setattr(underlay, "FOLDER", pdfs[0].parent / "underlays")
+    res = importer.build(list(pdfs), "venue", FakeAI(PATCH, [PLAN]))
+    (u,) = res.rig_doc["underlays"]
+    assert set(u["fixtures"]) >= {"diablo101", "diablo102", "par1"} and u["file"] in res.pages
+    # the AI's reference: the stage's ends at x 0.1 and 0.9 of the page, the front edge at y 0.8
+    assert u["a"] == pytest.approx([0.9, 0.8], abs=0.01) and u["b"] == pytest.approx([0.1, 0.8], abs=0.01)
+    assert underlay.to_rig(u, 0.9, 0.8) == pytest.approx((0.0, 0.0), abs=0.05)  # stage left at the front edge
+    places = res.rig_doc["placements"]["venue"]
+    before = places["diablo101"]["x"] * 14, places["diablo101"]["y_m"]
+    # lined up again: the stage really runs from x 0.3 to 0.7 of the page: everything is twice as far apart
+    underlay.align(res.rig_doc, u["id"], [0.7, 0.8], [0.3, 0.8], 14.0)
+    after = places["diablo101"]["x"] * 14, places["diablo101"]["y_m"]
+    assert after[1] == pytest.approx(before[1] * 2, rel=0.05)  # upstage twice as far
+    assert after[0] - 7 == pytest.approx((before[0] - 7) * 2, abs=0.3)
+    truss = next(t for t in res.rig_doc["trusses"] if t["id"] == places["diablo101"]["truss"])
+    assert truss["y_m"] == pytest.approx(after[1] + 0.0, abs=0.6)  # the truss went with them
+    underlay.save_page(res.pages[u["file"]])
+    assert underlay.page_bytes(u["file"]).startswith(b"%PDF")
+    with pytest.raises(FileNotFoundError):
+        underlay.page_bytes("../../secret.pdf")
+
+
+def test_the_corners_turn_with_the_drawing():
+    from amadeus.rig.importer import underlay
+
+    u = {"w": 100, "h": 100, "a": [0.0, 1.0], "b": [1.0, 1.0], "a_m": [0.0, 0.0], "b_m": [10.0, 0.0]}
+    # stage left at the page's left, stage right at its right: the performer faces up the page, so the
+    # audience is at its top (and a plan drawn the usual way, audience at the bottom, has stage left on the right)
+    tl, tr, br, bl = underlay.corners(u)
+    assert bl == pytest.approx((0.0, 0.0)) and br == pytest.approx((10.0, 0.0))
+    assert tl == pytest.approx((0.0, 10.0)) and tr == pytest.approx((10.0, 10.0))
+    u.update(a=[1.0, 0.0], b=[0.0, 0.0])  # the usual way: stage left at the top right, the audience below
+    tl, tr, br, bl = underlay.corners(u)
+    assert tr == pytest.approx((0.0, 0.0)) and tl == pytest.approx((10.0, 0.0)) and bl[1] == pytest.approx(10.0)
