@@ -1,4 +1,4 @@
-// The sidebar: the pages, and the engine's state at the bottom.
+// The sidebar: the pages, and at the bottom the engine's state and this version with its updates.
 import AmadeusKit
 import SwiftUI
 
@@ -18,7 +18,13 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) { EngineFooter().padding(10) }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 6) {
+                EngineFooter()
+                VersionFooter()
+            }
+            .padding(10)
+        }
     }
 
     private func badge(_ s: Section) -> Text? {
@@ -97,6 +103,94 @@ struct EngineFooter: View {
     }
 }
 
+/// This version and its updates, under the engine's card: not everybody looks in Settings. A newer one gets its
+/// one click here; the line opens the update settings. It checks by itself only when checking automatically is on,
+/// and never while a show runs.
+struct VersionFooter: View {
+    @Environment(AppModel.self) private var model
+    @State private var showsOptions = false
+
+    var body: some View {
+        let updates = model.updates
+        HStack(spacing: 6) {
+            Button { showsOptions = true } label: {
+                HStack(spacing: 5) {
+                    icon(updates).imageScale(.small)
+                    Text(line(updates)).lineLimit(1).truncationMode(.middle)
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .help(updates.isAvailable ? "Updates: this version, the newest, and whether to check by itself"
+                                      : "A development build: it updates with the code, not by itself")
+            .popover(isPresented: $showsOptions, arrowEdge: .trailing) { options(updates) }
+            switch updates.state {
+            case .available(let v):
+                Button("Update to \(v)") { updates.installNewest() }
+                    .buttonStyle(.borderedProminent).controlSize(.small).disabled(!updates.canCheck)
+                    .help("Downloads Amadeus DMX \(v) and installs it; Amadeus DMX starts again")
+            case .downloading(_, let share):
+                if let share { ProgressView(value: share).frame(width: 50) } else { ProgressView().controlSize(.mini) }
+                Button { updates.cancelInstall() } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).help("Stop the download")
+            default:
+                EmptyView()
+            }
+        }
+        .padding(.horizontal, 6)
+        .onAppear { refresh() }
+        .onChange(of: model.engineRunning) { _, running in if !running { refresh() } }
+    }
+
+    /// The sidebar's own check: only with checking automatically on (opt-in), never during a show.
+    private func refresh() {
+        let updates = model.updates
+        if updates.isAvailable, updates.checksAutomatically, !model.engineRunning { updates.refresh() }
+    }
+
+    private func line(_ u: Updates) -> String {
+        guard u.isAvailable else { return "Amadeus DMX \(u.version) · development build" }
+        switch u.state {
+        case .available(let v): return "\(u.version) · \(v) is available"
+        case .downloading(let v, _): return "Downloading \(v)…"
+        case .installing(let v): return u.waitingForIdle ? "\(v) installs when the show stops" : "Installing \(v)…"
+        case .checking: return "Amadeus DMX \(u.version) · checking…"
+        case .upToDate: return "Amadeus DMX \(u.version) · up to date"
+        case .failed: return "Amadeus DMX \(u.version) · couldn't check"
+        case .unknown: return "Amadeus DMX \(u.version)"
+        }
+    }
+
+    @ViewBuilder private func icon(_ u: Updates) -> some View {
+        switch u.isAvailable ? u.state : .unknown {
+        case .available: Image(systemName: "arrow.down.circle.fill").foregroundStyle(.orange)
+        case .upToDate: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        case .installing: Image(systemName: u.waitingForIdle ? "clock" : "arrow.triangle.2.circlepath")
+        default: Image(systemName: "info.circle")
+        }
+    }
+
+    @ViewBuilder private func options(_ u: Updates) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if u.isAvailable {
+                UpdateStatusView(updates: u, appName: "Amadeus DMX", whenIdle: "when the show stops")
+                Divider()
+                UpdateToggles(updates: u)
+                Text(UpdateToggles.rules).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Amadeus DMX \(u.version)").font(.headline)
+                Text("A development build: it updates with the code, not by itself.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(width: 340)
+    }
+}
 
 /// What the show costs the computer: the lights against the 3D stage.
 struct PowerLine: View {

@@ -105,9 +105,10 @@ public sealed class UpdatesSection(AppModel model)
             Form.Row("Download and install updates by themselves", installs),
             UpdateStatusView.Build(updates, "Amadeus DMX", "when the show stops"),
         };
-        return Form.Section("Updates", rows,
-            "Never during a show: no check while the lights run, and an update you install then waits until the show stops. One downloaded by itself is installed when you quit. Your sets, rigs and packs stay as they are.");
+        return Form.Section("Updates", rows, Rules);
     }
+
+    public const string Rules = "Never during a show: no check while the lights run, and an update you install then waits until the show stops. One downloaded by itself is installed when you quit. Your sets, rigs and packs stay as they are.";
 }
 
 /// The optional packs (amadeus/cli/packs.py): what each adds, and installing it.

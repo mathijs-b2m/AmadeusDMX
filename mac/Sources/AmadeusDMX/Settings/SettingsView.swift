@@ -86,20 +86,12 @@ struct GeneralSettings: View {
 /// Updates (Sparkle, App/Updates.swift): whether to check and install by itself, and checking now.
 struct UpdatesSection: View {
     @Environment(AppModel.self) private var model
-    @State private var checks = false
-    @State private var installs = false
 
     var body: some View {
         let updates = model.updates
         SwiftUI.Section {
             if updates.isAvailable {
-                Toggle("Check for updates automatically", isOn: Binding(get: { checks }, set: {
-                    updates.checksAutomatically = $0; checks = $0
-                }))
-                Toggle("Download and install updates by themselves", isOn: Binding(get: { installs }, set: {
-                    updates.installsAutomatically = $0; installs = $0
-                }))
-                .disabled(!checks)
+                UpdateToggles(updates: updates)
                 UpdateStatusView(updates: updates, appName: "Amadeus DMX", whenIdle: "when the show stops")
             } else {
                 LabeledContent("Amadeus DMX \(updates.version)") {
@@ -109,10 +101,27 @@ struct UpdatesSection: View {
         } header: {
             Text("Updates")
         } footer: {
-            if updates.isAvailable {
-                Text("Never during a show: no check while the lights run, and an update you install then waits until the show stops. One downloaded by itself is installed when you quit. Your sets, rigs and packs stay as they are.")
-            }
+            if updates.isAvailable { Text(UpdateToggles.rules) }
         }
+    }
+}
+
+/// Whether to check and install by itself (Settings › General and the sidebar's version line).
+struct UpdateToggles: View {
+    let updates: Updates
+    @State private var checks = false
+    @State private var installs = false
+
+    static let rules = "Never during a show: no check while the lights run, and an update you install then waits until the show stops. One downloaded by itself is installed when you quit. Your sets, rigs and packs stay as they are."
+
+    var body: some View {
+        Toggle("Check for updates automatically", isOn: Binding(get: { checks }, set: {
+            updates.checksAutomatically = $0; checks = $0
+        }))
+        Toggle("Download and install updates by themselves", isOn: Binding(get: { installs }, set: {
+            updates.installsAutomatically = $0; installs = $0
+        }))
+        .disabled(!checks)
         .onAppear {
             checks = updates.checksAutomatically
             installs = updates.installsAutomatically
