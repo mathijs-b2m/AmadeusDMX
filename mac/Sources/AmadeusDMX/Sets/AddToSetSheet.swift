@@ -45,7 +45,7 @@ struct AddToSetSheet: View {
                     Image(systemName: icon(e)).frame(width: 22).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(e.manufacturer) \(e.model)")
-                        Text([e.type, e.look, e.isLocal ? "in your library" : e.source?.uppercased()].compactMap { $0 }.joined(separator: " · "))
+                        Text([e.type, e.look, e.isLocal ? "in your library" : e.source?.uppercased()].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -82,7 +82,7 @@ struct AddToSetSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Add \(count) to the Set") { Task { await add() } }
+                Button(key == nil ? "Add to the Set" : "Add \(count) to the Set") { Task { await add() } }  // a number once one is chosen
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(key == nil || mode.isEmpty || busy)

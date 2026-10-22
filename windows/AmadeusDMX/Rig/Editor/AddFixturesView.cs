@@ -47,7 +47,7 @@ public sealed class AddFixturesView(AppModel model, RigEditorModel editor)
             list.Items.Clear();
             foreach (var r in _results)
             {
-                var detail = string.Join(" · ", new[] { r.Type, r.IsLocal ? "in your library" : r.Source?.ToUpperInvariant() }.OfType<string>());
+                var detail = string.Join(" · ", new[] { r.Type, r.IsLocal ? "in your library" : r.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0));
                 list.Items.Add(new ListViewItem { Content = UI.VStack(0, UI.Text($"{r.Manufacturer} {r.Model}"), UI.Text(detail, Font.Caption).Secondary()), Tag = r });
             }
         };

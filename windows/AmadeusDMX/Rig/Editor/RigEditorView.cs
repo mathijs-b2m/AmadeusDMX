@@ -29,12 +29,18 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         stage.Children.Add(UI.VStack(8, Toolbar(),
             EditorUI.Keyed(editor, () => (editor.ChangedOnDisk is null).ToString(), () => editor.ChangedOnDisk is null ? null : ChangedOnDisk()))
             .Align(VerticalAlignment.Top).Margin(12, 12, 12, 0));
-        var bottom = UI.HStack(8,
-            EditorUI.Keyed(editor, () => editor.Check is null ? "hint" : "check",
-                           () => editor.Check is null ? Hint() : new HangCheckPanel(editor, _host).Build()),
-            UI.Spacer(),
-            CameraButtons()).Align(VerticalAlignment.Bottom).Margin(12, 0, 12, 12);
-        bottom.Alignment = 1;  // to the bottom, like HStack(alignment: .bottom)
+        // the hint (or the check) on the left, wrapping in a narrow window; the camera buttons always in view
+        var bottom = new Grid { ColumnSpacing = 8, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(12, 0, 12, 12) };
+        bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var info = EditorUI.Keyed(editor, () => editor.Check is null ? "hint" : "check",
+                                  () => editor.Check is null ? Hint() : new HangCheckPanel(editor, _host).Build());
+        info.VerticalAlignment = VerticalAlignment.Bottom;
+        info.HorizontalAlignment = HorizontalAlignment.Left;
+        var cameras = CameraButtons();
+        Grid.SetColumn(cameras, 1);
+        bottom.Children.Add(info);
+        bottom.Children.Add(cameras);
         stage.Children.Add(bottom);
 
         var inspector = new EditorInspector(model, editor).Build();
@@ -144,7 +150,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
     UIElement BuildToolbar()
     {
         var d = editor.Doc;
-        var row = UI.HStack(8);
+        var row = new FlowPanel { Spacing = 8, LineSpacing = 8 };  // the tools wrap in a narrow window; Save stays in view
         row.Children.Add(new RigMenu(model, editor).Build());
         row.Children.Add(ToolPicker());
         if (editor.Tool == EditorTool.Truss)
@@ -199,12 +205,21 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
                                     "Show or hide the zones (a selected zone always shows)"));
         row.Children.Add(IconToggle("squareshape.split.3x3", editor.Snap, v => editor.Snap = v,
                                     "Snap to the 25 cm grid and onto trusses (hold Alt while dragging to place freely)"));
-        row.Children.Add(UI.Spacer());
-        if (editor.Busy) row.Children.Add(UI.Spinner());
-        row.Children.Add(UI.Text("", Font.Callout).Secondary().Bind(editor, nameof(RigEditorModel.Message), t => t.Text = editor.Message ?? ""));
-        row.Children.Add(UI.Button("Revert", editor.Revert).Disabled(!editor.IsDirty));
-        row.Children.Add(UI.Button("Save", Save).Prominent().Disabled(!editor.IsDirty).Tooltip("Save the rig, and where the set hangs on it (Ctrl+S)"));
-        return row;
+        var end = UI.HStack(8);
+        if (editor.Busy) end.Children.Add(UI.Spinner());
+        var message = UI.Text("", Font.Callout).Secondary().Bind(editor, nameof(RigEditorModel.Message), t => t.Text = editor.Message ?? "");
+        message.MaxWidth = 240;
+        end.Children.Add(message);
+        end.Children.Add(UI.Button("Revert", editor.Revert).Disabled(!editor.IsDirty));
+        end.Children.Add(UI.Button("Save", Save).Prominent().Disabled(!editor.IsDirty).Tooltip("Save the rig, and where the set hangs on it (Ctrl+S)"));
+        end.VerticalAlignment = VerticalAlignment.Top;
+        var bar = new Grid { ColumnSpacing = 8 };
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(end, 1);
+        bar.Children.Add(row);
+        bar.Children.Add(end);
+        return bar;
     }
 
     /// Select · Draw Truss · Place Tower (a segmented picker of symbols).
@@ -337,6 +352,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
     FrameworkElement Hint()
     {
         var text = UI.Text("", Font.Caption);
+        text.TextWrapping = TextWrapping.Wrap;
         var pill = new Border
         {
             Child = text, Padding = new Thickness(10, 6, 10, 6), CornerRadius = new CornerRadius(14),

@@ -33,7 +33,7 @@ struct AddFixturesView: View {
             List(results, selection: Binding(get: { chosen?.key }, set: { k in chosen = results.first { $0.key == k } })) { e in
                 VStack(alignment: .leading) {
                     Text("\(e.manufacturer) \(e.model)")
-                    Text([e.type, e.isLocal ? "in your library" : e.source?.uppercased()].compactMap { $0 }.joined(separator: " · "))
+                    Text([e.type, e.isLocal ? "in your library" : e.source?.uppercased()].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

@@ -46,7 +46,7 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
                 UI.Icon(AddToSetSheet.Icon(e)).Secondary().Frame(width: 22),
                 UI.VStack(1,
                     UI.Text($"{e.Manufacturer} {e.Model}"),
-                    UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? "in your library" : e.Source?.ToUpperInvariant() }.OfType<string>()),
+                    UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? "in your library" : e.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0)),
                             Font.Caption).Secondary()).Grow(),
                 UI.Button("Add", () =>
                 {
