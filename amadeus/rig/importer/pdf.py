@@ -260,7 +260,7 @@ def read(files: list[Path], client=None, progress=None) -> Draft:
     d.stage = {
         "width_m": stage.get("width_m") or stage.get("usable_width_m"),
         "depth_m": stage.get("depth_m"),
-        "ceiling_m": (stage.get("grid_height_m") or 0) + (stage.get("deck_height_m") or 0) or None,
+        "ceiling_m": stage["grid_height_m"] + (stage.get("deck_height_m") or 0) if stage.get("grid_height_m") else None,
         "deck_m": stage.get("deck_height_m"),
     }
     sizes = ", ".join(f"{k.replace('_m', '').replace('_', ' ')} {v:g} m" for k, v in stage.items() if v)

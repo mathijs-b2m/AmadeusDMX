@@ -480,3 +480,14 @@ def test_a_raised_stage_lifts_what_stands_on_it():
     full = geometry.stage({"stage": st})
     assert geometry.beam_end([4.0, -2.0, 6.0], np.array([0.0, 0.0, -1.0]), full)[0][2] == pytest.approx(1.5)
     assert geometry.beam_end([4.0, 3.0, 6.0], np.array([0.0, 0.0, -1.0]), full)[0][2] == pytest.approx(0.0)
+
+
+def test_what_stands_on_a_raised_stage_stands_on_its_deck_not_in_it(pdfs):
+    # the documents give the stage's height but not its grid: the ceiling isn't the deck, and a head drawn on
+    # the deck stands on it (its height is its tilt axis), not with its base sunk into the stage
+    patch = {**PATCH, "stage": {**PATCH["stage"], "grid_height_m": None}}
+    plan = {**PLAN, "symbols": [{**PLAN["symbols"][0], "floor": True}] + PLAN["symbols"][1:]}
+    res = importer.build(list(pdfs), "venue", FakeAI(patch, [plan]))
+    pl, st = res.rig_doc["placements"]["venue"], res.rig_doc["stage"]
+    assert pl["diablo101"]["mount"] == "floor" and pl["diablo101"]["z_m"] == pytest.approx(1.5 + 0.3)
+    assert st["ceiling_m"] > max(p["z_m"] for p in pl.values())

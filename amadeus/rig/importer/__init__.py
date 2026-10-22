@@ -16,7 +16,7 @@ from pathlib import Path
 
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry, store
-from amadeus.rig.automount import automount
+from amadeus.rig.automount import automount, role
 from amadeus.rig.importer import layout, mvr, pdf, resolve, sheet, underlay
 from amadeus.rig.importer.draft import Draft, Note
 
@@ -115,12 +115,13 @@ def mount_waiting(merged: dict, waiting: list[str], draft: Draft, set_doc: dict)
     floor" in a row at the back of the stage, "hall"/"front"/"balcony" ones on the trusses over the crowd, the rest
     on the stage's trusses (each group on all trusses when its own kind has none)."""
     where = {f["id"]: it.where for f, it in zip(set_doc["fixtures"], draft.items)}
+    kinds = {f["id"]: role(fxlib.get(f["fixture"])) for f in set_doc["fixtures"]}
     places: dict[str, dict] = {}
     floor = [f for f in waiting if FLOOR.search(where.get(f, "")) and not HALL.search(where.get(f, ""))]
     depth = float(draft.stage.get("depth_m") or 4.0)
     for k, fid in enumerate(floor):  # spread along the back of the stage
         places[fid] = {"x": round((k + 1) / (len(floor) + 1), 4), "y_m": round(-depth + 0.8, 2),
-                       "z_m": float(draft.stage.get("deck_m") or 0.0),
+                       "z_m": float(draft.stage.get("deck_m") or 0.0) + layout.lift(kinds[fid]),
                        "mount": "floor"}  # fmt: skip
     rest = [f for f in waiting if f not in places]
     groups = {
