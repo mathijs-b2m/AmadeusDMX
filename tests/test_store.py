@@ -235,3 +235,23 @@ def test_mounting_new_fixtures_leaves_a_small_room_as_it_is():
     xs = sorted(p["x"] for p in places.values())
     assert all(min(abs(x - 0.1), abs(x - 0.9)) > 0.15 for x in xs)  # not on top of the ones already there
     assert all(p["mount"] == "stand" for p in places.values())
+
+
+def test_an_example_added_later_comes_in_once(config, monkeypatch):
+    examples = config / "examples"
+    for folder in ("sets", "rigs"):
+        (examples / folder).mkdir(parents=True)
+        (examples / folder / "showcase.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(store, "EXAMPLES", examples)
+    (config / "sets" / "mine.json").write_text("{}", encoding="utf-8")  # a folder from before .examples
+    assert store.sets.names() == ["mine"]  # showcase shipped then: this folder had it and deleted it
+    assert store.rigs.names() == ["showcase"]  # a first run
+
+    (examples / "sets" / "venue.json").write_text("{}", encoding="utf-8")  # a later version adds an example
+    (examples / "rigs" / "venue.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(store._prepare, "done", False)
+    assert store.sets.names() == ["mine", "venue"] and store.rigs.names() == ["showcase", "venue"]
+
+    (config / "sets" / "venue.json").unlink()  # deleted stays deleted
+    monkeypatch.setattr(store._prepare, "done", False)
+    assert store.sets.names() == ["mine"]

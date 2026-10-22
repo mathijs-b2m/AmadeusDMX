@@ -32,6 +32,7 @@ ACTIVE_SET = paths.CONFIG / "active-set"
 ACTIVE_RIG = paths.CONFIG / "active-rig"
 LEGACY_RIG_FILE = paths.CONFIG / "rig.json"
 EXAMPLES = paths.EXAMPLES
+EXAMPLES_BEFORE_RECORD = {"showcase", "concert", "concert60", "encore60", "fuze24"}  # shipped before .examples
 FIRST = "showcase"  # what a fresh checkout starts with
 
 # what belongs to the rig (the venue) rather than the set (the gear)
@@ -312,17 +313,34 @@ def _prepare():
     for p in sorted(SETS_DIR.glob("*.json")):
         migrate_set_file(p)
     for kind, folder in ((sets, "sets"), (rigs, "rigs")):
-        if not any(kind.folder.glob("*.json")) and (EXAMPLES / folder).exists():
-            kind.folder.mkdir(parents=True, exist_ok=True)
-            for example in (EXAMPLES / folder).glob("*.json"):
-                if not (kind.folder / example.name).exists():
-                    shutil.copy(example, kind.folder / example.name)
-            if not kind.active_file.exists() and (kind.folder / f"{FIRST}.json").exists():
-                kind.active_file.write_text(FIRST + "\n", encoding="utf-8")
+        if (EXAMPLES / folder).exists():
+            _add_new_examples(kind, EXAMPLES / folder)
     if not ACTIVE_RIG.exists() and ACTIVE_SET.exists():  # migrated: the rig that came out of the active set
         name = ACTIVE_SET.read_text(encoding="utf-8").strip()
         if (RIGS_DIR / f"{name}.json").exists():
             ACTIVE_RIG.write_text(name + "\n", encoding="utf-8")
+
+
+def _add_new_examples(kind: _Kind, examples: Path):
+    """Copy in the examples this folder hasn't had yet: all of them on a first run, and an example a later
+    version adds, once. The folder's .examples remembers what it was given, so a deleted example stays gone."""
+    record = kind.folder / ".examples"
+    names = sorted(p.stem for p in examples.glob("*.json"))
+    if record.exists():
+        given = set(record.read_text(encoding="utf-8").split())
+        if given.issuperset(names):
+            return
+    elif any(kind.folder.glob("*.json")):  # a folder from before .examples had what shipped then
+        given = {p.stem for p in kind.folder.glob("*.json")} | EXAMPLES_BEFORE_RECORD
+    else:
+        given = set()
+    kind.folder.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        if name not in given and not (kind.folder / f"{name}.json").exists():
+            shutil.copy(examples / f"{name}.json", kind.folder / f"{name}.json")
+    record.write_text("".join(f"{n}\n" for n in sorted(given | set(names))), encoding="utf-8")
+    if not kind.active_file.exists() and (kind.folder / f"{FIRST}.json").exists():
+        kind.active_file.write_text(FIRST + "\n", encoding="utf-8")
 
 
 def is_combined(doc: dict) -> bool:
