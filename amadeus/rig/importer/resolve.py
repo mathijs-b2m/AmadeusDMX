@@ -45,8 +45,11 @@ class Choice:
     why: str = ""  # for the report, when not sure
 
 
+SHORT = {"clr": "color", "col": "color", "colour": "color", "lt": "light", "mh": "moving"}  # as patch lists write
+
+
 def _words(text: str) -> list[str]:
-    return [t for t in _tokens(text) if t not in NOISE]
+    return [SHORT.get(t, t) for t in _tokens(text) if t not in NOISE]
 
 
 def _modes(c: dict) -> dict[str, int]:
@@ -103,6 +106,8 @@ def match(name: str, channels: int, mode: str) -> Choice | None:
         return None
     _, c, m, modes, hit, covered, numbers_ok = best
     fits = not channels or modes.get(m) == channels
+    if channels == 1 and not fits:  # one dimmer channel ("Dim Clr Command"): a light on a dimmer, not that fixture
+        return None
     sure = fits and numbers_ok and hit == 1 and covered == 1
     why = []
     if not numbers_ok or hit < 1 or covered < 1:

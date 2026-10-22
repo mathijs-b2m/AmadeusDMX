@@ -41,6 +41,7 @@ class Draft:
     items: list[Item] = field(default_factory=list)
     trusses: list[dict] = field(default_factory=list)  # named structure from the document: {name, s, y, z, dir}
     notes: list[Note] = field(default_factory=list)
+    stage: dict = field(default_factory=dict)  # what the documents say: width_m, depth_m, ceiling_m (grid)
 
     def note(self, level: str, text: str, ids: list[str] | None = None) -> None:
         self.notes.append(Note(level, text, ids or []))
@@ -49,3 +50,4 @@ class Draft:
         self.items += other.items
         self.trusses += other.trusses
         self.notes += other.notes
+        self.stage.update({k: v for k, v in other.stage.items() if v})

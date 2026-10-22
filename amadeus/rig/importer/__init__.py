@@ -1,10 +1,10 @@
-"""Build a set and a rig from a venue's documents: an MVR scene, patch sheets (CSV, Excel).
+"""Build a set and a rig from a venue's documents: an MVR scene, patch sheets (CSV, Excel), PDFs.
 
 `build(files, name)` reads every file into one draft (`draft.Item` per fixture), finds each type in the library
 (`resolve`), hangs what has a position (`layout`), auto-mounts the rest, and checks the result. It returns the
 set, the rig and a report: what was assumed, what was guessed and should be checked, what is missing. Nothing
-is saved until `save`. These readers need no AI and no account; reading PDFs and drawings (planned) will need
-the user's own OpenAI API key.
+is saved until `save`. MVR files and patch sheets need no AI and no account; PDFs (patch lists, riders, light
+plots) are read with AI and need the user's own OpenAI API key (`pdf`).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pathlib import Path
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry, store
 from amadeus.rig.automount import automount
-from amadeus.rig.importer import layout, mvr, resolve, sheet
+from amadeus.rig.importer import layout, mvr, pdf, resolve, sheet
 from amadeus.rig.importer.draft import Draft, Note
 
 READERS = {
@@ -39,16 +39,21 @@ class Result:
         return [{"level": n.level, "text": n.text, "ids": n.ids} for n in self.notes]
 
 
-def read(files: list[Path]) -> Draft:
+def read(files: list[Path], client=None) -> Draft:
+    """Every file into one draft; the PDFs together (a patch in one, its drawings in another)."""
     draft = Draft()
+    pdfs = [p for p in files if p.suffix.lower() == ".pdf"]
+    if pdfs:
+        try:
+            draft.merge(pdf.read(pdfs, client))
+        except (OSError, ValueError, KeyError) as e:
+            draft.note("missing", f"{', '.join(p.name for p in pdfs)}: couldn't be read ({e})")
     for p in files:
+        if p in pdfs:
+            continue
         reader = READERS.get(p.suffix.lower())
         if reader is None:
-            draft.note(
-                "missing",
-                f"{p.name}: can't read this kind of file yet (MVR, CSV and Excel can be read; "
-                "PDFs and drawings need the AI reader)",
-            )
+            draft.note("missing", f"{p.name}: can't read this kind of file (MVR, PDF, CSV and Excel can be read)")
             continue
         try:
             draft.merge(reader(p))
@@ -57,8 +62,8 @@ def read(files: list[Path]) -> Draft:
     return draft
 
 
-def build(files: list[Path], name: str) -> Result:
-    draft = read(files)
+def build(files: list[Path], name: str, client=None) -> Result:
+    draft = read(files, client)
     if not draft.items:
         return Result({"fixtures": []}, {"trusses": [], "placements": {}}, draft.notes)
     choices = resolve.resolve(draft)
@@ -69,7 +74,7 @@ def build(files: list[Path], name: str) -> Result:
         model = fxlib.get(c.key)
         text = f"{len(who)} × {model['manufacturer']} {model['model']}, mode {c.mode} ({c.footprint} ch)"
         draft.note("ok" if c.sure else "check", text + (f": {c.why}" if c.why else ""), who)
-    if any(it.pos for it in draft.items):
+    if any(it.pos for it in draft.items) and not draft.stage.get("width_m"):
         st = rig_doc["stage"]
         draft.note(
             "check",

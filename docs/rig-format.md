@@ -174,7 +174,17 @@ close: a conventional light plays on one dimmer channel, anything else is made f
 Hanging fixtures go on the drawn trusses, else on trusses found from their rows; fixtures without a position
 are auto-mounted. The report says what was assumed (the frame, the stage size), what is a guess to check (a
 near match, a mode the documents don't name, fixed lights pointing at a wall or the ceiling) and what is
-missing (no patch). Reading PDFs and drawings is planned; it will need your own OpenAI API key.
+missing (no patch).
+
+- **PDFs** (patch lists, the technical rider, light plots) are read with AI and need **your own OpenAI API key**
+  (Settings › OpenAI in the app, or `OPENAI_API_KEY` in `.env`); without one nothing is sent and the report
+  says so. Every page of every PDF is read: the text pages together (every patched fixture, the modes the notes
+  name, the stage's size and heights, house lights left out), each drawing on its own (its plans, the audience
+  side, the stage's edges or the hall's walls for the scale, every fixture symbol and its label, the trusses).
+  The patch says what the fixtures are; a plan places them, matched by number or address. The scale of a plan
+  comes from the sizes the rider gives (the median of what agrees); a plan that doesn't show the stage, like a
+  hall plot, gets a rough scale and the report asks to check it. Answers are cached (`.cache/import`), so
+  importing the same files again costs nothing.
 
 ## Hang sheet
 

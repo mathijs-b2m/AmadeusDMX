@@ -12,6 +12,7 @@ import pytest
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import importer, store
 from amadeus.rig.importer import mvr, resolve, sheet
+from amadeus.rig.importer.draft import Draft
 from tests.mvr_tool import gdtf_bytes, mvr_bytes
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -201,3 +202,165 @@ def test_another_model_number_is_never_sure():
 )
 def test_patch_cells(cell, want):
     assert sheet.patch(cell) == want
+
+
+# ------------------------------------------------------------------ PDFs (read with AI): recorded answers, no key
+
+
+class FakeAI:
+    """Answers the patch and plan questions with what a model said; counts the requests."""
+
+    def __init__(self, patch: dict, plans: list[dict]):
+        self.answers = {"patch": patch, "plot": {"plans": plans}}
+        self.asked = []
+
+    @property
+    def responses(self):
+        return self
+
+    def create(self, model, input, text):
+        name = text["format"]["name"]
+        self.asked.append(name)
+        return type("R", (), {"output_text": json.dumps(self.answers[name])})()
+
+
+def _pdf(path: Path, pages: list[str | None]) -> Path:
+    """A PDF with text pages (str) and empty pages (None: a drawing)."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    w = PdfWriter()
+    for text in pages:
+        page = w.add_blank_page(595, 842)
+        if text:
+            lines = "".join(
+                f"BT /F1 9 Tf 40 {800 - 12 * i} Td ({ln}) Tj ET\n" for i, ln in enumerate(text.splitlines())
+            )
+            stream = DecodedStreamObject()
+            stream.set_data(lines.encode())
+            font = DictionaryObject(
+                {
+                    NameObject("/Type"): NameObject("/Font"),
+                    NameObject("/Subtype"): NameObject("/Type1"),
+                    NameObject("/BaseFont"): NameObject("/Helvetica"),
+                }
+            )
+            page[NameObject("/Resources")] = DictionaryObject(
+                {NameObject("/Font"): DictionaryObject({NameObject("/F1"): w._add_object(font)})}
+            )
+            page[NameObject("/Contents")] = w._add_object(stream)
+    w.write(path)
+    return path
+
+
+PATCH_TEXT = "\n".join(
+    ["universe 1 patch list fixture type description address"]
+    + [f"#{100 + i} stage truss Diablo S {1 + 56 * (i - 1)} some words for the page" for i in range(1, 8)]
+)
+PATCH = {
+    "fixtures": [
+        {"number": "101", "type": "Diablo S", "manufacturer": "Ayrton", "where": "stage truss", "universe": 2,
+         "address": 1, "last_address": None, "per_channel": False, "count": 1, "house_only": False},
+        {"number": "102", "type": "Diablo S", "manufacturer": "Ayrton", "where": "stage truss", "universe": 2,
+         "address": 57, "last_address": None, "per_channel": False, "count": 1, "house_only": False},
+        {"number": "", "type": "PAR 64", "manufacturer": "", "where": "truss stage", "universe": 1, "address": 34,
+         "last_address": 37, "per_channel": True, "count": 1, "house_only": False},
+        {"number": "701", "type": "Atomic", "manufacturer": "Martin", "where": "stage truss", "universe": 3,
+         "address": 301, "last_address": 305, "per_channel": False, "count": 1, "house_only": False},
+        {"number": "", "type": "MDG ATMe Hazer", "manufacturer": "MDG", "where": "haze stage", "universe": 1,
+         "address": 501, "last_address": 503, "per_channel": False, "count": 1, "house_only": False},
+        {"number": "", "type": "4 x rgb led", "manufacturer": "", "where": "interior lights", "universe": 1,
+         "address": 434, "last_address": 445, "per_channel": False, "count": 1, "house_only": True},
+    ],
+    "modes": [{"type": "Diablo S", "mode": "Extended", "channels": 56}],
+    "stage": {"width_m": 14.0, "usable_width_m": 9.5, "depth_m": 6.5, "grid_height_m": 7.5, "deck_height_m": 1.5,
+              "hall_grid_height_m": 5.5},
+}  # fmt: skip
+# the stage plan: audience at the bottom, the stage from x 0.1 to 0.9 (14 m), its front edge at y 0.8, 6.5 m deep
+PLAN = {
+    "title": "stage truss", "area": "stage", "audience": "bottom", "stage_edge": 0.8, "stage_back": 0.5375,
+    "stage_end_a": 0.1, "stage_end_b": 0.9, "wall_a": None, "wall_b": None,
+    "symbols": [{"label": "101", "x": 0.3, "y": 0.5, "floor": False},
+                {"label": "2.57", "x": 0.7, "y": 0.5, "floor": False},
+                {"label": "1.34", "x": 0.4, "y": 0.55, "floor": False},
+                {"label": "999", "x": 0.5, "y": 0.5, "floor": False}],
+    "trusses": [{"label": "upstage", "x1": 0.2, "y1": 0.5, "x2": 0.8, "y2": 0.5}],
+}  # fmt: skip
+
+
+@pytest.fixture
+def pdfs(data, monkeypatch):
+    from amadeus.rig.importer import pdf as pdfmod
+
+    monkeypatch.setattr(pdfmod, "CACHE", data / "cache")
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    return _pdf(data / "patch.pdf", [PATCH_TEXT]), _pdf(data / "plots.pdf", [None])
+
+
+def test_without_a_key_nothing_is_sent_and_the_report_says_why(data, monkeypatch):
+    from amadeus.rig.importer import pdf as pdfmod
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(pdfmod.paths, "load_dotenv", lambda: None)
+    ai = FakeAI(PATCH, [PLAN])
+    d = importer.read([_pdf(data / "p.pdf", [PATCH_TEXT])], ai)
+    assert not ai.asked and not d.items
+    assert d.notes[0].level == "missing" and "own OpenAI API key" in d.notes[0].text
+
+
+def test_a_patch_pdf_and_its_plan_build_the_rig(pdfs):
+    ai = FakeAI(PATCH, [PLAN])
+    res = importer.build(list(pdfs), "venue", ai)
+    assert ai.asked == ["patch", "plot"]  # every page read: the text together, the drawing on its own
+    fx = {f["id"]: f for f in res.set_doc["fixtures"]}
+    assert fx["diablo101"]["mode"] == "ext" and fx["diablo101"]["universe"] == 2
+    assert sorted(f["address"] for f in fx.values() if f["fixture"] == "generic/par-64") == [34, 35, 36, 37]
+    assert [f["mode"] for f in fx.values() if f["fixture"] == "martin/atomic-3000"][0] in fxlib.get(
+        "martin/atomic-3000"
+    )["modes"] and len([f for f in fx.values() if f["fixture"] == "martin/atomic-3000"]) == 1
+    assert len([f for f in fx.values() if f["fixture"] == "mdg/atme"]) == 1  # a fixture's range, not 3 lights
+    assert any("house lights" in n.text and "rgb" in n.text for n in res.notes)
+    assert res.rig_doc["stage"]["width_m"] == 14.0 and res.rig_doc["stage"]["ceiling_m"] == 7.5
+    pl = res.rig_doc["placements"]["venue"]
+    # 0.8 of the page is 14 m: 101 at x 0.3 is 5.6 m from the stage-left end, 57 is 5.6 m from the other
+    W = res.rig_doc["stage"]["width_m"]
+    assert pl["diablo101"]["x"] * W == pytest.approx(14 - 0.25 * 14, abs=0.3)  # page left is stage right
+    assert pl["diablo102"]["x"] * W == pytest.approx(0.25 * 14, abs=0.3)
+    assert pl["diablo101"]["y_m"] == pytest.approx(-0.3 * 842 * 14 / (0.8 * 595), abs=0.5)
+    assert any("isn't in the patch" in n.text for n in res.notes)
+    assert all(p.get("aim", [0, -90])[1] < 0 for p in pl.values() if "aim" in p)  # fixed lights never at the ceiling
+
+
+def test_answers_are_cached(pdfs):
+    ai = FakeAI(PATCH, [PLAN])
+    importer.build(list(pdfs), "venue", ai)
+    again = FakeAI(PATCH, [PLAN])
+    importer.build(list(pdfs), "venue", again)
+    assert again.asked == []
+
+
+@pytest.mark.parametrize("audience, sym, want", [
+    ("bottom", (0.3, 0.5), "right"), ("top", (0.3, 0.5), "left"),
+    ("left", (0.5, 0.3), "right"), ("right", (0.5, 0.3), "left"),
+])  # fmt: skip
+def test_a_plan_turned_any_way_puts_stage_right_where_it_is(audience, sym, want):
+    """A symbol on the page's left/top: stage right or left depending on where the audience sits."""
+    from amadeus.rig.importer import pdf as pdfmod
+    from amadeus.rig.importer.draft import Item
+
+    it = Item(name="x", label="1")
+    plan = dict(PLAN, audience=audience, symbols=[{"label": "1", "x": sym[0], "y": sym[1], "floor": False}],
+                trusses=[], stage_edge=0.8 if audience in ("bottom", "right") else 0.2,
+                stage_back=0.4 if audience in ("bottom", "right") else 0.6)  # fmt: skip
+    d = Draft()
+    assert pdfmod.place(plan, 595, 595, PATCH["stage"], {"1": it}, d, "plan") == 1
+    assert (it.pos[0] > 0) == (want == "right")
+
+
+def test_labels_match_however_they_are_written():
+    from amadeus.rig.importer.pdf import label_key
+
+    assert label_key("#101") == label_key("101") == "101"
+    assert label_key("2.169") == label_key("2. 169") == label_key("02.169") == "2.169"
+    assert label_key("1.034") == "1.34"
+    assert label_key("6.301 / 6.305") == "6.301"

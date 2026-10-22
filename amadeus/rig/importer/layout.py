@@ -20,6 +20,7 @@ ROW_NEAR_M = 0.6  # fixtures this close across a row's line are in it
 ROW_GAP_M = 3.0  # a gap longer than this between fixtures: two trusses
 HIGH_M = 1.8  # hanging higher than this: on a truss
 FLOOR_M = 0.6  # lower than this: on the floor
+FRONT = re.compile(r"front|foh|f\.o\.h|follow|key ?light|dj", re.I)  # a fixed light there lights the stage
 
 
 def slug(text: str) -> str:
@@ -111,8 +112,11 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
         fixtures.append(f)
     placed = {names[i]: it for i, it in enumerate(draft.items) if it.pos}
     on_stage = [it.pos[0] for it in placed.values() if it.pos[1] <= 1.0] or [it.pos[0] for it in placed.values()]
-    W = max(6.0, math.ceil((max(on_stage) - min(on_stage) + 2.0) * 2) / 2) if on_stage else 8.0
-    mid = (max(on_stage) + min(on_stage)) / 2 if on_stage else 0.0
+    if draft.stage.get("width_m"):  # the documents give it: positions are from its centre line
+        W, mid = float(draft.stage["width_m"]), 0.0
+    else:
+        W = max(6.0, math.ceil((max(on_stage) - min(on_stage) + 2.0) * 2) / 2) if on_stage else 8.0
+        mid = (max(on_stage) + min(on_stage)) / 2 if on_stage else 0.0
     trusses, places = [], {}
 
     def xyz(it: Item) -> tuple[float, float, float]:
@@ -154,13 +158,20 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
         places[fid] = {"x": round(x / W, 4), "y_m": round(y, 3), "z_m": round(max(z, 0.0), 3), "mount": mount}
     for i, it in enumerate(draft.items):
         fid = names[i]
-        if fid in places and it.beam and role(fxlib.get(choices[i].key)) != "head":
+        if fid not in places or role(fxlib.get(choices[i].key)) == "head":
+            continue
+        if it.beam:
             places[fid]["aim"] = aim(it.beam, places[fid].get("rot_deg", 0.0))
+        elif places[fid].get("mount") == "hang":  # the documents don't say: down, front light onto the stage
+            front = FRONT.search(it.where) and places[fid]["y_m"] > 0
+            places[fid]["aim"] = aim(
+                (0.0, -0.8, -0.6) if front else (0.0, 0.26, -0.97), places[fid].get("rot_deg", 0.0)
+            )
     ys = [p["y_m"] for p in places.values()]
     zs = [p["z_m"] for p in places.values()]
     stage = {
         "width_m": W,
-        "ceiling_m": round(max(zs + [4.0]) + 1.0, 1),
+        "ceiling_m": float(draft.stage.get("ceiling_m") or round(max(zs + [4.0]) + 1.0, 1)),
         "eye_safety": True,
         "room_depth_m": round(max(15.0, max(ys + [0.0]) + 4.0), 1),
     }
