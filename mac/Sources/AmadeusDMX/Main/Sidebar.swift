@@ -123,8 +123,7 @@ struct VersionFooter: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .help(updates.isAvailable ? "Updates: this version, the newest, and whether to check by itself"
-                                      : "A development build: it updates with the code, not by itself")
+            .help(help(updates))
             .popover(isPresented: $showsOptions, arrowEdge: .trailing) { options(updates) }
             switch updates.state {
             case .available(let v):
@@ -150,10 +149,16 @@ struct VersionFooter: View {
         if updates.isAvailable, updates.checksAutomatically, !model.engineRunning { updates.refresh() }
     }
 
+    private func help(_ u: Updates) -> String {
+        guard u.isAvailable else { return "A development build: it updates with the code, not by itself" }
+        if case .available(let v) = u.state { return "\(v) is available: you have \(u.version). Click for the update settings." }
+        return "Updates: this version, the newest, and whether to check by itself"
+    }
+
     private func line(_ u: Updates) -> String {
         guard u.isAvailable else { return "Amadeus DMX \(u.version) · development build" }
         switch u.state {
-        case .available(let v): return "\(u.version) · \(v) is available"
+        case .available: return u.version  // the button names the newer one
         case .downloading(let v, _): return "Downloading \(v)…"
         case .installing(let v): return u.waitingForIdle ? "\(v) installs when the show stops" : "Installing \(v)…"
         case .checking: return "Amadeus DMX \(u.version) · checking…"

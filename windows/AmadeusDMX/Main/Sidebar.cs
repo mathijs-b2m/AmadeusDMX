@@ -143,8 +143,9 @@ public sealed class VersionFooter(AppModel model)
         {
             Content = UI.HStack(5, icon, UI.Text(Line(u), Font.Caption).Secondary()),
             Padding = new Thickness(0),
-        }.Tooltip(u.IsAvailable ? "Updates: this version, the newest, and whether to check by itself"
-                                : "A development build: it updates with the code, not by itself");
+        }.Tooltip(!u.IsAvailable ? "A development build: it updates with the code, not by itself"
+            : u.State == UpdateState.Available ? $"{u.Newest} is available: you have {u.Version}. Click for the update settings."
+            : "Updates: this version, the newest, and whether to check by itself");
         line.Click += (_, _) => new Flyout { Content = Options(u), Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.RightEdgeAlignedBottom }.ShowAt(line);
         UIElement? action = u.State switch
         {
@@ -164,7 +165,7 @@ public sealed class VersionFooter(AppModel model)
         if (!u.IsAvailable) return $"Amadeus DMX {u.Version} · development build";
         return u.State switch
         {
-            UpdateState.Available => $"{u.Version} · {u.Newest} is available",
+            UpdateState.Available => u.Version,  // the button names the newer one
             UpdateState.Downloading => $"Downloading {u.Newest}…",
             UpdateState.Installing => u.WaitingForIdle ? $"{u.Newest} installs when the show stops" : $"Installing {u.Newest}…",
             UpdateState.Checking => $"Amadeus DMX {u.Version} · checking…",
