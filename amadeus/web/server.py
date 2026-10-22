@@ -16,9 +16,10 @@ POST /api/fixture/map        {"key", "mode", "kind", "channels": [{"role", "cell
                              ("wheel": colour wheel slots and "checked": true from the channel-by-channel check)
 GET  /api/fixture/templates?type=spot&channels=9   common layouts to make a fixture without a brand from
 POST /api/fixture/new        {"manufacturer", "model", "template", "channels", …}: make it in your library
+POST /api/fixture/gdtf       {"name", "data": base64 .gdtf}: convert a GDTF file into your library (key, mode)
 GET  /api/directors          decision models available right now (rules, OpenAI, local Ollama decision models)
 POST /api/director           {"director": "..."}: switch the decision model (saved in the rig file on its own)
-GET  /api/catalog?q=fuze     search our library + the QLC+ library + the Open Fixture Library
+GET  /api/catalog?q=fuze     search our library + the QLC+, Open Fixture and DMXControl DDF libraries
 GET  /api/catalog/details?key=...   modes and channels of one catalogue entry
 POST /api/catalog/add        {"key": "qlc:..."}: convert it into fixtures/ and return its library key
 POST /api/suggest            {"key", "mode", "count", "universe"}: free start addresses (packed / easy to dial)

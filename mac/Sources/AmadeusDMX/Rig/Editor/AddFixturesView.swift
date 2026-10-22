@@ -68,7 +68,7 @@ struct AddFixturesView: View {
         busy = true
         defer { busy = false }
         do {
-            let k = e.isLocal ? e.key : try await model.api.addToLibrary(e.key)  // QLC+/OFL → our library
+            let k = e.isLocal ? e.key : try await model.api.addToLibrary(e.key)  // QLC+/OFL/DDF → our library
             key = k
             guard let def = editor.definition(k) else { error = "Couldn’t read \(k)"; return }
             note = def.addingNote

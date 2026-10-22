@@ -62,12 +62,13 @@ def add_commands(sub) -> dict:
     p.add_argument("--replace", action="store_true", help="with --import: overwrite a set or rig NAME")
 
     p = sub.add_parser(
-        "library", help="list fixture definitions, or search/add from the QLC+ and Open Fixture libraries"
+        "library", help="list fixture definitions, or search/add from the QLC+, Open Fixture and DMXControl libraries"
     )
     p.add_argument("query", nargs="*", help="search words, e.g. 'beamz fuze'")
     p.add_argument(
         "--add", metavar="KEY", help="add a search result (e.g. qlc:Ayra/Ayra-Compar-Kit-3.qxf) to fixtures/"
     )
+    p.add_argument("--gdtf", metavar="FILE", help="convert a .gdtf file you have into your fixtures")
 
     p = sub.add_parser("patch", help="patch fixtures by model and count, assign addresses")
     p.add_argument("specs", nargs="+", metavar="MODEL[:COUNT]")
@@ -213,8 +214,13 @@ def library(args):
     from amadeus.library import catalog
     from amadeus.library import fixtures as fxlib
 
-    if args.add:
-        key = catalog.add(args.add)
+    if args.add or args.gdtf:
+        if args.gdtf:
+            from amadeus.library import gdtf
+
+            key = gdtf.add_file(args.gdtf)
+        else:
+            key = catalog.add(args.add)
         d = fxlib.get(key)
         print(f"Added as '{key}'. Check it once with `amadeus test`.")
         if fxlib.inert(d):

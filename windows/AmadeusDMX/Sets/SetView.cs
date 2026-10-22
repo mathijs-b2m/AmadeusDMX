@@ -183,7 +183,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         if (_doc is not { Fixtures.Count: > 0 } doc)
         {
             _middle.Content = UI.Unavailable("light.overhead.right", "No Fixtures Yet",
-                "Add the fixtures you own: search by brand or model across our library, QLC+ and the Open Fixture Library.",
+                "Add the fixtures you own: search by brand or model across our library, QLC+, the Open Fixture Library and DMXControl.",
                 UI.Button("Add Fixtures…", ShowAdd).Prominent());
             return;
         }

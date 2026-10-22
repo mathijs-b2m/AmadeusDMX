@@ -9,7 +9,7 @@ struct FixturesStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             StepHeader(symbol: "light.overhead.right.fill", title: "Your Fixtures",
-                       text: "The gear you bring to every gig: your set. Search our library, QLC+ and the Open Fixture Library by brand or model. Where they hang comes next.")
+                       text: "The gear you bring to every gig: your set. Search our library, QLC+, the Open Fixture Library and DMXControl by brand or model. Where they hang comes next.")
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("e.g. beamz fuze, mac encore, laserworld", text: $w.query)

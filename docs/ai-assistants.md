@@ -102,7 +102,7 @@ can (above).
 | `get_show`, `save_show` | a set on a rig as one combined dict ([rig format](rig-format.md)); saving checks it first |
 | `create_set`, `create_rig`, `make_active` | new sets (empty or a copy) and rigs (from a template or a copy); switch |
 | `place_set_on_rig`, `automount` | put a set on a rig and mount its fixtures |
-| `search_fixtures`, `fixture_details` | our library, QLC+ and the Open Fixture Library |
+| `search_fixtures`, `fixture_details` | our library, QLC+, the Open Fixture Library and the DMXControl DDF library |
 | `add_fixtures` | add fixtures of one model at free (or given) addresses, mounted on the rig |
 | `check_show` | problems, DMX overlaps, fixtures not mounted or not patched, fixtures the show keeps dark |
 | `write_hang_sheet` | the crew's paperwork as a printable HTML file |

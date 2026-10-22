@@ -164,7 +164,7 @@ def resolve(draft: Draft) -> dict[int, Choice]:
         k = (it.name.lower(), it.channels, it.mode.lower())
         if k not in seen:
             c = match(it.name, it.channels, it.mode) or make(it.name, it.channels)
-            if c.key.startswith(("qlc:", "ofl:")):
+            if c.key.startswith(catalog.REMOTE):
                 c.key = catalog.add(c.key)
             if not c.mode:
                 c.mode = fxlib.default_mode(fxlib.get(c.key))

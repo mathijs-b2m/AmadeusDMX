@@ -1,10 +1,10 @@
-"""The shadow catalogue (fixtures/catalog/): every converted QLC+ and Open Fixture Library fixture is safe to
-add and patch, and adding one works offline."""
+"""The shadow catalogue (fixtures/catalog/): every converted QLC+, Open Fixture Library and DMXControl DDF fixture
+is safe to add and patch, and adding one works offline."""
 
 import pytest
 
 from amadeus.engine.state import State
-from amadeus.library import catalog, ofl, qlc, shadow
+from amadeus.library import catalog, ddf, ofl, qlc, shadow
 from amadeus.library import fixtures as fxlib
 
 KINDS = {"moving_head", "moving_bar", "par", "par_bar", "strobe", "blinder", "laser", "smoke"}
@@ -20,7 +20,9 @@ def test_built_with_the_current_converters():
     """A converter changed: run `python tools/build_catalog.py` so every fixture gets the change."""
     assert shadow.load("qlc")["converter"] == qlc.CONVERTER_VERSION
     assert shadow.load("ofl")["converter"] == ofl.CONVERTER_VERSION
+    assert shadow.load("ddf")["converter"] == ddf.CONVERTER_VERSION
     assert len(shadow.load("qlc")["fixtures"]) > 1500 and len(shadow.load("ofl")["fixtures"]) > 500
+    assert len(shadow.load("ddf")["fixtures"]) > 500
 
 
 def test_lasers_stay_dark_and_smoke_machines_only_fire_their_output():
@@ -28,7 +30,7 @@ def test_lasers_stay_dark_and_smoke_machines_only_fire_their_output():
     only its output and its fan (engine/fog.py); everything else on it (timers, programs, LEDs) stays off."""
     seen = {"laser": 0, "smoke": 0, "driven smoke": 0}
     for key, idx, d in entries():
-        cats = set(idx.get("categories", [])) | {idx.get("type", "")}
+        cats = set(idx.get("categories", [])) | {idx.get("type", ""), idx.get("kind", "")}  # DDF: no categories
         if cats & {"laser", "Laser"}:
             assert d["kind"] == "laser" and fxlib.inert(d), key
             seen["laser"] += 1
@@ -95,3 +97,20 @@ def test_adding_works_offline(monkeypatch, tmp_path):
 @pytest.mark.parametrize("key", ["qlc:beamZ/beamZ-LS-3DRG.qxf"])
 def test_a_laser_dmx_cant_keep_off_says_so(key):
     assert "power it from a switch" in shadow.get(key)["warning"]
+
+
+def test_a_ddf_fixture_keeps_its_licence_and_authors(monkeypatch, tmp_path):
+    """CC BY-SA 4.0: a DDF fixture copied into your library still says where it came from, by whom, under what."""
+    monkeypatch.setattr(fxlib, "LIB_DIR", tmp_path)
+    monkeypatch.setattr(fxlib, "USER_DIR", None)
+    catalog._candidates_cached.cache_clear()
+    fxlib.library.cache_clear()
+    try:
+        hits = [c for c in catalog.search("eurolite", 200) if c["source"] == "ddf"]
+        assert hits, "the DDF library fills in Eurolite"
+        key = catalog.add(hits[0]["key"])
+        d = fxlib.get(key)
+        assert d["ddf"]["license"] == "CC-BY-SA-4.0" and d["ddf"]["ids"] and "CC BY-SA 4.0" in d["source"]
+    finally:
+        catalog._candidates_cached.cache_clear()
+        fxlib.library.cache_clear()

@@ -349,7 +349,7 @@ def footprint_m(it: Item) -> float | None:
     if c is None:
         return None
     try:
-        d = catalog.definition(c.key) if c.key.startswith(("qlc:", "ofl:")) else fxlib.get(c.key)
+        d = catalog.definition(c.key) if c.key.startswith(catalog.REMOTE) else fxlib.get(c.key)
     except (OSError, KeyError, ValueError):
         return None
     size = d.get("physical", {}).get("size_mm")

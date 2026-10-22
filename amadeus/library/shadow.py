@@ -1,4 +1,4 @@
-"""The shadow catalogue: every QLC+ and Open Fixture Library fixture, already converted to our format.
+"""The shadow catalogue: every QLC+, Open Fixture Library and DMXControl DDF fixture, converted to our format.
 
 Shipped in fixtures/catalog/ (one compressed file per source), so searching and adding a fixture work offline
 and on the first run, and a converter fix reaches every fixture at once. `tools/build_catalog.py` rebuilds it
@@ -17,7 +17,8 @@ from functools import cache
 from amadeus import paths
 
 CATALOG_DIR = paths.FIXTURES / "catalog"
-FILES = {"qlc": "qlcplus.json.gz", "ofl": "ofl.json.gz"}
+# ddf.json.gz is CC BY-SA 4.0 (its own data file, see THIRD_PARTY_NOTICES.md); the others Apache-2.0 and MIT
+FILES = {"qlc": "qlcplus.json.gz", "ofl": "ofl.json.gz", "ddf": "ddf.json.gz"}
 
 
 @cache

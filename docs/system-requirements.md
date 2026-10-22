@@ -61,8 +61,8 @@ Measured on a MacBook Pro with an M3 Max (16 cores, 128 GB) on a 6:51 house trac
   steady; Wi-Fi works for a living room. A network switch between the computer and the node is fine.
 - **USB DMX interfaces**: ENTTEC DMX USB Pro / Pro Mk2, DMXking ultraDMX, Eurolite USB-DMX512-PRO and other
   Pro-compatible interfaces (one universe each).
-- **Fixtures**: any DMX fixture. About 2,400 are built in (the QLC+ and Open Fixture libraries), and the rest
-  can be mapped by hand in the app.
+- **Fixtures**: any DMX fixture. About 3,000 are built in (the QLC+, Open Fixture and DMXControl DDF
+  libraries), a maker's GDTF file can be imported, and the rest can be mapped by hand in the app.
 
 ## Amadeus Link (the DJ laptop)
 

@@ -30,6 +30,14 @@ the Open Fixture Library (`ofl.json.gz`, MIT, © 2017 Florian & Felix Edelmann a
 mapped, safe defaults added, lasers kept dark, smoke machines' output channels mapped). Each file records the
 upstream version it was built from (`"upstream"`); `tools/build_catalog.py` rebuilds it.
 
+**DMXControl DDF fixtures** (`fixtures/catalog/ddf.json.gz`, Creative Commons Attribution-ShareAlike 4.0,
+license text in `licenses/CC-BY-SA-4.0.txt`): every DMXControl 3 device definition of the DMXControl DDF library
+(https://ddf-library.dmxcontrol.de, © the DMXControl community and each file's author), converted into this
+project's format and modified (channel roles mapped, safe defaults added, lasers and fixtures without a dimmable
+light kept dark, smoke machines' output channels mapped). Each fixture names its DDF ids and authors (`"ddf"`,
+`"source"`). This data file, and any fixture copied from it into your library, stays under CC BY-SA 4.0: share
+changes to it under the same licence. The project's code stays MIT. `tools/build_catalog.py` rebuilds it.
+
 **Gobo pictures** (`fixtures/catalog/gobos.json.gz`): the gobo images of the QLC+ fixture library
 (`resources/gobos/`, Apache License 2.0, © the QLC+ authors) and of the Open Fixture Library
 (`resources/gobos/`, MIT, © the Open Fixture Library contributors), rendered small and modified (as the light
@@ -44,6 +52,11 @@ MilkDrop-style visuals in the web visualiser. License texts: `licenses/butterchu
 - **QLC+ fixture library** (Apache-2.0) and **Open Fixture Library** (MIT, https://open-fixture-library.org):
   the original libraries, fetched into `.cache/qlcplus` and `.cache/ofl` only to rebuild the catalogue or to
   add a fixture newer than it.
+- **DMXControl DDF library** (CC BY-SA 4.0): the original files, fetched into `.cache/ddf` only to rebuild the
+  catalogue.
+- **GDTF files** (https://gdtf.eu): never included or downloaded. A `.gdtf` you choose (Import GDTF… or
+  `amadeus library --gdtf FILE`) is converted on your computer into your own fixtures; its terms are those of
+  wherever you got it (the maker's site, your GDTF Share account).
 - **VirtualDJ SDK headers** (© Atomix Productions): downloaded by `vdj/build.sh` from virtualdj.com to build
   the AmadeusLink plugin; not redistributable, so not included.
 - **Python packages** (`pyproject.toml`): numpy, scipy (BSD), soundfile, sounddevice, websockets, pyserial

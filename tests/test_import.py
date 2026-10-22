@@ -186,7 +186,7 @@ def test_a_name_finds_its_fixture(name, channels, key):
 
 
 def test_another_model_number_is_never_sure():
-    c = resolve.match("GLP Impression X4 Bar 20", 0, "")
+    c = resolve.match("GLP Impression X4 Bar 30", 0, "")  # the libraries have the Bar 10 and Bar 20
     assert c is None or not c.sure
 
 
