@@ -43,22 +43,28 @@ private struct RigList: View {
     var body: some View {
         List(selection: Binding(get: { model.editingRig }, set: { if let v = $0 { model.editingRig = v } })) {  // it opens showing a set on it (rigSetDefault)
             SwiftUI.Section {
-                ForEach(model.rigs) { r in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(r.name).font(.headline)
-                        let on = model.setsOn(r.name)
-                        Text(r.summary + (on.isEmpty ? "" : " · " + on.joined(separator: ", ")))
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    }
-                    .tag(Optional(r.name))
+                ForEach(model.rigs.filter { !$0.isExample }) { RigRow(rig: $0) }
+                if !model.rigs.contains(where: { !$0.isExample }) {
+                    Text("None yet. Your venues go in rigs of your own: make one with New Rig…")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .selectionDisabled()
                 }
             } header: {
                 HStack {
-                    Text("Rigs")
+                    Text("Your Rigs")
                     Spacer()
                     Button("New Rig…", systemImage: "plus") { model.showNewRig = true }
                         .labelStyle(.iconOnly).buttonStyle(.borderless)
                         .help("Make a new rig (⌥⌘N)")
+                }
+            }
+            if model.rigs.contains(where: \.isExample) {
+                SwiftUI.Section {
+                    ForEach(model.rigs.filter(\.isExample)) { RigRow(rig: $0) }
+                } header: {
+                    Text("Examples")
+                } footer: {
+                    Text("Venues to look around in and try the show on.").font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -78,6 +84,21 @@ private struct RigList: View {
             }
             .padding(10)
         }
+    }
+}
+
+private struct RigRow: View {
+    @Environment(AppModel.self) private var model
+    let rig: RigSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(rig.name).font(.headline)
+            let on = model.setsOn(rig.name)
+            Text(rig.summary + (on.isEmpty ? "" : " · " + on.joined(separator: ", ")))
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        }
+        .tag(Optional(rig.name))
     }
 }
 

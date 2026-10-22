@@ -259,9 +259,13 @@ public sealed partial record Workspace
     public IReadOnlyList<RigSummary> Rigs()
     {
         var active = ActiveRig;
-        return RigNames().Select(name => ReadObject(RigURL(name)) is { } o ? new RigSummary(name, o, name == active) : null)
+        return RigNames().Select(name => ReadObject(RigURL(name)) is { } o ? new RigSummary(name, o, name == active, IsExampleRig(name)) : null)
             .OfType<RigSummary>().ToList();
     }
+
+    /// One of the rigs a first run starts from (examples/rigs): venues to look around in, not your own.
+    /// Renamed or duplicated, it is yours.
+    public bool IsExampleRig(string name) => File.Exists(Path.Combine(Root, "examples", "rigs", $"{name}.json"));
 
     // MARK: a set on a rig
 
@@ -503,10 +507,12 @@ public sealed record RigSummary
     /// Sets with fixtures mounted on this rig, and how many.
     public IReadOnlyDictionary<string, int> Mounted { get; init; }
     public bool IsDefault { get; init; }
+    /// One of the shipped example rigs (Workspace.IsExampleRig).
+    public bool IsExample { get; init; }
 
     public string Id => Name;
 
-    internal RigSummary(string name, IReadOnlyDictionary<string, JSONValue> o, bool isDefault)
+    internal RigSummary(string name, IReadOnlyDictionary<string, JSONValue> o, bool isDefault, bool isExample = false)
     {
         Name = name;
         Description = o.GetValueOrDefault("description")?.String ?? "";
@@ -519,6 +525,7 @@ public sealed record RigSummary
         Mounted = (o.GetValueOrDefault("placements")?.Object ?? new Dictionary<string, JSONValue>())
             .ToDictionary(p => p.Key, p => p.Value.Object?.Count ?? 0);
         IsDefault = isDefault;
+        IsExample = isExample;
     }
 
     /// "12 m wide · 2 trusses · 2 towers · LED wall"
@@ -538,7 +545,7 @@ public sealed record RigSummary
     public bool Equals(RigSummary? b) =>
         b is not null && Name == b.Name && Description == b.Description && WidthM == b.WidthM && Trusses == b.Trusses
         && Towers == b.Towers && HasScreen == b.HasScreen && Zones == b.Zones && IsDefault == b.IsDefault
-        && Mounted.Count == b.Mounted.Count && Mounted.All(p => b.Mounted.TryGetValue(p.Key, out var n) && n == p.Value);
+        && IsExample == b.IsExample && Mounted.Count == b.Mounted.Count && Mounted.All(p => b.Mounted.TryGetValue(p.Key, out var n) && n == p.Value);
 
     public override int GetHashCode() => Name.GetHashCode();
 }

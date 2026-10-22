@@ -216,8 +216,14 @@ public struct Workspace: Sendable, Equatable {
         return rigNames().compactMap { name in
             guard let data = try? Data(contentsOf: rigURL(name)),
                   let o = try? JSONDecoder().decode([String: JSONValue].self, from: data) else { return nil }
-            return RigSummary(name: name, json: o, isDefault: name == active)
+            return RigSummary(name: name, json: o, isDefault: name == active, isExample: isExampleRig(name))
         }
+    }
+
+    /// One of the rigs a first run starts from (examples/rigs): venues to look around in, not your own.
+    /// Renamed or duplicated, it is yours.
+    public func isExampleRig(_ name: String) -> Bool {
+        FileManager.default.fileExists(atPath: root.appending(path: "examples/rigs/\(name).json").path)
     }
 
     // MARK: a set on a rig
@@ -424,10 +430,12 @@ public struct RigSummary: Sendable, Identifiable, Hashable {
     /// Sets with fixtures mounted on this rig, and how many.
     public var mounted: [String: Int]
     public var isDefault: Bool
+    /// One of the shipped example rigs (Workspace.isExampleRig).
+    public var isExample: Bool
 
     public var id: String { name }
 
-    init(name: String, json o: [String: JSONValue], isDefault: Bool) {
+    init(name: String, json o: [String: JSONValue], isDefault: Bool, isExample: Bool = false) {
         self.name = name
         description = o["description"]?.string ?? ""
         widthM = o["stage"]?.object?["width_m"]?.number ?? 6
@@ -441,6 +449,7 @@ public struct RigSummary: Sendable, Identifiable, Hashable {
         zones = o["zones"]?.array?.count ?? 0
         mounted = (o["placements"]?.object ?? [:]).mapValues { $0.object?.count ?? 0 }
         self.isDefault = isDefault
+        self.isExample = isExample
     }
 
     /// "12 m · 2 trusses · 2 towers · LED wall"
