@@ -1,4 +1,5 @@
-"""Fixtures: our library, search across QLC+ and the Open Fixture Library, adding fixtures, label photos."""
+"""Fixtures: our library, search across QLC+, the Open Fixture Library and DMXControl, adding fixtures, GDTF
+import, label photos."""
 
 from __future__ import annotations
 
@@ -40,6 +41,26 @@ def add_to_library(req):
     from amadeus.library import catalog
 
     return {"key": catalog.add(req.body()["key"])}
+
+
+def import_gdtf(req):
+    """{"name", "data": base64 of a .gdtf}: convert it into your fixtures; {"key", "mode"} or {"error"}."""
+    import base64
+    import binascii
+    import zipfile
+    from xml.etree.ElementTree import ParseError
+
+    from amadeus.library import gdtf
+
+    b = req.body()
+    name = str(b.get("name") or "")
+    try:
+        key = gdtf.add_file(base64.b64decode(b.get("data") or ""), name)
+    except (binascii.Error, zipfile.BadZipFile, KeyError, ParseError, AttributeError, ValueError) as e:
+        return {"error": f"{name or 'The file'} isn't a GDTF file this can read ({e.__class__.__name__}: {e})"}, 400
+    d = fxlib.get(key)
+    event(f"{req.client} imported {name} as {key}")
+    return {"key": key, "mode": fxlib.default_mode(d), "inert": fxlib.inert(d), "warning": d.get("warning", "")}
 
 
 def suggest(req):
@@ -154,6 +175,7 @@ GET = {
 }
 POST = {
     "/api/catalog/add": add_to_library,
+    "/api/fixture/gdtf": import_gdtf,
     "/api/suggest": suggest,
     "/api/rig/add": add_to_rig,
     "/api/label": identify_label,

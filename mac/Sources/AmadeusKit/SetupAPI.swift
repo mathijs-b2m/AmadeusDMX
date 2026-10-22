@@ -152,6 +152,12 @@ public struct SetupAPI: Sendable {
         return r.key
     }
 
+    /// Converts a .gdtf file (from the maker's site or your own GDTF Share account) into your fixtures; returns its
+    /// library key and default mode. Your copy only: GDTF fixtures are never shipped.
+    public func importGDTF(name: String, data: Data) async throws -> NewFixture {
+        try await post("api/fixture/gdtf", ["name": name, "data": data.base64EncodedString()], timeout: 120)
+    }
+
     /// USB DMX interfaces plugged into this Mac (probed for the DMX USB Pro protocol).
     public func usbInterfaces() async throws -> [USBInterface] {
         struct R: Decodable { var usb: [USBInterface] }

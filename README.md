@@ -95,7 +95,7 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 <tr>
 <td valign="top">
 <h3>🛠️ Set up in minutes</h3>
-<p>A set-up assistant walks you through your fixtures, the venue and where everything hangs. Drag fixtures onto straight or round trusses in the 3D rig editor, or let it hang them for you. About <b>2,400 fixtures from 200+ brands</b> are built in, offline. Something unusual? Map its channels by hand with the <b>DMX mapper</b>, trying them on the real light.</p>
+<p>A set-up assistant walks you through your fixtures, the venue and where everything hangs. Drag fixtures onto straight or round trusses in the 3D rig editor, or let it hang them for you. About <b>3,000 fixtures from 270 brands</b> are built in, offline, and a maker's GDTF file can be imported. Something unusual? Map its channels by hand with the <b>DMX mapper</b>, trying them on the real light.</p>
 </td>
 <td valign="top">
 <h3>📋 From the app to the truss</h3>
@@ -180,7 +180,7 @@ Updates install themselves when you allow them, never in the middle of a show.
 
 You'll also need:
 - **a way to send DMX**: an Art-Net or sACN node, or a USB DMX interface;
-- **any DMX fixtures**: about 2,400 are built in, and others can be mapped by hand;
+- **any DMX fixtures**: about 3,000 are built in, a maker's GDTF file can be imported, and others can be mapped by hand;
 - **optionally**, VirtualDJ, djay Pro or Mixxx, and an OpenAI key for the AI director (or a free local
   model with Ollama).
 

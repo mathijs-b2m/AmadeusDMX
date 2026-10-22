@@ -136,7 +136,7 @@ Sets**, the two you started with under **Examples**: put your fixtures in a set 
 <td width="50%"><img src="screenshots/guide/wizard-rig.png" alt="Where Do They Hang: pick a venue template such as Club or Concert Stage, its size and an LED wall"></td>
 </tr>
 <tr>
-<td><sub><b>Your Fixtures:</b> search about 2,400 fixtures by brand or model, offline, and pick the DMX mode set on the fixture.</sub></td>
+<td><sub><b>Your Fixtures:</b> search about 3,000 fixtures by brand or model, offline (or import a maker's GDTF file), and pick the DMX mode set on the fixture.</sub></td>
 <td><sub><b>Where Do They Hang:</b> pick a venue (empty room, stands, a truss over the booth, club, concert stage, round truss) and its size.</sub></td>
 </tr>
 <tr>

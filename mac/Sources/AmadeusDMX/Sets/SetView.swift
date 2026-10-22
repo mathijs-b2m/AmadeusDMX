@@ -92,7 +92,7 @@ struct SetView: View {
                     ContentUnavailableView {
                         Label("No Fixtures Yet", systemImage: "light.overhead.right")
                     } description: {
-                        Text("Add the fixtures you own: search by brand or model across our library, QLC+ and the Open Fixture Library.")
+                        Text("Add the fixtures you own: search by brand or model across our library, QLC+, the Open Fixture Library and DMXControl.")
                     } actions: {
                         Button("Add Fixtures…") { showAdd = true }.buttonStyle(.borderedProminent)
                     }

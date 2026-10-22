@@ -1,8 +1,10 @@
-"""One fixture search over every source: our own library, the QLC+ library and the Open Fixture Library.
+"""One fixture search over every source: our own library, the QLC+ library, the Open Fixture Library and the
+DMXControl DDF library.
 
 Keys tell the source apart: "beamz/fuze75b-beam" (ours), "qlc:beamZ/beamZ-Fuze-75B-Beam.qxf",
-"ofl:cameo/flat-pro-18". A fixture found in several libraries is listed once, from the first source
-in that order (ours is checked on the real hardware; QLC+ has more DJ brands than the OFL).
+"ofl:cameo/flat-pro-18", "ddf:eurolite/led-tmh-13". A fixture found in several libraries is listed once, from
+the first source in that order (ours is checked on the real hardware; QLC+ has more DJ brands than the OFL; the
+DDF library fills in DJ brands both lack, and is only in the shipped catalogue).
 """
 
 from __future__ import annotations
@@ -10,11 +12,17 @@ from __future__ import annotations
 import re
 from functools import cache
 
+from amadeus.library import ddf, ofl, qlc, shadow
 from amadeus.library import fixtures as fxlib
-from amadeus.library import ofl, qlc, shadow
 from amadeus.library.ofl import _tokens
 
-SOURCES = {"local": "your library", "qlc": "QLC+ library", "ofl": "Open Fixture Library"}
+SOURCES = {
+    "local": "your library",
+    "qlc": "QLC+ library",
+    "ofl": "Open Fixture Library",
+    "ddf": "DMXControl DDF library",
+}
+REMOTE = ("qlc:", "ofl:", "ddf:")
 
 
 OFL_TYPES = [
@@ -91,6 +99,7 @@ def _candidates_uncached() -> list[dict]:
             out[-1]["look"] = "spot"
     for source, index in (("qlc", qlc.index), ("ofl", ofl.index)):
         out += [_typed(dict(c, source=source)) for c in _source_index(source, index)]
+    out += [_typed(dict(c, source="ddf")) for c in shadow.index("ddf") or []]
     seen, unique = set(), []
     for c in out:
         _typed(c)
@@ -118,10 +127,12 @@ def _source_index(source: str, live) -> list[dict]:
 
 
 def definition(key: str) -> dict:
-    """A QLC+ / OFL entry converted: from the shipped catalogue, else converted now (downloads if needed)."""
+    """A QLC+ / OFL / DDF entry converted: from the shipped catalogue, else converted now (downloads if needed)."""
     d = shadow.get(key)
     if d is not None:
         return d
+    if key.startswith("ddf:"):
+        raise KeyError(f"{key} is not in the shipped DDF catalogue")
     if key.startswith("qlc:"):
         return qlc.convert(key[4:])
     return ofl.convert(*key[4:].split("/", 1))
@@ -132,7 +143,7 @@ def search(query: str, limit: int = 15) -> list[dict]:
     q = _tokens(query)
     if not q:
         return []
-    rank = {"local": 2, "qlc": 1, "ofl": 0}
+    rank = {"local": 3, "qlc": 2, "ofl": 1, "ddf": 0}
     scored = []
     for c in _candidates():
         words = _tokens(f"{c['manufacturer']} {c['model']}")
@@ -147,7 +158,7 @@ def search(query: str, limit: int = 15) -> list[dict]:
 
 def details(key: str) -> dict:
     """Modes and channel layout of any catalogue entry (downloads the definition if needed)."""
-    d = definition(key) if key.startswith(("qlc:", "ofl:")) else fxlib.get(key)
+    d = definition(key) if key.startswith(REMOTE) else fxlib.get(key)
     return {
         "key": key,
         "manufacturer": d["manufacturer"],
@@ -168,6 +179,8 @@ def add(key: str) -> str:
         return qlc.add_to_library(key)
     if key.startswith("ofl:"):
         return ofl.add_to_library(key)
+    if key.startswith("ddf:"):
+        return ddf.add_to_library(key)
     fxlib.get(key)
     return key
 

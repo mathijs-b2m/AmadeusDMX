@@ -184,6 +184,11 @@ public sealed class SetupAPI
     public Task<string> AddToLibrary(string key, CancellationToken ct = default) =>
         Post("api/catalog/add", new { key }, c => J.Req(c, "key", J.String), ct: ct);
 
+    /// Converts a .gdtf file (from the maker's site or your own GDTF Share account) into your fixtures; returns its
+    /// library key and default mode. Your copy only: GDTF fixtures are never shipped.
+    public Task<AmadeusKit.NewFixture> ImportGDTF(string name, byte[] data, CancellationToken ct = default) =>
+        Post("api/fixture/gdtf", new { name, data = Convert.ToBase64String(data) }, AmadeusKit.NewFixture.From, timeout: 120, ct: ct);
+
     /// USB DMX interfaces plugged into this computer (probed for the DMX USB Pro protocol).
     public Task<USBInterface[]> UsbInterfaces(CancellationToken ct = default) =>
         Get("api/outputs", c => J.Req(c, "usb", J.ArrayOf(USBInterface.From)), ct: ct);

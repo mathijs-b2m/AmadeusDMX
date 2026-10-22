@@ -1,7 +1,8 @@
-// Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library), choose its mode and how
+// Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library, DMXControl DDF), choose its mode and how
 // many. No start addresses: you give each the one set on the fixture (in the inspector). Where they hang is done
 // on the Rigs page (mac/Sources/AmadeusDMX/Sets/AddToSetSheet.swift). A sheet: a ContentDialog here. A fixture no
-// library knows is made from a common layout with New Fixture… (NewFixtureSheet.cs, shown in this dialog).
+// library knows is imported from its maker's GDTF file, or made from a common layout with New Fixture…
+// (NewFixtureSheet.cs, shown in this dialog).
 namespace AmadeusDMX;
 
 public sealed class AddToSetSheet
@@ -77,6 +78,8 @@ public sealed class AddToSetSheet
         };
         var newFixture = UI.HStack(8,
             _madeNote.Grow(),
+            UI.Button("Import GDTF…", ImportGDTF, "square.and.arrow.down")
+                .Tooltip("Convert a .gdtf file from the maker's site or your own GDTF Share account into your fixtures"),
             UI.Button("New Fixture…", ShowNew, "plus")
                 .Tooltip("Make it from a common channel layout, then check it channel by channel on the real fixture"));
         _dialog.Content = _main = UI.VStack(14,
@@ -103,8 +106,8 @@ public sealed class AddToSetSheet
         _busyRing.Visibility = _busy ? Visibility.Visible : Visibility.Collapsed;
         _dialog.PrimaryButtonText = $"Add {_count} to the Set";
         _dialog.IsPrimaryButtonEnabled = _key is not null && _mode.Length > 0 && !_busy;
-        _madeNote.Text = _madeKey is null ? "Not in any library, or no real brand on it?"
-            : "Made from a common layout: once added, give it its start address and check its channels on the fixture.";
+        _madeNote.Text = _madeKey is null ? "Not in any library? Import the maker's GDTF file, or make it from a common layout."
+            : "Made for you: once added, give it its start address and check its channels on the fixture once.";
         _note.Content = _definition?.AddingNote is { } note
             ? UI.Text(note, Font.Callout).Foreground(_definition.Warning is null ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Red)).Wrap()
             : null;
@@ -146,6 +149,34 @@ public sealed class AddToSetSheet
         "smoke" => "cloud.fog",
         _ => "lightbulb",
     };
+
+    // MARK: Import GDTF…
+
+    /// A .gdtf file you have, converted on this computer into your fixtures, then chosen like a search result.
+    async void ImportGDTF()
+    {
+        if (_main is null || Dialogs.WindowOf(_main) is not { } id) return;
+        var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(id) { CommitButtonText = "Import" };
+        picker.FileTypeFilter.Add(".gdtf");
+        if (await picker.PickSingleFileAsync() is not { } file) return;
+        _busy = true;
+        Refresh();
+        try
+        {
+            if (!await _model.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            var name = Path.GetFileName(file.Path);
+            var r = await _model.Api.ImportGDTF(name, await File.ReadAllBytesAsync(file.Path));
+            if (r.Key is not { } k || r.Mode is not { } m) throw SetupAPIException.Server($"Couldn’t import {name}");
+            _busy = false;
+            Use(k, m);
+        }
+        catch (Exception x) when (SetView.IsApiError(x) || x is IOException) { ShowError(x.Message); }
+        finally
+        {
+            _busy = false;
+            Refresh();
+        }
+    }
 
     // MARK: New Fixture…
 
@@ -190,7 +221,7 @@ public sealed class AddToSetSheet
         Refresh();
         try
         {
-            var k = e.IsLocal ? e.Key : await _model.Api.AddToLibrary(e.Key);  // QLC+/OFL → our library
+            var k = e.IsLocal ? e.Key : await _model.Api.AddToLibrary(e.Key);  // QLC+/OFL/DDF → our library
             _key = k;
             _definition = _model.Workspace?.Definition(k);
             _mode = _definition?.DefaultMode ?? "";

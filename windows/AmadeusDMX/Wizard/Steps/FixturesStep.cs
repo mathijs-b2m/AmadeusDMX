@@ -20,7 +20,7 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
         };
         return UI.VStack(14,
             StepHeader.Build("light.overhead.right.fill", "Your Fixtures",
-                "The gear you bring to every gig: your set. Search our library, QLC+ and the Open Fixture Library by brand or model. Where they hang comes next."),
+                "The gear you bring to every gig: your set. Search our library, QLC+, the Open Fixture Library and DMXControl by brand or model. Where they hang comes next."),
             field,
             UI.Live(w, Results, nameof(WizardModel.Results)),
             UI.Live(w, Planned, nameof(WizardModel.Planned), nameof(WizardModel.Results)));

@@ -1,8 +1,10 @@
-// Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library), choose its mode and how
+// Adding fixtures to the set: search a model (our library, QLC+, Open Fixture Library, DMXControl DDF), choose its mode and how
 // many. No start addresses: you give each the one set on the fixture (in the inspector). Where they hang is done
 // on the Rigs page.
 import AmadeusKit
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AddToSetSheet: View {
     @Environment(AppModel.self) private var model
@@ -52,9 +54,11 @@ struct AddToSetSheet: View {
             .frame(minHeight: 200)
             .onChange(of: chosen) { Task { await prepare() } }
             HStack {
-                Text(madeKey == nil ? "Not in any library, or no real brand on it?" : "Made from a common layout: once added, give it its start address and check its channels on the fixture.")
+                Text(madeKey == nil ? "Not in any library? Import the maker's GDTF file, or make it from a common layout." : "Made for you: once added, give it its start address and check its channels on the fixture once.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Spacer()
+                Button("Import GDTF…", systemImage: "square.and.arrow.down") { Task { await importGDTF() } }
+                    .help("Convert a .gdtf file from the maker's site or your own GDTF Share account into your fixtures")
                 Button("New Fixture…", systemImage: "plus") { showNew = true }
                     .help("Make it from a common channel layout, then check it channel by channel on the real fixture")
             }
@@ -103,6 +107,26 @@ struct AddToSetSheet: View {
         error = definition == nil ? "Couldn’t read \(k)" : nil
     }
 
+    /// A .gdtf file you have, converted on this Mac into your fixtures, then chosen like a search result.
+    private func importGDTF() async {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = false
+        p.allowedContentTypes = [UTType(filenameExtension: "gdtf") ?? .zip]
+        p.message = "Choose a GDTF file: from the fixture maker's website or your own GDTF Share account"
+        p.prompt = "Import"
+        guard p.runModal() == .OK, let url = p.url else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
+            let r = try await model.api.importGDTF(name: url.lastPathComponent, data: try Data(contentsOf: url))
+            guard let k = r.key, let m = r.mode else { throw SetupAPIError.server("Couldn’t import \(url.lastPathComponent)") }
+            use(k, mode: m)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     private func icon(_ e: CatalogEntry) -> String {
         switch e.type ?? "" {
         case "moving head": "light.overhead.right"
@@ -120,7 +144,7 @@ struct AddToSetSheet: View {
         busy = true
         defer { busy = false }
         do {
-            let k = e.isLocal ? e.key : try await model.api.addToLibrary(e.key)  // QLC+/OFL → our library
+            let k = e.isLocal ? e.key : try await model.api.addToLibrary(e.key)  // QLC+/OFL/DDF → our library
             key = k
             definition = model.workspace?.definition(k)
             mode = definition?.defaultMode ?? ""

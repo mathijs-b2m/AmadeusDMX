@@ -1,14 +1,16 @@
 # Fixture catalogue
 
-Any fixture works, not only the ones in `fixtures/`. Search covers three libraries at once: ours (checked
-on real hardware), the QLC+ fixture library (~1,800, Apache-2.0) and the Open Fixture Library (~650, MIT).
+Any fixture works, not only the ones in `fixtures/`. Search covers four libraries at once: ours (checked
+on real hardware), the QLC+ fixture library (~1,800, Apache-2.0), the Open Fixture Library (~650, MIT) and the
+DMXControl DDF library (~900, of which ~700 in neither of the others, CC BY-SA 4.0: many DJ brands the others lack, such as Eurolite, Stairville
+and lightmaXX). A fixture in none of them can be imported from its maker's GDTF file (below).
 Adding a fixture copies its definition into `fixtures/<brand>/<model>.json`, where it is an ordinary library
 fixture that can be checked and calibrated (`amadeus test`, `colors`, `gobos`, `motion`, `tools/twin.py`).
 
 ## The shadow catalogue
 
-Every QLC+ and OFL fixture, already converted to our format, ships in `fixtures/catalog/`
-(`qlcplus.json.gz`, `ofl.json.gz`; about 0.4 MB together). Searching and adding work offline and on the
+Every QLC+, OFL and DDF fixture, already converted to our format, ships in `fixtures/catalog/`
+(`qlcplus.json.gz`, `ofl.json.gz`, `ddf.json.gz`; about 0.5 MB together). Searching and adding work offline and on the
 first run, and a converter fix reaches every fixture at once. A fixture that is newer than the catalogue
 is converted live from a downloaded library, as before.
 
@@ -16,7 +18,19 @@ is converted live from a downloaded library, as before.
 python tools/build_catalog.py --refresh
 ```
 
-rebuilds it from the latest libraries. `tests/test_catalog.py` fails when a converter changed and the
+rebuilds it from the latest libraries (`--only ddf` rebuilds one). The DDF file is its own data file under
+CC BY-SA 4.0 (see `THIRD_PARTY_NOTICES.md`); a fixture copied from it into your library keeps its DDF ids,
+authors and licence (`"ddf"`). Only DMXControl 3 files are read; a device the converter can't read yet (HSV
+colour, a shorthand matrix) is left out, and a device that is also in QLC+ or the OFL is listed from there.
+
+## Your own GDTF files
+
+GDTF is what makers publish for new fixtures, but GDTF Share's terms don't allow passing its files on, so
+none ship here. Use **Import GDTF…** when adding fixtures to a set (Mac and Windows), or
+`amadeus library --gdtf FILE`: a `.gdtf` you downloaded from the maker's site or your own GDTF Share account
+is converted on your computer into your fixtures (`amadeus/library/gdtf.py`), with the same safety rules as
+the other converters. It never replaces a fixture of the same name from another library (it gets `-gdtf`).
+Check it once on the real fixture, as with every converted fixture. `tests/test_catalog.py` fails when a converter changed and the
 catalogue wasn't rebuilt. It also patches every mode and beam effect of every fixture, and checks the
 safety rules below.
 
