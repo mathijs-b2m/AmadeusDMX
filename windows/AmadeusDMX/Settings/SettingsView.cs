@@ -207,7 +207,15 @@ public sealed class AssistantSection(AppModel model)
 
     public FrameworkElement Build()
     {
-        _host.Loaded += async (_, _) => { Show(); await model.RefreshClaudeDesktop(); };
+        _host.Loaded += async (_, _) =>  // while it shows: Claude's config can change elsewhere (Claude, another app)
+        {
+            Show();
+            while (_host.IsLoaded)
+            {
+                if (!_busy) await model.RefreshClaudeDesktop();
+                await Task.Delay(TimeSpan.FromSeconds(5));
+            }
+        };
         _host.Bind(model, nameof(AppModel.ClaudeDesktop), _ => Show());
         Show();
         return _host;
