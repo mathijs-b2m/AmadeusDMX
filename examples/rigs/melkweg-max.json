@@ -2089,7 +2089,7 @@
         "z_m": 5.08,
         "mount": "hang",
         "aim": [
-          0.0,
+          180.0,
           -75.0
         ],
         "truss": "balconySL",
@@ -2103,7 +2103,7 @@
         "z_m": 5.08,
         "mount": "hang",
         "aim": [
-          0.0,
+          180.0,
           -75.0
         ],
         "truss": "balconySL",
@@ -2145,7 +2145,7 @@
         "z_m": 5.08,
         "mount": "hang",
         "aim": [
-          0.0,
+          180.0,
           -75.0
         ],
         "truss": "balconySL",
@@ -2159,7 +2159,7 @@
         "z_m": 5.08,
         "mount": "hang",
         "aim": [
-          0.0,
+          180.0,
           -75.0
         ],
         "truss": "balconySL",
@@ -2201,7 +2201,7 @@
         "z_m": 5.08,
         "mount": "hang",
         "aim": [
-          0.0,
+          180.0,
           -75.0
         ],
         "truss": "balconySL",
@@ -2215,7 +2215,7 @@
         "z_m": 5.08,
         "mount": "hang",
         "aim": [
-          0.0,
+          180.0,
           -75.0
         ],
         "truss": "balconySL",
