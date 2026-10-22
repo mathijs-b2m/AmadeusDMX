@@ -104,7 +104,7 @@ public sealed class AddToSetSheet
             return;
         }
         _busyRing.Visibility = _busy ? Visibility.Visible : Visibility.Collapsed;
-        _dialog.PrimaryButtonText = $"Add {_count} to the Set";
+        _dialog.PrimaryButtonText = _key is null ? "Add to the Set" : $"Add {_count} to the Set";  // a number once a fixture is chosen
         _dialog.IsPrimaryButtonEnabled = _key is not null && _mode.Length > 0 && !_busy;
         _madeNote.Text = _madeKey is null ? "Not in any library? Import the maker's GDTF file, or make it from a common layout."
             : "Made for you: once added, give it its start address and check its channels on the fixture once.";
@@ -135,7 +135,7 @@ public sealed class AddToSetSheet
                     UI.Icon(Icon(e)).Secondary().Frame(width: 22),
                     UI.VStack(1,
                         UI.Text($"{e.Manufacturer} {e.Model}"),
-                        UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? "in your library" : e.Source?.ToUpperInvariant() }.OfType<string>()),
+                        UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? "in your library" : e.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0)),
                                 Font.Caption).Secondary())),
             });
     }

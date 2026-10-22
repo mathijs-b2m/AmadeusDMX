@@ -30,7 +30,7 @@ struct FixturesStep: View {
                             Image(systemName: icon(e)).frame(width: 22).foregroundStyle(.secondary)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text("\(e.manufacturer) \(e.model)")
-                                Text([e.type, e.look, e.isLocal ? "in your library" : e.source?.uppercased()].compactMap { $0 }.joined(separator: " · "))
+                                Text([e.type, e.look, e.isLocal ? "in your library" : e.source?.uppercased()].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()

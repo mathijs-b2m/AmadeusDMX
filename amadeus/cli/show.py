@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 from amadeus import paths, system
@@ -188,6 +189,14 @@ def direct_or_play(args):
 
     if args.director == "auto" and args.cmd == "play":  # the model chosen on the setup page
         args.director = args.show.load().get("director", "auto")
+        if args.director == "openai" and not os.environ.get("OPENAI_API_KEY"):
+            # the set's choice never stops a show (as in a live show): without a key, an AI plan made before, else
+            # the rules
+            from amadeus.pipeline import plan_path
+
+            if args.redo or not plan_path(args.wav, "openai", args.tempo).exists():
+                print("No OpenAI API key (Settings › Director): the rule-based director lights this track.")
+                args.director = "rules"
     director = pick_director(args.director, args.wav, args.redo, args.tempo)
     rig = load_rig(args.show) if args.cmd == "play" else None
     separate_now(args.wav)
