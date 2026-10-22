@@ -89,6 +89,9 @@ struct EditorInspector: View {
                 ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
             }
             ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
+            ValueSlider(title: "Stage height", value: Binding(get: { editor.doc.stage.deckM }, set: { editor.setStageHeight($0) }),
+                        range: 0...3, step: 0.1)
+                .help("How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage")
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
             if !editor.doc.stage.outdoor {
                 Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
@@ -408,9 +411,10 @@ struct FixtureInspector: View {
                     .font(.caption).foregroundStyle(.secondary)
             } else {
             Picker("Mount", selection: Binding(get: { fixture.mount }, set: { m in
+                let stage = editor.doc.stage
                 editor.updateFixture(fixture.id, "Change Mount") { f in
                     f.mount = m
-                    if m == "floor" && f.truss == nil { f.zM = 0.25 }
+                    if m == "floor" && f.truss == nil { f.zM = 0.25 + stage.ground(x: f.x, yM: f.yM) }
                 }
             })) {
                 Text(truss == nil ? "Hanging" : "Under").tag("hang")

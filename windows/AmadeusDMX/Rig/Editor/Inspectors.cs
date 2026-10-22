@@ -123,6 +123,8 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             d.Stage.Outdoor ? null
                 : EditorUI.ValueSlider(editor, "Ceiling", () => editor.Doc.Stage.CeilingM, v => editor.UpdateStage(s => s.CeilingM = v), 2.5, 20, 0.5),
             EditorUI.ValueSlider(editor, "Room depth", () => editor.Doc.Stage.RoomDepthM, v => editor.UpdateStage(s => s.RoomDepthM = v), 3, 60, 1),
+            EditorUI.NumberField(editor, "Stage height", () => editor.Doc.Stage.DeckM, editor.SetDeck, 0, 3, 0.1,
+                help: "How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage"),
             EditorUI.Toggle(editor, "LED wall behind the DJ", () => editor.Doc.HasScreen, editor.SetScreen),
             d.Stage.Outdoor ? null
                 : EditorUI.Toggle(editor, "Beams stay off the ceiling", () => editor.Doc.Stage.CeilingGuard, v => editor.UpdateStage(s => s.CeilingGuard = v),
@@ -415,7 +417,7 @@ public sealed class FixtureInspector(AppModel model, RigEditorModel editor, IRig
                 m => editor.UpdateFixture(id, "Change Mount", f =>
                 {
                     f.Mount = m;
-                    if (m == "floor" && f.Truss is null) f.ZM = 0.25;
+                    if (m == "floor" && f.Truss is null) f.ZM = RigEditorModel.FloorHeight(editor.Doc.Stage, f);
                 })));
         }
         if (truss is { } tr)

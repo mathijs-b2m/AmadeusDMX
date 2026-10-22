@@ -28,6 +28,14 @@ public sealed class SettingsView(AppModel model)
             host.Content = pages[i] ??= tabs[i].Page();  // built once: a tab keeps its state
         };
         bar.SelectedItem = bar.Items[0];
+        // opened for one tab (Import from Documents… → the OpenAI key): that one
+        string[] keys = ["general", "director", "integrations"];
+        bar.Bind(model, nameof(AppModel.SettingsTab), b =>
+        {
+            if (model.SettingsTab is not { } tab) return;
+            model.SettingsTab = null;
+            if (Array.IndexOf(keys, tab) is var i and >= 0) b.SelectedItem = b.Items[i];
+        });
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });

@@ -55,6 +55,16 @@ public sealed class AppModel : Observable
     /// Sheets: a new rig (from a template), and "mount the set on this rig?" when it isn't yet.
     bool _showNewRig;
     public bool ShowNewRig { get => _showNewRig; set => Set(ref _showNewRig, value); }
+    /// Import from Documents… (a set and a rig built from a venue's files).
+    bool _showImport;
+    public bool ShowImport { get => _showImport; set => Set(ref _showImport, value); }
+    /// Fixtures to select in the rig editor once it opens (a line of the import's report).
+    IReadOnlyList<string>? _pendingSelection;
+    public IReadOnlyList<string>? PendingSelection { get => _pendingSelection; set => Set(ref _pendingSelection, value); }
+    /// The Settings tab to show when the Settings page opens next ("director": the OpenAI key), like the Mac's
+    /// "settingsTab".
+    string? _settingsTab;
+    public string? SettingsTab { get => _settingsTab; set => Set(ref _settingsTab, value); }
     /// Goes up whenever sets or rigs were (re)read: views showing a file reload it.
     int _configVersion;
     public int ConfigVersion { get => _configVersion; private set => Set(ref _configVersion, value); }

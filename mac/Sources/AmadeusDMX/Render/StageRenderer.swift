@@ -19,6 +19,16 @@ struct StageInput {
     var selected: Set<String> = []   // "truss:ID" / "fixture:ID" (rig editor)
     var keepCamera = false           // the editor rebuilds the scene on every change: leave the camera alone
     var zones: [Zone] = []           // drawn translucent (rig editor)
+    var drawings: [FloorDrawing] = []  // a venue's light plots on the floor (rig editor)
+}
+
+/// A drawing lying on the stage floor (a page of a venue's light plot under the rig, rig editor).
+struct FloorDrawing {
+    var key: String                  // its page: the texture is made once
+    var image: CGImage
+    var corners: [SIMD2<Float>]      // its plan's top-left, top-right, bottom-right, bottom-left on the rig (m)
+    var crop: SIMD4<Float> = [0, 0, 1, 1]  // that plan's part of the page: x0, y0, x1, y1 (fractions from the top left)
+    var opacity: Float
 }
 
 extension StageInput {
@@ -37,7 +47,7 @@ extension StageInput {
 final class StageRenderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
     let queue: MTLCommandQueue
-    var solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe: MTLRenderPipelineState!
+    var solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, drawingPipe: MTLRenderPipelineState!
     var goboBeamPipe, goboDecalPipe: MTLRenderPipelineState!
     var zoneBuffer: MTLBuffer?
     var zoneCount = 0
@@ -59,6 +69,9 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var sceneryBuffer: MTLBuffer?
     var sceneryCount = 0
     var wallBuffer: MTLBuffer?
+    // the drawings on the floor: their pages as textures (kept per page), and what to draw this rig
+    var drawingTextures: [String: MTLTexture] = [:]
+    var drawingDraws: [(buffer: MTLBuffer, count: Int, texture: MTLTexture, opacity: Float)] = []
     var wallTexture: MTLTexture!
     var hdr, depth, halfA, halfB, quarterA, quarterB: MTLTexture?
     var scenery: Scenery?
@@ -169,7 +182,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         wake()
         preset = p
         guard let s = scenery else { return }
-        let target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling)
+        let target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling, deck: s.room.deck)
         if animated { goal = target } else { pose = target; goal = nil }
     }
 
@@ -411,6 +424,16 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 enc.setFragmentTexture(wallTexture, index: 0)
                 enc.setFragmentBytes(&wp, length: MemoryLayout<WallParams>.stride, index: 3)
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+            }
+            // the drawings on the floor: over it, under everything standing on it (they don't hide the spots)
+            for d in drawingDraws {
+                var params = SIMD4<Float>(d.opacity, Self.drawingBrightness, 0, 0)
+                enc.setRenderPipelineState(drawingPipe)
+                enc.setDepthStencilState(lightDepth)
+                enc.setVertexBuffer(d.buffer, offset: 0, index: 0)
+                enc.setFragmentTexture(d.texture, index: 0)
+                enc.setFragmentBytes(&params, length: MemoryLayout<SIMD4<Float>>.stride, index: 3)
+                enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: d.count)
             }
             enc.setDepthStencilState(lightDepth)
             if !decals.isEmpty {

@@ -595,7 +595,8 @@ class CinematicMixin:
         centre = np.mean([p[0] for p in self.head_pos])
         span = max(np.ptp([p[0] for p in self.head_pos]) / 2, 0.5)
         side = [float(np.clip((p[0] - centre) / span, -1, 1)) for p in self.head_pos]
-        stage_point = np.array([self.stage["width_m"] / 2, -0.5, 2.6])  # over the DJ's head, not in their face
+        deck = float(self.stage.get("deck_m", 0.0))
+        stage_point = np.array([self.stage["width_m"] / 2, -0.5, deck + 2.6])  # over the DJ's head, not in their face
         pics = []
         pics.append([(0.0, 78.0)] * n)  # a cathedral: every beam straight up
         pics.append([(s_ * 38, 12.0) for s_ in side])  # a fan over the crowd

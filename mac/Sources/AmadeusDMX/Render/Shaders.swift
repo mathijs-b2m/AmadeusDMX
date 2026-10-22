@@ -360,6 +360,16 @@ fragment float4 wall_fragment(WallOut in [[stage_in]], texture2d<float> tex [[te
     return float4(c * w.info.x * 1.6 * grid + float3(0.004), 1);
 }
 
+// ---------------------------------------------------------------- a drawing on the floor (rig editor)
+// d: x opacity, y brightness (white paper as the work-lit floor shows it); premultiplied alpha over the scene
+fragment float4 drawing_fragment(WallOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
+                                 constant float4 &d [[buffer(3)]]) {
+    constexpr sampler smp(filter::linear, mip_filter::linear, address::clamp_to_edge);
+    float4 c = tex.sample(smp, in.uv);
+    float a = c.a * d.x;
+    return float4(c.rgb * d.y * d.x, a);
+}
+
 // ---------------------------------------------------------------- final picture: bloom + tone curve
 struct FSOut { float4 pos [[position]]; float2 uv; };
 

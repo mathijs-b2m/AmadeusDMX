@@ -350,6 +350,7 @@ public sealed class RigDocument
         var fixtures = (out_.GetValueOrDefault("fixtures")?.Array ?? []).Select(v => v.Object).OfType<IReadOnlyDictionary<string, JSONValue>>()
             .Select(o => new Dictionary<string, JSONValue>(o)).ToList();
         var waiting = fixtures.Count(f => !places.ContainsKey(f.GetValueOrDefault("id")?.String ?? ""));
+        var deck = out_.GetValueOrDefault("stage")?["deck_m"]?.Number ?? 0;   // a raised stage: they wait on its deck (store.py)
         var k2 = 0;
         foreach (var f in fixtures)
         {
@@ -360,7 +361,7 @@ public sealed class RigDocument
             {
                 var spot = new Dictionary<string, JSONValue>
                 {
-                    ["x"] = Round((k2 + 1.0) / (waiting + 1), 10000), ["y_m"] = -0.3, ["z_m"] = 0.25, ["mount"] = "floor",
+                    ["x"] = Round((k2 + 1.0) / (waiting + 1), 10000), ["y_m"] = -0.3, ["z_m"] = Round(0.25 + deck, 1000), ["mount"] = "floor",
                 };
                 foreach (var (sk, sv) in spot) f[sk] = sv;
                 f[UnplacedKey] = JSONValue.Of(spot);

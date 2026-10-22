@@ -47,6 +47,8 @@ public sealed record Room
     public float Side { get; init; } = 2;
     /// An open-air stage: no ceiling, beams going up end in the air.
     public bool Outdoor { get; init; }
+    /// The stage's height above the hall floor: beams landing behind its front edge (y ≤ 0) stop on it.
+    public float Deck { get; init; }
 
     /// The back wall stands 1.5 m behind the rearmost fixture or truss (a round truss: its back edge).
     public Room(Stage stage, IEnumerable<FixtureInfo> fixtures, IEnumerable<Truss>? trusses = null)
@@ -54,6 +56,7 @@ public sealed record Room
         Width = (float)stage.WidthM;
         Ceiling = (float)stage.CeilingM;
         Outdoor = stage.Outdoor;
+        Deck = (float)stage.DeckM;
         Depth = (float)stage.RoomDepthM;
         var trussBack = (trusses ?? []).Select(t => t.Vertical ? t.YM : t.Pieces().Select(p => Math.Min(p.A.Y, p.B.Y)).DefaultIfEmpty(t.YM).Min());
         var rear = fixtures.Select(f => f.Pos.Y).Concat(trussBack).DefaultIfEmpty(-1).Min();
@@ -65,7 +68,11 @@ public sealed record Room
     {
         var best = (maxLen, Surface.Air);
         void Consider(float t, Surface s) { if (t > 0 && t < best.Item1) best = (t, s); }
-        if (d.Z < -1e-3f) Consider(-p.Z / d.Z, Surface.Floor);
+        if (d.Z < -1e-3f)  // the hall floor, or the stage where it lands behind its front edge (geometry.py beam_end)
+        {
+            var onDeck = (Deck - p.Z) / d.Z;
+            Consider(Deck > 0 && p.Z > Deck && p.Y + d.Y * onDeck <= 0 ? onDeck : -p.Z / d.Z, Surface.Floor);
+        }
         if (d.Z > 1e-3f && !Outdoor) Consider((Ceiling - p.Z) / d.Z, Surface.Ceiling);
         if (d.Y > 1e-3f) Consider((Depth - p.Y) / d.Y, Surface.Front);
         if (d.Y < -1e-3f) Consider((Back - p.Y) / d.Y, Surface.Back);

@@ -36,6 +36,13 @@ public sealed partial class StageRenderer
             new("TEXCOORD", 0, Format.R32G32_Float, WallVertex.UvOffset, 0),
         ];
 
+        InputElementDescription[] underlayVD =
+        [
+            new("POSITION", 0, Format.R32G32B32_Float, 0, 0),
+            new("TEXCOORD", 0, Format.R32G32_Float, UnderlayVertex.UvOffset, 0),
+            new("TEXCOORD", 1, Format.R32_Float, UnderlayVertex.AlphaOffset, 0),
+        ];
+
         solidPipe = Pipe("Solid.hlsl", "solid_vertex", "solid_fragment", solidVD, null);
         wallPipe = Pipe("Wall.hlsl", "wall_vertex", "wall_fragment", wallVD, null);
         beamPipe = Pipe("Beam.hlsl", "beam_vertex", "beam_fragment", coneVD, additive);
@@ -48,6 +55,7 @@ public sealed partial class StageRenderer
         downsamplePipe = Pipe("Post.hlsl", "fullscreen_vertex", "downsample_fragment", null, null);
         blurPipe = Pipe("Post.hlsl", "fullscreen_vertex", "blur_fragment", null, null);
         zonePipe = Pipe("Solid.hlsl", "solid_vertex", "zone_fragment", solidVD, premultiplied);
+        underlayPipe = Pipe("Underlay.hlsl", "underlay_vertex", "underlay_fragment", underlayVD, premultiplied);
 
         solidDepth = Device.CreateDepthStencilState(new DepthStencilDescription(true, DepthWriteMask.All, ComparisonFunction.Less));
         lightDepth = Device.CreateDepthStencilState(new DepthStencilDescription(true, DepthWriteMask.Zero, ComparisonFunction.Less));
@@ -100,6 +108,22 @@ public sealed partial class StageRenderer
         var c = CappedConeVertices();
         cappedConeCount = c.Length;
         cappedConeBuffer = Device.CreateBuffer((ReadOnlySpan<Vector3>)c, BindFlags.VertexBuffer);
+    }
+
+    /// A drawing's page as a texture, mipmapped (a plan's thin lines seen from afar).
+    unsafe (ID3D11Texture2D Texture, ID3D11ShaderResourceView View) PageTexture(DrawingPicture p)
+    {
+        int w = Math.Max(1, p.Width), h = Math.Max(1, p.Height);
+        var mips = (uint)(Math.Floor(Math.Log2(Math.Max(w, h))) + 1);
+        var d = new Texture2DDescription(Format.B8G8R8A8_UNorm, (uint)w, (uint)h, 1, mips, BindFlags.ShaderResource | BindFlags.RenderTarget,
+            ResourceUsage.Default, CpuAccessFlags.None, 1, 0, ResourceOptionFlags.GenerateMips);
+        var tex = Device.CreateTexture2D(d);
+        if (p.Bgra.Length >= w * h * 4)
+            fixed (byte* px = p.Bgra)
+                Context.UpdateSubresource(tex, 0, null, (IntPtr)px, (uint)(w * 4), 0);
+        var view = Device.CreateShaderResourceView(tex);
+        Context.GenerateMips(view);
+        return (tex, view);
     }
 
     /// The rig's gobo pictures (the hello's) as texture slices, mipmapped: slice i is picture i.

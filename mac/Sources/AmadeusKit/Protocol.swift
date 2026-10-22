@@ -50,6 +50,8 @@ public struct Stage: Codable, Sendable, Equatable {
     public var widthM: Double
     public var ceilingM: Double
     public var roomDepthM: Double
+    /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
+    public var deckM = 0.0
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public var ceilingGuard = true
     public var backGuard = true
@@ -58,8 +60,14 @@ public struct Stage: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case backGuard = "back_guard", outdoor
+        case deckM = "deck_m", backGuard = "back_guard", outdoor
     }
+
+    /// Whether a spot (x: fraction of the stage width) is on the stage: behind its front edge, across its width.
+    public static func onStage(x: Double, yM: Double) -> Bool { yM <= 0 && x >= 0 && x <= 1 }
+
+    /// What a fixture there stands on: the stage's deck, else the hall floor (heights count from the hall floor).
+    public func ground(x: Double, yM: Double) -> Double { Self.onStage(x: x, yM: yM) ? deckM : 0 }
 
     public init(widthM: Double = 6, ceilingM: Double = 4.5, roomDepthM: Double = 6) {
         self.widthM = widthM; self.ceilingM = ceilingM; self.roomDepthM = roomDepthM
@@ -70,6 +78,7 @@ public struct Stage: Codable, Sendable, Equatable {
         widthM = try c.decodeIfPresent(Double.self, forKey: .widthM) ?? 6
         ceilingM = try c.decodeIfPresent(Double.self, forKey: .ceilingM) ?? 4.5
         roomDepthM = try c.decodeIfPresent(Double.self, forKey: .roomDepthM) ?? 6
+        deckM = try c.decodeIfPresent(Double.self, forKey: .deckM) ?? 0
         ceilingGuard = try c.decodeIfPresent(Bool.self, forKey: .ceilingGuard) ?? true
         backGuard = try c.decodeIfPresent(Bool.self, forKey: .backGuard) ?? true
         outdoor = try c.decodeIfPresent(Bool.self, forKey: .outdoor) ?? false

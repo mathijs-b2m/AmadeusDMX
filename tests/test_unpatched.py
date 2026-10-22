@@ -27,6 +27,11 @@ def test_a_set_with_fixtures_waiting_for_an_address_loads():
     assert fxlib.validate(rig) == [] and fxlib.overlaps(rig) == []
 
 
+def test_one_without_a_universe_plays_in_universe_1():
+    rig = load_rig_dict({"fixtures": [{"id": "katana1", "fixture": "dts/katana", "x": 0.5}]})  # as documents import it
+    assert rig["fixtures"][0]["universe"] == 1
+
+
 def test_overlaps_are_a_warning_out_of_range_is_refused():
     n = fxlib.footprint(KATANA)
     both = {"fixtures": [{"id": "a", **KATANA, "address": 1}, {"id": "b", **KATANA, "address": n // 2}]}

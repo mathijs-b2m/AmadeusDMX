@@ -89,8 +89,9 @@ public static class CameraPresets
         _ => "square.grid.3x3",
     };
 
-    /// The pose for a room (fits the rig, like the web visualiser's camera).
-    public static CameraPose Pose(this CameraPreset p, float width, float top, float back, float ceiling)
+    /// The pose for a room (fits the rig, like the web visualiser's camera); `deck`: the stage's height above the
+    /// hall floor (what looks at the stage floor looks that much higher, the DJ stands on it).
+    public static CameraPose Pose(this CameraPreset p, float width, float top, float back, float ceiling, float deck = 0)
     {
         var W = width;
         var cx = W / 2;
@@ -104,14 +105,14 @@ public static class CameraPresets
             case CameraPreset.Crowd:
                 return CameraPose.From(new(cx - W * 0.12f, dist * 0.45f, 1.7f), new(cx, back / 2, tz * 1.15f));
             case CameraPreset.Drone:
-                return CameraPose.From(new(cx + W * 0.45f, dist * 1.25f, roomH + dist * 0.75f), new(cx, back / 2.5f, 1.0f));
+                return CameraPose.From(new(cx + W * 0.45f, dist * 1.25f, roomH + dist * 0.75f), new(cx, back / 2.5f, deck + 1.0f));
             case CameraPreset.Side:
                 return CameraPose.From(new(cx + W * 0.5f + dist * 0.75f, dist * 0.35f, roomH * 0.55f), new(cx, back / 3, tz));
             case CameraPreset.Dj:
-                return CameraPose.From(new(cx, back + 1.6f, 2.6f), new(cx, 8, 1.8f));
+                return CameraPose.From(new(cx, back + 1.6f, deck + 2.6f), new(cx, 8, 1.8f));
             default:  // Plan: top-down (almost: straight down has no "up" for the camera)
                 var span = MathF.Max(W + 6, -back + 8);
-                return new CameraPose(new(cx, back / 2 + 1, 0), 0, 1.45f, span * 1.25f);
+                return new CameraPose(new(cx, back / 2 + 1, deck), 0, 1.45f, span * 1.25f);
         }
     }
 }

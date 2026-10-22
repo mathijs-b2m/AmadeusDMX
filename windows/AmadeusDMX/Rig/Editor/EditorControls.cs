@@ -72,6 +72,33 @@ public static class EditorUI
                                                double min, double max, double step = 0.1, string unit = " m") =>
         ValueSlider(editor, title, get, set, () => min, () => max, step, unit);
 
+    /// A labelled number field with − and + (a Form's TextField with a number format and a Stepper), `min`…`max`,
+    /// stepping by `step`; `unit` after it ("m").
+    public static FrameworkElement NumberField(RigEditorModel editor, string title, Func<double> get, Action<double> set,
+                                               double min, double max, double step = 0.1, string unit = "m", string? help = null)
+    {
+        var following = false;  // the value set from the model isn't the user's
+        var box = new NumberBox
+        {
+            Value = get(), Minimum = min, Maximum = max, SmallChange = step, LargeChange = step * 5,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, Width = 130,
+        };
+        box.ValueChanged += (b, e) =>
+        {
+            if (following) return;
+            if (double.IsNaN(e.NewValue)) { b.Value = get(); return; }   // an emptied field: what it was
+            var v = Math.Min(max, Math.Max(min, Math.Round(e.NewValue, 2, MidpointRounding.AwayFromZero)));
+            if (Math.Abs(v - get()) > 1e-9) set(v);
+        };
+        var row = UI.HStack(8, UI.Text(title), UI.Spacer(), box, UI.Text(unit).Secondary()).Tooltip(help);
+        return row.Bind(editor, Follow, _ =>
+        {
+            following = true;
+            try { if (Math.Abs(box.Value - get()) > 1e-9) box.Value = get(); }
+            finally { following = false; }
+        });
+    }
+
     /// A switch with its title at the left (a Form's Toggle).
     public static FrameworkElement Toggle(RigEditorModel editor, string title, Func<bool> get, Action<bool> set, string? help = null)
     {

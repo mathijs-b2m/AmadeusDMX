@@ -182,6 +182,8 @@ public sealed partial class StageRenderer
     internal readonly List<SolidVertex> ZoneVertices = [];
     internal readonly List<LineInstance> ZoneEdges = [];
     internal WallVertex[]? WallVertices;
+    /// The drawings under the rig (rig editor): each one's page and its triangles on the floor.
+    internal readonly List<(string Key, DrawingPicture Picture, UnderlayVertex[] Vertices)> DrawingQuads = [];
 
     /// The view has keyboard focus (the window is the key window): held keys whose key-up went elsewhere are dropped.
     public Func<bool>? HasKeyFocus { get; set; }
@@ -195,7 +197,7 @@ public sealed partial class StageRenderer
         Wake();
         Preset = p;
         if (Scenery is not { } s) return;
-        var target = p.Pose(s.Room.Width, s.Top, s.Room.Back, s.Room.Ceiling);
+        var target = p.Pose(s.Room.Width, s.Top, s.Room.Back, s.Room.Ceiling, s.Room.Deck);
         if (animated) Goal = target; else { Pose = target; Goal = null; }
     }
 
@@ -457,6 +459,9 @@ public sealed partial class StageRenderer
         Scenery = s;
         SceneryKey = inp.Key;
         BuildZones(inp);
+        DrawingQuads.Clear();
+        foreach (var d in inp.Drawings)
+            if (DrawingVertices(d, s.Deck) is { Length: > 0 } dv) DrawingQuads.Add((d.Key, d.Picture, dv));
         if (s.Wall is { } w)
         {
             var c = w.Corners;
@@ -470,6 +475,55 @@ public sealed partial class StageRenderer
         }
         SceneryVersion++;
         if (first || !inp.KeepCamera) SetPreset(Preset, animated: false);
+    }
+
+    /// How far above the floor a drawing lies (m): just clear of it, under everything standing on it.
+    public const float DrawingLift = 0.008f;
+
+    /// A drawing's triangles: its plan (the page's crop) on the floor at its corners (rig metres are world x/y, as the
+    /// trusses'), and where a big or raised stage's deck is, the part over the deck again on top of it (the floor's
+    /// copy is hidden under it). The page lies on the rig turned and scaled, never sheared: its texture coordinates
+    /// interpolate exactly.
+    public static UnderlayVertex[] DrawingVertices(StageDrawing d, (float X0, float X1, float Y0, float Y1, float Top)? deck)
+    {
+        if (d.Corners.Count < 4) return [];
+        var crop = d.Crop is { Count: 4 } c4 ? c4.Select(v => (float)v).ToArray() : [0, 0, 1, 1];
+        Vector2[] uv = [new(crop[0], crop[1]), new(crop[2], crop[1]), new(crop[2], crop[3]), new(crop[0], crop[3])];
+        var page = d.Corners.Take(4).Select((c, i) => (P: new Vector2((float)c.X, (float)c.Y), Uv: uv[i])).ToList();
+        var out_ = new List<UnderlayVertex>();
+        void Fan(List<(Vector2 P, Vector2 Uv)> poly, float z)
+        {
+            for (var i = 1; i + 1 < poly.Count; i++)
+                foreach (var v in new[] { poly[0], poly[i], poly[i + 1] })
+                    out_.Add(new UnderlayVertex(new Vector3(v.P, z), v.Uv, d.Opacity));
+        }
+        Fan(page, DrawingLift);
+        if (deck is { } k)
+        {
+            // Sutherland–Hodgman against the deck's four sides
+            var poly = page;
+            foreach (var (axis, limit, keepBelow) in new[] { (0, k.X0, false), (0, k.X1, true), (1, k.Y0, false), (1, k.Y1, true) })
+                poly = Clip(poly, axis, limit, keepBelow);
+            if (poly.Count >= 3) Fan(poly, k.Top + DrawingLift);
+        }
+        return [.. out_];
+    }
+
+    static List<(Vector2 P, Vector2 Uv)> Clip(List<(Vector2 P, Vector2 Uv)> poly, int axis, float limit, bool keepBelow)
+    {
+        var out_ = new List<(Vector2 P, Vector2 Uv)>();
+        bool Inside((Vector2 P, Vector2 Uv) v) => keepBelow ? v.P[axis] <= limit : v.P[axis] >= limit;
+        for (var i = 0; i < poly.Count; i++)
+        {
+            var (a, b) = (poly[i], poly[(i + 1) % poly.Count]);
+            if (Inside(a)) out_.Add(a);
+            if (Inside(a) != Inside(b))
+            {
+                var t = (limit - a.P[axis]) / (b.P[axis] - a.P[axis]);
+                out_.Add((Vector2.Lerp(a.P, b.P, t), Vector2.Lerp(a.Uv, b.Uv, t)));
+            }
+        }
+        return out_;
     }
 
     /// Zone faces (translucent) and their edges (thin glowing lines), coloured by kind.

@@ -21,6 +21,9 @@ public interface IRigEditorHost
     bool EngineRunning { get; }
     /// The set only feeds the visualiser, no DMX output (true too for a set the app doesn't know).
     bool IsVirtual(string set);
+    /// A drawing's page as a picture (fetched from the engine and rendered once per file), or nil when it can't be
+    /// (no PDF renderer here: the tests).
+    Task<DrawingPicture?> PagePicture(string file) => Task.FromResult<DrawingPicture?>(null);
 }
 
 /// The setup API calls the editor makes (SetupAPI's, with the layouts as JSON objects).
@@ -36,6 +39,10 @@ public interface IRigEditorAPI
     Task<Dictionary<string, Dictionary<string, JSONValue>>> InOrderPlacements(IReadOnlyDictionary<string, JSONValue> layout);
     Task SaveRigStructure(IReadOnlyDictionary<string, JSONValue> layout, string rig);
     Task SaveRig(IReadOnlyDictionary<string, JSONValue> layout, string rigName, string setName);
+    /// The drawings under a rig (an import's plans), lining one up again (saves the rig), taking one away.
+    Task<Underlay[]> Underlays(string rig) => Task.FromResult<Underlay[]>([]);
+    Task<Underlay> AlignUnderlay(string rig, string id, Vec2 a, Vec2 b, double widthM) => throw new NotSupportedException();
+    Task<Underlay[]> RemoveUnderlay(string rig, string id) => throw new NotSupportedException();
 }
 
 /// The editor's calls on the engine's setup API.
@@ -64,4 +71,10 @@ public sealed class SetupEditorAPI(SetupAPI api) : IRigEditorAPI
 
     public Task SaveRig(IReadOnlyDictionary<string, JSONValue> layout, string rigName, string setName) =>
         api.SaveRig(layout, rigName, setName);
+
+    public Task<Underlay[]> Underlays(string rig) => api.Underlays(rig);
+
+    public Task<Underlay> AlignUnderlay(string rig, string id, Vec2 a, Vec2 b, double widthM) => api.AlignUnderlay(rig, id, a, b, widthM);
+
+    public Task<Underlay[]> RemoveUnderlay(string rig, string id) => api.RemoveUnderlay(rig, id);
 }
