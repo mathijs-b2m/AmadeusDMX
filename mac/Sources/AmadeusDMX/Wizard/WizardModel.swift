@@ -134,7 +134,7 @@ final class WizardModel {
         }
         let modes = channels.sorted { $0.value > $1.value }.map(\.key)
         planned.append(PlannedFixture(entry: e, mode: modes.first ?? "", modes: modes,
-                                      count: e.type == "moving head" ? 4 : 2, channels: channels))
+                                      count: 1, channels: channels))
     }
 
     /// The universes the fixtures take, packed as the engine patches them (amadeus/dmx/discover.py
