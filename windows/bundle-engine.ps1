@@ -68,7 +68,8 @@ if ($env:FFMPEG_EXE) {
 
 # compiled once here: the installed program folder is never written to (the engine runs with
 # PYTHONDONTWRITEBYTECODE), and "unchecked-hash" keeps the .pyc files valid whatever the files' dates become
-& $Python -m compileall -q -j 0 --invalidation-mode unchecked-hash $Lib (Join-Path $Engine 'amadeus') | Out-Null
+# (-f: the runtime's own come with date-checked ones, which Python would otherwise rewrite in the program folder)
+& $Python -m compileall -q -f -j 0 --invalidation-mode unchecked-hash $Lib (Join-Path $Engine 'amadeus') | Out-Null
 
 & $Python -c 'import numpy, scipy, soundfile, sounddevice, websockets, openai, serial, aalink, comtypes, zeroconf'
 # djay's UI Automation wrapper, generated now: at first use comtypes would write it into %APPDATA%

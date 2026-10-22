@@ -84,7 +84,8 @@ public sealed partial record Workspace
         {
             using var p = Process.Start(new ProcessStartInfo(runtime)
             {
-                ArgumentList = { "-m", "venv", "--upgrade", "--system-site-packages", "--without-pip", env },
+                // -B: nothing written into the program folder
+                ArgumentList = { "-B", "-m", "venv", "--upgrade", "--system-site-packages", "--without-pip", env },
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
             });
             p?.WaitForExit();

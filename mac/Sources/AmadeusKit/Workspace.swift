@@ -52,7 +52,7 @@ public struct Workspace: Sendable, Equatable {
         guard !cfg.contains("home = \(runtime.deletingLastPathComponent().path)\n") else { return }
         let p = Process()
         p.executableURL = runtime
-        p.arguments = ["-m", "venv", "--upgrade", "--system-site-packages", "--without-pip", env.path]
+        p.arguments = ["-B", "-m", "venv", "--upgrade", "--system-site-packages", "--without-pip", env.path]  // -B: nothing written into the signed app
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         try? p.run()

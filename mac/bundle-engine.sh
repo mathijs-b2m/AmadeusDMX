@@ -40,8 +40,9 @@ mkdir -p "$RES/engine/vdj/build"
 cp -R "$ROOT/vdj/build/AmadeusLink.bundle" "$RES/engine/vdj/build/"
 
 # compiled once here: the signed app is never written to (the engine runs with PYTHONDONTWRITEBYTECODE), and
-# "unchecked-hash" keeps the .pyc files valid whatever the files' dates become after copying
-"$RES/runtime/bin/python3" -m compileall -q -j 0 --invalidation-mode unchecked-hash "$LIB" "$RES/engine/amadeus" >/dev/null
+# "unchecked-hash" keeps the .pyc files valid whatever the files' dates become after copying (-f: the runtime's own
+# come with date-checked ones, which Python would otherwise rewrite inside the app)
+"$RES/runtime/bin/python3" -m compileall -q -f -j 0 --invalidation-mode unchecked-hash "$LIB" "$RES/engine/amadeus" >/dev/null
 
 # every binary of the runtime signed on its own (ad hoc: Apple Silicon needs a signature; the VirtualDJ plugin is
 # signed as a bundle by vdj/build.sh), the app itself after this script
