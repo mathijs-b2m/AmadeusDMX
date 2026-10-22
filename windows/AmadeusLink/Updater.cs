@@ -62,6 +62,9 @@ public sealed class Updater : IUpdater, IDisposable
             CustomInstallerArguments = InstallerArguments + " /RELAUNCH",
             RelaunchAfterUpdate = false,  // the installer starts the app it installed, not this exe wherever it ran from
             ClearOldInstallers = null,
+            // name the download after the feed's link (AmadeusLink-Setup-1.3.1.exe): asking the server names it after
+            // where GitHub redirects, a bare id without .exe, and Windows can't run that, so nothing installs
+            CheckServerFileName = false,
         };
         _sparkle.Configuration = new BuildConfiguration(new BuildAccessor(appName));
         _sparkle.AppCastHelper = new ByBuildNumber();
