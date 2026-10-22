@@ -118,9 +118,9 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
     names = ids(draft, choices)
     fixtures = []
     for i, it in enumerate(draft.items):
-        f = {"id": names[i], "fixture": choices[i].key, "mode": choices[i].mode}
+        f = {"id": names[i], "fixture": choices[i].key, "mode": choices[i].mode, "universe": it.universe or 1}
         if it.address:
-            f.update(universe=it.universe or 1, address=it.address)
+            f["address"] = it.address
         fixtures.append(f)
     placed = {names[i]: it for i, it in enumerate(draft.items) if it.pos}
     on_stage = [it.pos[0] for it in placed.values() if it.pos[1] <= 1.0] or [it.pos[0] for it in placed.values()]
