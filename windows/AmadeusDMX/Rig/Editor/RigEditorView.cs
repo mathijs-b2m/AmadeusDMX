@@ -121,7 +121,8 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
     FrameworkElement ChangedOnDisk()
     {
         var row = UI.HStack(10,
-            UI.Label("exclamationmark.triangle", "This rig was changed outside the editor (by your AI assistant or the setup page) while you have unsaved changes.", Font.Callout).Grow(),
+            UI.Label("exclamationmark.triangle", "Saved elsewhere while you were editing", Font.Callout)
+                .Tooltip("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours."),
             UI.Button("Load Their Changes", editor.TakeChangesOnDisk).Prominent()
                 .Tooltip("Show the rig as it was saved elsewhere. Undo brings your changes back"),
             UI.Button("Keep Mine", editor.KeepChangesHere).Tooltip("Keep your changes: saving puts them over the other ones"));

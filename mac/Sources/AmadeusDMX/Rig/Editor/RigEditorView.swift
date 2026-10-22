@@ -209,9 +209,9 @@ struct RigEditorView: View {
     /// Saved elsewhere (your AI assistant, the web setup page) while there are unsaved changes here: which to keep.
     private var changedOnDisk: some View {
         HStack(spacing: 10) {
-            Label("This rig was changed outside the editor (by your AI assistant or the setup page) while you have unsaved changes.",
-                  systemImage: "exclamationmark.triangle")
+            Label("Saved elsewhere while you were editing", systemImage: "exclamationmark.triangle")
                 .font(.callout)
+                .help("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours.")
             Button("Load Their Changes") { editor.takeChangesOnDisk() }
                 .buttonStyle(.glassProminent)
                 .help("Show the rig as it was saved elsewhere. Undo brings your changes back")
