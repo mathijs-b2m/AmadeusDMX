@@ -45,38 +45,60 @@ public sealed class RigView(AppModel model)
 sealed class RigList(AppModel model)
 {
     bool _quiet;
+    List<(string Name, string Line, bool IsExample)> _shown = [];
+
+    void Select(ListView l)
+    {
+        var quiet = _quiet;
+        _quiet = true;
+        l.SelectedItem = l.Items.OfType<ListViewItem>().FirstOrDefault(i => i.Tag is (string n, string _) && n == model.EditingRig);
+        _quiet = quiet;
+    }
 
     public FrameworkElement Build()
     {
         var list = new ListView { SelectionMode = ListViewSelectionMode.Single };
         list.SelectionChanged += (_, _) =>
         {
-            if (_quiet || list.SelectedItem is not ListViewItem { Tag: (string name, string _) }) return;
-            model.EditingRig = name;  // it opens showing a set on it (AppModel.RigSetDefault)
+            if (_quiet) return;
+            if (list.SelectedItem is ListViewItem { Tag: (string name, string _) }) model.EditingRig = name;  // it opens showing a set on it (AppModel.RigSetDefault)
+            else Select(list);  // a section title isn't a rig
         };
         list.Bind(model, [nameof(AppModel.Rigs), nameof(AppModel.Sets), nameof(AppModel.EditingRig)], l =>
         {
             _quiet = true;
             try
             {
-                var rows = model.Rigs.Select(r => (r.Name, Line: Line(r.Name))).ToList();
-                var shown = l.Items.OfType<ListViewItem>().Select(i => i.Tag is (string n, string s) ? (n, s) : ("", "")).ToList();
-                if (!rows.SequenceEqual(shown))
+                // yours first, then the examples under their own title (as on the Sets page)
+                var rows = model.Rigs.OrderBy(r => r.IsExample).Select(r => (r.Name, Line(r.Name), r.IsExample)).ToList();
+                if (!rows.SequenceEqual(_shown))
                 {
+                    _shown = rows;
                     l.Items.Clear();
-                    foreach (var (name, line) in rows)
+                    void Title(UIElement content) =>
+                        l.Items.Add(new ListViewItem { Content = content, IsTabStop = false, Padding = new Thickness(12, 10, 12, 2) });
+                    if (!rows.Any(r => !r.IsExample))
+                        Title(UI.Text("None yet. Your venues go in rigs of your own: make one with New Rig…", Font.Callout).Secondary().Wrap());
+                    var titled = false;
+                    foreach (var (name, line, example) in rows)
                     {
+                        if (example && !titled)
+                        {
+                            titled = true;
+                            Title(UI.VStack(1, UI.Text("Examples", Font.Subheadline).Secondary().Bold(),
+                                            UI.Text("Venues to look around in and try the show on.", Font.Caption).Secondary().Wrap()));
+                        }
                         var text = UI.VStack(2, UI.Text(name, Font.Headline), UI.Text(line, Font.Caption).Secondary().Wrap(2));
                         text.Padding = new Thickness(0, 4, 0, 4);
                         l.Items.Add(new ListViewItem { Content = text, Tag = (name, line) });
                     }
                 }
-                l.SelectedItem = l.Items.OfType<ListViewItem>().FirstOrDefault(i => i.Tag is (string n, string _) && n == model.EditingRig);
+                Select(l);
             }
             finally { _quiet = false; }
         });
 
-        var header = UI.HStack(8, UI.Text("Rigs", Font.Subheadline).Secondary().Bold(), UI.Spacer(),
+        var header = UI.HStack(8, UI.Text("Your Rigs", Font.Subheadline).Secondary().Bold(), UI.Spacer(),
                                UI.IconButton("plus", "Make a new rig (Ctrl+Alt+N)", () => model.ShowNewRig = true)).Padding(14, 10);
         // a real button, full width under the list: the first place you look for a new rig
         var add = UI.Button("New Rig…", () => model.ShowNewRig = true, "plus").Prominent().Tooltip("Make a new rig: start from an empty room or a template (Ctrl+Alt+N)");
