@@ -138,7 +138,7 @@ struct SetView: View {
         .onDisappear { switchOffTests() }
         .onChange(of: model.editingSet) { old, _ in switchOffTests(set: old); selection = []; load() }
         .onChange(of: model.engineRunning) { if model.engineRunning { switchOffTests() } }
-        .onChange(of: model.sets) { load() }
+        .onChange(of: model.configVersion) { load() }  // also a change made elsewhere (amadeus mcp, the web page)
         .onChange(of: selection) { stage.highlight = Set(selection.flatMap { id in elementIDs(id) }) }
     }
 

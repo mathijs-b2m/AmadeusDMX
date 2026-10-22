@@ -117,6 +117,55 @@ public class RigEditorTests(ITestOutputHelper output)
     static PlacedFixture Fx(RigEditorModel e, string id) => e.Doc.Fixtures.First(f => f.Id == id);
     static Truss Tr(RigEditorModel e, string id) => e.Doc.Trusses.First(t => t.Id == id);
 
+    /// Another program (amadeus mcp, the web setup page) saves the rig: the stage width it gives it.
+    static void SavedElsewhere(EditorWorkspace w, double width)
+    {
+        var path = Path.Combine(w.Data, "config", "rigs", "showcase.json");
+        var rig = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+        rig["stage"]!["width_m"] = width;
+        File.WriteAllText(path, rig.ToJsonString());
+    }
+
+    [Fact]
+    public void AChangeSavedElsewhereReloadsACleanEditorAndAsksADirtyOne()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        SavedElsewhere(w, 14);
+        e.ReloadIfClean();  // nothing unsaved here: it simply shows the new rig
+        Assert.Equal(14, e.Doc.Width, 6);
+        Assert.False(e.IsDirty);
+        Assert.Null(e.ChangedOnDisk);
+
+        var front = Tr(e, "front") with { };
+        Assert.True(e.Pick(Above(front.XM, front.YM), Down, false));
+        e.Drag(Above(front.XM, front.YM - 1), Down, false);
+        e.EndDrag();
+        var mine = Tr(e, "front").YM;
+        SavedElsewhere(w, 16);
+        e.ReloadIfClean();  // unsaved changes here: nothing replaced, it asks
+        Assert.NotNull(e.ChangedOnDisk);
+        Assert.Equal(14, e.Doc.Width, 6);
+        Assert.Equal(mine, Tr(e, "front").YM, 6);
+        e.TakeChangesOnDisk();
+        Assert.Null(e.ChangedOnDisk);
+        Assert.Equal(16, e.Doc.Width, 6);
+        Assert.False(e.IsDirty);
+        e.UndoManager!.Undo();  // my changes back
+        Assert.Equal(mine, Tr(e, "front").YM, 6);
+        Assert.True(e.IsDirty);
+
+        SavedElsewhere(w, 18);
+        e.ReloadIfClean();
+        Assert.NotNull(e.ChangedOnDisk);
+        e.KeepChangesHere();  // Save would put mine over theirs; no more asking about the same change
+        Assert.Null(e.ChangedOnDisk);
+        Assert.True(e.IsDirty);
+        e.ReloadIfClean();
+        Assert.Null(e.ChangedOnDisk);
+        Assert.Equal(mine, Tr(e, "front").YM, 6);
+    }
+
     [Fact]
     public void ATrussDraggedSnapsTo25cmAndItsFixturesFollow()
     {

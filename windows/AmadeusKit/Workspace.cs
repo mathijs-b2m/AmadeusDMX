@@ -108,6 +108,41 @@ public sealed partial record Workspace
         catch (System.ComponentModel.Win32Exception) { return []; }
     }
 
+    /// Whether Claude Desktop starts this engine's assistant server (`amadeus mcp --claude-desktop`): "status",
+    /// or "on"/"off" to change it. Null when the engine couldn't say.
+    public async Task<ClaudeDesktopStatus?> ClaudeDesktop(string action = "status", CancellationToken ct = default)
+    {
+        var psi = PythonStart(["-m", "amadeus", "mcp", "--claude-desktop", action]);
+        try
+        {
+            using var p = Process.Start(psi);
+            if (p is null) return null;
+            var data = await p.StandardOutput.ReadToEndAsync(ct);
+            await p.WaitForExitAsync(ct);
+            return J.Decode(J.Utf8(data), ClaudeDesktopStatus.From);
+        }
+        catch (System.ComponentModel.Win32Exception) { return null; }
+    }
+
+    /// The sets and rigs on disk, in one line: it changes when any of them is written, added or removed (by the
+    /// web setup page, the command line, your AI assistant), so the app can read them again.
+    public string ConfigStamp()
+    {
+        var parts = new List<string>();
+        foreach (var dir in new[] { SetsDir, RigsDir })
+        {
+            if (!Directory.Exists(dir)) continue;
+            foreach (var f in Directory.GetFiles(dir, "*.json").Order(StringComparer.Ordinal))
+            {
+                var i = new FileInfo(f);
+                parts.Add(i.Exists ? $"{f}|{i.LastWriteTimeUtc.Ticks}|{i.Length}" : f);
+            }
+        }
+        parts.Add(ActiveSet ?? "");
+        parts.Add(ActiveRig ?? "");
+        return string.Join("\n", parts);
+    }
+
     ProcessStartInfo PythonStart(IEnumerable<string> args)
     {
         var psi = new ProcessStartInfo(Python)
@@ -286,6 +321,16 @@ public sealed record PackInfo(string Name, string Title, string About, string Si
     public static PackInfo From(System.Text.Json.JsonElement c) => new(
         J.Req(c, "name", J.String), J.Req(c, "title", J.String), J.Req(c, "about", J.String), J.Req(c, "size", J.String),
         J.Req(c, "note", J.String), J.Req(c, "installed", J.Bool));
+}
+
+/// Claude Desktop and the assistant server (amadeus/mcp/claude_desktop.py status). Installed: it has a config
+/// folder; On: its config starts this engine's server; Current: as this engine would write it now (else the app
+/// moved: write it again).
+public sealed record ClaudeDesktopStatus(bool Installed, bool On, bool Current, string Config, string Problem)
+{
+    public static ClaudeDesktopStatus From(System.Text.Json.JsonElement c) => new(
+        J.Req(c, "installed", J.Bool), J.Req(c, "on", J.Bool), J.Req(c, "current", J.Bool), J.Req(c, "config", J.String),
+        J.Req(c, "problem", J.String));
 }
 
 /// A set file (config/sets/NAME.json), the parts the app shows.

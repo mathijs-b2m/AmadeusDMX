@@ -22,7 +22,11 @@ struct RigEditorView: View {
                         stage.preset = .drone
                         editor.undoManager = undoManager
                     }
-                toolbar.padding(12)
+                VStack(spacing: 8) {
+                    toolbar
+                    if editor.changedOnDisk != nil { changedOnDisk }
+                }
+                .padding(12)
                 VStack {
                     Spacer()
                     HStack(alignment: .bottom) {
@@ -200,6 +204,23 @@ struct RigEditorView: View {
             .font(.caption)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .glassEffect(.regular, in: .capsule)
+    }
+
+    /// Saved elsewhere (your AI assistant, the web setup page) while there are unsaved changes here: which to keep.
+    private var changedOnDisk: some View {
+        HStack(spacing: 10) {
+            Label("Saved elsewhere while you were editing", systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .help("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours.")
+            Button("Load Their Changes") { editor.takeChangesOnDisk() }
+                .buttonStyle(.glassProminent)
+                .help("Show the rig as it was saved elsewhere. Undo brings your changes back")
+            Button("Keep Mine") { editor.keepChangesHere() }
+                .buttonStyle(.glass)
+                .help("Keep your changes: saving puts them over the other ones")
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .glassEffect(.regular.tint(.orange.opacity(0.25)), in: .capsule)
     }
 
     private var cameraButtons: some View {

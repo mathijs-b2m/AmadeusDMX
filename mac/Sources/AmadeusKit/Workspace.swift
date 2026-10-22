@@ -75,6 +75,40 @@ public struct Workspace: Sendable, Equatable {
         return (try? JSONDecoder().decode([PackInfo].self, from: data)) ?? []
     }
 
+    /// Whether Claude Desktop starts this engine's assistant server (`amadeus mcp --claude-desktop`): "status",
+    /// or "on"/"off" to change it. Nil when the engine couldn't say.
+    public func claudeDesktop(_ action: String = "status") async -> ClaudeDesktopStatus? {
+        let p = Process()
+        p.executableURL = python
+        p.arguments = ["-m", "amadeus", "mcp", "--claude-desktop", action]
+        p.currentDirectoryURL = root
+        p.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let data = await Task.detached { out.fileHandleForReading.readDataToEndOfFile() }.value
+        p.waitUntilExit()
+        return try? JSONDecoder().decode(ClaudeDesktopStatus.self, from: data)
+    }
+
+    /// The sets and rigs on disk, in one line: it changes when any of them is written, added or removed (by the
+    /// web setup page, the command line, your AI assistant), so the app can read them again.
+    public func configStamp() -> String {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+        var parts: [String] = []
+        for dir in [setsDir, rigsDir] {
+            let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys)) ?? []
+            for f in files.filter({ $0.pathExtension == "json" }).sorted(by: { $0.path < $1.path }) {
+                let v = try? f.resourceValues(forKeys: Set(keys))
+                parts.append("\(f.path)|\(v?.contentModificationDate?.timeIntervalSince1970 ?? 0)|\(v?.fileSize ?? 0)")
+            }
+        }
+        parts.append(activeSet ?? "")
+        parts.append(activeRig ?? "")
+        return parts.joined(separator: "\n")
+    }
+
     public var isBuiltIn: Bool { data != root }
 
     /// What the engine needs to know where it is (amadeus/paths.py).
@@ -238,6 +272,18 @@ public struct PackInfo: Codable, Sendable, Identifiable {
     public var note: String
     public var installed: Bool
     public var id: String { name }
+}
+
+/// Claude Desktop and the assistant server (amadeus/mcp/claude_desktop.py status).
+public struct ClaudeDesktopStatus: Codable, Sendable, Equatable {
+    /// Claude Desktop is installed (it has a config folder).
+    public var installed: Bool
+    /// Its config starts this engine's server.
+    public var on: Bool
+    /// … as this engine would write it now (else the app moved: write it again).
+    public var current: Bool
+    public var config: String
+    public var problem: String
 }
 
 /// A set file (config/sets/NAME.json), the parts the app shows.

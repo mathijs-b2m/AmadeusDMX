@@ -213,6 +213,7 @@ struct IntegrationSettings: View {
         Form {
             VirtualDJSection()
             StreamedSection()
+            AssistantSection()
         }
         .formStyle(.grouped)
     }
@@ -259,6 +260,47 @@ struct StreamedSection: View {
         model.workspace?.setIntegrationSetting("streamed", "on", value)
         if !value { model.workspace?.setIntegrationSetting("djay", "streamed", false) }  // off means off, also the old one
         on = value
+    }
+}
+
+/// Your own AI assistant (amadeus mcp, docs/ai-assistants.md): Claude Desktop starts the engine's assistant server and
+/// can then make and change your sets and rigs. Off until switched on; the engine writes Claude's config.
+struct AssistantSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var busy = false
+
+    var body: some View {
+        let status = model.claudeDesktop
+        SwiftUI.Section {
+            Toggle(isOn: Binding(get: { status?.on ?? false }, set: { on in
+                busy = true
+                Task { await model.setClaudeDesktop(on); busy = false }
+            })) {
+                Text("Claude Desktop can work on your sets and rigs")
+                Text("Ask Claude to make a rig for a venue from its PDFs, add fixtures, mount them or check what is unfinished. It uses your own Claude subscription.")
+            }
+            .disabled(busy || status == nil || status?.installed == false && status?.on == false)
+            if let status {
+                if !status.problem.isEmpty {
+                    Label(status.problem, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.orange)
+                } else if !status.installed {
+                    Label("Claude Desktop isn't installed (or hasn't been opened yet).", systemImage: "info.circle")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else if status.on {
+                    Label("Restart Claude Desktop to pick this up. In a new chat, amadeus-dmx is under the tools button.",
+                          systemImage: "checkmark.circle").font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            HStack {
+                Spacer()
+                Link("Other assistants (Claude Code, Codex)…", destination: HelpLinks.assistants).font(.callout)
+            }
+        } header: {
+            Text("Your AI assistant")
+        } footer: {
+            Text("Everything it saves is checked as in the app, and before each change your sets and rigs are copied aside: ask it to undo. It can't delete sets or rigs, switch lights on or change a show that is running. An open rig editor shows its changes, or asks first when you have unsaved changes there.")
+        }
+        .task(id: model.workspace) { await model.refreshClaudeDesktop() }
     }
 }
 

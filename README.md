@@ -271,6 +271,7 @@ python3 -m venv .venv
 | [Command line](docs/command-line.md) | Every `amadeus` command, VirtualDJ live mode, the sync test, sets and rigs, the hardware checklist |
 | [Architecture](docs/architecture.md) | The code map: which package does what, and which way the dependencies go |
 | [Sets and rigs](docs/rig-format.md) | The file formats, trusses, auto-mount, the hang sheet |
+| [Your own AI assistant](docs/ai-assistants.md) | Claude Desktop, Claude Code or Codex sets up your sets and rigs (`amadeus mcp`) |
 | [DJ software](docs/dj-software.md) | Each integration: what it reads, what it needs, what it's tested on |
 | [Protocols](docs/protocols.md) | The engine's feed, the VirtualDJ plugin, Amadeus Link |
 | [Fixture catalogue](docs/fixture-catalog.md) · [Fixture twin](docs/fixture-twin.md) | QLC+ / OFL conversion; checking head motion against the real fixture |

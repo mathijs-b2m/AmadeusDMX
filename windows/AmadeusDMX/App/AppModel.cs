@@ -201,6 +201,41 @@ public sealed class AppModel : Observable
         }
     }
 
+    /// Follows changes to the sets and rigs made outside the app (the web setup page, the command line, your AI
+    /// assistant through `amadeus mcp`): they are read again, and an open rig editor reloads (RigEditorModel).
+    async void WatchConfig()
+    {
+        _configStamp = Workspace?.ConfigStamp() ?? "";
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            if (Workspace?.ConfigStamp() is not { } stamp || stamp == _configStamp) continue;
+            _configStamp = stamp;
+            ReloadSets();
+        }
+    }
+    string _configStamp = "";
+
+    /// Claude Desktop and the assistant server (Settings › Integrations): null until read.
+    ClaudeDesktopStatus? _claudeDesktop;
+    public ClaudeDesktopStatus? ClaudeDesktop { get => _claudeDesktop; private set => Set(ref _claudeDesktop, value); }
+
+    /// Reads whether Claude Desktop starts the assistant server; when it does with an engine somewhere else (the
+    /// app moved, an update, another engine folder chosen), it is pointed at this one again.
+    public async Task RefreshClaudeDesktop()
+    {
+        if (Workspace is not { } ws) { ClaudeDesktop = null; return; }
+        var s = await ws.ClaudeDesktop();
+        if (s is { On: true, Current: false, Problem: "" }) s = await ws.ClaudeDesktop("on") ?? s;
+        ClaudeDesktop = s;
+    }
+
+    public async Task SetClaudeDesktop(bool on)
+    {
+        if (Workspace is not { } ws) return;
+        ClaudeDesktop = await ws.ClaudeDesktop(on ? "on" : "off") ?? ClaudeDesktop;
+    }
+
     /// Open the rig editor.
     public void EditLayout() => Section = Section.Rig;
 
@@ -252,6 +287,8 @@ public sealed class AppModel : Observable
         Later(() => EditorSelfTest.RunIfRequested(this));  // -editorSelfTest SET (development; it saves into the set and rig SET)
         if (Workspace is { } ws && ws.LimiterLevel() < 1) ws.SetLimiterLevel(1);
         WatchLimiter();
+        WatchConfig();
+        _ = RefreshClaudeDesktop();
     }
 
     public bool NeedsSetup => Workspace is null;
@@ -263,6 +300,7 @@ public sealed class AppModel : Observable
         Workspace = ws;
         Defaults.Standard.Set("engineRoot", path);
         ReloadSets();
+        _ = RefreshClaudeDesktop();
         return true;
     }
 
@@ -289,6 +327,7 @@ public sealed class AppModel : Observable
         Workspace = ws;
         Defaults.Standard.Remove("engineRoot");
         ReloadSets();
+        _ = RefreshClaudeDesktop();
     }
 
     /// Reads the sets and rigs again (after any change to them), and keeps a valid selection.

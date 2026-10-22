@@ -26,7 +26,9 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
         var stage = new Grid { MinWidth = 520 };
         stage.Children.Add(_viewport.Build());
-        stage.Children.Add(Toolbar().Align(VerticalAlignment.Top).Margin(12, 12, 12, 0));
+        stage.Children.Add(UI.VStack(8, Toolbar(),
+            EditorUI.Keyed(editor, () => (editor.ChangedOnDisk is null).ToString(), () => editor.ChangedOnDisk is null ? null : ChangedOnDisk()))
+            .Align(VerticalAlignment.Top).Margin(12, 12, 12, 0));
         var bottom = UI.HStack(8,
             EditorUI.Keyed(editor, () => editor.Check is null ? "hint" : "check",
                            () => editor.Check is null ? Hint() : new HangCheckPanel(editor, _host).Build()),
@@ -112,6 +114,23 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             Child = bar, Padding = new Thickness(8), CornerRadius = new CornerRadius(12),
             Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"), BorderBrush = Theme.Brush("CardStrokeColorDefaultBrush"),
             BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+    }
+
+    /// Saved elsewhere (your AI assistant, the web setup page) while there are unsaved changes here: which to keep.
+    FrameworkElement ChangedOnDisk()
+    {
+        var row = UI.HStack(10,
+            UI.Label("exclamationmark.triangle", "Saved elsewhere while you were editing", Font.Callout)
+                .Tooltip("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours."),
+            UI.Button("Load Their Changes", editor.TakeChangesOnDisk).Prominent()
+                .Tooltip("Show the rig as it was saved elsewhere. Undo brings your changes back"),
+            UI.Button("Keep Mine", editor.KeepChangesHere).Tooltip("Keep your changes: saving puts them over the other ones"));
+        return new Border
+        {
+            Child = row, Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(12),
+            Background = Theme.Brush("SystemFillColorCautionBackgroundBrush"), BorderBrush = Theme.Brush("CardStrokeColorDefaultBrush"),
+            BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Center,
         };
     }
 
