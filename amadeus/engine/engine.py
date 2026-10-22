@@ -28,6 +28,7 @@ from amadeus.engine.rings import RingsMixin
 from amadeus.engine.rolls import RollsMixin
 from amadeus.engine.state import State
 from amadeus.engine.timing import TimingMixin, _ease, note_env, pick_stabs
+from amadeus.engine.zoom import ZoomMixin
 from amadeus.library import fixtures as fxlib
 from amadeus.library import gobos
 from amadeus.rig import geometry
@@ -35,7 +36,9 @@ from amadeus.rig import geometry
 PICKUP_LEAD = 0.65  # a section that leads in early: how far its look has come in by the downbeat (which lands it)
 
 
-class Engine(TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, CinematicMixin, FogMixin, RollsMixin):
+class Engine(
+    TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, CinematicMixin, FogMixin, RollsMixin, ZoomMixin
+):
     def __init__(
         self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False, fog_carry: bool = False
     ):
@@ -118,6 +121,7 @@ class Engine(TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, Cine
         self._init_groups(rig)
         self._init_lasers(rig, fixtures)
         self._init_fog(rig, fixtures)
+        self._init_zoom(rig, fixtures)  # (before the cinematic program: it plays the washes' zoom too)
         # synth/melody notes for the lasers to play: from the separated synth instrument when available
         if analysis.synth_notes is not None and len(analysis.synth_notes[0]):
             self.syn_t, self.syn_s, self.syn_p = (np.asarray(x, float) for x in analysis.synth_notes)

@@ -151,6 +151,13 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 
 The descriptions in `amadeus/director/vocabulary.py` are sent to the model verbatim: they are its style guide.
 
+**Zoom** isn't a decision of its own: it follows from these (`amadeus/engine/zoom.py`), set per phrase and never
+moving with the beat. Beam and spot heads go tight when the music is big, the beams fly (sky, fast movement) or a
+prism splits them, and open up into soft pools when it is calm; wash heads stay wide and gather into thick beams at
+the peaks; fixed washes with a zoom stay wide, a little tighter at the peaks. A buildup focuses into its drop, an
+accent layer or a featured group plays tighter than the rest, and "wide" is what the rig needs: neighbouring pools
+overlapping evenly at the throw, one setting per fixture model.
+
 ### Safety nets (musical facts first)
 
 The analysis can overrule the model where the music is unambiguous; changed phrases are marked `+guard`.

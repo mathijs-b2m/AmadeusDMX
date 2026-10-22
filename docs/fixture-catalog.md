@@ -64,8 +64,9 @@ wheel, but the show never picks them by itself. A converted fixture without hand
 grouped by these styles, so a "rings" phrase really picks the rings.
 
 **Zoom.** A zoom channel (QLC+ presets, OFL `Zoom` capabilities, with the lens's range) is played between
-its tightest and widest end: beams tight, gobos opened up enough to read on the floor and walls, frost
-fully open (`looks.BEAM_ZOOM`).
+its tightest and widest end, by the music (`amadeus/engine/zoom.py`): beams tight at the peaks and soft when calm,
+gobos opened up enough to read on the floor and walls, frost fully open; washes (heads without gobos, pars with a
+zoom) wide, gathering at the peaks.
 
 ### Fixtures the show can't play: the DMX mapper
 
