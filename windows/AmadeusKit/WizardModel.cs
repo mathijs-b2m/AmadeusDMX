@@ -217,7 +217,7 @@ public sealed class WizardModel : Observable
             catch (Exception x) when (IsApiError(x)) { }
         }
         var modes = channels.OrderByDescending(p => p.Value).Select(p => p.Key).ToList();
-        _planned.Add(new PlannedFixture(e, modes) { Count = e.Type == "moving head" ? 4 : 2, Channels = channels });
+        _planned.Add(new PlannedFixture(e, modes) { Count = 1, Channels = channels });
         PlannedChanged();
     }
 
