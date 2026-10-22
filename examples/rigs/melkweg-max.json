@@ -1719,364 +1719,508 @@
         ]
       },
       "hallpar67": {
-        "x": 0.5371,
-        "y_m": 4.62,
-        "z_m": 5.2,
+        "x": 0.5393,
+        "y_m": 3.85,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall2",
+        "truss_pos_m": 0.55,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar68": {
-        "x": 0.4571,
-        "y_m": 4.62,
-        "z_m": 5.2,
+        "x": 0.4607,
+        "y_m": 3.85,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall2",
+        "truss_pos_m": -0.55,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar69": {
-        "x": 0.7229,
-        "y_m": 6.05,
-        "z_m": 5.2,
+        "x": 0.725,
+        "y_m": 8.53,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall3",
+        "truss_pos_m": 3.15,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar70": {
-        "x": 0.565,
-        "y_m": 5.19,
-        "z_m": 5.2,
+        "x": 0.6179,
+        "y_m": 3.85,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall2",
+        "truss_pos_m": 1.65,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar71": {
-        "x": 0.4386,
-        "y_m": 5.19,
-        "z_m": 5.2,
+        "x": 0.3821,
+        "y_m": 3.85,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall2",
+        "truss_pos_m": -1.65,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar72": {
-        "x": 0.2721,
-        "y_m": 6.05,
-        "z_m": 5.2,
+        "x": 0.275,
+        "y_m": 8.53,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall3",
+        "truss_pos_m": -3.15,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar73": {
-        "x": 0.5557,
-        "y_m": 7.27,
-        "z_m": 5.2,
+        "x": 0.5571,
+        "y_m": 8.53,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall3",
+        "truss_pos_m": 0.8,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar74": {
-        "x": 0.4386,
-        "y_m": 7.27,
-        "z_m": 5.2,
+        "x": 0.4429,
+        "y_m": 8.53,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall3",
+        "truss_pos_m": -0.8,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar75": {
-        "x": 0.5371,
-        "y_m": 9.87,
-        "z_m": 5.2,
+        "x": 0.5393,
+        "y_m": 11.0,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall4",
+        "truss_pos_m": 0.55,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar76": {
-        "x": 0.4571,
-        "y_m": 9.87,
-        "z_m": 5.2,
+        "x": 0.4607,
+        "y_m": 11.0,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall4",
+        "truss_pos_m": -0.55,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar77": {
-        "x": 0.5557,
-        "y_m": 11.38,
-        "z_m": 5.2,
+        "x": 0.6179,
+        "y_m": 11.0,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall4",
+        "truss_pos_m": 1.65,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar78": {
-        "x": 0.4386,
-        "y_m": 11.38,
-        "z_m": 5.2,
+        "x": 0.3821,
+        "y_m": 11.0,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall4",
+        "truss_pos_m": -1.65,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar79": {
-        "x": 0.7229,
-        "y_m": 12.39,
-        "z_m": 5.2,
+        "x": 0.725,
+        "y_m": 14.43,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall5",
+        "truss_pos_m": 3.15,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar80": {
-        "x": 0.2721,
-        "y_m": 12.39,
-        "z_m": 5.2,
+        "x": 0.275,
+        "y_m": 14.43,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall5",
+        "truss_pos_m": -3.15,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar81": {
-        "x": 0.5557,
-        "y_m": 13.38,
-        "z_m": 5.2,
+        "x": 0.5571,
+        "y_m": 14.43,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall5",
+        "truss_pos_m": 0.8,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar82": {
-        "x": 0.4386,
-        "y_m": 13.38,
-        "z_m": 5.2,
+        "x": 0.4429,
+        "y_m": 14.43,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall5",
+        "truss_pos_m": -0.8,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar83": {
-        "x": 0.5371,
-        "y_m": 15.58,
-        "z_m": 5.2,
+        "x": 0.5393,
+        "y_m": 16.69,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall6",
+        "truss_pos_m": 0.55,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar84": {
-        "x": 0.4571,
-        "y_m": 15.58,
-        "z_m": 5.2,
+        "x": 0.4607,
+        "y_m": 16.69,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall6",
+        "truss_pos_m": -0.55,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar85": {
-        "x": 0.5557,
-        "y_m": 17.27,
-        "z_m": 5.2,
+        "x": 0.6179,
+        "y_m": 16.69,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall6",
+        "truss_pos_m": 1.65,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar86": {
-        "x": 0.4386,
-        "y_m": 17.27,
-        "z_m": 5.2,
+        "x": 0.3821,
+        "y_m": 16.69,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall6",
+        "truss_pos_m": -1.65,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar87": {
-        "x": 0.7229,
-        "y_m": 18.39,
-        "z_m": 5.2,
+        "x": 0.725,
+        "y_m": 19.02,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall7",
+        "truss_pos_m": 3.15,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar88": {
-        "x": 0.2721,
-        "y_m": 18.39,
-        "z_m": 5.2,
+        "x": 0.275,
+        "y_m": 19.02,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall7",
+        "truss_pos_m": -3.15,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar89": {
-        "x": 0.5557,
-        "y_m": 19.61,
-        "z_m": 5.2,
+        "x": 0.5571,
+        "y_m": 19.02,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall7",
+        "truss_pos_m": 0.8,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar90": {
-        "x": 0.4386,
-        "y_m": 19.61,
-        "z_m": 5.2,
+        "x": 0.4429,
+        "y_m": 19.02,
+        "z_m": 5.6,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "hall7",
+        "truss_pos_m": -0.8,
+        "truss_side": "front",
+        "mount_roll_deg": 90
       },
       "hallpar91": {
         "x": 1.0471,
         "y_m": 4.75,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySR",
+        "truss_pos_m": -5.12,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar92": {
         "x": 1.0471,
         "y_m": 5.45,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySR",
+        "truss_pos_m": -4.42,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar93": {
         "x": -0.0471,
         "y_m": 4.75,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySL",
+        "truss_pos_m": -5.12,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar94": {
         "x": -0.0471,
         "y_m": 5.45,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySL",
+        "truss_pos_m": -4.42,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar95": {
         "x": 1.0471,
         "y_m": 10.13,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySR",
+        "truss_pos_m": 0.26,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar96": {
         "x": 1.0471,
         "y_m": 10.91,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySR",
+        "truss_pos_m": 1.04,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar97": {
         "x": -0.0471,
         "y_m": 10.13,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySL",
+        "truss_pos_m": 0.26,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar98": {
         "x": -0.0471,
         "y_m": 10.91,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySL",
+        "truss_pos_m": 1.04,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar99": {
         "x": 1.0471,
         "y_m": 15.84,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySR",
+        "truss_pos_m": 5.97,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar100": {
         "x": 1.0471,
         "y_m": 16.62,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySR",
+        "truss_pos_m": 6.75,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar101": {
         "x": -0.0471,
         "y_m": 15.84,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySL",
+        "truss_pos_m": 5.97,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "hallpar102": {
         "x": -0.0471,
         "y_m": 16.62,
-        "z_m": 5.2,
+        "z_m": 3.58,
         "mount": "hang",
         "aim": [
           0.0,
           -75.0
-        ]
+        ],
+        "truss": "balconySL",
+        "truss_pos_m": 6.75,
+        "truss_side": "under",
+        "rot_deg": 90
       },
       "haze": {
         "x": 0.8929,
@@ -2092,13 +2236,16 @@
       },
       "foghall": {
         "x": 0.5,
-        "y_m": 20.78,
-        "z_m": 5.2,
+        "y_m": 18.62,
+        "z_m": 5.18,
         "mount": "hang",
         "aim": [
           180.0,
           -10.0
-        ]
+        ],
+        "truss": "hall7",
+        "truss_pos_m": 0.0,
+        "truss_side": "under"
       }
     }
   }
