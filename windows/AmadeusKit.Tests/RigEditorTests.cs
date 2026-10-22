@@ -108,6 +108,30 @@ public sealed class FakeHost : IRigEditorHost, IRigEditorAPI
         LastLayout = layout;
         return Task.CompletedTask;
     }
+
+    // the drawings under the rig
+    public Underlay[] UnderlayList = [];
+    public Task<Underlay[]> Underlays(string rig)
+    {
+        Calls.Add($"underlays {rig}");
+        return Task.FromResult(UnderlayList);
+    }
+    public Task<Underlay> AlignUnderlay(string rig, string id, Vec2 a, Vec2 b, double widthM)
+    {
+        Calls.Add(FormattableString.Invariant($"align {id} {a.X},{a.Y} {b.X},{b.Y} {widthM}"));
+        return Task.FromResult(UnderlayList.First(u => u.Id == id) with { A = a, B = b });
+    }
+    public Task<Underlay[]> RemoveUnderlay(string rig, string id)
+    {
+        Calls.Add($"remove {id}");
+        UnderlayList = [.. UnderlayList.Where(u => u.Id != id)];
+        return Task.FromResult(UnderlayList);
+    }
+    public Task<DrawingPicture?> PagePicture(string file)
+    {
+        Calls.Add($"page {file}");
+        return Task.FromResult<DrawingPicture?>(new DrawingPicture(2, 2, new byte[16]));
+    }
 }
 
 public class RigEditorTests(ITestOutputHelper output)

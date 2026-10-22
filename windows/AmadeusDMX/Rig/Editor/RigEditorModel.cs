@@ -214,6 +214,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
             Key = $"edit:{Doc.Label}:{Version}", Fixtures = els, Stage = Doc.Stage with { }, Screen = Doc.HasScreen, Hello = null,
             Trusses = Doc.Trusses.Select(x => x with { }).ToList(), Selected = selected.ToHashSet(), KeepCamera = true,
             Zones = Doc.Zones.Where(z => ShowZones || Selection == EditorSelection.Zone(z.Id)).Select(z => z.Clone()).ToList(),
+            Drawings = Drawings.Where(IsShown).Select(u => Picture(u) is { } p ? new StageDrawing(u.File, p, u.Corners, (float)DrawingOpacity) : null)
+                .OfType<StageDrawing>().ToList(),
         };
     }
 
@@ -1106,6 +1108,119 @@ public sealed class RigEditorModel : Observable, IStageEditing
         return a;
     }
 
+    // MARK: - the drawings under the rig (an import's plans: amadeus/rig/importer/underlay.py)
+
+    IReadOnlyList<Underlay> _underlays = [];
+    /// Every drawing under the rig (all its sets'), as the engine has them.
+    public IReadOnlyList<Underlay> Underlays
+    {
+        get => _underlays;
+        private set { _underlays = value; Changed(nameof(Underlays), nameof(Drawings)); }
+    }
+    /// The drawings for what is showing: the set's, or all of them with the rig alone.
+    public IReadOnlyList<Underlay> Drawings => _underlays.Where(u => Doc.Set.Length == 0 || u.Set == Doc.Set).ToList();
+    readonly Dictionary<string, DrawingPicture> _pictures = [];
+    /// A drawing's page, once it is rendered.
+    public DrawingPicture? Picture(Underlay u) => _pictures.GetValueOrDefault(u.File);
+
+    /// Remembered per rig in the app's settings: the drawings hidden, how opaque they are.
+    const string HiddenKey = "rigDrawingsHidden", OpacityKey = "rigDrawingsOpacity";
+    public static readonly double[] Opacities = [0.25, 0.5, 0.75];
+
+    /// The rig's file has drawings (the engine is asked only then).
+    bool HasDrawings()
+    {
+        try { return JSONValue.ParseObject(File.ReadAllBytes(_workspace.RigURL(Doc.Rig)))?.GetValueOrDefault("underlays")?.Array is { Count: > 0 }; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return false; }
+    }
+
+    /// Reads the rig's drawings and renders their pages (once per file). Nothing to show when that fails: the rig
+    /// is the same without them.
+    public async Task LoadDrawings(IRigEditorHost host)
+    {
+        if (!HasDrawings()) { if (_underlays.Count > 0) { Underlays = []; Refresh(); } return; }
+        try
+        {
+            if (!await host.EnsureSetupService()) return;
+            Underlays = await host.Api.Underlays(Doc.Rig);
+            foreach (var u in Drawings)
+                if (!_pictures.ContainsKey(u.File) && await host.PagePicture(u.File) is { } p) _pictures[u.File] = p;
+            Refresh();
+        }
+        catch (Exception e) when (e is not OutOfMemoryException) { }
+    }
+
+    public bool IsShown(Underlay u) => Defaults.Standard.Object(HiddenKey)?[Doc.Rig]?.Array?.Any(v => v.String == u.Id) != true;
+
+    public void SetShown(Underlay u, bool on)
+    {
+        var all = Defaults.Standard.Object(HiddenKey)?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
+        var ids = (all.GetValueOrDefault(Doc.Rig)?.Array ?? []).Select(v => v.String).OfType<string>().Where(id => id != u.Id).ToList();
+        if (!on) ids.Add(u.Id);
+        if (ids.Count > 0) all[Doc.Rig] = JSONValue.Of(ids.Select(JSONValue.Of));
+        else all.Remove(Doc.Rig);
+        Defaults.Standard.Set(HiddenKey, JSONValue.Of(all));
+        Refresh();
+    }
+
+    /// How opaque the drawings are on the floor (25, 50 or 75 %; half by default).
+    public double DrawingOpacity
+    {
+        get => Defaults.Standard.Object(OpacityKey)?[Doc.Rig]?.Number ?? 0.5;
+        set
+        {
+            var all = Defaults.Standard.Object(OpacityKey)?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
+            all[Doc.Rig] = value;
+            Defaults.Standard.Set(OpacityKey, JSONValue.Of(all));
+            Changed();
+            Refresh();
+        }
+    }
+
+    /// Lines a drawing up again from two clicks on its page (`a`: the stage's front edge at stage left, `b`: at stage
+    /// right, page fractions) `widthM` apart. The engine moves its fixtures and their trusses and saves the rig; the
+    /// editor reads it again (unsaved changes here must be saved or discarded first).
+    public async Task<bool> LineUp(IRigEditorHost host, Underlay u, Vec2 a, Vec2 b, double widthM)
+    {
+        Busy = true;
+        try
+        {
+            if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            var lined = await host.Api.AlignUnderlay(Doc.Rig, u.Id, a, b, widthM);
+            Underlays = _underlays.Any(x => x.Id == lined.Id) ? _underlays.Select(x => x.Id == lined.Id ? lined : x).ToList() : [.. _underlays, lined];
+            Reload();
+            Refresh();   // the drawing's new corners, also when nothing else changed
+            host.ReloadSets();
+            var moved = lined.Fixtures.Keys.Count(id => Doc.Fixtures.Any(f => f.Id == id));
+            Message = $"Lined up: {moved} fixture{(moved == 1 ? "" : "s")} moved";
+            return true;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            Message = Error(e);
+            return false;
+        }
+        finally { Busy = false; }
+    }
+
+    /// Takes a drawing away from the rig (the fixtures stay where they are).
+    public async Task RemoveDrawing(IRigEditorHost host, Underlay u)
+    {
+        Busy = true;
+        try
+        {
+            if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            Underlays = await host.Api.RemoveUnderlay(Doc.Rig, u.Id);
+            Refresh();
+            Message = $"Removed the drawing {u.Name}";
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            Message = Error(e);
+        }
+        finally { Busy = false; }
+    }
+
     // MARK: - save / revert
 
     /// Saved through the engine's setup API: it splits the layout into the rig file and the set file.
@@ -1128,7 +1243,14 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// there are unsaved changes here.
     public void ReloadIfClean()
     {
-        if (IsDirty || _workspace.Document(Doc.Rig, Doc.Set) is not { } d || Same(d, Doc)) return;
+        if (!IsDirty) Reload();
+    }
+
+    /// Reads the files again, whatever was changed here (after a line-up the engine saved, with the changes here
+    /// saved or discarded first).
+    public void Reload()
+    {
+        if (_workspace.Document(Doc.Rig, Doc.Set) is not { } d || Same(d, Doc) && Same(d, _saved)) return;
         Doc = d;
         _saved = d.Clone();
         Selection = null;

@@ -48,6 +48,19 @@ extension StageRenderer {
         goboBeamPipe = try pipe("gobo_beam_vertex", "gobo_beam_fragment", coneVD, additive: true)
         goboDecalPipe = try pipe("gobo_decal_vertex", "gobo_decal_fragment", nil, additive: true)
         compositePipe = try pipe("fullscreen_vertex", "composite_fragment", nil, additive: false, final: true)
+        do {  // drawings on the floor: a page (the wall's quad) in premultiplied alpha over the scene
+            let d = MTLRenderPipelineDescriptor()
+            d.vertexFunction = lib.makeFunction(name: "wall_vertex")
+            d.fragmentFunction = lib.makeFunction(name: "drawing_fragment")
+            d.vertexDescriptor = wallVD
+            let ca = d.colorAttachments[0]!
+            ca.pixelFormat = .rgba16Float
+            ca.isBlendingEnabled = true
+            ca.sourceRGBBlendFactor = .one; ca.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            ca.sourceAlphaBlendFactor = .one; ca.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            d.depthAttachmentPixelFormat = .depth32Float
+            drawingPipe = try device.makeRenderPipelineState(descriptor: d)
+        }
         do {  // zones: premultiplied alpha over the scene
             let d = MTLRenderPipelineDescriptor()
             d.vertexFunction = lib.makeFunction(name: "solid_vertex")
@@ -146,7 +159,87 @@ extension StageRenderer {
         } else {
             wallBuffer = nil
         }
+        buildDrawings(inp, s)
         if first || !inp.keepCamera { setPreset(preset, animated: false) }
+    }
+
+    /// The drawings on the floor: each page a quad on its corners (rig metres are world metres: x from stage left,
+    /// y towards the audience, as the trusses), a few mm over the hall floor, and again over the stage deck where
+    /// it covers the deck (the deck stands 15 cm high: the floor's copy is hidden under it).
+    func buildDrawings(_ inp: StageInput, _ s: Scenery) {
+        drawingDraws = []
+        for d in inp.drawings where d.corners.count == 4 {
+            guard let tex = drawingTexture(d) else { continue }
+            let c = d.corners
+            let uv: [SIMD2<Float>] = [[0, 0], [1, 0], [1, 1], [0, 1]]
+            var v: [WallVertex] = []
+            func fan(_ poly: [(p: SIMD2<Float>, uv: SIMD2<Float>)], z: Float) {
+                guard poly.count >= 3 else { return }
+                for i in 1..<(poly.count - 1) {
+                    for q in [poly[0], poly[i], poly[i + 1]] { v.append(WallVertex(pos: SIMD3(q.p, z), uv: q.uv)) }
+                }
+            }
+            let quad = Array(zip(c, uv)).map { (p: $0.0, uv: $0.1) }
+            fan(quad, z: Self.drawingLift)
+            if let deck = s.deck { fan(Self.clip(quad, x0: deck.x0, x1: deck.x1, y0: deck.y0, y1: deck.y1), z: deck.top + Self.drawingLift) }
+            guard !v.isEmpty, let buf = device.makeBuffer(bytes: v, length: v.count * MemoryLayout<WallVertex>.stride) else { continue }
+            drawingDraws.append((buf, v.count, tex, max(0, min(1, d.opacity))))
+        }
+    }
+
+    static let drawingLift: Float = 0.01        // over the floor (m): no fighting with it, seen from afar too
+    static let drawingBrightness: Float = 0.3   // white paper as the work-lit floor shows it, not a light
+
+    /// A convex polygon cut to a rectangle (Sutherland–Hodgman), its texture coordinates along.
+    static func clip(_ poly: [(p: SIMD2<Float>, uv: SIMD2<Float>)], x0: Float, x1: Float, y0: Float, y1: Float)
+        -> [(p: SIMD2<Float>, uv: SIMD2<Float>)] {
+        typealias P = (p: SIMD2<Float>, uv: SIMD2<Float>)
+        func cut(_ poly: [P], _ inside: (SIMD2<Float>) -> Float) -> [P] {  // inside(p) >= 0: kept
+            var out: [P] = []
+            for i in poly.indices {
+                let a = poly[i], b = poly[(i + 1) % poly.count]
+                let da = inside(a.p), db = inside(b.p)
+                if da >= 0 { out.append(a) }
+                if (da >= 0) != (db >= 0) {
+                    let t = da / (da - db)
+                    out.append((a.p + (b.p - a.p) * t, a.uv + (b.uv - a.uv) * t))
+                }
+            }
+            return out
+        }
+        var out = poly
+        out = cut(out) { $0.x - x0 }
+        out = cut(out) { x1 - $0.x }
+        out = cut(out) { $0.y - y0 }
+        out = cut(out) { y1 - $0.y }
+        return out
+    }
+
+    /// A drawing's page as a texture (sRGB, mipmapped: it stays smooth seen from afar), made once per page.
+    func drawingTexture(_ d: FloorDrawing) -> MTLTexture? {
+        if let t = drawingTextures[d.key] { return t }
+        let w = d.image.width, h = d.image.height
+        guard w > 0, h > 0 else { return nil }
+        let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm_srgb, width: w, height: h, mipmapped: true)
+        desc.usage = .shaderRead
+        guard let tex = device.makeTexture(descriptor: desc) else { return nil }
+        var px = [UInt8](repeating: 255, count: w * h * 4)
+        let drawn = px.withUnsafeMutableBytes { buf -> Bool in
+            guard let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(d.image, in: CGRect(x: 0, y: 0, width: w, height: h))  // row 0 is the page's top
+            return true
+        }
+        guard drawn else { return nil }
+        tex.replace(region: MTLRegionMake2D(0, 0, w, h), mipmapLevel: 0, withBytes: px, bytesPerRow: w * 4)
+        if let cmd = queue.makeCommandBuffer(), let blit = cmd.makeBlitCommandEncoder() {
+            blit.generateMipmaps(for: tex)
+            blit.endEncoding()
+            cmd.commit()
+        }
+        drawingTextures[d.key] = tex
+        return tex
     }
 
     /// Zone faces (translucent) and their edges (thin glowing lines), coloured by kind.

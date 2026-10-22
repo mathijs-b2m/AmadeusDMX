@@ -37,6 +37,8 @@ public sealed class Scenery
     public WallPlacement? Wall { get; private set; }
     public Room Room { get; private set; }
     public bool Big { get; }
+    /// A big stage's deck (x from, x to, y from, y to, its top), the floor the rig editor's drawings lie on there.
+    public (float X0, float X1, float Y0, float Y1, float Top)? Deck { get; }
     public float Top { get; }
     public Vector3 DjHead { get; private set; }
     public FixtureModels Models { get; }
@@ -75,6 +77,7 @@ public sealed class Scenery
         {
             var deckBack = MathF.Min(-3, back + 1.0f);
             Box(-0.5f, W + 0.5f, deckBack, -0.2f, 0, 0.15f, V(0.055f, 0.058f, 0.07f));
+            Deck = (-0.5f, W + 0.5f, deckBack, -0.2f, 0.15f);
             float ry = MathF.Max(deckBack + 0.5f, -4.5f), rd = 2.2f, rw = MathF.Min(5, W * 0.3f);
             Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, 0.15f, 0.95f, V(0.07f, 0.074f, 0.09f));
             boothY = ry - 0.4f; boothZ = 0.95f;

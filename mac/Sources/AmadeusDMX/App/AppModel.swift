@@ -35,6 +35,12 @@ final class AppModel {
     var showLabel: String { selectedSet.isEmpty ? "No Set" : "\(selectedSet) on \(selectedRig)" }
     /// Sheets: a new rig (from a template), and "mount the set on this rig?" when it isn't yet.
     var showNewRig = false
+    /// A set and rig built from a venue's documents (MVR, patch sheets, PDFs read with AI).
+    var showImport = false
+    /// Fixtures the rig editor selects when it opens next (a line of an import's report).
+    var pendingRigSelection: [String]?
+    /// The Settings tab to show when Settings opens next (e.g. "director": the OpenAI key).
+    var settingsTab: String?
     /// Goes up whenever sets or rigs were (re)read: views showing a file reload it.
     var configVersion = 0
     var mountPrompt: (rig: String, set: String)?

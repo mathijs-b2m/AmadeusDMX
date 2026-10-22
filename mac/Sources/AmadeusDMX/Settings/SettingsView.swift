@@ -4,6 +4,7 @@ import SwiftUI
 
 /// The same settings in the Settings window (⌘,) and on the main window's Settings page.
 struct SettingsView: View {
+    @Environment(AppModel.self) private var model
     var page = false
 
     var body: some View {
@@ -16,12 +17,21 @@ struct SettingsView: View {
 
     @State private var tab = UserDefaults.standard.string(forKey: "settingsTab") ?? "general"  // -settingsTab director (screenshots)
 
+    /// Another page asked for a tab (the import's "Open Settings…": the OpenAI key).
+    private func showAsked() {
+        guard let t = model.settingsTab else { return }
+        tab = t
+        model.settingsTab = nil
+    }
+
     private var tabs: some View {
         TabView(selection: $tab) {
             Tab("General", systemImage: "gearshape", value: "general") { GeneralSettings() }
             Tab("Director", systemImage: "wand.and.stars", value: "director") { DirectorSettings() }
             Tab("Integrations", systemImage: "dot.radiowaves.left.and.right", value: "integrations") { IntegrationSettings() }
         }
+        .onAppear(perform: showAsked)
+        .onChange(of: model.settingsTab) { showAsked() }
     }
 }
 

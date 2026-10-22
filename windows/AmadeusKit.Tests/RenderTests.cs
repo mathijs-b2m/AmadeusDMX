@@ -131,6 +131,9 @@ public class RenderTests
         Assert.Equal(SolidVertex.ColorOffset, (int)Marshal.OffsetOf<SolidVertex>(nameof(SolidVertex.Color)));
         Assert.Equal(WallVertex.Size, Marshal.SizeOf<WallVertex>());
         Assert.Equal(WallVertex.UvOffset, (int)Marshal.OffsetOf<WallVertex>(nameof(WallVertex.Uv)));
+        Assert.Equal(UnderlayVertex.Size, Marshal.SizeOf<UnderlayVertex>());
+        Assert.Equal(UnderlayVertex.UvOffset, (int)Marshal.OffsetOf<UnderlayVertex>(nameof(UnderlayVertex.Uv)));
+        Assert.Equal(UnderlayVertex.AlphaOffset, (int)Marshal.OffsetOf<UnderlayVertex>(nameof(UnderlayVertex.Alpha)));
         foreach (var s in new[] { Uniforms.Size, WallParams.Size, BlurParams.Size }) Assert.Equal(0, s % 16);   // cbuffers
     }
 
@@ -193,6 +196,7 @@ public class RenderTests
         ("GoboBeam.hlsl", ["gobo_beam_vertex", "gobo_beam_fragment"]),
         ("GoboDecal.hlsl", ["gobo_decal_vertex", "gobo_decal_fragment"]),
         ("Wall.hlsl", ["wall_vertex", "wall_fragment"]),
+        ("Underlay.hlsl", ["underlay_vertex", "underlay_fragment"]),
         ("Post.hlsl", ["fullscreen_vertex", "composite_fragment", "downsample_fragment", "blur_fragment"]),
     ];
 

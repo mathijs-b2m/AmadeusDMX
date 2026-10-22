@@ -25,6 +25,8 @@ struct WallPlacement {
 struct Scenery {
     var vertices: [SolidVertex] = []
     var wall: WallPlacement?
+    /// The stage deck (a big rig's): where it stands and how high its top is.
+    var deck: (x0: Float, x1: Float, y0: Float, y1: Float, top: Float)?
     var room: Room
     var big: Bool
     var top: Float
@@ -56,6 +58,7 @@ struct Scenery {
         if big {
             let deckBack = min(-3, back + 1.0)
             box(-0.5, W + 0.5, deckBack, -0.2, 0, 0.15, [0.055, 0.058, 0.07])
+            deck = (-0.5, W + 0.5, deckBack, -0.2, 0.15)
             let ry = max(deckBack + 0.5, -4.5), rd: Float = 2.2, rw = min(5, W * 0.3)
             box(cx - rw / 2, cx + rw / 2, ry - rd, ry, 0.15, 0.95, [0.07, 0.074, 0.09])
             boothY = ry - 0.4; boothZ = 0.95

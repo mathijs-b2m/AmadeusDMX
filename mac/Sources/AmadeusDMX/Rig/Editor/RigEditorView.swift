@@ -10,6 +10,9 @@ struct RigEditorView: View {
     @StateObject private var stage = StageController()
     @State private var showAdd = false
     @State private var error: String?
+    @State private var lining: Underlay?          // the Line Up sheet's drawing
+    @State private var askSave: Underlay?         // unsaved changes before lining one up
+    @State private var removing: Underlay?
 
     var body: some View {
         HSplitView {
@@ -21,7 +24,9 @@ struct RigEditorView: View {
                         stage.input = { [editor] in (editor.stageInput(), editor.testFrame()) }
                         stage.preset = .drone
                         editor.undoManager = undoManager
+                        selectAsked()
                     }
+                    .task { await editor.loadDrawings(model) }
                 toolbar.padding(12)
                 VStack {
                     Spacer()
@@ -44,11 +49,84 @@ struct RigEditorView: View {
             if !editor.lit.isEmpty { Task { await editor.switchOffTests(model) } }
         }
         .onChange(of: model.configVersion) { editor.reloadIfClean() }
+        .onChange(of: model.pendingRigSelection) { selectAsked() }
+        .sheet(item: $lining) { u in LineUpSheet(editor: editor, underlay: u).environment(model) }
+        .confirmationDialog("Save your changes first?", isPresented: Binding(get: { askSave != nil }, set: { if !$0 { askSave = nil } }),
+                            titleVisibility: .visible, presenting: askSave) { u in
+            Button("Save") {
+                Task {
+                    do { try await editor.save(model); lining = u } catch { self.error = error.localizedDescription }
+                }
+            }
+            Button("Discard", role: .destructive) { lining = u }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Lining up a drawing moves its fixtures and trusses in the saved rig, and the editor reads it again: changes not saved are lost.")
+        }
+        .confirmationDialog("Remove the drawing “\(removing?.title ?? "")”?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            titleVisibility: .visible, presenting: removing) { u in
+            Button("Remove", role: .destructive) { Task { await editor.removeDrawing(model, u) } }
+        } message: { _ in
+            Text("It is taken away from under the rig; the fixtures stay where they are.")
+        }
         .background {  // ⌘S saves the rig
             Button("") { save() }.keyboardShortcut("s", modifiers: .command).hidden()
         }
         .alert("Couldn’t Save", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
         } message: { Text(error ?? "") }
+    }
+
+    /// Fixtures to select that another page asked for (a line of an import's report).
+    private func selectAsked() {
+        guard let ids = model.pendingRigSelection else { return }
+        model.pendingRigSelection = nil
+        let here = Set(editor.doc.fixtures.map(\.id))
+        editor.select(fixtures: ids.filter(here.contains))
+    }
+
+    private func lineUp(_ u: Underlay) {
+        if editor.isDirty { askSave = u } else { lining = u }
+    }
+
+    /// The drawings under the rig: show or hide each (remembered per rig), how strongly, line one up, remove one.
+    @ViewBuilder private var drawingsMenu: some View {
+        let list = editor.drawings
+        if !list.isEmpty {
+            Menu {
+                if list.count == 1, let u = list.first {
+                    Toggle("Show “\(u.title)”", isOn: Binding(get: { editor.isShown(u) }, set: { editor.show(u, $0) }))
+                    opacityPicker
+                    Divider()
+                    Button("Line Up…", systemImage: "ruler") { lineUp(u) }
+                    Button("Remove…", systemImage: "trash", role: .destructive) { removing = u }
+                } else {
+                    SwiftUI.Section("Show") {
+                        ForEach(list) { u in
+                            Toggle(u.title, isOn: Binding(get: { editor.isShown(u) }, set: { editor.show(u, $0) }))
+                        }
+                    }
+                    opacityPicker
+                    Divider()
+                    Menu("Line Up", systemImage: "ruler") {
+                        ForEach(list) { u in Button("\(u.title)…") { lineUp(u) } }
+                    }
+                    Menu("Remove", systemImage: "trash") {
+                        ForEach(list) { u in Button("\(u.title)…", role: .destructive) { removing = u } }
+                    }
+                }
+            } label: {
+                Label("Drawings", systemImage: "doc.richtext")
+            }
+            .buttonStyle(.glass)
+            .disabled(editor.busy)
+            .help("The venue's drawings under the rig (from the import): show or hide them, line one up with the stage, remove one. Best seen from Plan view")
+        }
+    }
+
+    private var opacityPicker: some View {
+        Picker("Opacity", selection: $editor.drawingOpacity) {
+            ForEach([0.25, 0.5, 0.75], id: \.self) { o in Text("\(Int(o * 100)) %").tag(o) }
+        }
     }
 
     private func save() {
@@ -158,6 +236,7 @@ struct RigEditorView: View {
                         .disabled(editor.busy || editor.doc.fixtures.isEmpty)
                         .help("The hang sheet for the crew: where every fixture goes on which truss, which way round, its DMX address, and labels to stick on them. Opens in your browser to print or save as PDF")
                 }
+                drawingsMenu
                 Toggle(isOn: $editor.showZones) { Label("Zones", systemImage: editor.showZones ? "eye" : "eye.slash") }
                     .toggleStyle(.button)
                     .buttonStyle(.glass)
@@ -230,6 +309,7 @@ private struct RigMenu: View {
                 let r = model.editingRig
                 run { try await model.api.createRig(name: unique(r + "-copy"), copyOf: r) }
             }
+            Button("Import from Documents…", systemImage: "doc.badge.arrow.up") { model.showImport = true }
             Button("Rename…", systemImage: "pencil") { renaming = model.editingRig }
             Button("Show in Finder", systemImage: "folder") {
                 if let url = model.workspace?.rigURL(model.editingRig) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
@@ -242,7 +322,7 @@ private struct RigMenu: View {
         }
         .buttonStyle(.glass)
         .disabled(model.engineRunning)
-        .help("The rig: a new one, duplicate, rename, delete")
+        .help("The rig: a new one, duplicate, import from a venue's documents, rename, delete")
         .alert("Rename the Rig", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: Binding(get: { renaming ?? "" }, set: { renaming = $0 }))
             Button("Rename") {
