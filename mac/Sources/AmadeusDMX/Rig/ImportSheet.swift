@@ -17,6 +17,7 @@ struct ImportSheet: View {
     @State private var phase = Phase.pick
     @State private var replacing: String?
     @State private var error: String?
+    @State private var job: String?        // the running import, to cancel it
 
     enum Phase {
         case pick
@@ -152,6 +153,7 @@ struct ImportSheet: View {
                 guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
                 let payload = try picked.map { (name: $0.lastPathComponent, data: try Data(contentsOf: $0)) }
                 let job = try await model.api.startImport(name: rigName, files: payload, replace: replace)
+                self.job = job
                 await follow(job)
             } catch SetupAPIError.nameTaken {
                 phase = .pick
@@ -176,6 +178,10 @@ struct ImportSheet: View {
             case "failed":
                 phase = .failed(s, s.error ?? "The import failed.")
                 return
+            case "cancelled":
+                phase = .pick
+                error = "The import was cancelled: nothing was saved."
+                return
             default:
                 phase = .running(s.step ?? "Reading the files…")
             }
@@ -189,12 +195,22 @@ struct ImportSheet: View {
                 ProgressView().controlSize(.small)
                 Text(step).foregroundStyle(.secondary)
             }
-            Text(hasPDF ? "Reading PDFs with AI takes up to a few minutes. Closing this doesn't stop it: the rig shows up in the list when it's done."
-                 : "Closing this doesn't stop it: the rig shows up in the list when it's done.")
+            Text(hasPDF ? "Reading PDFs with AI takes up to a few minutes. You can close this and carry on: the import goes on, and the rig shows up in the list when it's done."
+                 : "You can close this and carry on: the import goes on, and the rig shows up in the list when it's done.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
+                Button("Cancel Import", role: .destructive) {
+                    guard let job else { return }
+                    phase = .running("Cancelling…")
+                    Task { _ = try? await model.api.cancelImport(job) }
+                }
+                .disabled(job == nil || step == "Cancelling…")
+                .help("Stop the import: nothing is saved (what was already read with AI is remembered, so trying again costs less)")
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Close") { dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .help("Close this and carry on: the import goes on, and the rig shows up in the list when it's done")
             }
         }
     }

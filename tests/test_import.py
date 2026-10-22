@@ -403,3 +403,15 @@ def test_the_corners_turn_with_the_drawing():
     u.update(a=[1.0, 0.0], b=[0.0, 0.0])  # the usual way: stage left at the top right, the audience below
     tl, tr, br, bl = underlay.corners(u)
     assert tr == pytest.approx((0.0, 0.0)) and tl == pytest.approx((10.0, 0.0)) and bl[1] == pytest.approx(10.0)
+
+
+def test_an_import_can_be_cancelled_and_saves_nothing(data, monkeypatch):
+    from amadeus.rig import store as st
+    from amadeus.web import importer as web
+
+    path = data / "patch.csv"
+    path.write_text(CSV, encoding="utf-8")
+    monkeypatch.setattr(st.sets, "save", lambda *a: pytest.fail("saved"))
+    web.JOBS["j"] = {"state": "running", "step": "", "notes": [], "name": "venue", "cancel": True}
+    web._run("j", [path], "venue", data / "uploads")
+    assert web.JOBS["j"]["state"] == "cancelled"

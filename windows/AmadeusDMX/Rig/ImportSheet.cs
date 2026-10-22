@@ -20,6 +20,7 @@ public sealed class ImportSheet(AppModel model)
     string _name = "";
     bool _nameEdited, _busy;
     string _step = "";
+    string? _job;   // the running import, to cancel it
     string? _error;
     ImportStatus? _status;
     ContentDialog? _dialog;
@@ -47,9 +48,14 @@ public sealed class ImportSheet(AppModel model)
                 default: args.Cancel = true; break;
             }
         };
-        _dialog.SecondaryButtonClick += (_, args) =>  // Change Name, Back: to the form again
+        _dialog.SecondaryButtonClick += (_, args) =>  // Change Name, Back: to the form again; Cancel Import
         {
             args.Cancel = true;
+            if (_phase == Phase.Running)
+            {
+                if (_job is { } job) { _step = "Cancelling…"; Render(); CancelJob(job); }
+                return;
+            }
             _phase = Phase.Form;
             Render();
         };
@@ -81,11 +87,12 @@ public sealed class ImportSheet(AppModel model)
         {
             Phase.Form => ("Import", "", "Cancel"),
             Phase.Replace => ("Replace", "Change Name", "Cancel"),
-            Phase.Running => ("", "", "Cancel"),
+            Phase.Running => ("", "Cancel Import", "Close"),
             Phase.Done => ("Open in Rig Editor", "", "Close"),
             _ => ("", "Back", "Close"),
         };
         _dialog.DefaultButton = _phase is Phase.Form or Phase.Done ? ContentDialogButton.Primary : ContentDialogButton.None;
+        _dialog.IsSecondaryButtonEnabled = _phase != Phase.Running || (_job is not null && _step != "Cancelling…");
         _dialog.IsPrimaryButtonEnabled = _phase switch
         {
             Phase.Form => !_busy && _files.Count > 0 && SafeName.Length > 0 && !NeedsKey,
@@ -185,8 +192,8 @@ public sealed class ImportSheet(AppModel model)
     UIElement Progress() =>
         UI.VStack(14,
             UI.HStack(10, UI.Spinner(20), UI.Text(_step.Length > 0 ? _step : "Reading the files…").Wrap().Grow()),
-            UI.Text(HasPDF ? "Reading PDFs with AI takes up to a few minutes. Closing this doesn't stop it: the rig shows up in the list when it's done."
-                           : "Closing this doesn't stop it: the rig shows up in the list when it's done.", Font.Callout).Secondary().Wrap());
+            UI.Text(HasPDF ? "Reading PDFs with AI takes up to a few minutes. You can close this and carry on: the import goes on, and the rig shows up in the list when it's done."
+                           : "You can close this and carry on: the import goes on, and the rig shows up in the list when it's done.", Font.Callout).Secondary().Wrap());
 
     UIElement Report()
     {
@@ -253,6 +260,7 @@ public sealed class ImportSheet(AppModel model)
                 return;
             }
             _phase = Phase.Running;
+            _job = job;
             _step = "Reading the files…";
             Render();
             Follow(job);
@@ -263,6 +271,13 @@ public sealed class ImportSheet(AppModel model)
             _error = e.Message;
             Render();
         }
+    }
+
+    /// Stops the import at its next step; Follow sees it cancelled.
+    async void CancelJob(string job)
+    {
+        try { await model.Api.CancelImport(job); }
+        catch (Exception e) when (e is not OutOfMemoryException) { _error = e.Message; Render(); }
     }
 
     /// Asks how the import goes once a second until it is done (also after the sheet was closed: the set and rig
@@ -277,6 +292,14 @@ public sealed class ImportSheet(AppModel model)
                 var s = await model.Api.ImportStatus(job);
                 misses = 0;
                 _status = s;
+                if (s.State == "cancelled")
+                {
+                    _phase = Phase.Form;
+                    _job = null;
+                    _error = "The import was cancelled: nothing was saved.";
+                    Render();
+                    return;
+                }
                 if (!s.Running)
                 {
                     _phase = s.Done ? Phase.Done : Phase.Failed;

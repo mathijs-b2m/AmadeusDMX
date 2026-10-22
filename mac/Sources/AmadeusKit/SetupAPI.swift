@@ -268,6 +268,11 @@ public struct SetupAPI: Sendable {
         try await get("api/import", query: ["job": job])
     }
 
+    /// Stop an import at its next step; nothing is saved.
+    public func cancelImport(_ job: String) async throws -> ImportJob {
+        try await post("api/import/cancel", ["job": job])
+    }
+
     /// The drawings under a rig (a venue's light plots), each with its corners on the rig.
     public func underlays(rig: String) async throws -> [Underlay] {
         struct R: Decodable { var underlays: [Underlay] }

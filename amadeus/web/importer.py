@@ -2,7 +2,9 @@
 the drawings under the rig (rig/importer/underlay.py): list them, their pages, line one up again, remove one.
 
 POST /api/import            {"name", "files": [{"name", "data": base64}], "replace": bool}: start; {"job"}
-GET  /api/import?job=…      {"state": running|done|failed, "step", "notes", "name", "fixtures", "trusses", "error"}
+GET  /api/import?job=…      {"state": running|done|failed|cancelled, "step", "notes", "name", "fixtures", "trusses",
+                            "error"}
+POST /api/import/cancel     {"job"}: stop it at its next step (between two AI requests); nothing is saved
 GET  /api/underlays?rig=…   the rig's drawings, each with its corners on the rig (metres) to draw it
 GET  /api/underlay/page?file=…   one drawing's page (a one-page PDF)
 POST /api/underlay/align    {"rig", "id", "a": [x, y], "b": [x, y], "width_m"}: line it up (page fractions of
@@ -50,12 +52,24 @@ def start_import(req):
     return {"job": job}
 
 
+class Cancelled(Exception):
+    pass
+
+
 def _run(job: str, files: list[Path], name: str, folder: Path):
     from amadeus.rig import importer, store
 
     state = JOBS[job]
+
+    def progress(text: str):
+        if state.get("cancel"):
+            raise Cancelled
+        state.update(step=text)
+
     try:
-        result = importer.build(files, name, progress=lambda text: state.update(step=text))
+        result = importer.build(files, name, progress=progress)
+        if state.get("cancel"):
+            raise Cancelled
         state["notes"] = result.report()
         if not result.set_doc.get("fixtures"):
             state.update(state="failed", error="No fixtures found in these files")
@@ -67,6 +81,9 @@ def _run(job: str, files: list[Path], name: str, folder: Path):
                      trusses=len(result.rig_doc.get("trusses", [])),
                      underlays=len(result.rig_doc.get("underlays", [])))  # fmt: skip
         event(f"import: built {name} ({state['fixtures']} fixtures)")
+    except Cancelled:
+        state.update(state="cancelled", step="Cancelled")
+        event(f"import: {name} cancelled")
     except Exception as e:  # noqa: BLE001 - the app shows it
         state.update(state="failed", error=f"{e.__class__.__name__}: {e}")
     finally:
@@ -77,6 +94,15 @@ def import_status(req):
     job = JOBS.get(req.query.get("job", ""))
     if job is None:
         return {"error": "unknown import"}, 404
+    return job
+
+
+def cancel_import(req):
+    job = JOBS.get(req.body().get("job", ""))
+    if job is None:
+        return {"error": "unknown import"}, 404
+    if job["state"] == "running":
+        job.update(cancel=True, step="Cancelling…")
     return job
 
 
@@ -126,4 +152,9 @@ def remove_underlay(req):
 
 
 GET = {"/api/import": import_status, "/api/underlays": list_underlays, "/api/underlay/page": underlay_page}
-POST = {"/api/import": start_import, "/api/underlay/align": align_underlay, "/api/underlay/remove": remove_underlay}
+POST = {
+    "/api/import": start_import,
+    "/api/import/cancel": cancel_import,
+    "/api/underlay/align": align_underlay,
+    "/api/underlay/remove": remove_underlay,
+}

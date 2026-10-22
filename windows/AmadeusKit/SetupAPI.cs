@@ -430,6 +430,10 @@ public sealed class SetupAPI
     public Task<ImportStatus> ImportStatus(string job, CancellationToken ct = default) =>
         Get("api/import", AmadeusKit.ImportStatus.From, new Dictionary<string, string> { ["job"] = job }, ct);
 
+    /// Stops an import at its next step; nothing is saved.
+    public Task<ImportStatus> CancelImport(string job, CancellationToken ct = default) =>
+        Post("api/import/cancel", new { job }, AmadeusKit.ImportStatus.From, ct: ct);
+
     /// The drawings under a rig (the plans an import placed its fixtures from), each with its corners on the rig.
     public Task<Underlay[]> Underlays(string rig, CancellationToken ct = default) =>
         Get("api/underlays", c => J.Req(c, "underlays", J.ArrayOf(Underlay.From)), new Dictionary<string, string> { ["rig"] = rig }, ct);
@@ -478,7 +482,7 @@ public sealed record ImportStatus
             new(J.Req(c, "level", J.String), J.Req(c, "text", J.String), J.Ref(c, "ids", J.ArrayOf(J.String)) ?? []);
     }
 
-    public string State { get; init; } = "running";   // running | done | failed
+    public string State { get; init; } = "running";   // running | done | failed | cancelled
     public string Step { get; init; } = "";
     public IReadOnlyList<Note> Notes { get; init; } = [];
     public string Name { get; init; } = "";
