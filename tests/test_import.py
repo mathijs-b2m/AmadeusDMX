@@ -7,6 +7,7 @@ import math
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from amadeus.library import fixtures as fxlib
@@ -320,7 +321,9 @@ def test_a_patch_pdf_and_its_plan_build_the_rig(pdfs):
     )["modes"] and len([f for f in fx.values() if f["fixture"] == "martin/atomic-3000"]) == 1
     assert len([f for f in fx.values() if f["fixture"] == "mdg/atme"]) == 1  # a fixture's range, not 3 lights
     assert any("house lights" in n.text and "rgb" in n.text for n in res.notes)
-    assert res.rig_doc["stage"]["width_m"] == 14.0 and res.rig_doc["stage"]["ceiling_m"] == 7.5
+    # heights from the hall floor: the stage 1.5 m high, its grid 7.5 m above it
+    assert res.rig_doc["stage"]["width_m"] == 14.0 and res.rig_doc["stage"]["deck_m"] == 1.5
+    assert res.rig_doc["stage"]["ceiling_m"] == 9.0
     pl = res.rig_doc["placements"]["venue"]
     # 0.8 of the page is 14 m: 101 at x 0.3 is 5.6 m from the stage-left end, 57 is 5.6 m from the other
     W = res.rig_doc["stage"]["width_m"]
@@ -415,3 +418,63 @@ def test_an_import_can_be_cancelled_and_saves_nothing(data, monkeypatch):
     web.JOBS["j"] = {"state": "running", "step": "", "notes": [], "name": "venue", "cancel": True}
     web._run("j", [path], "venue", data / "uploads")
     assert web.JOBS["j"]["state"] == "cancelled"
+
+
+def test_a_building_plan_places_nothing(pdfs):
+    roof = dict(PLAN, title="stage roof", purpose="building")
+    res = importer.build(list(pdfs), "venue", FakeAI(PATCH, [roof]))
+    assert not res.rig_doc.get("underlays")
+    assert any("plan of the building" in n.text for n in res.notes)
+
+
+def test_a_hall_plan_is_scaled_by_its_walls_and_hangs_in_front_of_the_stage():
+    """What a hall plan calls the stage is ignored: its walls are as wide as the stage, its first row 1.5 m out."""
+    from amadeus.rig.importer import pdf as pdfmod
+    from amadeus.rig.importer.draft import Item
+
+    items = {str(n): Item(name="x", label=str(n), where="hall") for n in (1, 2, 3)}
+    plan = dict(PLAN, area="both", stage_edge=0.9, stage_back=0.5, stage_end_a=0.4, stage_end_b=0.6,
+                wall_a=0.1, wall_b=0.9, crop=None,
+                symbols=[{"label": "1", "x": 0.3, "y": 0.2, "size": None, "floor": False},
+                         {"label": "2", "x": 0.7, "y": 0.2, "size": None, "floor": False},
+                         {"label": "3", "x": 0.5, "y": 0.4, "size": None, "floor": False}])  # fmt: skip
+    assert pdfmod.place(plan, 595, 842, PATCH["stage"], items, Draft(), "hall plot") == 3
+    m_per_pt = 14 / (0.8 * 595)
+    assert items["1"].pos[1] == pytest.approx(1.5) and items["2"].pos[1] == pytest.approx(1.5)
+    assert items["3"].pos[1] == pytest.approx(1.5 + 0.2 * 842 * m_per_pt, abs=0.01)
+    assert items["1"].pos[0] == pytest.approx(-items["2"].pos[0]) and items["1"].pos[2] > 3  # over the crowd
+
+
+def test_each_drawing_shows_its_own_plan():
+    from amadeus.rig.importer import underlay
+
+    u = {"w": 100, "h": 100, "a": [0.0, 1.0], "b": [1.0, 1.0], "a_m": [0.0, 0.0], "b_m": [10.0, 0.0],
+         "crop": [0.0, 0.5, 1.0, 1.0]}  # fmt: skip
+    tl, tr, br, bl = underlay.corners(u)
+    assert tl == pytest.approx((0.0, 5.0)) and br == pytest.approx((10.0, 0.0))
+
+
+def test_trusses_found_from_rows_are_named_by_where_they_hang(data):
+    from amadeus.rig.importer import layout
+
+    assert layout.free_id({"stage1", "stage2"}, "stage") == "stage3"
+    s, r = _melkweg()
+    path = data / "venue.mvr"
+    path.write_bytes(mvr_bytes(s, {**r, "trusses": []}, "melkweg-max"))  # no trusses drawn: found from the rows
+    ids = {t["id"] for t in importer.build([path], "venue").rig_doc["trusses"]}
+    assert {i.rstrip("0123456789") for i in ids} <= {"stage", "hall"} and "hall1" in ids and "stage1" in ids
+
+
+def test_a_raised_stage_lifts_what_stands_on_it():
+    from amadeus.rig import geometry
+    from amadeus.rig.automount import automount
+
+    st = {"width_m": 8.0, "ceiling_m": 9.0, "deck_m": 1.5}
+    merged = {"stage": st, "trusses": [], "fixtures": [
+        {"id": f"p{i}", "fixture": "generic/par-64", "mode": "1ch", "_unplaced": {}} for i in range(4)]}  # fmt: skip
+    places = automount(merged)
+    assert all(p["z_m"] >= 1.5 for p in places.values() if p.get("mount") == "floor")
+    # a beam straight down from 6 m lands on the deck on the stage, on the hall floor out front
+    full = geometry.stage({"stage": st})
+    assert geometry.beam_end([4.0, -2.0, 6.0], np.array([0.0, 0.0, -1.0]), full)[0][2] == pytest.approx(1.5)
+    assert geometry.beam_end([4.0, 3.0, 6.0], np.array([0.0, 0.0, -1.0]), full)[0][2] == pytest.approx(0.0)

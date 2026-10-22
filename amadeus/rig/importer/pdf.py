@@ -33,6 +33,7 @@ KEY_NOTE = (
     "OPENAI_API_KEY in .env); nothing was sent. MVR files and patch sheets (CSV, Excel) import without one"
 )
 DRAWING_WORDS = 40  # a page with fewer words than this is a drawing
+HALL = re.compile(r"hall|zaal|audience|publiek|foh|f\.o\.h|balcon|dance ?floor|house", re.I)  # where it hangs
 
 
 def has_key() -> bool:
@@ -122,6 +123,9 @@ TEXT_PROMPT = (
 PLAN = _obj(
     {
         "title": {"type": "string"},
+        "purpose": {"type": "string", "enum": ["lighting", "building"]},
+        "box": _obj({"x0": {"type": "number"}, "y0": {"type": "number"}, "x1": {"type": "number"},
+                     "y1": {"type": "number"}}),
         "area": {"type": "string", "enum": ["stage", "hall", "both", "other"]},
         "audience": {"type": "string", "enum": ["bottom", "top", "left", "right"]},
         "stage_edge": _nullable("number"),
@@ -137,41 +141,32 @@ PLAN = _obj(
                     "label": {"type": "string", "description": "the number or address printed at the symbol"},
                     "x": {"type": "number"},
                     "y": {"type": "number"},
+                    "size": _nullable("number"),
                     "floor": {"type": "boolean", "description": "standing on the floor rather than hanging"},
                 }
             ),
         },
-        "trusses": {
-            "type": "array",
-            "items": _obj(
-                {
-                    "label": {"type": "string"},
-                    "x1": {"type": "number"},
-                    "y1": {"type": "number"},
-                    "x2": {"type": "number"},
-                    "y2": {"type": "number"},
-                }
-            ),
-        },
     }
-)
+)  # fmt: skip
 PLOT_SCHEMA = _obj({"plans": {"type": "array", "items": PLAN}})
 
 PLOT_PROMPT = (
     "One page of a music venue's lighting drawings. List each plan on it (a drawing seen from above; a page can "
     "hold several, e.g. the stage roof and the stage truss); 3D views and photos are not plans: leave them out. "
     "{sizes}All positions are fractions of the whole page: x from its left edge, y from its top (0..1). Per "
-    "plan: its title, whether it shows the stage, the hall (audience area) or both, and on which side of the "
-    "plan the audience is (the side away from the stage, towards the front of house). The stage's front edge "
-    "and its back edge (y, or x when the audience is left or right; on a hall plan without the stage: the "
-    "hall's end wall at the stage as the front edge); the whole stage platform's two outer ends along the "
-    "front edge (x, or y), not a riser on it; the two side walls of the audience floor where it meets the "
-    "stage: the edges of the floor people stand on, inside any balconies or stairs, not the area the fixtures "
-    "cover; the printed scale (100 for 1:100). Null for what isn't drawn. Then every lighting fixture symbol, "
-    "moving heads, strobes, blinders and conventional lights alike: the label printed at it (a number such as "
-    "101 or #101, or a DMX address such as 2.169 or 1.34; dense trusses print them in a row above or below the "
-    "symbols), the centre of the symbol, and whether it stands on the floor. And each truss or pipe they hang "
-    "on, as a line from end to end.{labels}"
+    "plan: its title; its purpose: the lighting rig (fixtures on trusses, pipes or the floor, as hung for a "
+    "show) or the building (the roof structure, rigging points, motors, work lights in the roof); the box it "
+    "takes on the page (its drawing, without the title); whether it shows the stage, the hall (audience area) "
+    "or both, and on which side of the plan the audience is (the side away from the stage, towards the front of "
+    "house). The stage's front edge and its back edge (y, or x when the audience is left or right; on a hall "
+    "plan without the stage: the hall's end wall at the stage as the front edge); the whole stage platform's "
+    "two outer ends along the front edge (x, or y), not a riser on it; the two side walls of the audience "
+    "floor where it meets the stage: the edges of the floor people stand on, inside any balconies or stairs, "
+    "not the area the fixtures cover. Null for what isn't drawn. Then every lighting fixture symbol, moving "
+    "heads, strobes, blinders and conventional lights alike: the label printed at it (a number such as 101 or "
+    "#101, or a DMX address such as 2.169 or 1.34; dense trusses print them in a row above or below the "
+    "symbols), the centre of the symbol, its size (the longer side of the symbol itself, as a fraction of the "
+    "page's width; null when you can't tell), and whether it stands on the floor.{labels}"
 )
 
 
@@ -254,7 +249,8 @@ def read(files: list[Path], client=None, progress=None) -> Draft:
     d.stage = {
         "width_m": stage.get("width_m") or stage.get("usable_width_m"),
         "depth_m": stage.get("depth_m"),
-        "ceiling_m": stage.get("grid_height_m"),
+        "ceiling_m": (stage.get("grid_height_m") or 0) + (stage.get("deck_height_m") or 0) or None,
+        "deck_m": stage.get("deck_height_m"),
     }
     sizes = ", ".join(f"{k.replace('_m', '').replace('_', ' ')} {v:g} m" for k, v in stage.items() if v)
     labels = sorted(by_key, key=lambda k: [int(n) if n.isdigit() else 0 for n in re.split(r"\D", k)])
@@ -317,6 +313,43 @@ def fixtures(patch: dict, d: Draft) -> list[Item]:
     return items
 
 
+def footprint_m(it: Item) -> float | None:
+    """How big a fixture is seen from above (metres, its longer side), when the library knows the model."""
+    from amadeus.library import catalog
+    from amadeus.library import fixtures as fxlib
+    from amadeus.rig.importer import resolve
+
+    c = resolve.match(it.name, it.channels, it.mode)
+    if c is None:
+        return None
+    try:
+        d = catalog.definition(c.key) if c.key.startswith(("qlc:", "ofl:")) else fxlib.get(c.key)
+    except (OSError, KeyError, ValueError):
+        return None
+    size = d.get("physical", {}).get("size_mm")
+    if not size or len(size) < 3 or d.get("kind") not in ("moving_head", "moving_bar"):
+        return None  # only moving heads: drawn as their own footprint (conventionals get symbols of any size)
+    return max(size[0], size[2]) / 1000
+
+
+def symbol_scale(plot: dict, w: float, by_key: dict[str, Item]) -> float | None:
+    """Metres per point from the fixture symbols: plans are drawn to scale, so a moving head's symbol is as big
+    as the head. The median over the plan's heads (at least three), else None."""
+    got = []
+    for s in plot.get("symbols", []):
+        it = by_key.get(label_key(s["label"]))
+        size = s.get("size")
+        if it is None or not size or size <= 0.003:
+            continue
+        m = footprint_m(it)
+        if m:
+            got.append(m / (size * w))
+    if len(got) < 3:
+        return None
+    got.sort()
+    return got[len(got) // 2]
+
+
 def place(
     plot: dict,
     w: float,
@@ -331,6 +364,9 @@ def place(
     """Positions for the patch's fixtures from one plan; returns how many were placed. `under` gets the plan's
     two reference points (the stage's front edge at its ends) for the drawing under the rig (underlay.py), and
     each placed item its spot on the page."""
+    if plot.get("purpose") == "building":
+        d.note("ok", f"{where}: a plan of the building (roof, rigging), not of the lighting: not used for positions")
+        return 0
     if plot.get("area") == "other" or not plot.get("symbols"):
         return 0
     aud = plot.get("audience", "bottom")
@@ -342,41 +378,54 @@ def place(
         return {"bottom": y * h, "top": (1 - y) * h, "left": (1 - x) * w, "right": x * w}[aud]
 
     width = stage.get("width_m") or stage.get("usable_width_m")
-    scales, centre = [], None  # metres per point, from what the drawing gives: the median is taken
+    found = [s for s in plot.get("symbols", []) if label_key(s["label"]) in by_key]
+    # a plan of the hall: the patch hangs most of its fixtures there. What it calls the stage on it is a guess
+    # (often the first rows of the hall): only its side walls count, and its first row hangs over the crowd
+    hall_plan = sum(1 for s in found if HALL.search(by_key[label_key(s["label"])].where)) > 0.6 * max(1, len(found))
+    refs, centre = [], None  # metres per point, from what the plan shows
     ends, walls = (plot.get("stage_end_a"), plot.get("stage_end_b")), (plot.get("wall_a"), plot.get("wall_b"))
-    for a, b in (ends, walls):
+    for a, b in (walls,) if hall_plan else (ends, walls):
         if a is not None and b is not None and abs(a - b) > 0.05:
             centre = centre if centre is not None else (sl(a, a) + sl(b, b)) / 2
             if width:
-                scales.append(width / abs(sl(b, b) - sl(a, a)))
+                refs.append(width / abs(sl(b, b) - sl(a, a)))
     front, back = plot.get("stage_edge"), plot.get("stage_back")
-    if stage.get("depth_m") and front is not None and back is not None and abs(front - back) > 0.03:
-        scales.append(stage["depth_m"] / abs(out(front, front) - out(back, back)))
+    if not hall_plan and stage.get("depth_m") and front is not None and back is not None and abs(front - back) > 0.03:
+        refs.append(stage["depth_m"] / abs(out(front, front) - out(back, back)))
+    by_symbols = symbol_scale(plot, w, by_key)
+    agree = len(refs) >= 2 and max(refs) <= 1.15 * min(refs)
+    if agree:  # two sizes the plan shows agree: they win (the AI judges symbol sizes less well)
+        scales = refs
+    elif by_symbols:  # else the fixtures drawn on it: plans are drawn to scale
+        scales = [x for x in refs if abs(x / by_symbols - 1) <= 0.25] + [by_symbols]
+        if len(scales) == 1:
+            d.note("check", f"{where}: scaled by the size of its fixture symbols: check the distances")
+    else:
+        scales = refs
+    if centre is None and scales:  # nothing drawn across the stage: the rig's middle is the fixtures' middle
+        across = [sl(s["x"], s["y"]) for s in found]
+        centre = (min(across) + max(across)) / 2 if across else None
     if not scales or centre is None:
         d.note("check", f"{where}: no scale (the stage's width and its ends on the drawing): not used for positions")
         return 0
     scales.sort()
-    scale = (
-        scales[len(scales) // 2] if len(scales) % 2 else sum(scales[len(scales) // 2 - 1 : len(scales) // 2 + 1]) / 2
-    )
-    if len(scales) == 1 or max(scales) > 1.3 * min(scales):
-        d.note(
-            "check",
-            f"{where}: its scale is uncertain (one size to go by, or sizes that don't agree): check the distances",
-        )
-    edge = plot.get("stage_edge")
+    mid_k = len(scales) // 2
+    scale = scales[mid_k] if len(scales) % 2 else (scales[mid_k - 1] + scales[mid_k]) / 2
+    if not agree:
+        d.note("check", f"{where}: its scale is uncertain (one size to go by, or sizes that don't agree): check the "
+               "distances")  # fmt: skip
+    edge = None if hall_plan else plot.get("stage_edge")
     edge_pt = out(edge, edge) if edge is not None else None
-    found = [s for s in plot.get("symbols", []) if label_key(s["label"]) in by_key]
     depths = sorted(out(s["x"], s["y"]) for s in found)
-    if plot.get("area") == "hall" and depths and (edge_pt is None or depths[len(depths) // 5] < edge_pt):
+    if (hall_plan or plot.get("area") == "hall") and depths and (edge_pt is None or depths[len(depths) // 5] < edge_pt):
         edge_pt = depths[0] - 1.5 / scale  # a hall plan: its fixtures are in front of the stage
         d.note("check", f"{where}: where the stage is isn't clear on this plan: its first row taken as 1.5 m out")
     elif edge_pt is None:
         edge_pt = 0.0
         d.note("check", f"{where}: the stage's front edge isn't drawn: taken as the top of the drawing")
-    grid = stage.get("grid_height_m") or 6.0
-    deck = stage.get("deck_height_m") or 0.0
-    hall = (stage.get("hall_grid_height_m") or grid + deck) - deck
+    deck = stage.get("deck_height_m") or 0.0  # heights count from the hall floor; the stage stands this high
+    grid = deck + (stage.get("grid_height_m") or 6.0)  # the stage's grid, above the stage
+    hall = stage.get("hall_grid_height_m") or grid
 
     def metres(x: float, y: float) -> tuple[float, float]:  # (to stage right of the centre, to the audience)
         return (centre - sl(x, y)) * scale, (out(x, y) - edge_pt) * scale
@@ -388,26 +437,12 @@ def place(
             unknown += 1
             continue
         sx, sy = metres(s["x"], s["y"])
-        z = 0.0 if s["floor"] else (hall if sy > 0.5 else grid) - 0.6
+        z = (deck if sy <= 0.5 else 0.0) if s["floor"] else (hall if sy > 0.5 else grid) - 0.6
         it.pos, it.hanging = (round(sx, 3), round(sy, 3), round(z, 3)), not s["floor"]
         it.page = (index, s["x"], s["y"])
         placed += 1
     if unknown:
         d.note("check", f"{where}: {unknown} symbols had a label that isn't in the patch")
-    for t in plot.get("trusses", []):
-        (ax, ay), (bx, by) = metres(t["x1"], t["y1"]), metres(t["x2"], t["y2"])
-        n = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
-        if n > 1.0:
-            z = (hall if (ay + by) / 2 > 0.5 else grid) - 0.2
-            d.trusses.append(
-                {
-                    "name": t["label"] or "truss",
-                    "s": round((ax + bx) / 2, 3),
-                    "y": round((ay + by) / 2, 3),
-                    "z": round(z, 3),
-                    "dir": ((bx - ax) / n, (by - ay) / n),
-                }
-            )
     if placed and under is not None:
 
         def page_at(s_m: float, y_m: float) -> list[float]:  # rig (to stage right of the centre, out) → page
@@ -418,6 +453,13 @@ def place(
 
         W = float(width)
         under.update(a=page_at(-W / 2, 0.0), b=page_at(W / 2, 0.0), a_m=[0.0, 0.0], b_m=[W, 0.0])
+        box = plot.get("box") or {}
+        if all(isinstance(box.get(k), (int, float)) for k in ("x0", "y0", "x1", "y1")):
+            x0, x1 = sorted((box["x0"], box["x1"]))
+            y0, y1 = sorted((box["y0"], box["y1"]))
+            if x1 - x0 > 0.05 and y1 - y0 > 0.05:
+                under["crop"] = [round(max(0.0, x0), 4), round(max(0.0, y0), 4), round(min(1.0, x1), 4),
+                                 round(min(1.0, y1), 4)]  # fmt: skip
     if placed:
         d.note("check", f"{where}: {placed} fixtures placed from the drawing (positions read by AI: check them; "
                "line the drawing up in the rig editor if they are off)")  # fmt: skip

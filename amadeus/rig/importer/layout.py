@@ -123,9 +123,13 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
         return it.pos[0] - mid + W / 2, it.pos[1], it.pos[2]
 
     high = {fid: xyz(it) for fid, it in placed.items() if it.pos[2] >= HIGH_M}
+    deck = float(draft.stage.get("deck_m") or 0.0)
     trusses, places = on_drawn_trusses(draft, high, W, mid)
     high = {fid: p for fid, p in high.items() if fid not in places and placed[fid].hanging is not False}
+    heads = {names[i] for i in range(len(names)) if role(fxlib.get(choices[i].key)) == "head"}
     for run, axis in rows(high):
+        if len(run) < 3 and not heads & set(run):  # two fixed lights side by side are no truss: they hang free
+            continue
         ps = [high[f] for f in run]
         z = sorted(p[2] for p in ps)[len(ps) // 2] + T.HANG_DROP
         along = 0 if axis == "x" else 1
@@ -154,7 +158,8 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
         if fid in places:
             continue
         x, y, z = xyz(it)
-        mount = "floor" if z < FLOOR_M else ("hang" if it.hanging is not False else "stand")
+        ground = deck if y <= 0.5 else 0.0  # the stage's deck, or the hall floor
+        mount = "floor" if z - ground < FLOOR_M else ("hang" if it.hanging is not False else "stand")
         places[fid] = {"x": round(x / W, 4), "y_m": round(y, 3), "z_m": round(max(z, 0.0), 3), "mount": mount}
     for i, it in enumerate(draft.items):
         fid = names[i]
@@ -171,6 +176,7 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
     zs = [p["z_m"] for p in places.values()]
     stage = {
         "width_m": W,
+        **({"deck_m": deck} if deck else {}),
         "ceiling_m": float(draft.stage.get("ceiling_m") or round(max(zs + [4.0]) + 1.0, 1)),
         "eye_safety": True,
         "room_depth_m": round(max(15.0, max(ys + [0.0]) + 4.0), 1),
@@ -223,15 +229,15 @@ def on_drawn_trusses(draft: Draft, points: dict[str, tuple[float, float, float]]
             fs = [(f, -a, -b, zz) for f, a, b, zz in fs]
             c = -c
         t = {
-            "id": re.sub(r"[^A-Za-z0-9]+", "", t0["name"]) or "truss",
+            "id": re.sub(r"[^A-Za-z0-9]+", "", t0["name"]) or free_id({x["id"] for x in trusses}, "truss"),
             "type": "quatro",
             "length_m": math.ceil((hi - lo + 1.0) * 2) / 2,
             "x_m": round(ox + c * dx, 2),
             "y_m": round(oy + c * dy, 2),
             "z_m": round(z, 2),
         }
-        while t["id"] in {x["id"] for x in trusses}:
-            t["id"] += "b"
+        if t["id"] in {x["id"] for x in trusses}:
+            t["id"] = free_id({x["id"] for x in trusses}, t["id"])
         if abs(rot) > 0.5:
             t["rot_deg"] = round(rot, 1)
         trusses.append(t)
@@ -242,14 +248,19 @@ def on_drawn_trusses(draft: Draft, points: dict[str, tuple[float, float, float]]
 
 
 def _truss_id(draft: Draft, trusses: list[dict], s: float, y: float, z: float) -> str:
-    """The document's name for the truss at this spot (an MVR truss within a metre), else truss1, truss2…"""
+    """The document's name for the truss at this spot (an MVR truss within a metre), else where it hangs and a
+    number: stage1, stage2… over the stage, hall1, hall2… over the audience."""
     taken = {t["id"] for t in trusses}
     for t in draft.trusses:
         if abs(t["s"] - s) < 1.5 and abs(t["y"] - y) < 1.0 and abs(t["z"] - z) < 1.0:
-            base = re.sub(r"[^A-Za-z0-9]+", "", t["name"]) or "truss"
-            if base not in taken:
+            base = re.sub(r"[^A-Za-z0-9]+", "", t["name"])
+            if base and base not in taken:
                 return base
-    n = len(trusses) + 1
-    while f"truss{n}" in taken:
+    return free_id(taken, "stage" if y < 0.5 else "hall")
+
+
+def free_id(taken: set[str], base: str) -> str:
+    n = 1
+    while f"{base}{n}" in taken:
         n += 1
-    return f"truss{n}"
+    return f"{base}{n}"

@@ -57,9 +57,16 @@ def to_rig(u: dict, fx: float, fy: float) -> tuple[float, float]:
     return z.real, z.imag
 
 
+def crop(u: dict) -> list[float]:
+    """The part of the page that is this plan ([x0, y0, x1, y1], page fractions): a page can hold several."""
+    return u.get("crop") or [0.0, 0.0, 1.0, 1.0]
+
+
 def corners(u: dict) -> list[tuple[float, float]]:
-    """The page's corners on the rig (top left, top right, bottom right, bottom left): where to draw it."""
-    return [to_rig(u, x, y) for x, y in ((0, 0), (1, 0), (1, 1), (0, 1))]
+    """The plan's corners on the rig (top left, top right, bottom right, bottom left of its `crop`): where to draw
+    it, with the page's texture from `crop`."""
+    x0, y0, x1, y1 = crop(u)
+    return [to_rig(u, x, y) for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
 
 
 def align(rig_doc: dict, uid: str, a: list[float], b: list[float], width_m: float) -> dict:

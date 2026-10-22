@@ -68,6 +68,11 @@ machines make the room ([fixture-catalog.md](fixture-catalog.md)).
 }
 ```
 
+`stage.deck_m` is the stage's height above the hall floor (default 0: the stage is the floor). Heights (`z_m`, a
+truss's `z_m`, `ceiling_m`) count from the hall floor, so on a 1.5 m stage a fixture standing on it has `z_m` 1.5;
+auto-mount puts its floor rows on the deck, beams land on it, and the hang sheet gives a stage truss's height above
+the stage as well.
+
 `stage.outdoor: true` is an open-air stage: there is no ceiling (`ceiling_m` and the ceiling guard are ignored),
 the sky aim goes higher and wider, the directors aim at the sky far more often (the AI is told it is an outdoor
 show), and smoke clears in about a minute instead of five. Indoors nothing changes: the ceiling guard keeps

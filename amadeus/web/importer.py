@@ -5,7 +5,8 @@ POST /api/import            {"name", "files": [{"name", "data": base64}], "repla
 GET  /api/import?job=…      {"state": running|done|failed|cancelled, "step", "notes", "name", "fixtures", "trusses",
                             "error"}
 POST /api/import/cancel     {"job"}: stop it at its next step (between two AI requests); nothing is saved
-GET  /api/underlays?rig=…   the rig's drawings, each with its corners on the rig (metres) to draw it
+GET  /api/underlays?rig=…   the rig's drawings, each with its corners on the rig (metres) and the part of its page
+                            those are (`crop`: x0, y0, x1, y1 page fractions) to draw it
 GET  /api/underlay/page?file=…   one drawing's page (a one-page PDF)
 POST /api/underlay/align    {"rig", "id", "a": [x, y], "b": [x, y], "width_m"}: line it up (page fractions of
                             the stage's front edge, stage left then stage right); its fixtures move with it
@@ -109,7 +110,7 @@ def cancel_import(req):
 def _with_corners(u: dict) -> dict:
     from amadeus.rig.importer import underlay
 
-    return {**u, "corners": [[round(x, 3), round(y, 3)] for x, y in underlay.corners(u)]}
+    return {**u, "crop": underlay.crop(u), "corners": [[round(x, 3), round(y, 3)] for x, y in underlay.corners(u)]}
 
 
 def list_underlays(req):

@@ -25,6 +25,7 @@ DEFAULT_STAGE = {
     "ceiling_m": 4.5,
     "outdoor": False,  # an open-air stage: no ceiling, the sky is free for beams (ceiling_m is then ignored)
     "room_depth_m": 6.0,  # from the stage edge to the far wall (beams stop there in the visualiser)
+    "deck_m": 0.0,  # the stage's height above the hall floor (heights count from the hall floor)
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …
     "audience_min_up_deg": 35.0,  # … or this far up (heads below 2.5 m); 10° for higher heads
@@ -235,6 +236,11 @@ def beam_end(pos, d, st: dict, max_len: float = 12.0):
     p = np.asarray(pos, dtype=float)
     if d[2] < -1e-3:
         t, surf = -p[2] / d[2], "floor"
+        deck = float(st.get("deck_m", 0.0))
+        if deck > 0 and p[2] > deck:  # it lands on the stage (behind its front edge) at the deck's height
+            on = p + d * ((deck - p[2]) / d[2])
+            if on[1] <= 0.0:
+                t = (deck - p[2]) / d[2]
     elif d[2] > 1e-3 and not st.get("outdoor"):
         t, surf = (st["ceiling_m"] - p[2]) / d[2], "ceiling"
     else:

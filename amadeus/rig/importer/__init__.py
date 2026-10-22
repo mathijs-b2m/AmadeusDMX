@@ -10,6 +10,7 @@ plots) are read with AI and need the user's own OpenAI API key (`pdf`).
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -90,9 +91,8 @@ def build(files: list[Path], name: str, client=None, progress=None) -> Result:
     waiting = [f["id"] for f in merged["fixtures"] if f.get("_unplaced")]
     if waiting:
         had_trusses = bool(rig_doc["trusses"])
-        places = automount(merged, waiting)
+        rig_doc["placements"][name].update(mount_waiting(merged, waiting, draft, set_doc))
         rig_doc["trusses"] = merged["trusses"]
-        rig_doc["placements"][name].update(places)
         where = "on the trusses found" if had_trusses else "on a standard structure for the stage"
         draft.note(
             "check",
@@ -104,6 +104,40 @@ def build(files: list[Path], name: str, client=None, progress=None) -> Result:
         draft.note("missing", "No DMX patch in the documents: give the fixtures their addresses on the Set page")
     draft.notes += checks(store.compose(set_doc, rig_doc, name))
     return Result(set_doc, rig_doc, draft.notes, pages)
+
+
+FLOOR = re.compile(r"floor|vloer|deck", re.I)
+HALL = re.compile(r"hall|zaal|audience|publiek|foh|f\.o\.h|balcon|front|house", re.I)
+
+
+def mount_waiting(merged: dict, waiting: list[str], draft: Draft, set_doc: dict) -> dict[str, dict]:
+    """Auto-mount the fixtures the documents give no spot, where the patch says they hang: heads "on the stage
+    floor" in a row at the back of the stage, "hall"/"front"/"balcony" ones on the trusses over the crowd, the rest
+    on the stage's trusses (each group on all trusses when its own kind has none)."""
+    where = {f["id"]: it.where for f, it in zip(set_doc["fixtures"], draft.items)}
+    places: dict[str, dict] = {}
+    floor = [f for f in waiting if FLOOR.search(where.get(f, "")) and not HALL.search(where.get(f, ""))]
+    depth = float(draft.stage.get("depth_m") or 4.0)
+    for k, fid in enumerate(floor):  # spread along the back of the stage
+        places[fid] = {"x": round((k + 1) / (len(floor) + 1), 4), "y_m": round(-depth + 0.8, 2),
+                       "z_m": float(draft.stage.get("deck_m") or 0.0),
+                       "mount": "floor"}  # fmt: skip
+    rest = [f for f in waiting if f not in places]
+    groups = {
+        "hall": [f for f in rest if HALL.search(where.get(f, ""))],
+        "stage": [f for f in rest if not HALL.search(where.get(f, ""))],
+    }
+    everything = merged.get("trusses", [])
+    for zone, ids in groups.items():
+        if not ids:
+            continue
+        own = [t for t in everything if (t.get("y_m", 0.0) > 1.0) == (zone == "hall")]
+        if everything:
+            merged["trusses"] = own or everything
+        places.update(automount(merged, ids))
+        everything = everything or merged.get("trusses", [])  # a standard structure, when there was none
+        merged["trusses"] = everything
+    return places
 
 
 def underlays(draft: Draft, set_doc: dict, rig_doc: dict, name: str) -> dict[str, bytes]:
@@ -121,6 +155,8 @@ def underlays(draft: Draft, set_doc: dict, rig_doc: dict, name: str) -> dict[str
         out.append({"id": f"u{len(out) + 1}", "title": u["title"], "source": u["source"], "file": file,
                     "w": u["w"], "h": u["h"], "set": name, "a": u["a"], "b": u["b"], "a_m": u["a_m"],
                     "b_m": u["b_m"], "fixtures": spots[i]})  # fmt: skip
+        if u.get("crop"):
+            out[-1]["crop"] = u["crop"]
     if out:
         rig_doc["underlays"] = out
     return pages
