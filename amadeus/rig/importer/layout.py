@@ -17,7 +17,10 @@ from amadeus.rig.importer.draft import Draft, Item
 from amadeus.rig.importer.resolve import Choice
 
 ROW_NEAR_M = 0.6  # fixtures this close across a row's line are in it
-ROW_GAP_M = 3.0  # a gap longer than this between fixtures: two trusses
+ROW_GAP_M = 1.5  # a gap longer than this between fixtures (and…
+SPLIT_SPACING = 2.2  # …this many times the row's usual spacing): two trusses
+ROW_SPAN_M = 4.0  # a truss never spans a longer gap than this without a fixture
+FACE_NEAR_M = 1.0  # fixed lights drawn this close beside a row of heads hang on the face of that truss
 HIGH_M = 1.8  # hanging higher than this: on a truss
 FLOOR_M = 0.6  # lower than this: on the floor
 FRONT = re.compile(r"front|foh|f\.o\.h|follow|key ?light|dj", re.I)  # a fixed light there lights the stage
@@ -63,6 +66,13 @@ def rows(points: dict[str, tuple[float, float, float]]) -> list[tuple[list[str],
     """Groups of hanging fixtures in a line at one height: (ids, "x") across the stage or (ids, "y") up/down it."""
     left = dict(points)
     found = []
+
+    def line(run: list[str], along: int, across: int) -> bool:  # longer along it than wide across: a row this way
+        if len(run) < 2:
+            return False
+        length = max(left[f][along] for f in run) - min(left[f][along] for f in run)
+        return length > max(left[f][across] for f in run) - min(left[f][across] for f in run)
+
     for axis, across in (("x", 1), ("y", 0)):  # across the stage first: the usual truss
         groups: list[list[str]] = []
         for fid in sorted(left, key=lambda f: (left[f][across], left[f][2])):
@@ -78,13 +88,15 @@ def rows(points: dict[str, tuple[float, float, float]]) -> list[tuple[list[str],
         for g in groups:
             g.sort(key=lambda f: left[f][along])
             run = [g[0]]
+            gaps = sorted(left[b][along] - left[a][along] for a, b in zip(g, g[1:]))
+            split = min(max(ROW_GAP_M, SPLIT_SPACING * gaps[len(gaps) // 2]), ROW_SPAN_M) if gaps else ROW_GAP_M
             for a, b in zip(g, g[1:]):
-                if left[b][along] - left[a][along] > ROW_GAP_M:
-                    if len(run) >= 2:
+                if left[b][along] - left[a][along] > split:
+                    if line(run, along, across):
                         found.append((run, axis))
                     run = []
                 run.append(b)
-            if len(run) >= 2:
+            if line(run, along, across):
                 found.append((run, axis))
         for run, _ in found:
             for f in run:
@@ -127,13 +139,46 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
     trusses, places = on_drawn_trusses(draft, high, W, mid)
     high = {fid: p for fid, p in high.items() if fid not in places and placed[fid].hanging is not False}
     heads = {names[i] for i in range(len(names)) if role(fxlib.get(choices[i].key)) == "head"}
-    for run, axis in rows(high):
-        if len(run) < 3 and not heads & set(run):  # two fixed lights side by side are no truss: they hang free
+    runs = rows(high)
+
+    def of_heads(run: list[str]) -> bool:  # a row of heads (a stray head among PARs drawn beside them is not)
+        n = len(heads & set(run))
+        return n >= 2 and 2 * n >= len(run) or n == len(run)
+
+    head_runs = [(run, axis) for run, axis in runs if of_heads(run)]
+    on_face: dict[int, list[tuple[str, str]]] = {k: [] for k in range(len(head_runs))}
+    loose: list[tuple[list[str], str]] = []
+    for run, axis in runs:  # a plan draws a truss's PARs beside it, to be read: they hang on its face
+        if of_heads(run):
             continue
+        across, along = (1, 0) if axis == "x" else (0, 1)
+        left = []
+        for f in run:
+            p, best = high[f], None
+            for k, (hr, ha) in enumerate(head_runs):
+                if ha != axis:
+                    continue
+                hp = [high[g] for g in hr]
+                off = p[across] - sum(q[across] for q in hp) / len(hp)
+                lo, hi = min(q[along] for q in hp) - 0.6, max(q[along] for q in hp) + 0.6
+                near = abs(off) <= FACE_NEAR_M and lo <= p[along] <= hi and abs(p[2] - hp[0][2]) <= 0.8
+                if near and (best is None or abs(off) < abs(best[1])):
+                    best = (k, off)
+            if best:  # the face towards where it is drawn (front: towards the audience; turned trusses: -x)
+                k, off = best
+                on_face[k].append(
+                    (f, ("front" if off > 0 else "back") if axis == "x" else ("front" if off < 0 else "back"))
+                )
+            else:
+                left.append(f)
+        loose += [(r, a) for r, a in rows({f: high[f] for f in left}) if len(r) >= 3]
+    found = [(run, axis, dict(on_face[k])) for k, (run, axis) in enumerate(head_runs)] + [(r, a, {}) for r, a in loose]
+    for run, axis, sides in found:
+        members = list(run) + list(sides)
         ps = [high[f] for f in run]
         z = sorted(p[2] for p in ps)[len(ps) // 2] + T.HANG_DROP
         along = 0 if axis == "x" else 1
-        lo, hi = min(p[along] for p in ps), max(p[along] for p in ps)
+        lo, hi = min(high[f][along] for f in members), max(high[f][along] for f in members)
         cx, cy = sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps)
         if axis == "x":
             cx = (lo + hi) / 2
@@ -150,10 +195,10 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
         if axis == "y":
             t["rot_deg"] = 90
         trusses.append(t)
-        for f in run:
+        for f in members:
             p = high[f]
             u = p[0] - cx if axis == "x" else p[1] - cy
-            places[f] = T.place({}, t, round(u, 3), W, "under")
+            places[f] = T.place({}, t, round(u, 3), W, sides.get(f, "under"))
     for fid, it in placed.items():
         if fid in places:
             continue
