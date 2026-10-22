@@ -1,6 +1,6 @@
 """Which library fixture and mode each fixture type of the documents is.
 
-A name is searched in every library (ours, QLC+, the Open Fixture Library); a match must name the same model
+A name is searched in every library (ours, QLC+, the Open Fixture Library, DDF); a match must name the same model
 numbers ("X4 Bar 20" is not an "X4 Bar 10") and have a mode as long as the document's footprint, when it says.
 What fits best is taken; anything short of every word and the footprint matching is marked for a check. A type
 nothing matches is made from a generic template (conventional lights on a dimmer: a PAR 64 on one channel), so

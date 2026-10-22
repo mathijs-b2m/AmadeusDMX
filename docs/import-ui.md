@@ -1,7 +1,8 @@
-# Import from documents: the apps (spec for Mac and Windows)
+# Import from documents: the apps (Mac and Windows)
 
-The engine side is done (`amadeus/rig/importer/`, `amadeus/web/importer.py`, docs/rig-format.md "Import from a
-venue's documents"). Both apps get the same three pieces, built the same way.
+The engine reads the documents (`amadeus/rig/importer/`, `amadeus/web/importer.py`, and
+[rig-format.md](rig-format.md#import-from-a-venues-documents) for what it reads). Both apps have the same three
+pieces, built the same way; this is how they work.
 
 ## API (the setup service, as the other `/api/` calls)
 

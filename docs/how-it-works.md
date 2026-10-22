@@ -44,6 +44,11 @@ peaks, deeper breathers against fatigue, a finale and an outro.
   groups play, the biggest groups and the special effects (lasers, strobes, blinders) stay in the box until the
   moments that earn them. With an empty floor, the warm-up is a cosy static wash with slow heads projecting
   gobos on the floor. Only real calm phases (a wedding dinner, the goodnight) dim.
+- **A countdown is rare.** The LED wall's 3-2-1 DROP! is granted by the arc, not played into every drop: in a
+  peak or the finale (a few minutes into the night), into a track's first main drop after a build or a
+  breakdown, at most twice a night and well apart. The engine names that drop in the feed's hello
+  (`countdown`); the walls on the Mac, Windows and in the browser only count into it. A track played on its own
+  counts into its main drop.
 - **Knobs** (all live, in every mode of the app): light groups in play, special effects, LED wall, smoke,
   movement, look changes, colour variety, responsiveness, drop size, flashes and intensity. The operator can
   take over any knob at any moment and give it back to the arc, force or hold a stage, pick the event type and

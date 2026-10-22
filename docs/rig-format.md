@@ -9,7 +9,9 @@ Two kinds of files describe your lighting, because they change for different rea
 
 A show runs with one set placed on one rig. The active ones are named in `config/active-set` and
 `config/active-rig`; commands take `--set NAME` and `--rig NAME` to pick others. A fresh checkout starts with
-copies of `examples/sets` and `examples/rigs`. `config/` is not in git: it is yours.
+copies of `examples/sets` and `examples/rigs`. `config/` is not in git: it is yours. An example a later
+version adds is copied in once; each folder's `.examples` remembers what it was given, so an example you
+deleted stays gone. The apps list the examples apart from yours (*Examples* under *Your Sets* and *Your Rigs*).
 
 The usual flow (the Mac app's set-up assistant does exactly this):
 
@@ -173,7 +175,8 @@ their place, and their room on a truss is left free.
   id, position, quantity and x/y/z columns are used when they are there. "1.141", "1/141", "U1 141" and dimmer
   ranges ("1.013 > 1.019": one conventional light per channel) are understood.
 
-Each type is found in the libraries (ours, QLC+, the Open Fixture Library); a match must name the same model
+Each type is found in the fixture catalogue (ours, QLC+, the Open Fixture Library, the DMXControl DDF library);
+a match must name the same model
 numbers, and its mode is the one as long as the document's footprint (or the spacing of the patch). Nothing
 close: a conventional light plays on one dimmer channel, anything else is made from a generic template.
 Hanging fixtures go on the drawn trusses, else on trusses found from their rows; fixtures without a position
@@ -182,7 +185,8 @@ near match, a mode the documents don't name, fixed lights pointing at a wall or 
 missing (no patch).
 
 - **PDFs** (patch lists, the technical rider, light plots) are read with AI and need **your own OpenAI API key**
-  (Settings › OpenAI in the app, or `OPENAI_API_KEY` in `.env`); without one nothing is sent and the report
+  (Settings › Director in the app, the same key the AI director uses, or `OPENAI_API_KEY` in `.env`); without
+  one nothing is sent and the report
   says so. Every page of every PDF is read: the text pages together (every patched fixture, the modes the notes
   name, the stage's size and heights, house lights left out), each drawing on its own (its plans, the audience
   side, the stage's edges or the hall's walls for the scale, every fixture symbol and its label, the trusses).
@@ -190,6 +194,18 @@ missing (no patch).
   comes from the sizes the rider gives (the median of what agrees); a plan that doesn't show the stage, like a
   hall plot, gets a rough scale and the report asks to check it. Answers are cached (`.cache/import`), so
   importing the same files again costs nothing.
+
+Heights are measured from the hall floor: a raised stage gets its height (`stage.deck_m`), and what stands on
+the floor stands on the deck or the hall floor (a head's tilt axis 0.3 m over it, as auto-mount puts it).
+A fixture the documents don't patch waits for its address in universe 1.
+
+**In the apps** (Mac and Windows), *Import from Documents…* on the Rigs page and in the rig editor does the same
+as a job with progress (Close lets it run on, *Cancel Import* saves nothing) and shows the report. Each plan
+fixtures were placed from stays with the rig as a **drawing under the rig** (`"underlays"`,
+`amadeus/rig/importer/underlay.py`): shown on the stage floor in the rig editor, with show/hide, opacity and
+remove. When the AI's scale was off, **Line Up…** takes two clicks on the page, the stage's front edge at stage
+left and at stage right, and moves the plan's fixtures and trusses with it. The API is in
+[import-ui.md](import-ui.md).
 
 ## Hang sheet
 
