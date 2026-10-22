@@ -39,7 +39,8 @@ updates** and click **Check Automatically**.
 <img src="screenshots/guide/update-prompt.png" alt="The update question on first launch: tick Automatically download and install updates, then click Check Automatically" width="480">
 
 Updates never happen during a show: no check while the lights run, and an update waits until the show stops.
-You can change this any time in **Settings › General › Updates** (both switches on).
+You can change this any time in **Settings › General › Updates** (both switches on). The bottom of the sidebar
+shows your version; when a newer one is out it says **Update to …**, and one click installs it.
 
 ## 3. ⭐ Add your OpenAI key (the AI director)
 
@@ -57,7 +58,8 @@ each phrase, knows the song's arc, and picks lights, colours and moves like a li
 <img src="screenshots/guide/settings-director.png" alt="Settings › Director: choose OpenAI under Who decides the show, and paste the key under AI Director: OpenAI API key" width="100%">
 
 Your key is kept in your Mac's **Keychain**. It's handed to the engine when a show starts, never written to a
-file, and only sent to OpenAI. The toolbar on the Show page then says **✨ AI**.
+file, and only sent to OpenAI. The toolbar on the Show page then says **✨ AI**. Without a key a show never
+stops: it plays with the rule-based director instead.
 
 > **Rather stay offline?** Choose **Local model**: a free AI director that runs on your own Mac with
 > [Ollama](https://ollama.com). Install Ollama, run `ollama pull nimble` in Terminal, and click **Refresh**.
@@ -128,7 +130,10 @@ No DJ software? Press ⌘O and play a track from your Mac.
 
 **File › New Set…** opens the set-up assistant. It makes your **set** (the fixtures you own) and a **rig**
 (the venue they hang in), and mounts one on the other. On the Sets page your own sets are listed under **Your
-Sets**, the two you started with under **Examples**: put your fixtures in a set of your own, not in an example.
+Sets**, the shipped ones under **Examples** (a showcase of popular fixtures, a 60-head concert stage, and the
+house rig of the Melkweg Max in Amsterdam); the Rigs page does the same with **Your Rigs** and **Examples**. Put
+your fixtures in a set of your own, not in an example. An example a later version adds shows up once; one you
+delete stays gone.
 
 <table>
 <tr>
@@ -152,6 +157,17 @@ Sets**, the two you started with under **Examples**: put your fixtures in a set 
 Then **Create and Mount**: the assistant hangs every fixture the way a lighting tech would. Fine-tune it on
 the **Rigs** page: drag fixtures onto trusses, add round trusses, draw zones that keep beams off walls and
 lasers out of the audience, and switch **Outdoor** on for an open-air stage.
+
+**Playing a venue with its own house rig?** Skip the assistant: **Import from Documents…** on the Rigs page
+builds the set and the rig from what the venue sends you. An MVR scene (Vectorworks, Capture, grandMA3) or a
+patch sheet (CSV, Excel) is read on your Mac; PDFs (the rider, patch lists, light plots) are read with AI and
+need your OpenAI key (step 3). The plans the fixtures came from lie under the rig in the editor: if one sits
+off, **Line Up…** takes two clicks on the stage's front edge, stage left and stage right, and moves the
+fixtures with it. The report says what was assumed and what to check before the gig.
+
+Rather have it done for you? Your own AI assistant (Claude or Codex) can make the rig and hang your set on it
+from a description, and builds fixtures the library lacks from the maker's manual:
+see [Your own AI assistant](ai-assistants.md).
 
 Hanging it for real? The printer button in the rig editor prints a **hang sheet** for the crew. After
 hanging, the checklist button lights the fixtures one by one, so a swapped or turned fixture is fixed with

@@ -8,6 +8,7 @@ amadeus setup   [--lan]                  web UI for fixtures, node and stage
 
 amadeus set [NAME] [--copy-of SET | --grid MODEL:COUNT]   your gear: list, switch or create sets
 amadeus rig [NAME] [--template T] [--automount] [--hang-sheet]   the venue: rigs; mount the set; print where it hangs
+amadeus rig NAME --import FILE…                           a set and a rig from a venue's MVR, patch sheets, PDFs
 amadeus library [WORDS] [--add KEY] [--gdtf FILE]          fixture library: ours, QLC+, Open Fixture Library, DDF
 amadeus patch MODEL[:COUNT] …                             patch fixtures into the active set
 amadeus mcp [--guide]                                     your own AI assistant edits sets and rigs (MCP, stdio)

@@ -45,7 +45,9 @@ For VirtualDJ: see [Live in VirtualDJ](#live-in-virtualdj).
 | `amadeus motion FIXTURE [--axis pan\|tilt]` | Measure how fast a moving head really swings on the beat |
 | `amadeus simnode MODEL[:COUNT],…` | Simulated Net-2/5 with virtual (RDM) fixtures, decodes incoming DMX |
 | `amadeus set [NAME] [--new \| --copy-of SET]` | Your fixtures: list, switch or create sets |
-| `amadeus rig [NAME] [--template T] [--automount [--all]] [--hang-sheet [FILE]]` | The venue: list, switch or create rigs (templates: floor, stands, booth, club, stage); mount the set on it; write the hang sheet for the crew |
+| `amadeus rig [NAME] [--template T] [--automount [--all]] [--hang-sheet [FILE]]` | The venue: list, switch or create rigs (templates: floor, stands, booth, club, stage, ring); mount the set on it; write the hang sheet for the crew |
+| `amadeus rig NAME --import FILE… [--replace]` | Build a set and a rig `NAME` from a venue's documents: MVR, patch sheets (CSV, Excel), PDFs with your OpenAI key ([rig-format.md](rig-format.md#import-from-a-venues-documents)) |
+| `amadeus mcp [--guide]` | Your own AI assistant works on your sets and rigs: an MCP server on stdio ([ai-assistants.md](ai-assistants.md)) |
 | `amadeus monitor` | Watch VirtualDJ and the engine: CPU, memory, threads, GPU, crashes |
 | `amadeus probe [NAME] [--emit 127.0.0.1:9123]` | Other DJ software (Mixxx, djay Pro, …): list, watch and measure one, or pass it to the Amadeus Link app |
 | `amadeus packs [install NAME]` | The optional packs (instrument analysis, streamed tracks): list or install |

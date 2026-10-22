@@ -122,6 +122,16 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 <p>Flashes are capped at 3 Hz, nothing strobes along with the music, and laser zones, keep-out zones and eye-safety rules keep beams where they belong. While you set up, a brightness limiter caps every light (and tells you it's on).</p>
 </td>
 </tr>
+<tr>
+<td valign="top">
+<h3>📄 From the venue's paperwork</h3>
+<p>Playing a venue with its own house rig? <b>Import from Documents</b> builds the set and the rig from what the venue sends: an MVR scene, patch sheets (CSV, Excel), or the rider's PDFs and light plots, read with AI on your own OpenAI key. The plans lie under the rig in the editor, lined up with two clicks, and the report says what to check.</p>
+</td>
+<td valign="top">
+<h3>🤖 Your own AI assistant</h3>
+<p>Let <b>Claude</b> or <b>Codex</b> set up your gear: describe your rig or your venue and it makes the rigs, adds and mounts the fixtures and checks the result, with undo. A fixture no library has? It builds one from the DMX chart in the maker's manual. One switch in Settings › Integrations connects Claude Desktop.</p>
+</td>
+</tr>
 </table>
 
 **See it before you rig it:** a live 3D stage shows every beam, so you can plan and try a show without a
@@ -162,8 +172,9 @@ out over Art-Net, sACN or a USB DMX interface.
 2. **Switch on the extras** in Settings: your OpenAI key for the AI director, the optional packs
    (instrument analysis and streamed tracks) and *Light streamed tracks*. See the
    [setup guide](docs/mac-setup.md).
-3. **Follow the set-up assistant:** your fixtures, your venue, done. No lights yet? Start with one of the
-   example rigs and watch the 3D stage.
+3. **Follow the set-up assistant:** your fixtures, your venue, done. Or import the venue's documents (Rigs ›
+   Import from Documents…). No lights yet? Open one of the examples (a showcase, a 60-head concert stage, the
+   Melkweg Max in Amsterdam) and watch the 3D stage.
 4. **Press play.** Play a track, or start a live show and DJ as usual.
 
 Using a separate lighting laptop? Put **Amadeus Link** (on the same download page) on the DJ laptop.
@@ -270,18 +281,18 @@ python3 -m venv .venv
 | [How it works](docs/how-it-works.md) | The analysis, the director and decision models, genres and house styles, the show arc, the engine |
 | [Command line](docs/command-line.md) | Every `amadeus` command, VirtualDJ live mode, the sync test, sets and rigs, the hardware checklist |
 | [Architecture](docs/architecture.md) | The code map: which package does what, and which way the dependencies go |
-| [Sets and rigs](docs/rig-format.md) | The file formats, trusses, auto-mount, the hang sheet |
-| [Your own AI assistant](docs/ai-assistants.md) | Claude Desktop, Claude Code or Codex sets up your sets and rigs (`amadeus mcp`) |
+| [Sets and rigs](docs/rig-format.md) | The file formats, trusses, auto-mount, importing a venue's documents, the hang sheet |
+| [Your own AI assistant](docs/ai-assistants.md) | Claude Desktop, Claude Code or Codex sets up your sets and rigs and makes missing fixtures (`amadeus mcp`) |
 | [DJ software](docs/dj-software.md) | Each integration: what it reads, what it needs, what it's tested on |
 | [Protocols](docs/protocols.md) | The engine's feed, the VirtualDJ plugin, Amadeus Link |
-| [Fixture catalogue](docs/fixture-catalog.md) · [Fixture twin](docs/fixture-twin.md) | QLC+ / OFL conversion; checking head motion against the real fixture |
+| [Fixture catalogue](docs/fixture-catalog.md) · [Fixture sources](docs/fixture-sources.md) · [Fixture twin](docs/fixture-twin.md) | QLC+ / OFL / DDF conversion, GDTF import, gobos and zoom, the DMX mapper; which libraries we ship and why; checking head motion against the real fixture |
 | [Safety](docs/safety.md) | Flash limits, strobe-free, eye safety, zones and the laser guard |
 
 ### Project layout
 
 | Path | What's there |
 |---|---|
-| `amadeus/` | The engine (Python): `audio/`, `director/`, `engine/`, `show/`, `rig/`, `library/`, `dmx/`, `setup/`, `web/`, `cli/` |
+| `amadeus/` | The engine (Python): `audio/`, `director/`, `engine/`, `show/`, `rig/`, `library/`, `dmx/`, `setup/`, `web/`, `mcp/`, `cli/` |
 | `mac/` | The Mac app and Amadeus Link for Mac |
 | `windows/` | The Windows app and Amadeus Link for Windows |
 | `web/` | Browser UI: 3D visualiser, setup page, mobile rig setup |
@@ -294,7 +305,8 @@ python3 -m venv .venv
 ### Contributing and license
 
 Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Amadeus DMX is MIT licensed
-([LICENSE](LICENSE)); fixture definitions converted from QLC+ are Apache-2.0 and the optional instrument models
+([LICENSE](LICENSE)); fixture definitions converted from QLC+ are Apache-2.0, from the Open Fixture Library MIT
+and from the DMXControl DDF library CC BY-SA 4.0 (a data file of its own), and the optional instrument models
 are non-commercial, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Lighting can hurt people: strobes and flashes can trigger seizures, and lasers can blind. The safety
