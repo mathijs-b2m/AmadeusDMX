@@ -185,3 +185,100 @@ def test_windows_finds_the_store_apps_config_too(tmp_path):
     store = tmp_path / "Local" / "Packages" / "Claude_pzs8sxrjxfjjc" / "LocalCache" / "Roaming" / "Claude"
     store.mkdir(parents=True)
     assert cd.folders(env, tmp_path, windows=True) == [store]
+
+
+@pytest.fixture
+def fixtures_dir(config, tmp_path, monkeypatch):
+    """Your fixtures in a folder of their own (the shipped library stays as it is)."""
+    from amadeus.library import fixtures as fxlib
+
+    monkeypatch.setattr(fxlib, "USER_DIR", tmp_path / "fixtures")
+    fxlib.library.cache_clear()
+    yield tmp_path / "fixtures"
+    fxlib.library.cache_clear()
+
+
+# a 15-channel beam/wash moving head as a maker's DMX chart lists it (made up for the test)
+CHART = [
+    {"name": "Pan", "role": "pan"}, {"name": "Pan fine", "role": "pan_fine"},
+    {"name": "Tilt", "role": "tilt"}, {"name": "Tilt fine", "role": "tilt_fine"},
+    {"name": "Pan/tilt speed", "role": "hold", "value": 0, "ranges": [[0, 255, "fast to slow"]]},
+    {"name": "Dimmer", "role": "dimmer"}, {"name": "Dimmer fine", "role": "dimmer_fine"},
+    {"name": "Shutter", "role": "hold", "value": 255, "ranges": [[0, 3, "closed"], [4, 7, "open"], [8, 255, "strobe"]]},
+    {"name": "Red", "role": "red"}, {"name": "Green", "role": "green"}, {"name": "Blue", "role": "blue"},
+    {"name": "White", "role": "white"}, {"name": "Zoom", "role": "hold", "value": 128},
+    {"name": "Auto programs", "role": "hold", "value": 0}, {"name": "Control", "role": "hold", "value": 0},
+]  # fmt: skip
+
+
+def test_a_fixture_the_library_lacks_is_made_from_its_chart_then_patched(fixtures_dir):
+    tool("create_rig", name="venue", template="club")
+    tool("create_set", name="gear")
+    made = tool("create_fixture", manufacturer="Test Maker", model="Beamwash 15", type="wash", mode="15CH",
+                channels=CHART, physical={"watts": 300, "beam_deg": 4, "pan_deg": 540, "tilt_deg": 270},
+                source="the user manual, page 12")  # fmt: skip
+    assert made["key"] == "test-maker/beamwash-15" and made["mode"] == "15CH" and made["checked"] is False
+    assert made["details"]["kind"] == "moving_head" and len(made["details"]["modes"]["15CH"]) == 15
+
+    from amadeus.library import fixtures as fxlib
+
+    defn = fxlib.get(made["key"])
+    chans = defn["modes"]["15CH"]
+    assert chans[7] == {"attr": "shutter", "default": 255}  # held open: the light shows
+    assert chans[12] == {"attr": "zoom", "default": 128}
+    assert [c["attr"] for c in chans if "default" not in c] == [
+        "pan", "pan_fine", "tilt", "tilt_fine", "dimmer", "dimmer_fine", "red", "green", "blue", "white"]  # fmt: skip
+    assert defn["made"]["checked"] is False and "page 12" in defn["source"]
+    assert defn["made"]["channels"]["15CH"][7]["ranges"][1] == [4, 7, "open"]
+    assert defn["physical"]["pan_deg"] == 540 and defn["physical"]["watts"] == 300
+
+    added = tool("add_fixtures", key=made["key"], mode="15CH", count=2)
+    assert [f["address"] for f in added["added"]] == [1, 21] and len(added["mounted"]) == 2
+    tool("undo_last_change")  # the patch
+    tool("undo_last_change")  # the fixture
+    assert not (fixtures_dir / "test-maker" / "beamwash-15.json").exists()
+
+
+def test_a_chart_that_cant_light_or_has_an_unknown_role_makes_nothing(fixtures_dir):
+    r = mcp.call("create_fixture", {"manufacturer": "X", "model": "Dark", "type": "par", "source": "x",
+                                    "channels": [{"name": "Macro", "role": "hold", "value": 0}]})  # fmt: skip
+    assert r["isError"] and "No channel lights it" in r["content"][0]["text"]
+    r = mcp.call("create_fixture", {"manufacturer": "X", "model": "Odd", "type": "par", "source": "x",
+                                    "channels": [{"name": "Gobo", "role": "gobo"}]})  # fmt: skip
+    assert r["isError"] and "unknown role" in r["content"][0]["text"]
+    assert not list(fixtures_dir.glob("*/*.json"))
+    assert not (fixtures_dir.parent / "undo").exists() or not list((fixtures_dir.parent / "undo").iterdir())
+
+
+QXF = """<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="http://www.qlcplus.org/FixtureDefinition">
+ <Manufacturer>Test Maker</Manufacturer>
+ <Model>Par Four</Model>
+ <Type>Color Changer</Type>
+ <Channel Name="Dimmer" Preset="IntensityMasterDimmer"/>
+ <Channel Name="Red" Preset="IntensityRed"/>
+ <Channel Name="Green" Preset="IntensityGreen"/>
+ <Channel Name="Blue" Preset="IntensityBlue"/>
+ <Mode Name="4 Channel">
+  <Channel Number="0">Dimmer</Channel>
+  <Channel Number="1">Red</Channel>
+  <Channel Number="2">Green</Channel>
+  <Channel Number="3">Blue</Channel>
+ </Mode>
+</FixtureDefinition>
+"""
+
+
+def test_a_fixture_file_of_your_own_is_imported_and_never_replaces_one(fixtures_dir, tmp_path):
+    f = tmp_path / "Test-Maker-Par-Four.qxf"
+    f.write_text(QXF, encoding="utf-8")
+    first = tool("import_fixture_file", path=str(f))
+    assert first["key"] == "testmaker/par-four" and list(first["details"]["modes"]) == ["4ch"]
+    assert tool("import_fixture_file", path=str(f))["key"] == "testmaker/par-four-2"
+    tool("undo_last_change")
+    assert not (fixtures_dir / "testmaker" / "par-four-2.json").exists()
+    assert (fixtures_dir / "testmaker" / "par-four.json").exists()
+    r = mcp.call("import_fixture_file", {"path": str(tmp_path / "nope.qxf")})
+    assert r["isError"] and "No file" in r["content"][0]["text"]
+    (tmp_path / "x.d4").write_text("x", encoding="utf-8")
+    assert "a .gdtf or .qxf" in mcp.call("import_fixture_file", {"path": str(tmp_path / "x.d4")})["content"][0]["text"]

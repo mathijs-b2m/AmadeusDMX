@@ -144,6 +144,8 @@ def index() -> list[dict]:
 
 
 def _load(rel: str) -> ET.Element:
+    if Path(rel).is_absolute():  # a file of your own (add_file)
+        return ET.parse(rel).getroot()
     local = FIXTURES_DIR / rel
     if not local.exists():
         try:
@@ -505,6 +507,21 @@ def details(rel: str) -> dict:
         "kind": d["kind"],
         "modes": {m: len(c) for m, c in d["modes"].items()},
     }
+
+
+def add_file(path: str | Path) -> str:
+    """A .qxf you have (from the maker, the QLC+ fixture editor, or exported from the Open Fixture Library) into
+    your fixtures; returns its library key (a model the library has already gets a key of its own: "-2")."""
+    path = Path(path).expanduser().resolve()
+    d = convert(str(path))
+    d["source"] = f"QLC+ fixture file {path.name}, converted: check it once with `amadeus test`"
+    d["qlc"]["key"] = path.name
+    from amadeus.library import generic
+
+    brand = re.sub(r"[^a-z0-9]+", "", d["manufacturer"].lower()) or "other"
+    key = generic._free_key(brand, re.sub(r"[^a-z0-9]+", "-", d["model"].lower()).strip("-") or "fixture")
+    fxlib.save(key, d)
+    return key
 
 
 def add_to_library(qlc_key: str) -> str:

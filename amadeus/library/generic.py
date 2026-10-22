@@ -324,6 +324,82 @@ def create(
     return {"key": key, "mode": mode}
 
 
+# A fixture from its DMX chart: what it is (the chart's own words) → the kind the mapper sets it as
+CHART_KINDS = {"spot": "moving_head", "wash": "moving_head", "beam": "moving_head", "par": "par", "bar": "par",
+               "strobe": "strobe", "blinder": "blinder"}  # fmt: skip
+
+
+def from_chart(
+    manufacturer: str,
+    model: str,
+    type_: str,
+    channels: list[dict],
+    mode: str = "",
+    wheel_slots: list[dict] | None = None,
+    physical: dict | None = None,
+    source: str = "",
+) -> dict:
+    """Make a fixture in your library from the DMX chart in its manual: each channel {"name", "role" (a role in
+    mapper.ROLES, or "hold"), "value" (what a held channel stays at: shutter open, no strobe, gobo open), "cell"
+    (a bar's cell), "ranges" ([[from, to, what]], the chart's own words)}, in the chart's order. Like a fixture
+    made from a template, it is not checked yet: the Set page's channel check does that on the real fixture.
+    Returns {"key", "mode"} or {"problems"} (then nothing is made)."""
+    from amadeus.library import mapper
+
+    problems = []
+    if type_ not in CHART_KINDS:
+        problems.append(f"Unknown type '{type_}': {', '.join(CHART_KINDS)}")
+    if not 1 <= len(channels) <= 64:
+        problems.append("A mode has 1 to 64 channels")
+    for n, c in enumerate(channels):
+        role = c.get("role", mapper.HOLD)
+        if role != mapper.HOLD and role not in mapper.ROLE:
+            problems.append(f"Channel {n + 1} ({c.get('name', '')}): unknown role '{role}'")
+    if problems:
+        return {"problems": problems}
+    tmpl_type = {"spot": "spot", "wash": "wash", "beam": "beam"}.get(type_, "par")
+    made = create(manufacturer, model, "blank", len(channels), tmpl_type, int((physical or {}).get("watts") or 0))
+    if "problems" in made:
+        return made
+    key, first = made["key"], made["mode"]
+
+    def held(name: str) -> str:  # a held channel keeps the chart's name; never one the show drives (smoke)
+        attr = _slug(name).replace("-", "_")[:40]
+        return f"{attr}_held" if attr in ("fog", "fog_fan") else attr
+
+    roles = [
+        {"role": c.get("role", mapper.HOLD), "cell": int(c.get("cell") or 0), "value": int(c.get("value") or 0),
+         "attr": held(str(c.get("name", "")))}
+        for c in channels
+    ]  # fmt: skip
+    problems = mapper.apply(key, first, CHART_KINDS[type_], roles, wheel_slots)
+    if problems:
+        fxlib.path_of(key).unlink(missing_ok=True)
+        fxlib.library.cache_clear()
+        return {"problems": problems}
+    defn = dict(fxlib.get(key))
+    defn.pop("key", None)
+    mode = (mode or first).strip()
+    if mode != first:
+        defn["modes"] = {mode: defn["modes"].pop(first)}
+        defn["mapped"]["modes"] = [mode]
+    defn["made"].update(
+        template="chart",
+        type=tmpl_type,
+        channels={mode: [{"name": str(c.get("name") or f"Channel {n + 1}"), "ranges": c.get("ranges") or []}
+                         for n, c in enumerate(channels)]},
+    )  # fmt: skip
+    defn["source"] = (
+        f"Made from the DMX chart in {source.strip() or 'its manual'}: check it channel by channel on the fixture "
+        "(Set page, Check Channels)"
+    )
+    for k in ("watts", "beam_deg", "beam_deg_max", "pan_deg", "tilt_deg"):
+        if (physical or {}).get(k):
+            defn["physical"][k] = float(physical[k]) if k.startswith("beam") else int(physical[k])
+    fxlib.save(key, defn)
+    return {"key": key, "mode": mode}
+
+
 def wheel(slots: list[dict] | None = None) -> dict:
     """A colour wheel: the named slots from the check, else the usual cheap wheel (open and seven colours
     across 0–127)."""
