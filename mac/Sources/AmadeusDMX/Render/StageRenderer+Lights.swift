@@ -54,26 +54,6 @@ extension StageRenderer {
         let gdt = min(0.2, max(0, t - goboT))
         goboT = t
 
-        // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears
-        let dt = min(0.2, max(0, t - fogT))
-        fogT = t
-        var fogSum: Float = 0
-        for fx in inp.fixtures where fx.kind == .smoke {
-            let out = highlight.contains(fx.id) ? 0.6 : frame?.fog[fx.id] ?? 0
-            var pf = fogPuffs[fx.id] ?? [0, 9]   // (amount, seconds since it fired)
-            pf = out > 0 ? [max(pf.x, out), 0] : [pf.x * exp(-dt / 2.5), pf.y + dt]
-            fogPuffs[fx.id] = pf
-            fogSum += out
-            guard pf.x > 0.02 else { continue }
-            let p = SIMD3<Float>(Float(fx.pos.x), Float(fx.pos.y), Float(fx.pos.z))
-            var d = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 0.98, 0.17)
-            d = simd_normalize(d + SIMD3(0, 0, 0.15 * min(1, pf.y / 3)))   // warm fog rises as it drifts
-            let reach = 0.6 + 2.6 * min(1, pf.y / 2 + pf.x * 0.6)
-            beam(p, d, spreadDeg: 38 + 20 * min(1, pf.y / 3), color: [0.82, 0.85, 0.9], intensity: 0.5 * pf.x,
-                 maxLen: reach, spot: false)
-        }
-        roomFog = min(1, roomFog * exp(-dt / 90) + fogSum * dt * 0.08)
-
         for (i, fx) in inp.fixtures.enumerated() {
             let p = SIMD3<Float>(Float(fx.pos.x), Float(fx.pos.y), Float(fx.pos.z))
             var dim: Float = 0, col = SIMD3<Float>(repeating: 1)
@@ -201,5 +181,28 @@ extension StageRenderer {
             }
         }
         ambient = lightSum / Float(max(1, inp.fixtures.count)) * 0.8
+
+        // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears. Smoke
+        // gives no light of its own: the plume shows only where the room's lights catch it, in their colour
+        let dt = min(0.2, max(0, t - fogT))
+        fogT = t
+        var fogSum: Float = 0
+        let lit = min(1, ambient.max() * 2 + workLight * 0.6)
+        let tint = simd_mix(SIMD3<Float>(repeating: 1), ambient / max(ambient.max(), 1e-3), SIMD3(repeating: 0.5))
+        for fx in inp.fixtures where fx.kind == .smoke {
+            let out = highlight.contains(fx.id) ? 0.6 : frame?.fog[fx.id] ?? 0
+            var pf = fogPuffs[fx.id] ?? [0, 9]   // (amount, seconds since it fired)
+            pf = out > 0 ? [max(pf.x, out), 0] : [pf.x * exp(-dt / 2.5), pf.y + dt]
+            fogPuffs[fx.id] = pf
+            fogSum += out
+            guard pf.x > 0.02, lit > 0.01 else { continue }
+            let p = SIMD3<Float>(Float(fx.pos.x), Float(fx.pos.y), Float(fx.pos.z))
+            var d = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 0.98, 0.17)
+            d = simd_normalize(d + SIMD3(0, 0, 0.15 * min(1, pf.y / 3)))   // warm fog rises as it drifts
+            let reach = 0.6 + 2.6 * min(1, pf.y / 2 + pf.x * 0.6)
+            beam(p, d, spreadDeg: 38 + 20 * min(1, pf.y / 3), color: tint * [0.82, 0.85, 0.9], intensity: 0.5 * pf.x * lit,
+                 maxLen: reach, spot: false)
+        }
+        roomFog = min(1, roomFog * exp(-dt / 90) + fogSum * dt * 0.08)
     }
 }

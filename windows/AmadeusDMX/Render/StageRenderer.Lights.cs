@@ -56,28 +56,6 @@ public sealed partial class StageRenderer
         var gdt = MathF.Min(0.2f, MathF.Max(0, t - GoboT));
         GoboT = t;
 
-        // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears
-        var dt = MathF.Min(0.2f, MathF.Max(0, t - FogT));
-        FogT = t;
-        float fogSum = 0;
-        foreach (var fx in inp.Fixtures)
-        {
-            if (fx.Kind != FixtureKind.Smoke) continue;
-            var output = highlight.Contains(fx.Id) ? 0.6f : frame?.Fog.GetValueOrDefault(fx.Id) ?? 0;
-            var pf = FogPuffs.TryGetValue(fx.Id, out var had) ? had : new Vector2(0, 9);   // (amount, seconds since it fired)
-            pf = output > 0 ? new Vector2(MathF.Max(pf.X, output), 0) : new Vector2(pf.X * MathF.Exp(-dt / 2.5f), pf.Y + dt);
-            FogPuffs[fx.Id] = pf;
-            fogSum += output;
-            if (pf.X <= 0.02f) continue;
-            var p = fx.Pos.ToFloat();
-            var d = fx.Dir?.ToFloat() ?? new Vector3(0, 0.98f, 0.17f);
-            d = Vector3.Normalize(d + new Vector3(0, 0, 0.15f * MathF.Min(1, pf.Y / 3)));   // warm fog rises as it drifts
-            var reach = 0.6f + 2.6f * MathF.Min(1, pf.Y / 2 + pf.X * 0.6f);
-            Beam(p, d, spreadDeg: 38 + 20 * MathF.Min(1, pf.Y / 3), color: new(0.82f, 0.85f, 0.9f), intensity: 0.5f * pf.X,
-                 maxLen: reach, spot: false);
-        }
-        RoomFog = MathF.Min(1, RoomFog * MathF.Exp(-dt / 90) + fogSum * dt * 0.08f);
-
         Span<Vector3> rays = stackalloc Vector3[3];
         for (var i = 0; i < inp.Fixtures.Count; i++)
         {
@@ -235,5 +213,31 @@ public sealed partial class StageRenderer
             }
         }
         ambient = lightSum / Math.Max(1, inp.Fixtures.Count) * 0.8f;
+
+        // smoke: a plume blows out of the nozzle on each burst and lingers; the room's haze builds up and clears. Smoke
+        // gives no light of its own: the plume shows only where the room's lights catch it, in their colour
+        var dt = MathF.Min(0.2f, MathF.Max(0, t - FogT));
+        FogT = t;
+        float fogSum = 0;
+        var brightest = MathF.Max(ambient.X, MathF.Max(ambient.Y, ambient.Z));
+        var lit = MathF.Min(1, brightest * 2 + WorkLight * 0.6f);
+        var tint = Vector3.Lerp(Vector3.One, ambient / MathF.Max(brightest, 1e-3f), 0.5f);
+        foreach (var fx in inp.Fixtures)
+        {
+            if (fx.Kind != FixtureKind.Smoke) continue;
+            var output = highlight.Contains(fx.Id) ? 0.6f : frame?.Fog.GetValueOrDefault(fx.Id) ?? 0;
+            var pf = FogPuffs.TryGetValue(fx.Id, out var had) ? had : new Vector2(0, 9);   // (amount, seconds since it fired)
+            pf = output > 0 ? new Vector2(MathF.Max(pf.X, output), 0) : new Vector2(pf.X * MathF.Exp(-dt / 2.5f), pf.Y + dt);
+            FogPuffs[fx.Id] = pf;
+            fogSum += output;
+            if (pf.X <= 0.02f || lit <= 0.01f) continue;
+            var p = fx.Pos.ToFloat();
+            var d = fx.Dir?.ToFloat() ?? new Vector3(0, 0.98f, 0.17f);
+            d = Vector3.Normalize(d + new Vector3(0, 0, 0.15f * MathF.Min(1, pf.Y / 3)));   // warm fog rises as it drifts
+            var reach = 0.6f + 2.6f * MathF.Min(1, pf.Y / 2 + pf.X * 0.6f);
+            Beam(p, d, spreadDeg: 38 + 20 * MathF.Min(1, pf.Y / 3), color: tint * new Vector3(0.82f, 0.85f, 0.9f), intensity: 0.5f * pf.X * lit,
+                 maxLen: reach, spot: false);
+        }
+        RoomFog = MathF.Min(1, RoomFog * MathF.Exp(-dt / 90) + fogSum * dt * 0.08f);
     }
 }
