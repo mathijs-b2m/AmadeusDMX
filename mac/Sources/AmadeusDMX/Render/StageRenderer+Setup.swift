@@ -163,15 +163,17 @@ extension StageRenderer {
         if first || !inp.keepCamera { setPreset(preset, animated: false) }
     }
 
-    /// The drawings on the floor: each page a quad on its corners (rig metres are world metres: x from stage left,
-    /// y towards the audience, as the trusses), a few mm over the hall floor, and again over the stage deck where
-    /// it covers the deck (the deck stands 15 cm high: the floor's copy is hidden under it).
+    /// The drawings on the floor: each plan a quad on its corners showing its part of the page (rig metres are world
+    /// metres: x from stage left, y towards the audience, as the trusses), a few mm over the hall floor, and again
+    /// over the stage deck where it covers the deck (the deck stands 15 cm high, or as high as the stage: the
+    /// floor's copy is hidden under it).
     func buildDrawings(_ inp: StageInput, _ s: Scenery) {
         drawingDraws = []
         for d in inp.drawings where d.corners.count == 4 {
             guard let tex = drawingTexture(d) else { continue }
             let c = d.corners
-            let uv: [SIMD2<Float>] = [[0, 0], [1, 0], [1, 1], [0, 1]]
+            let k = d.crop
+            let uv: [SIMD2<Float>] = [[k.x, k.y], [k.z, k.y], [k.z, k.w], [k.x, k.w]]
             var v: [WallVertex] = []
             func fan(_ poly: [(p: SIMD2<Float>, uv: SIMD2<Float>)], z: Float) {
                 guard poly.count >= 3 else { return }

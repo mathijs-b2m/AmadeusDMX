@@ -168,13 +168,31 @@ final class RigEditorModel: StageEditing {
     func updateStage(_ name: String = "Change Stage", _ body: (inout Stage) -> Void) {
         change(name) { d in
             body(&d.stage)
-            // merged into what was there: the stage keeps the settings the editor doesn't show (eye safety…)
-            var merged = d.raw["stage"]?.object ?? [:]
-            if let o = (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage)))?.object {
-                merged.merge(o) { _, new in new }
-            }
-            d.raw["stage"] = .object(merged)
+            Self.keepStage(&d)
         }
+    }
+
+    /// The stage's height above the hall floor: what stands on the stage (on the floor or a stand, not on a truss)
+    /// goes up or down with it; trusses stay where they hang.
+    func setStageHeight(_ h: Double) {
+        change("Change Stage Height") { d in
+            let was = d.stage.deckM
+            d.stage.deckM = (h * 100).rounded() / 100
+            Self.keepStage(&d)
+            for i in d.fixtures.indices where d.fixtures[i].truss == nil && d.fixtures[i].mount != "hang"
+                && Stage.onStage(x: d.fixtures[i].x, yM: d.fixtures[i].yM) {
+                d.fixtures[i].zM = max(0, d.fixtures[i].zM + d.stage.deckM - was)
+            }
+        }
+    }
+
+    /// The stage merged into what was there: it keeps the settings the editor doesn't show (eye safety…).
+    private static func keepStage(_ d: inout RigDocument) {
+        var merged = d.raw["stage"]?.object ?? [:]
+        if let o = (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(d.stage)))?.object {
+            merged.merge(o) { _, new in new }
+        }
+        d.raw["stage"] = .object(merged)
     }
 
     func setScreen(_ on: Bool) {
@@ -322,6 +340,7 @@ final class RigEditorModel: StageEditing {
     }
 
     func attach(_ id: String, to trussID: String?) {
+        let stage = doc.stage
         updateFixture(id, trussID == nil ? "Take Off Truss" : "Put on Truss") { f in
             if let trussID {
                 f.truss = trussID
@@ -329,7 +348,7 @@ final class RigEditorModel: StageEditing {
                 if f.mount == "floor" { f.mount = "hang" }
             } else {
                 f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil
-                f.mount = "floor"; f.zM = 0.25
+                f.mount = "floor"; f.zM = 0.25 + stage.ground(x: f.x, yM: f.yM)
             }
         }
     }
@@ -348,13 +367,14 @@ final class RigEditorModel: StageEditing {
         group = []
     }
 
-    /// Waiting fixtures stand in a row on the floor at the front of the stage (as the engine puts them).
+    /// Waiting fixtures stand in a row on the floor at the front of the stage (as the engine puts them; on a raised
+    /// stage on its deck).
     private static func lineUpWaiting(_ d: inout RigDocument) {
         let waiting = d.fixtures.indices.filter { d.fixtures[$0].waiting }
         for (k, i) in waiting.enumerated() {
             d.fixtures[i].x = (Double(k) + 1) / Double(waiting.count + 1)
             d.fixtures[i].yM = -0.3
-            d.fixtures[i].zM = 0.25
+            d.fixtures[i].zM = 0.25 + d.stage.ground(x: d.fixtures[i].x, yM: -0.3)
             d.fixtures[i].mount = "floor"
         }
     }
@@ -402,9 +422,9 @@ final class RigEditorModel: StageEditing {
             d.fixtures[i].truss = nil; d.fixtures[i].trussPos = nil; d.fixtures[i].side = nil; d.fixtures[i].mountRoll = nil
             d.fixtures[i].waiting = false
             d.fixtures[i].mount = "floor"
-            d.fixtures[i].zM = 0.25
             d.fixtures[i].x = (p.x - span / 2 + spacing * Double(k)) / d.width
             d.fixtures[i].yM = p.y
+            d.fixtures[i].zM = 0.25 + d.stage.ground(x: d.fixtures[i].x, yM: p.y)
         }
     }
 
@@ -422,7 +442,7 @@ final class RigEditorModel: StageEditing {
                 let id = "\(base)\(n)"
                 newIDs.append(id)
                 var f = PlacedFixture(id: id, key: key, mode: mode, universe: 1, address: nil, mount: "floor",
-                                      x: (Double(k) + 1) / Double(count + 1), yM: -0.6, zM: 0.25, rotDeg: 0, aim: nil,
+                                      x: (Double(k) + 1) / Double(count + 1), yM: -0.6, zM: 0.25 + d.stage.deckM, rotDeg: 0, aim: nil,
                                       truss: nil, trussPos: nil)
                 if let t = truss {
                     let span = t.vertical ? t.lengthM : t.lengthM * 0.9
@@ -771,7 +791,7 @@ final class RigEditorModel: StageEditing {
                 d.trusses.removeAll { $0.id == id }
                 for i in d.fixtures.indices where d.fixtures[i].truss == id {
                     d.fixtures[i].truss = nil; d.fixtures[i].trussPos = nil
-                    d.fixtures[i].mount = "floor"; d.fixtures[i].zM = 0.25
+                    d.fixtures[i].mount = "floor"; d.fixtures[i].zM = 0.25 + d.stage.ground(x: d.fixtures[i].x, yM: d.fixtures[i].yM)
                 }
             }
         case .fixture:
@@ -908,7 +928,7 @@ final class RigEditorModel: StageEditing {
         drawings.compactMap { u in
             guard isShown(u), u.corners.count == 4, let img = Self.pages[u.file] else { return nil }
             return FloorDrawing(key: u.file, image: img, corners: u.corners.map { SIMD2(Float($0.x), Float($0.y)) },
-                                opacity: Float(drawingOpacity))
+                                crop: SIMD4(u.crop.map(Float.init)), opacity: Float(drawingOpacity))
         }
     }
 
@@ -1315,9 +1335,12 @@ final class RigEditorModel: StageEditing {
             } else {
                 if snapOn { target.x = (target.x / grid).rounded() * grid; target.y = (target.y / grid).rounded() * grid }
                 let delta = SIMD2(target.x - g.start.x, target.y - g.start.y)
-                if f.truss != nil { f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil; f.mount = "floor"; f.zM = 0.25 }
+                let under = doc.stage.ground(x: f.x, yM: f.yM)
+                if f.truss != nil { f.truss = nil; f.trussPos = nil; f.side = nil; f.mountRoll = nil; f.mount = "floor"; f.zM = 0.25 + under }
                 f.x = target.x / doc.width
                 f.yM = target.y
+                // onto the stage or off it: it stands on what is under it now (a raised stage's deck or the hall floor)
+                if f.mount != "hang" { f.zM = max(0, f.zM + doc.stage.ground(x: f.x, yM: f.yM) - under) }
                 doc.fixtures[i] = f
                 for other in group {  // the others move by as much, onto the floor
                     guard let j = doc.fixtures.firstIndex(where: { $0.id == other }),
@@ -1325,9 +1348,10 @@ final class RigEditorModel: StageEditing {
                     var o2 = doc.fixtures[j]
                     let p = was.position(width: doc.width)
                     o2.waiting = false
-                    o2.truss = nil; o2.trussPos = nil; o2.side = nil; o2.mountRoll = nil; o2.mount = "floor"; o2.zM = 0.25
+                    o2.truss = nil; o2.trussPos = nil; o2.side = nil; o2.mountRoll = nil; o2.mount = "floor"
                     o2.x = (p.x + delta.x) / doc.width
                     o2.yM = (was.waiting ? f.yM : p.y + delta.y)
+                    o2.zM = 0.25 + doc.stage.ground(x: o2.x, yM: o2.yM)
                     doc.fixtures[j] = o2
                 }
             }
@@ -1411,7 +1435,10 @@ final class RigEditorModel: StageEditing {
             }
         } else {
             guard d.z < -1e-4 else { return false }
-            let hit = o + d * (-o.z / d.z)
+            var hit = o + d * (-o.z / d.z)
+            // a raised stage: the pointer on its deck where it is over the stage
+            let deck = doc.stage.deckM, on = o + d * ((deck - o.z) / d.z)
+            if deck > 0, o.z > deck, Stage.onStage(x: on.x / doc.width, yM: on.y) { hit = on }
             change(ids.count == 1 ? "Place Fixture" : "Place \(ids.count) Fixtures") { doc in
                 Self.lineUp(&doc, ids, at: SIMD2(hit.x, hit.y))
                 Self.lineUpWaiting(&doc)

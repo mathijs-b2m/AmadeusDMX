@@ -132,7 +132,8 @@ def compose(set_doc: dict, rig_doc: dict, set_name: str) -> dict:
         for k in PLACEMENT_KEYS:
             f.pop(k, None)
         f.update(copy.deepcopy(places.get(f["id"], {})))
-    for f, spot in zip(waiting, waiting_row(len(waiting))):
+    deck = float(out.get("stage", {}).get("deck_m", 0.0) or 0.0)
+    for f, spot in zip(waiting, waiting_row(len(waiting), deck)):
         f.update(spot)
         f[UNPLACED] = dict(spot)
     _onto_tower_faces(out)
@@ -156,9 +157,11 @@ def _onto_tower_faces(rig: dict):
             trusses.place(f, t, f.get("truss_pos_m", t["length_m"] - 0.3), width, "front")
 
 
-def waiting_row(n: int) -> list[dict]:
-    """Where fixtures stand before they are mounted: on the floor along the front edge of the stage."""
-    return [{"x": round((k + 1) / (n + 1), 4), "y_m": -0.3, "z_m": 0.25, "mount": "floor"} for k in range(n)]
+def waiting_row(n: int, deck: float = 0.0) -> list[dict]:
+    """Where fixtures stand before they are mounted: on the floor along the front edge of the stage (on its deck,
+    `deck` metres up, when it is raised)."""
+    z = round(0.25 + deck, 3)
+    return [{"x": round((k + 1) / (n + 1), 4), "y_m": -0.3, "z_m": z, "mount": "floor"} for k in range(n)]
 
 
 def split(merged: dict, set_name: str, rig_doc: dict) -> tuple[dict, dict]:

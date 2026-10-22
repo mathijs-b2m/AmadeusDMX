@@ -39,12 +39,15 @@ public struct Room: Sendable {
     public var side: Float = 2
     /// An open-air stage: no ceiling, beams going up end in the air.
     public var outdoor = false
+    /// The stage's height above the hall floor: beams landing behind its front edge (y ≤ 0) stop on it.
+    public var deck: Float = 0
 
     /// The back wall stands 1.5 m behind the rearmost fixture or truss (a round truss: its back edge).
     public init(stage: Stage, fixtures: [FixtureInfo], trusses: [Truss] = []) {
         width = Float(stage.widthM)
         ceiling = Float(stage.ceilingM)
         outdoor = stage.outdoor
+        deck = Float(stage.deckM)
         depth = Float(stage.roomDepthM)
         let trussBack = trusses.map { t -> Double in
             t.vertical ? t.yM : t.pieces().map { min($0.0.y, $0.1.y) }.min() ?? t.yM
@@ -57,7 +60,10 @@ public struct Room: Sendable {
     public func hit(_ p: SIMD3<Float>, _ d: SIMD3<Float>, maxLen: Float = 30) -> (t: Float, surface: Surface) {
         var best: (Float, Surface) = (maxLen, .air)
         func consider(_ t: Float, _ s: Surface) { if t > 0, t < best.0 { best = (t, s) } }
-        if d.z < -1e-3 { consider(-p.z / d.z, .floor) }
+        if d.z < -1e-3 {  // the hall floor, or the stage where it lands behind its front edge (geometry.py beam_end)
+            let onDeck = (deck - p.z) / d.z
+            consider(deck > 0 && p.z > deck && p.y + d.y * onDeck <= 0 ? onDeck : -p.z / d.z, .floor)
+        }
         if d.z > 1e-3, !outdoor { consider((ceiling - p.z) / d.z, .ceiling) }
         if d.y > 1e-3 { consider((depth - p.y) / d.y, .front) }
         if d.y < -1e-3 { consider((back - p.y) / d.y, .back) }

@@ -37,7 +37,7 @@ public sealed class Scenery
     public WallPlacement? Wall { get; private set; }
     public Room Room { get; private set; }
     public bool Big { get; }
-    /// A big stage's deck (x from, x to, y from, y to, its top), the floor the rig editor's drawings lie on there.
+    /// A big or raised stage's deck (x from, x to, y from, y to, its top), the floor the rig editor's drawings lie on there.
     public (float X0, float X1, float Y0, float Y1, float Top)? Deck { get; }
     public float Top { get; }
     public Vector3 DjHead { get; private set; }
@@ -72,17 +72,28 @@ public sealed class Scenery
              V(-Room.Side - 8, back, Room.Ceiling), V(0.018f, 0.019f, 0.024f), normal: V(0, 1, 0));
 
         // stage, DJ riser and booth
+        // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
+        // audience; else a big rig's deck stands 15 cm high
         float boothY, boothZ;
-        if (Big)
+        var raised = MathF.Max(0, (float)stage.DeckM);
+        if (Big || raised > 0)
         {
             var deckBack = MathF.Min(-3, back + 1.0f);
-            Box(-0.5f, W + 0.5f, deckBack, -0.2f, 0, 0.15f, V(0.055f, 0.058f, 0.07f));
-            Deck = (-0.5f, W + 0.5f, deckBack, -0.2f, 0.15f);
-            float ry = MathF.Max(deckBack + 0.5f, -4.5f), rd = 2.2f, rw = MathF.Min(5, W * 0.3f);
-            Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, 0.15f, 0.95f, V(0.07f, 0.074f, 0.09f));
-            boothY = ry - 0.4f; boothZ = 0.95f;
+            float deckTop = raised > 0 ? raised : 0.15f, front = raised > 0 ? 0 : -0.2f;
+            Box(-0.5f, W + 0.5f, deckBack, front, 0, deckTop, V(0.055f, 0.058f, 0.07f));
+            Deck = (-0.5f, W + 0.5f, deckBack, front, deckTop);
+            if (Big)
+            {
+                float ry = MathF.Max(deckBack + 0.5f, -4.5f), rd = 2.2f, rw = MathF.Min(5, W * 0.3f);
+                Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8f, V(0.07f, 0.074f, 0.09f));
+                boothY = ry - 0.4f; boothZ = deckTop + 0.8f;
+            }
+            else
+            {
+                boothY = -1.3f; boothZ = deckTop;
+            }
             // a lit edge along the front of the deck
-            Box(-0.5f, W + 0.5f, -0.24f, -0.2f, 0.13f, 0.15f, V(0.25f, 0.27f, 0.35f), emissive: 0.6f);
+            Box(-0.5f, W + 0.5f, front - 0.04f, front, deckTop - 0.02f, deckTop, V(0.25f, 0.27f, 0.35f), emissive: 0.6f);
         }
         else
         {
@@ -111,7 +122,7 @@ public sealed class Scenery
             var sw = Big ? MathF.Min(10, W * 0.55f) : 2.6f;
             var sh = sw * 9 / 16;
             var sy = Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
-            var sz = Big ? 1.4f : 1.15f;
+            var sz = (Big ? 1.4f : 1.15f) + raised;  // over the stage, as high as it stands
             Wall = new WallPlacement(V(cx, sy, sz + sh / 2), sw, sh);
             Box(cx - sw / 2 - 0.12f, cx + sw / 2 + 0.12f, sy - 0.35f, sy - 0.02f, sz - 0.12f, sz + sh + 0.12f, V(0.03f, 0.03f, 0.035f));
             if (Big)  // legs

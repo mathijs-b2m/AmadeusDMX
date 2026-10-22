@@ -13,6 +13,7 @@ public class ImportTests
          "file": "09a7c2f4d86c548ef16d.pdf", "w": 595.32, "h": 841.92, "set": "showcase",
          "a": [0.90741, 0.405], "b": [0.09259, 0.405], "a_m": [0.0, 0.0], "b_m": [14.0, 0.0],
          "fixtures": {"sharpy1": [0.266, 0.305], "gone": [0.345, 0.305]},
+         "crop": [0.0, 0.1, 1.0, 0.9],
          "corners": [[15.591, -9.841], [-1.591, -9.841], [-1.591, 14.458], [15.591, 14.458]]}
         """;
 
@@ -29,12 +30,15 @@ public class ImportTests
         Assert.Equal(14.0, u.WidthM, 6);
         Assert.Equal(new Vec2(0.266, 0.305), u.Fixtures["sharpy1"]);
         Assert.Equal(4, u.Corners.Count);
-        Assert.Equal(new Vec2(15.591, -9.841), u.Corners[0]);   // the page's top left: upstage, at stage right
+        Assert.Equal(new Vec2(15.591, -9.841), u.Corners[0]);   // the crop's top left: upstage, at stage right
         Assert.Equal(new Vec2(15.591, 14.458), u.Corners[3]);
+        Assert.Equal([0.0, 0.1, 1.0, 0.9], u.Crop);              // the plan is part of the page
         // what may be left out
         var bare = J.DecodeOrThrow(J.Utf8("""{"id": "u2", "file": "x.pdf"}"""), Underlay.From);
         Assert.Equal("u2", bare.Name);
         Assert.Empty(bare.Corners);
+        Assert.Equal([0.0, 0.0, 1.0, 1.0], bare.Crop);            // the whole page
+        Assert.NotEqual(u, u with { Crop = Underlay.WholePage });
         Assert.Empty(bare.Fixtures);
         Assert.Throws<System.Text.Json.JsonException>(() => J.DecodeOrThrow(J.Utf8("""{"id": "u3"}"""), Underlay.From));
         // the list the engine answers with
@@ -95,6 +99,7 @@ public class ImportTests
         Assert.Equal("a.pdf", d.Key);
         Assert.Equal(0.5f, d.Opacity);
         Assert.Equal(new Vec2(-1.591, 14.458), d.Corners[2]);
+        Assert.Equal([0.0, 0.1, 1.0, 0.9], d.Crop);                // only its plan of the page
 
         try
         {
@@ -151,6 +156,25 @@ public class ImportTests
 
     static StageDrawing Drawing(params (double X, double Y)[] corners) =>
         new("a.pdf", new DrawingPicture(2, 2, new byte[16]), [.. corners.Select(c => new Vec2(c.X, c.Y))], 0.5f);
+
+    [Fact]
+    public void ADrawingShowsOnlyItsPlanOfThePage()
+    {
+        // the plan is the page's right half, bottom three quarters: its corners on the rig get those texture coordinates
+        var d = Drawing((10, -6), (0, -6), (0, 4), (10, 4)) with { Crop = [0.5, 0.25, 1, 1] };
+        var floor = StageRenderer.DrawingVertices(d, null);
+        Assert.Equal(6, floor.Length);
+        Assert.Contains(floor, v => v.Pos == new Vector3(10, -6, StageRenderer.DrawingLift) && v.Uv == new Vector2(0.5f, 0.25f));
+        Assert.Contains(floor, v => v.Pos == new Vector3(0, -6, StageRenderer.DrawingLift) && v.Uv == new Vector2(1, 0.25f));
+        Assert.Contains(floor, v => v.Pos == new Vector3(0, 4, StageRenderer.DrawingLift) && v.Uv == new Vector2(1, 1));
+        Assert.Contains(floor, v => v.Pos == new Vector3(10, 4, StageRenderer.DrawingLift) && v.Uv == new Vector2(0.5f, 1));
+        // clipped to a deck from y -3 to 0: the texture follows from the cropped corners (y -3 is 0.25 + 0.75 × 0.3)
+        var deck = StageRenderer.DrawingVertices(d, (-0.5f, 10.5f, -3f, 0f, 1.5f)).Skip(6).ToList();
+        Assert.All(deck, v => Assert.Equal(1.5f + StageRenderer.DrawingLift, v.Pos.Z));
+        Assert.Contains(deck, v => MathF.Abs(v.Pos.Y + 3) < 1e-4f && MathF.Abs(v.Uv.Y - 0.475f) < 1e-4f);
+        Assert.Contains(deck, v => MathF.Abs(v.Pos.Y) < 1e-4f && MathF.Abs(v.Uv.Y - 0.7f) < 1e-4f);
+        Assert.All(deck, v => Assert.InRange(v.Uv.X, 0.5f - 1e-4f, 1 + 1e-4f));
+    }
 
     [Fact]
     public void ADrawingLiesOnTheFloorAtItsCornersAndOnABigStagesDeck()

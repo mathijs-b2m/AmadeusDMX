@@ -1,7 +1,7 @@
 // Line Up…: puts a drawing under the rig right with two clicks on its page, the stage's front edge at stage left and
 // then at stage right, and the distance between them (amadeus/rig/importer/underlay.py align). What the import
-// thought shows faintly. The editor posts it (RigEditorModel.LineUp); the engine moves the drawing's fixtures and
-// their trusses and saves the rig.
+// thought shows faintly, and the part of the page that is this plan. The editor posts it (RigEditorModel.LineUp);
+// the engine moves the drawing's fixtures and their trusses and saves the rig.
 // The port of mac/Sources/AmadeusDMX/Rig/Editor/LineUpSheet.swift (docs/import-ui.md): a ContentDialog.
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -95,6 +95,18 @@ public sealed class LineUpSheet(Underlay drawing, DrawingPicture picture, double
     void Draw()
     {
         _marks.Children.Clear();
+        // the part of the page that is this plan (a page can hold several): a faint frame
+        if (drawing.Crop is [var x0, var y0, var x1, var y1] && !drawing.Crop.SequenceEqual(Underlay.WholePage))
+        {
+            var frame = new Rectangle
+            {
+                Width = Math.Max(0, x1 - x0) * _w, Height = Math.Max(0, y1 - y0) * _h, Stroke = new SolidColorBrush(Tint.Gray),
+                StrokeThickness = 1, StrokeDashArray = [6, 4], Opacity = 0.5,
+            };
+            Canvas.SetLeft(frame, x0 * _w);
+            Canvas.SetTop(frame, y0 * _h);
+            _marks.Children.Add(frame);
+        }
         // what the import thought: faint
         Pair(drawing.A, drawing.B, faint: true);
         if (_sl is { } a) Pair(a, _sr, faint: false);

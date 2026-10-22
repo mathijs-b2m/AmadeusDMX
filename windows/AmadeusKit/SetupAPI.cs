@@ -510,7 +510,8 @@ public sealed record ImportStatus
 
 /// A drawing under a rig (amadeus/rig/importer/underlay.py): a plan's page, and where it lies on the rig.
 /// `A`/`B` and `Fixtures` are page fractions (0..1, from the page's top left): the stage's front edge at stage left and
-/// stage right, and where each of its fixtures was drawn. `Corners`: the page's top-left, top-right, bottom-right and
+/// stage right, and where each of its fixtures was drawn. `Crop`: the part of the page that is this plan ([x0, y0, x1,
+/// y1], page fractions: a page can hold several). `Corners`: that part's top-left, top-right, bottom-right and
 /// bottom-left corners on the rig, in rig metres (x from stage left, y towards the audience: the trusses' frame).
 public sealed record Underlay
 {
@@ -527,6 +528,10 @@ public sealed record Underlay
     public Vec2 BM { get; init; }
     public IReadOnlyDictionary<string, Vec2> Fixtures { get; init; } = new Dictionary<string, Vec2>();
     public IReadOnlyList<Vec2> Corners { get; init; } = [];
+    public IReadOnlyList<double> Crop { get; init; } = WholePage;
+
+    /// The crop of a page that is one plan.
+    public static readonly IReadOnlyList<double> WholePage = [0, 0, 1, 1];
 
     static Vec2 Point(JsonElement e)
     {
@@ -544,6 +549,7 @@ public sealed record Underlay
         AM = J.Val(c, "a_m", Point) ?? new(0, 0), BM = J.Val(c, "b_m", Point) ?? new(0, 0),
         Fixtures = J.Ref(c, "fixtures", J.DictOf(Point)) ?? [],
         Corners = J.Ref(c, "corners", J.ArrayOf(Point)) ?? [],
+        Crop = J.Ref(c, "crop", J.ArrayOf(J.Double)) is { Length: 4 } crop ? crop : WholePage,
     };
 
     /// The name to show: its title, else where it came from.
@@ -553,7 +559,8 @@ public sealed record Underlay
     public double WidthM => (BM - AM).Length;
 
     public bool Equals(Underlay? o) => o is not null && Id == o.Id && File == o.File && Set == o.Set && A == o.A && B == o.B
-                                       && AM == o.AM && BM == o.BM && Corners.SequenceEqual(o.Corners);
+                                       && AM == o.AM && BM == o.BM && Corners.SequenceEqual(o.Corners)
+                                       && Crop.SequenceEqual(o.Crop);
     public override int GetHashCode() => HashCode.Combine(Id, File);
 }
 

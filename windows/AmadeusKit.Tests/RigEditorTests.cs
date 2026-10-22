@@ -235,6 +235,44 @@ public class RigEditorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void OnARaisedStageFixturesOnTheFloorStandOnItsDeck()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var trusses = e.Doc.Trusses.Select(t => (t.Id, t.ZM)).ToList();
+        var hung = Fx(e, "sharpy1").ZM;
+        e.SetDeck(1.5);
+        Assert.Equal(1.5, e.Doc.Stage.DeckM);
+        Assert.Equal(1.5, e.Doc.Raw["stage"]["deck_m"]?.Number);
+        Assert.False(e.Doc.Raw["stage"]["eye_safety"]?.Bool);    // the rest of the stage kept
+        Assert.Equal(0.25 + 1.5, Fx(e, "pixm1").ZM, 6);          // standing on the stage: up with it
+        Assert.Equal(0.2 + 1.5, Fx(e, "pixbar1").ZM, 6);
+        Assert.Equal(hung, Fx(e, "sharpy1").ZM);                 // hanging: where it was
+        Assert.Equal(trusses, e.Doc.Trusses.Select(t => (t.Id, t.ZM)).ToList());   // trusses don't move
+
+        // put on the floor: on the stage on its deck, in the hall on the hall floor
+        Assert.True(e.Drop(RigEditorModel.Payload(["sharpy2"]), Above(3, -3), Down));
+        Assert.Equal(RigEditorModel.FloorZ + 1.5, Fx(e, "sharpy2").ZM, 6);
+        Assert.Equal(-3, Fx(e, "sharpy2").YM, 6);
+        Assert.True(e.Drop(RigEditorModel.Payload(["sharpy2"]), Above(3, 4), Down));
+        Assert.Equal(RigEditorModel.FloorZ, Fx(e, "sharpy2").ZM, 6);
+        // nudged back onto the stage: up onto the deck again (its height above the floor kept)
+        e.Selection = EditorSelection.Fixture("sharpy2");
+        e.Nudge(0, -7);
+        Assert.Equal(RigEditorModel.FloorZ + 1.5, Fx(e, "sharpy2").ZM, 6);
+        // taken off its truss onto the stage
+        e.Attach("sharpy3", null);
+        Assert.Equal(Fx(e, "sharpy3").YM <= 0 ? RigEditorModel.FloorZ + 1.5 : RigEditorModel.FloorZ, Fx(e, "sharpy3").ZM, 6);
+
+        // lower it again: the stage's floor comes down, undo puts it back
+        e.SetDeck(0);
+        Assert.Equal(0.25, Fx(e, "pixm1").ZM, 6);
+        e.UndoManager!.Undo();
+        Assert.Equal(1.5, e.Doc.Stage.DeckM);
+        Assert.Equal(1.75, Fx(e, "pixm1").ZM, 6);
+    }
+
+    [Fact]
     public void AGroupDroppedOnATrussHangsInARow60cmApart()
     {
         using var w = new EditorWorkspace();

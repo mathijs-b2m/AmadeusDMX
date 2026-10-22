@@ -51,7 +51,8 @@ struct LineUpSheet: View {
         .onAppear { width = editor.doc.width }
     }
 
-    /// The page, fitted to the sheet: the clicks as SL and SR with a line between, the current ones faintly.
+    /// The page, fitted to the sheet: the clicks as SL and SR with a line between, the current ones faintly, and
+    /// the plan's part of the page framed faintly when the page holds more than this plan.
     @ViewBuilder private var page: some View {
         if let img = editor.page(underlay) {
             Image(decorative: img, scale: 1)
@@ -67,6 +68,13 @@ struct LineUpSheet: View {
                                     let f = SIMD2(Double(p.x / max(1, size.width)), Double(p.y / max(1, size.height)))
                                     clicks = clicks.count >= 2 ? [f] : clicks + [f]   // a third click starts over
                                 }
+                            if underlay.crop != [0, 0, 1, 1] {
+                                let k = underlay.crop
+                                Path(CGRect(x: k[0] * size.width, y: k[1] * size.height,
+                                            width: (k[2] - k[0]) * size.width, height: (k[3] - k[1]) * size.height))
+                                    .stroke(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                                    .allowsHitTesting(false)
+                            }
                             if clicks.isEmpty, let a = underlay.a, let b = underlay.b, a.count == 2, b.count == 2 {
                                 let pa = at(SIMD2(a[0], a[1])), pb = at(SIMD2(b[0], b[1]))
                                 Path { p in p.move(to: pa); p.addLine(to: pb) }

@@ -54,16 +54,24 @@ struct Scenery {
              [-room.side - 8, back, room.ceiling], [0.018, 0.019, 0.024], normal: [0, 1, 0])
 
         // stage, DJ riser and booth
+        // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
+        // audience; else a big rig's deck stands 15 cm high
         var boothY: Float, boothZ: Float
-        if big {
+        let raised = Float(max(0, stage.deckM))
+        if big || raised > 0 {
             let deckBack = min(-3, back + 1.0)
-            box(-0.5, W + 0.5, deckBack, -0.2, 0, 0.15, [0.055, 0.058, 0.07])
-            deck = (-0.5, W + 0.5, deckBack, -0.2, 0.15)
-            let ry = max(deckBack + 0.5, -4.5), rd: Float = 2.2, rw = min(5, W * 0.3)
-            box(cx - rw / 2, cx + rw / 2, ry - rd, ry, 0.15, 0.95, [0.07, 0.074, 0.09])
-            boothY = ry - 0.4; boothZ = 0.95
+            let deckTop: Float = raised > 0 ? raised : 0.15, front: Float = raised > 0 ? 0 : -0.2
+            box(-0.5, W + 0.5, deckBack, front, 0, deckTop, [0.055, 0.058, 0.07])
+            deck = (-0.5, W + 0.5, deckBack, front, deckTop)
+            if big {
+                let ry = max(deckBack + 0.5, -4.5), rd: Float = 2.2, rw = min(5, W * 0.3)
+                box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8, [0.07, 0.074, 0.09])
+                boothY = ry - 0.4; boothZ = deckTop + 0.8
+            } else {
+                boothY = -1.3; boothZ = deckTop
+            }
             // a lit edge along the front of the deck
-            box(-0.5, W + 0.5, -0.24, -0.2, 0.13, 0.15, [0.25, 0.27, 0.35], emissive: 0.6)
+            box(-0.5, W + 0.5, front - 0.04, front, deckTop - 0.02, deckTop, [0.25, 0.27, 0.35], emissive: 0.6)
         } else {
             boothY = -1.3; boothZ = 0
         }
@@ -89,7 +97,7 @@ struct Scenery {
         if screen {
             let sw = big ? min(10, W * 0.55) : 2.6, sh = sw * 9 / 16
             let sy = big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0
-            let sz: Float = big ? 1.4 : 1.15
+            let sz: Float = (big ? 1.4 : 1.15) + raised  // over the stage, as high as it stands
             wall = WallPlacement(center: [cx, sy, sz + sh / 2], width: sw, height: sh)
             box(cx - sw / 2 - 0.12, cx + sw / 2 + 0.12, sy - 0.35, sy - 0.02, sz - 0.12, sz + sh + 0.12, [0.03, 0.03, 0.035])
             if big {  // legs

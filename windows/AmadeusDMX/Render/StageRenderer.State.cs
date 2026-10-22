@@ -197,7 +197,7 @@ public sealed partial class StageRenderer
         Wake();
         Preset = p;
         if (Scenery is not { } s) return;
-        var target = p.Pose(s.Room.Width, s.Top, s.Room.Back, s.Room.Ceiling);
+        var target = p.Pose(s.Room.Width, s.Top, s.Room.Back, s.Room.Ceiling, s.Room.Deck);
         if (animated) Goal = target; else { Pose = target; Goal = null; }
     }
 
@@ -480,13 +480,15 @@ public sealed partial class StageRenderer
     /// How far above the floor a drawing lies (m): just clear of it, under everything standing on it.
     public const float DrawingLift = 0.008f;
 
-    /// A drawing's triangles: its page on the floor at its corners (rig metres are world x/y, as the trusses'), and
-    /// where a big stage's deck is, the part over the deck again on top of it (the floor's copy is hidden under it).
-    /// The page lies on the rig turned and scaled, never sheared: its texture coordinates interpolate exactly.
+    /// A drawing's triangles: its plan (the page's crop) on the floor at its corners (rig metres are world x/y, as the
+    /// trusses'), and where a big or raised stage's deck is, the part over the deck again on top of it (the floor's
+    /// copy is hidden under it). The page lies on the rig turned and scaled, never sheared: its texture coordinates
+    /// interpolate exactly.
     public static UnderlayVertex[] DrawingVertices(StageDrawing d, (float X0, float X1, float Y0, float Y1, float Top)? deck)
     {
         if (d.Corners.Count < 4) return [];
-        Vector2[] uv = [new(0, 0), new(1, 0), new(1, 1), new(0, 1)];
+        var crop = d.Crop is { Count: 4 } c4 ? c4.Select(v => (float)v).ToArray() : [0, 0, 1, 1];
+        Vector2[] uv = [new(crop[0], crop[1]), new(crop[2], crop[1]), new(crop[2], crop[3]), new(crop[0], crop[3])];
         var page = d.Corners.Take(4).Select((c, i) => (P: new Vector2((float)c.X, (float)c.Y), Uv: uv[i])).ToList();
         var out_ = new List<UnderlayVertex>();
         void Fan(List<(Vector2 P, Vector2 Uv)> poly, float z)

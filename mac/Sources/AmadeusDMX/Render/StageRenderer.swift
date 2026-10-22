@@ -26,7 +26,8 @@ struct StageInput {
 struct FloorDrawing {
     var key: String                  // its page: the texture is made once
     var image: CGImage
-    var corners: [SIMD2<Float>]      // the page's top-left, top-right, bottom-right, bottom-left on the rig (m)
+    var corners: [SIMD2<Float>]      // its plan's top-left, top-right, bottom-right, bottom-left on the rig (m)
+    var crop: SIMD4<Float> = [0, 0, 1, 1]  // that plan's part of the page: x0, y0, x1, y1 (fractions from the top left)
     var opacity: Float
 }
 
@@ -181,7 +182,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         wake()
         preset = p
         guard let s = scenery else { return }
-        let target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling)
+        let target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling, deck: s.room.deck)
         if animated { goal = target } else { pose = target; goal = nil }
     }
 

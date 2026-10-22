@@ -140,6 +140,39 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// Swift's `rounded()`: halves away from zero.
     static double Rounded(double v) => Math.Round(v, MidpointRounding.AwayFromZero);
 
+    /// How high a fixture put on the floor stands (its middle): this much above what it stands on.
+    public const double FloorZ = 0.25;
+
+    /// (x, y) (metres) is on the stage: behind its front edge, within its width.
+    static bool OnStage(Stage stage, double xM, double yM) => yM <= 0 && xM >= 0 && xM <= stage.WidthM;
+
+    /// What a fixture on the floor at (x, y) (metres) stands on: the stage's deck on the stage (stage.deck_m, heights
+    /// count from the hall floor), else the hall floor.
+    public static double Ground(Stage stage, double xM, double yM) => stage.DeckM > 0 && OnStage(stage, xM, yM) ? stage.DeckM : 0;
+
+    /// How high a fixture put on the floor where it is stands: on the deck on the stage, in the hall on the floor.
+    public static double FloorHeight(Stage stage, PlacedFixture f) => FloorZ + Ground(stage, f.X * stage.WidthM, f.YM);
+
+    /// A fixture standing on the floor moved from (x0 as a share of the width, y0): it keeps its height above what it
+    /// stands on, stepping up onto the stage's deck or down into the hall.
+    static void FollowGround(Stage stage, PlacedFixture f, double x0, double y0)
+    {
+        if (f.Mount != "floor" || f.Truss is not null) return;
+        f.ZM += Ground(stage, f.X * stage.WidthM, f.YM) - Ground(stage, x0 * stage.WidthM, y0);
+    }
+
+    /// Where a ray reaches the floor: on the stage's deck where it lands on the stage, else on the hall floor.
+    static Vec3? FloorHit(Stage stage, Vec3 o, Vec3 d)
+    {
+        if (!(d.Z < -1e-4)) return null;
+        if (stage.DeckM > 0 && o.Z > stage.DeckM)
+        {
+            var onDeck = o + d * ((stage.DeckM - o.Z) / d.Z);
+            if (Ground(stage, onDeck.X, onDeck.Y) > 0) return onDeck;
+        }
+        return o + d * (-o.Z / d.Z);
+    }
+
     RigEditorModel(Workspace workspace, RigDocument d)
     {
         _workspace = workspace;
@@ -214,7 +247,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             Key = $"edit:{Doc.Label}:{Version}", Fixtures = els, Stage = Doc.Stage with { }, Screen = Doc.HasScreen, Hello = null,
             Trusses = Doc.Trusses.Select(x => x with { }).ToList(), Selected = selected.ToHashSet(), KeepCamera = true,
             Zones = Doc.Zones.Where(z => ShowZones || Selection == EditorSelection.Zone(z.Id)).Select(z => z.Clone()).ToList(),
-            Drawings = Drawings.Where(IsShown).Select(u => Picture(u) is { } p ? new StageDrawing(u.File, p, u.Corners, (float)DrawingOpacity) : null)
+            Drawings = Drawings.Where(IsShown).Select(u => Picture(u) is { } p ? new StageDrawing(u.File, p, u.Corners, (float)DrawingOpacity, u.Crop) : null)
                 .OfType<StageDrawing>().ToList(),
         };
     }
@@ -250,7 +283,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public void UpdateStage(Action<Stage> body) => UpdateStage("Change Stage", body);
 
-    public void UpdateStage(string name, Action<Stage> body) => Change(name, d =>
+    public void UpdateStage(string name, Action<Stage> body) => Change(name, d => PutStage(d, body));
+
+    static void PutStage(RigDocument d, Action<Stage> body)
     {
         var stage = d.Stage with { };
         body(stage);
@@ -259,6 +294,16 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var merged = d.Raw.GetValueOrDefault("stage")?.Object is { } o ? new Dictionary<string, JSONValue>(o) : [];
         foreach (var (k, v) in d.Stage.ToJSON().Object!) merged[k] = v;
         d.Raw["stage"] = JSONValue.Of(merged);
+    }
+
+    /// How high the stage stands above the hall floor (stage.deck_m): what stands on its floor goes up or down with
+    /// it, the trusses stay where they hang (their heights count from the hall floor).
+    public void SetDeck(double m) => Change("Change Stage Height", d =>
+    {
+        var was = d.Stage.DeckM;
+        PutStage(d, s => s.DeckM = Math.Max(0, m));
+        foreach (var f in d.Fixtures.Where(f => f.Mount == "floor" && f.Truss is null && OnStage(d.Stage, f.X * d.Width, f.YM)))
+            f.ZM += d.Stage.DeckM - was;
     });
 
     public void SetScreen(bool on) => Change(on ? "Add LED Wall" : "Remove LED Wall", d =>
@@ -434,7 +479,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         else
         {
             f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null;
-            f.Mount = "floor"; f.ZM = 0.25;
+            f.Mount = "floor"; f.ZM = FloorHeight(Doc.Stage, f);
         }
     });
 
@@ -463,7 +508,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             waiting[k].X = (k + 1.0) / (waiting.Count + 1);
             waiting[k].YM = -0.3;
-            waiting[k].ZM = 0.25;
+            waiting[k].ZM = FloorHeight(d.Stage, waiting[k]);
             waiting[k].Mount = "floor";
         }
     }
@@ -519,9 +564,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
             f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null;
             f.Waiting = false;
             f.Mount = "floor";
-            f.ZM = 0.25;
             f.X = (p.X - span / 2 + Spacing * k) / d.Width;
             f.YM = p.Y;
+            f.ZM = FloorHeight(d.Stage, f);
         }
     }
 
@@ -543,7 +588,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 while (d.Fixtures.Any(f => f.Id == $"{prefix}{n}") || newIDs.Contains($"{prefix}{n}")) n++;
                 var id = $"{prefix}{n}";
                 newIDs.Add(id);
-                var f = new PlacedFixture(id, key, mode, 1, null, "floor", (k + 1.0) / (count + 1), -0.6, 0.25, 0, null, null, null);
+                var f = new PlacedFixture(id, key, mode, 1, null, "floor", (k + 1.0) / (count + 1), -0.6, FloorZ + d.Stage.DeckM, 0, null, null,
+                                          null);
                 if (truss is { } t)
                 {
                     var span = t.Vertical ? t.LengthM : t.LengthM * 0.9;
@@ -993,7 +1039,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                     foreach (var f in d.Fixtures.Where(f => f.Truss == sel.Id))
                     {
                         f.Truss = null; f.TrussPos = null;
-                        f.Mount = "floor"; f.ZM = 0.25;
+                        f.Mount = "floor"; f.ZM = FloorHeight(d.Stage, f);
                     }
                 });
                 break;
@@ -1066,7 +1112,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
                             Place(f, t, (f.TrussPos ?? 0) + dx, d.Width);
                         else
                         {
+                            var (x0, y0) = (f.X, f.YM);
                             f.X += dx / d.Width; f.YM += dy;
+                            FollowGround(d.Stage, f, x0, y0);
                         }
                     }
                 });
@@ -1617,18 +1665,25 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 {
                     target = SnapXY(target);
                     var delta = new Vec2(target.X - g.Start.X, target.Y - g.Start.Y);
-                    if (f.Truss is not null) { f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null; f.Mount = "floor"; f.ZM = 0.25; }
+                    var (x0, y0) = (f.X, f.YM);
+                    var fell = f.Truss is not null;
+                    if (fell) { f.Truss = null; f.TrussPos = null; f.Side = null; f.MountRoll = null; f.Mount = "floor"; }
                     f.X = target.X / Doc.Width;
                     f.YM = target.Y;
+                    if (fell) f.ZM = FloorHeight(Doc.Stage, f);
+                    else FollowGround(Doc.Stage, f, x0, y0);
                     foreach (var other in _group)  // the others move by as much, onto the floor
                     {
                         if (Doc.Fixtures.FirstOrDefault(x => x.Id == other) is not { } o2
                             || g.Before.Fixtures.FirstOrDefault(x => x.Id == other) is not { } was) continue;
                         var p = was.Position(Doc.Width);
                         o2.Waiting = false;
-                        o2.Truss = null; o2.TrussPos = null; o2.Side = null; o2.MountRoll = null; o2.Mount = "floor"; o2.ZM = 0.25;
+                        var (ox, oy, onFloor) = (o2.X, o2.YM, o2.Truss is null && o2.Mount == "floor");
+                        o2.Truss = null; o2.TrussPos = null; o2.Side = null; o2.MountRoll = null; o2.Mount = "floor";
                         o2.X = (p.X + delta.X) / Doc.Width;
                         o2.YM = was.Waiting ? f.YM : p.Y + delta.Y;
+                        if (onFloor) FollowGround(Doc.Stage, o2, ox, oy);
+                        else o2.ZM = FloorHeight(Doc.Stage, o2);
                     }
                 }
                 break;
@@ -1729,8 +1784,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             }
             else
             {
-                if (!(d.Z < -1e-4)) return false;
-                var hit = o + d * (-o.Z / d.Z);
+                if (FloorHit(Doc.Stage, o, d) is not { } hit) return false;
                 Change(ids.Count == 1 ? "Place Fixture" : $"Place {ids.Count} Fixtures", doc =>
                 {
                     LineUp(doc, ids, hit.XY);

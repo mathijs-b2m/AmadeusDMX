@@ -32,5 +32,7 @@ public sealed record StageInput
 public sealed record DrawingPicture(int Width, int Height, byte[] Bgra);
 
 /// A drawing on the stage floor: its page (`Key`: the page's file, one texture per file), its four corners on the
-/// rig (top left, top right, bottom right, bottom left of the page; rig metres, the trusses' x/y) and how opaque.
-public sealed record StageDrawing(string Key, DrawingPicture Picture, IReadOnlyList<Vec2> Corners, float Opacity);
+/// rig (top left, top right, bottom right, bottom left of its `Crop`; rig metres, the trusses' x/y), how opaque, and
+/// the part of the page that is this plan (`Crop`: [x0, y0, x1, y1], page fractions; null: the whole page).
+public sealed record StageDrawing(string Key, DrawingPicture Picture, IReadOnlyList<Vec2> Corners, float Opacity,
+                                  IReadOnlyList<double>? Crop = null);

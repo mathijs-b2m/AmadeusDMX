@@ -496,11 +496,14 @@ public struct Underlay: Decodable, Sendable, Identifiable, Hashable {
     public var a: [Double]?               // the stage's front edge on the page (fractions from the top left): stage left
     public var b: [Double]?               // … and stage right
     public var fixtures: [String: [Double]]  // where it shows each fixture (page fractions)
-    /// The page's top-left, top-right, bottom-right and bottom-left corners on the rig (metres: x from stage left,
+    /// The plan's part of the page (a page can hold several plans): x0, y0, x1, y1 in page fractions from the top
+    /// left; [0, 0, 1, 1] when the whole page.
+    public var crop: [Double]
+    /// That part's top-left, top-right, bottom-right and bottom-left corners on the rig (metres: x from stage left,
     /// y towards the audience), the frame trusses are in.
     public var corners: [SIMD2<Double>]
 
-    enum CodingKeys: String, CodingKey { case id, title, source, file, set, a, b, fixtures, corners }
+    enum CodingKeys: String, CodingKey { case id, title, source, file, set, a, b, fixtures, crop, corners }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -512,6 +515,7 @@ public struct Underlay: Decodable, Sendable, Identifiable, Hashable {
         a = try c.decodeIfPresent([Double].self, forKey: .a)
         b = try c.decodeIfPresent([Double].self, forKey: .b)
         fixtures = try c.decodeIfPresent([String: [Double]].self, forKey: .fixtures) ?? [:]
+        crop = (try c.decodeIfPresent([Double].self, forKey: .crop)).flatMap { $0.count == 4 ? $0 : nil } ?? [0, 0, 1, 1]
         corners = (try c.decodeIfPresent([[Double]].self, forKey: .corners) ?? []).compactMap { p in
             p.count >= 2 ? SIMD2(p[0], p[1]) : nil
         }
