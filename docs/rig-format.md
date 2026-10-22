@@ -157,6 +157,25 @@ count along a truss like the places do; *Auto-Mount › Put in Name Order* does 
 on the spots its fixtures already take. Fixtures that are already mounted keep
 their place, and their room on a truss is left free.
 
+## Import from a venue's documents
+
+`amadeus rig NAME --import FILE…` builds a set and a rig `NAME` from what a venue sends (`amadeus/rig/importer/`):
+
+- **MVR** (Vectorworks, Capture, grandMA3, Depence): every fixture with its position, the way it hangs and
+  points, its GDTF type and mode, and its patch; the drawn trusses. Read as drawn with the audience at the
+  bottom of the plan (+Y upstage), the origin at downstage centre on the stage floor.
+- **Patch sheets** (CSV, Excel): a header row naming at least the fixture type and its address; mode, universe,
+  id, position, quantity and x/y/z columns are used when they are there. "1.141", "1/141", "U1 141" and dimmer
+  ranges ("1.013 > 1.019": one conventional light per channel) are understood.
+
+Each type is found in the libraries (ours, QLC+, the Open Fixture Library); a match must name the same model
+numbers, and its mode is the one as long as the document's footprint (or the spacing of the patch). Nothing
+close: a conventional light plays on one dimmer channel, anything else is made from a generic template.
+Hanging fixtures go on the drawn trusses, else on trusses found from their rows; fixtures without a position
+are auto-mounted. The report says what was assumed (the frame, the stage size), what is a guess to check (a
+near match, a mode the documents don't name, fixed lights pointing at a wall or the ceiling) and what is
+missing (no patch). Reading PDFs and drawings is planned; it will need your own OpenAI API key.
+
 ## Hang sheet
 
 A set designed in the app still has to be hung for real. The hang sheet (`amadeus/rig/hangsheet.py`) is the paperwork for

@@ -56,6 +56,10 @@ def add_commands(sub) -> dict:
     p.add_argument("--hang-sheet", nargs="?", const="", metavar="FILE",
                    help="write the hang sheet of the active set on this rig (where every fixture goes, its DMX "
                    "address, labels) as a printable HTML file (default: hang-sheet-SET-RIG.html)")  # fmt: skip
+    p.add_argument("--import", dest="import_files", nargs="+", metavar="FILE",
+                   help="build a set and a rig NAME from a venue's documents: an MVR scene (Vectorworks, Capture, "
+                   "grandMA3), patch sheets (CSV, Excel); prints what was assumed and what to check")  # fmt: skip
+    p.add_argument("--replace", action="store_true", help="with --import: overwrite a set or rig NAME")
 
     p = sub.add_parser(
         "library", help="list fixture definitions, or search/add from the QLC+ and Open Fixture libraries"
@@ -124,6 +128,8 @@ def sets_command(args):
 def rigs_command(args):
     from amadeus.rig import manage, store
 
+    if args.import_files:
+        return import_command(args)
     if not args.name and not args.automount and args.hang_sheet is None:
         for i in store.rig_info():
             mark = "▶" if i["active"] else " "
@@ -156,6 +162,33 @@ def rigs_command(args):
         out = Path(args.hang_sheet or f"hang-sheet-{show.set}-{show.rig}.html")
         out.write_text(hangsheet.html(show.load(), show.set, show.rig), encoding="utf-8")
         print(f"Hang sheet of the set '{show.set}' on the rig '{show.rig}': {out} (open it in a browser to print)")
+
+
+def import_command(args):
+    from pathlib import Path
+
+    from amadeus.rig import importer, store
+
+    if not args.name:
+        raise SystemExit("Name the set and rig to build: amadeus rig NAME --import FILE…")
+    name = store.safe_name(args.name)
+    if not args.replace and (name in store.sets.names() or name in store.rigs.names()):
+        raise SystemExit(f"A set or rig '{name}' exists already: pick another name, or add --replace")
+    files = [Path(f) for f in args.import_files]
+    missing = [str(f) for f in files if not f.is_file()]
+    if missing:
+        raise SystemExit(f"Not found: {', '.join(missing)}")
+    result = importer.build(files, name)
+    marks = {"ok": "✓", "check": "?", "missing": "✗"}
+    for n in result.notes:
+        print(f" {marks.get(n.level, '·')} {n.text}")
+    if not result.set_doc["fixtures"]:
+        raise SystemExit("Nothing to build: no fixtures found in these files")
+    importer.save(result, name)
+    store.sets.switch(name)
+    store.rigs.switch(name)
+    print(f"Built the set and rig '{name}': {len(result.set_doc['fixtures'])} fixtures, "
+          f"{len(result.rig_doc['trusses'])} trusses (now active; check it in the rig editor)")  # fmt: skip
 
 
 def _grid_rig(args) -> dict:
