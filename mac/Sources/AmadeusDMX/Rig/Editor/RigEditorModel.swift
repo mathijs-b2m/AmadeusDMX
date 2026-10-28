@@ -339,6 +339,12 @@ final class RigEditorModel: StageEditing {
         }
     }
 
+    /// Heads into one group the show plays as a line (nil or blank: grouped by where they stand).
+    func setGroup(_ ids: Set<String>, _ name: String?) {
+        let name = name?.trimmingCharacters(in: .whitespaces) ?? ""
+        change(name.isEmpty ? "Group Automatically" : "Group as \(name)") { d in d.setGroup(ids, name) }
+    }
+
     func attach(_ id: String, to trussID: String?) {
         let stage = doc.stage
         updateFixture(id, trussID == nil ? "Take Off Truss" : "Put on Truss") { f in

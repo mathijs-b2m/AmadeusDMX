@@ -51,6 +51,17 @@ public class RigModelTests
     }
 
     [Fact]
+    public void HeadsGroupedByHandAreSavedAndCanGoBackToAutomatic()
+    {
+        var d = Document();
+        d.SetGroup(["a", "b"], "  floor left ");
+        Assert.True(d.Group("a") == "floor left" && d.Group("b") == "floor left" && d.GroupNames.SequenceEqual(["floor left"]));
+        d.SetGroup(["b"], "");
+        var saved = new RigDocument("r", "s", d.Json());
+        Assert.True(saved.Group("a") == "floor left" && saved.Group("b") is null);
+    }
+
+    [Fact]
     public void ACloneIsItsOwn()
     {
         var d = Document();

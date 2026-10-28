@@ -451,6 +451,20 @@ public sealed class RigDocument
     public void Calibrate(string id, IReadOnlyDictionary<string, JSONValue> fields) =>
         UpdateRaw(id, o => { foreach (var (k, v) in fields) o[k] = v; });
 
+    /// The head group a fixture is put in by hand (amadeus/rig/groups.py); null: grouped by where it stands.
+    public string? Group(string id) => RawFixture(id).GetValueOrDefault("group")?.String;
+
+    /// The hand-made group names on this rig, sorted.
+    public IReadOnlyList<string> GroupNames =>
+        [.. Fixtures.Where(f => !f.Waiting).Select(f => Group(f.Id)).OfType<string>().Distinct().Order(StringComparer.Ordinal)];
+
+    /// These fixtures into one hand-made group, or back to grouping by where they stand (null or blank).
+    public void SetGroup(IEnumerable<string> ids, string? name)
+    {
+        var n = name?.Trim() ?? "";
+        foreach (var id in ids) UpdateRaw(id, o => Put(o, "group", n.Length == 0 ? null : JSONValue.Of(n)));
+    }
+
     public IReadOnlyDictionary<string, JSONValue> RawFixture(string id) =>
         (Raw.GetValueOrDefault("fixtures")?.Array ?? []).Select(v => v.Object).OfType<IReadOnlyDictionary<string, JSONValue>>()
         .FirstOrDefault(o => o.GetValueOrDefault("id")?.String == id) ?? new Dictionary<string, JSONValue>();

@@ -365,6 +365,20 @@ public struct RigDocument: Equatable {
         updateRaw(id) { o in o.merge(fields) { _, new in new } }
     }
 
+    /// The head group a fixture is put in by hand (amadeus/rig/groups.py); nil: grouped by where it stands.
+    public func group(_ id: String) -> String? { rawFixture(id)["group"]?.string }
+
+    /// The hand-made group names on this rig, sorted.
+    public var groupNames: [String] {
+        Array(Set(fixtures.filter { !$0.waiting }.compactMap { group($0.id) })).sorted()
+    }
+
+    /// These fixtures into one hand-made group, or back to grouping by where they stand (nil or blank).
+    public mutating func setGroup(_ ids: Set<String>, _ name: String?) {
+        let name = name?.trimmingCharacters(in: .whitespaces) ?? ""
+        for id in ids { updateRaw(id) { o in o["group"] = name.isEmpty ? nil : .string(name) } }
+    }
+
     public func rawFixture(_ id: String) -> [String: JSONValue] {
         (raw["fixtures"]?.array ?? []).compactMap(\.object).first { $0["id"]?.string == id } ?? [:]
     }

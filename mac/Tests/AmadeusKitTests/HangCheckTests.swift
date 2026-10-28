@@ -38,3 +38,12 @@ private func document() throws -> RigDocument {
     let a = try #require(((out?["fixtures"] as? [[String: Any]]) ?? []).first { $0["id"] as? String == "a" })
     #expect(a["pan_invert"] as? Bool == true && a["pan_home_deg"] as? Double == 90)
 }
+
+@Test func headsGroupedByHandAreSavedAndCanGoBackToAutomatic() throws {
+    var d = try document()
+    d.setGroup(["a", "b"], "  floor left ")
+    #expect(d.group("a") == "floor left" && d.group("b") == "floor left" && d.groupNames == ["floor left"])
+    d.setGroup(["b"], "")
+    let saved = try RigDocument(rig: "r", set: "s", data: d.json())
+    #expect(saved.group("a") == "floor left" && saved.group("b") == nil)
+}

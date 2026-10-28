@@ -265,11 +265,64 @@ public sealed class MultiFixtureInspector(RigEditorModel editor, IRigEditorHost 
                 EditorUI.Segmented(editor, ["front", "left", "right", "back", "top"], () => Shared("front"),
                     v => char.ToUpperInvariant(v[0]) + v[1..], v => editor.SetSide(ids, v))));
         }
+        var heads = fixtures.Where(f => !f.Waiting && editor.Definition(f.Key)?.IsMoving == true).Select(f => f.Id).ToList();
+        if (heads.Count > 0) s.Children.Add(HeadGroupSection.Build(editor, heads));
         s.Children.Add(EditorUI.Section(null,
             UI.Button("Auto-Mount These", () => _ = editor.AutoMount(host, ids.ToList()), "wand.and.stars"),
             UI.Button("Rotate 90°", () => editor.RotateSelection(90), "rotate.right"),
             UI.Button("Unmount (Back to Waiting)", () => editor.Unmount(ids), "arrow.down.to.line")));
         return s;
+    }
+}
+
+/// The head group of the selected moving heads (amadeus/rig/groups.py): Automatic groups them by where they
+/// stand (one row per depth and height, a tower, a ring); a name puts them in a group of their own.
+public static class HeadGroupSection
+{
+    const string Automatic = "Automatic";
+
+    public static FrameworkElement Build(RigEditorModel editor, IReadOnlyCollection<string> ids)
+    {
+        string? Current()  // the group they share (blank: automatic); null when they differ
+        {
+            var names = ids.Select(i => editor.Doc.Group(i) ?? "").Distinct().ToList();
+            return names.Count == 1 ? names[0] : null;
+        }
+        var box = new ComboBox { IsEditable = true, MinWidth = 160 };
+        box.Tooltip("Type a name for a group of its own, or pick one already on this rig, or Automatic");
+        var following = false;
+        void Follow()
+        {
+            following = true;
+            try
+            {
+                box.Items.Clear();
+                box.Items.Add(Automatic);
+                foreach (var g in editor.Doc.GroupNames) box.Items.Add(g);
+                var now = Current();
+                box.PlaceholderText = now is null ? "Mixed" : Automatic;
+                box.SelectedItem = now is { Length: > 0 } ? now : now is null ? null : Automatic;
+                box.Text = now is { Length: > 0 } ? now : now is null ? "" : Automatic;
+            }
+            finally { following = false; }
+        }
+        void Set(string? name) => editor.SetGroup(ids, name is null || name.Trim() == Automatic ? null : name);
+        box.SelectionChanged += (_, _) => { if (!following && box.SelectedItem is string s) Set(s); };
+        box.TextSubmitted += (_, e) => { e.Handled = true; if (!following) Set(e.Text); };
+        var count = UI.Text("", Font.Caption).Secondary();
+        var rows = UI.VStack(10, UI.Row("Group", box), count).Bind(editor, [nameof(RigEditorModel.Version)], _ =>
+        {
+            if (box.FocusState == FocusState.Unfocused) Follow();
+            var now = Current();
+            var n = now is { Length: > 0 } ? editor.Doc.Fixtures.Count(f => !f.Waiting && editor.Doc.Group(f.Id) == now) : 0;
+            count.Text = n > 0 ? $"{n} heads in “{now}”" : "";
+            count.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
+        });
+        Follow();
+        return EditorUI.Section("Head Group", [rows],
+            "The show plays a group as one line: fans, waves and chases run through it, and the groups answer each other. "
+            + "Automatic groups heads by where they stand: a row at one depth and height, a tower, a ring. "
+            + "Type a name to group heads that don't stand in a line, such as a scattered floor.");
     }
 }
 
@@ -456,6 +509,7 @@ public sealed class FixtureInspector(AppModel model, RigEditorModel editor, IRig
             orientation.Add(UI.Text("Moving fixtures aim themselves; the rotation tells the engine where their front is.", Font.Caption).Secondary().Wrap());
         }
         s.Children.Add(EditorUI.Section("Orientation", orientation));
+        if (def?.IsMoving == true && !fixture.Waiting) s.Children.Add(HeadGroupSection.Build(editor, [id]));
 
         s.Children.Add(EditorUI.Section(null, [
             fixture.Waiting

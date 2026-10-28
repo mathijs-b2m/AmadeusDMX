@@ -468,6 +468,13 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (f.Truss is { } tid && d.Trusses.FirstOrDefault(t => t.Id == tid) is { } t) Place(f, t, f.TrussPos ?? 0, d.Width);
     });
 
+    /// Heads into one group the show plays as a line (null or blank: grouped by where they stand).
+    public void SetGroup(IEnumerable<string> ids, string? name)
+    {
+        var n = name?.Trim() ?? "";
+        Change(n.Length == 0 ? "Group Automatically" : $"Group as {n}", d => d.SetGroup(ids, n));
+    }
+
     public void Attach(string id, string? trussID) => UpdateFixture(id, trussID is null ? "Take Off Truss" : "Put on Truss", f =>
     {
         if (trussID is not null)
