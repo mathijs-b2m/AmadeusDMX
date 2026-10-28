@@ -110,8 +110,9 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
     public var mount: String
     public var beamDeg: Double
     public var beamWide: Double
-    public var output: Double
-    public var outputWide: Double
+    /// Its light against the reference beam (BeamLight), and its field angle as a multiple of the beam angle.
+    public var flux: Double
+    public var field: Double
     // drawing facts (newer engines): the fixture it belongs to, its housing, rotation, cells, static aim
     public var fixture: String?
     public var body: String?
@@ -128,11 +129,11 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
     public init(id: String, kind: FixtureKind, label: String, pos: SIMD3<Double>, mount: String, beamDeg: Double,
                 beamWide: Double? = nil) {
         self.id = id; self.kind = kind; self.label = label; self.pos = pos; self.mount = mount
-        self.beamDeg = beamDeg; self.beamWide = beamWide ?? beamDeg; output = 1; outputWide = 1
+        self.beamDeg = beamDeg; self.beamWide = beamWide ?? beamDeg; flux = 1; field = BeamLight.field
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, label, pos, mount, beamDeg = "beam_deg", beamWide = "beam_wide", output, outputWide = "output_wide"
+        case id, kind, label, pos, mount, beamDeg = "beam_deg", beamWide = "beam_wide", flux, field
         case fixture, body, rot, size, cells, length, dir, up, truss
     }
 
@@ -146,8 +147,8 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
         mount = try c.decodeIfPresent(String.self, forKey: .mount) ?? "stand"
         beamDeg = try c.decodeIfPresent(Double.self, forKey: .beamDeg) ?? 25
         beamWide = try c.decodeIfPresent(Double.self, forKey: .beamWide) ?? beamDeg
-        output = try c.decodeIfPresent(Double.self, forKey: .output) ?? 1
-        outputWide = try c.decodeIfPresent(Double.self, forKey: .outputWide) ?? 1
+        flux = try c.decodeIfPresent(Double.self, forKey: .flux) ?? 1
+        field = try c.decodeIfPresent(Double.self, forKey: .field) ?? BeamLight.field
         fixture = try c.decodeIfPresent(String.self, forKey: .fixture)
         body = try c.decodeIfPresent(String.self, forKey: .body)
         rot = try c.decodeIfPresent(Double.self, forKey: .rot) ?? 0
@@ -164,7 +165,7 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
         try c.encode(id, forKey: .id); try c.encode(kind, forKey: .kind); try c.encode(label, forKey: .label)
         try c.encode([pos.x, pos.y, pos.z], forKey: .pos); try c.encode(mount, forKey: .mount)
         try c.encode(beamDeg, forKey: .beamDeg); try c.encode(beamWide, forKey: .beamWide)
-        try c.encode(output, forKey: .output); try c.encode(outputWide, forKey: .outputWide)
+        try c.encode(flux, forKey: .flux); try c.encode(field, forKey: .field)
     }
 }
 

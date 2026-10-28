@@ -148,7 +148,10 @@ public struct FixtureDefinition: Decodable, Sendable {
         public var beamDegMax: Double?
         public var lumens: Double?
         public var sizeMM: [Double]?
-        enum CodingKeys: String, CodingKey { case beamDeg = "beam_deg", beamDegMax = "beam_deg_max", lumens, sizeMM = "size_mm" }
+        public var fieldDeg: Double?
+        enum CodingKeys: String, CodingKey {
+            case beamDeg = "beam_deg", beamDegMax = "beam_deg_max", lumens, sizeMM = "size_mm", fieldDeg = "field_deg"
+        }
     }
     public var manufacturer: String
     public var model: String
@@ -468,6 +471,10 @@ public enum RigElements {
                                        beamWide: def?.physical?.beamDegMax)
                 info.fixture = f.id
                 info.body = def?.kind
+                if kind == .head {
+                    info.flux = BeamLight.flux(lumens: def?.physical?.lumens)
+                    if let fd = def?.physical?.fieldDeg, fd > info.beamDeg { info.field = fd / info.beamDeg }
+                }
                 info.rot = f.rotDeg
                 info.truss = f.truss
                 if kind == .head { info.up = f.up }

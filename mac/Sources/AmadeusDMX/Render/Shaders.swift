@@ -56,8 +56,10 @@ fragment float4 zone_fragment(SolidOut in [[stage_in]], constant Uniforms &u [[b
 
 // ---------------------------------------------------------------- volumetric beams (cones)
 struct ConeIn { float3 local [[attribute(0)]]; };   // x = cos, y = sin, z = 0 (lens) .. 1 (end)
-struct BeamInstance { float4 apexLen; float4 dirRadius; float4 colorIntensity; float4 extra; };  // extra.x = lens radius
-struct BeamOut { float4 pos [[position]]; float3 world; float3 normal; float along; float4 color; };
+// extra.x = lens radius; extra.y = the reference radius (BeamLight.swift): the shaft as bright as its light over its
+// width, fading as it widens with the throw (0: the plain fade, for pars and washes)
+struct BeamInstance { float4 apexLen; float4 dirRadius; float4 colorIntensity; float4 extra; };
+struct BeamOut { float4 pos [[position]]; float3 world; float3 normal; float along; float4 color; float radius; float dist; float ref; };
 
 vertex BeamOut beam_vertex(ConeIn in [[stage_in]], uint iid [[instance_id]],
                            const device BeamInstance *beams [[buffer(2)]], constant Uniforms &u [[buffer(1)]]) {
@@ -74,6 +76,7 @@ vertex BeamOut beam_vertex(ConeIn in [[stage_in]], uint iid [[instance_id]],
     o.pos = u.viewProj * float4(o.world, 1);
     o.along = in.local.z;
     o.color = b.colorIntensity;
+    o.radius = r; o.dist = in.local.z * len; o.ref = b.extra.y;
     return o;
 }
 
@@ -84,6 +87,9 @@ fragment float4 beam_fragment(BeamOut in [[stage_in]], constant Uniforms &u [[bu
     float along = saturate(in.along);       // can overshoot 1 by a hair: pow() of a negative number is NaN
     float body = pow(facing, 2.2);          // soft edges: a cylinder of haze, not a slab
     float fade = pow(1.0 - along, 1.6) * (0.4 + 0.6 * exp(-along * 5.0));
+    if (in.ref > 0.0) {  // its light over its width here, a little lost in the haze on the way, softly ending
+        fade = min(3.0, in.ref / max(in.radius, 0.02)) * exp(-in.dist * 0.035) * (1.0 - 0.5 * smoothstep(0.75, 1.0, along));
+    }
     // a beam right next to (or through) the camera: fade its haze, it would white out the whole picture
     float near = smoothstep(0.4, 2.5, distance(u.camPos.xyz, in.world));
     float a = in.color.a * body * fade * near * u.params.y;
