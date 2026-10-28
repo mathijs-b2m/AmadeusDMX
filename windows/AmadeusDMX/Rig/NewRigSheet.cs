@@ -46,6 +46,11 @@ public static class RigSketch
                 break;
             case RigTemplate.Stands:
                 Tower(w * 0.2, h * 0.35); Tower(w * 0.8 - 4, h * 0.35);
+                Bar(w * 0.2 - 10, h * 0.35, 24); Bar(w * 0.8 - 14, h * 0.35, 24);
+                break;
+            case RigTemplate.Bridge:
+                Tower(w * 0.27, h * 0.3); Tower(w * 0.73 - 4, h * 0.3);
+                Bar(w * 0.25, h * 0.3, w * 0.5);
                 break;
             case RigTemplate.Booth:
                 Bar(w * 0.2, h * 0.25, w * 0.6);
@@ -99,7 +104,7 @@ public sealed class NewRigSheet(AppModel model)
     {
         var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
         for (var i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        for (var i = 0; i < 2; i++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var i = 0; i < (RigTemplates.All.Length + 2) / 3; i++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var k = 0;
         foreach (var t in RigTemplates.All)
         {
@@ -176,7 +181,7 @@ public sealed class NewRigSheet(AppModel model)
             UI.Row("Name", name.MinWidth(260)),
             SizeRow("Stage width", _width, 2, 30, 0.5, v => _width = v),
             _template == RigTemplate.Floor ? null
-                : SizeRow(_template == RigTemplate.Stands ? "Stand height" : "Truss height", _height, 2, 12, 0.5, v => _height = v),
+                : SizeRow(_template is RigTemplate.Stands or RigTemplate.Bridge ? "Stand height" : "Truss height", _height, 2, 12, 0.5, v => _height = v),
             SizeRow("Room depth", _depth, 4, 40, 1, v => _depth = v),
             UI.Row("LED wall behind the DJ", UI.Toggle("", _screen, v => _screen = v))));
     }

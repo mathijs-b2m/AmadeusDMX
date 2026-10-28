@@ -36,10 +36,38 @@ public sealed record Truss
     public double? ArcDeg { get; set; }
     /// Where the heads on it play: "audience" or "down"; nil: automatic (down when it hangs over the crowd).
     public string? Aim { get; set; }
+    /// A light stand's (type "bridge" or "tbar") limits as the maker gives them: what it takes, how high it goes.
+    public double? MaxKg { get; set; }
+    public double? MaxHeightM { get; set; }
+    public double? MinHeightM { get; set; }
 
     /// The usual round truss sizes (any other works too) and arcs.
     public static readonly double[] RingDiameters = [2, 3, 4, 5, 6, 8];
     public static readonly double[] RingArcs = [360, 180];
+
+    /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
+    public sealed record StandPreset(string Type, double LengthM, double? MinHeightM, double MaxHeightM, double MaxKg)
+    {
+        public string Title
+        {
+            get
+            {
+                var what = Type == "tbar" ? "T-bar stand" : "Light bridge";
+                return $"{what} {Format.Number(LengthM)} m · up to {Format.Number(MaxHeightM)} m, {Format.Number(MaxKg)} kg";
+            }
+        }
+    }
+    /// The usual budget ones: 3 m bridges up to 3 m (60 kg) and 2.65 m (25 kg), a sturdy T-bar stand up to 3.5 m
+    /// (50 kg) and a light one up to 2.5 m (10 kg).
+    public static readonly StandPreset[] StandPresets =
+    [
+        new("bridge", 3, null, 3, 60),
+        new("bridge", 3, 1.2, 2.65, 25),
+        new("tbar", 1.2, 1.6, 3.5, 50),
+        new("tbar", 1, 1.05, 2.5, 10),
+    ];
+    /// A light bridge's stands: this far in from the bar's ends.
+    public const double StandInsetM = 0.05;
 
     public Truss(string id, double lengthM, double xM, double yM, double zM, double rotDeg = 0, bool vertical = false)
     {
@@ -57,6 +85,9 @@ public sealed record Truss
             DiameterM = J.Val(c, "diameter_m", J.Double),
             ArcDeg = J.Val(c, "arc_deg", J.Double),
             Aim = J.Ref(c, "aim", J.String),
+            MaxKg = J.Val(c, "max_kg", J.Double),
+            MaxHeightM = J.Val(c, "max_height_m", J.Double),
+            MinHeightM = J.Val(c, "min_height_m", J.Double),
         };
         t.Normalise();
         return t;
@@ -75,6 +106,9 @@ public sealed record Truss
         if (DiameterM is { } d) o["diameter_m"] = d;
         if (ArcDeg is { } a) o["arc_deg"] = a;
         if (Aim is not null) o["aim"] = Aim;
+        if (MaxKg is { } kg) o["max_kg"] = kg;
+        if (MaxHeightM is { } top) o["max_height_m"] = top;
+        if (MinHeightM is { } bottom) o["min_height_m"] = bottom;
         return JSONValue.Of(o);
     }
 
@@ -93,6 +127,19 @@ public sealed record Truss
     public string? LightAim => Aim is "audience" or "down" ? Aim : !Vertical && YM >= OverCrowdM ? "down" : null;
 
     public bool IsRing => Shape == "circle" && !Vertical;
+    /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.
+    public bool IsStand => Type is "bridge" or "tbar" && !Vertical && !IsRing;
+    /// Where a light stand's tripods stand: under both ends of a bridge, under the middle of a T-bar.
+    public IReadOnlyList<Vec2> StandFeet
+    {
+        get
+        {
+            if (!IsStand) return [];
+            if (Type == "tbar") return [new(XM, YM)];
+            var u = Math.Max(0, LengthM / 2 - StandInsetM);
+            return [Point(-u).XY, Point(u).XY];
+        }
+    }
     public bool IsFullRing => IsRing && Arc >= 359.5;
     public double Arc => Math.Min(360, Math.Max(10, ArcDeg ?? 360));
     public double Radius => (DiameterM ?? 4) / 2;
@@ -101,6 +148,7 @@ public sealed record Truss
     public void Normalise()
     {
         if (IsRing) LengthM = RigDocument.Round(Arc * Math.PI / 180 * Radius, 1000);
+        if (IsStand) ZM = Math.Min(Math.Max(ZM, MinHeightM ?? 0), MaxHeightM ?? ZM);  // a stand goes as high as it does
     }
 
     /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.

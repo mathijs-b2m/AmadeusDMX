@@ -444,6 +444,24 @@ public class RigEditorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void AFixtureOnALightStandHangsCloserUnderItsThinTube()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        e.AddStand(Truss.StandPresets[0]);
+        var id = e.Selection!.Value.TrussId!;
+        var stand = Tr(e, id);
+        Assert.Equal("bridge", stand.Type);
+        Assert.True(stand.IsStand);
+        Assert.Equal(60, stand.MaxKg);
+        Assert.Equal(Math.Min(3, e.Doc.Stage.CeilingM - 0.5), stand.ZM, 6);
+        e.AddFixtures("dts/katana", "Extended", 1);
+        var k = e.Doc.Fixtures.Single(f => f.Truss == id);
+        Assert.Equal("under", k.Side);
+        Assert.Equal(stand.ZM - RigEditorModel.TubeDrop, k.ZM, 6);
+    }
+
+    [Fact]
     public void RotatingATrussTurnsItsFixturesWithIt()
     {
         using var w = new EditorWorkspace();

@@ -174,6 +174,9 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             UI.Separator(),
             UI.Note("Tower"),
             .. TowerLengths.Select(l => UI.Item($"{(int)l} m tower", () => editor.AddTruss(l, vertical: true))),
+            UI.Separator(),
+            UI.Note("Light stands (bar on tripods)"),
+            .. Truss.StandPresets.Select(p => UI.Item(p.Title, () => editor.AddStand(p))),
         ])).Tooltip("Add a truss or a tower"));
 
         row.Children.Add(UI.MenuButton(UI.Label("square.dashed", "Zone"), () => UI.Menu([
