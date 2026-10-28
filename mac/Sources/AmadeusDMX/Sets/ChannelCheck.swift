@@ -1,6 +1,7 @@
 // The DMX mapper's check, channel by channel on the real fixture: one channel sweeps slowly from 0 to 255 while
 // the others keep the light on and the head in the middle, and you say what the fixture does. That puts right what
-// the manual (or the layout a fixture was made from) has wrong; a colour wheel's colours are named on the way.
+// the manual (or the layout a fixture was made from) has wrong; a colour wheel's (or LED ring's) colours are named on
+// the way.
 import AmadeusKit
 import SwiftUI
 
@@ -56,6 +57,7 @@ struct ChannelCheck: View {
                     }
                 }
                 if channel.role == "color_wheel" { WheelNaming(slots: $mapping.wheel, probe: $probe, sweeping: $sweeping) }
+                if channel.role == "ring_color" { WheelNaming(slots: $mapping.ring, probe: $probe, sweeping: $sweeping, ring: true) }
                 HStack {
                     Button("Previous", systemImage: "chevron.left") { go(index - 1) }.disabled(index == 0)
                     Spacer()
@@ -101,7 +103,8 @@ struct ChannelCheck: View {
     }
 }
 
-/// The mapper's Colours…: the colour wheel's colours named and their values put right, without the whole check.
+/// The mapper's Colours…: the colour wheel's (or the ring's) colours named and their values put right, without the
+/// whole check.
 struct ColourWheelEditor: View {
     @Binding var mapping: FixtureMapping
     let index: Int
@@ -109,16 +112,19 @@ struct ColourWheelEditor: View {
     @Binding var sweeping: Bool
     let done: () -> Void
 
+    private var ring: Bool { mapping.channels[index].role == "ring_color" }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Colour Wheel").font(.title3.weight(.semibold))
+                    Text(ring ? "Ring Colour" : "Colour Wheel").font(.title3.weight(.semibold))
                     Text("channel \(mapping.channels[index].n)").foregroundStyle(.secondary)
                     Spacer()
                     Button("Done") { done() }.buttonStyle(.borderedProminent)
                 }
-                Text("The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
+                Text(ring ? "The light is on and the head in the middle. Show each colour of the ring round the lens, say what you see, and set its values. Name the one where the ring is off \"off\": the ring rests with the head. Sweep goes through the whole channel."
+                          : "The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Toggle(isOn: $sweeping) { Label(sweeping ? "Sweeping" : "Sweep", systemImage: sweeping ? "pause.fill" : "play.fill") }
@@ -126,18 +132,27 @@ struct ColourWheelEditor: View {
                     Slider(value: Binding(get: { Double(probe) }, set: { probe = Int($0.rounded()); sweeping = false }), in: 0...255)
                     Text("\(probe)").font(.body.monospacedDigit()).frame(width: 34, alignment: .trailing)
                 }
-                WheelNaming(slots: $mapping.wheel, probe: $probe, sweeping: $sweeping)
+                if ring {
+                    WheelNaming(slots: $mapping.ring, probe: $probe, sweeping: $sweeping, ring: true)
+                } else {
+                    WheelNaming(slots: $mapping.wheel, probe: $probe, sweeping: $sweeping)
+                }
             }
             .padding(16)
         }
     }
 }
 
-/// The colour wheel's colours: show each on the fixture, say what it is, put its values right.
+/// The colour wheel's (or a ring's) colours: show each on the fixture, say what it is, put its values right.
 private struct WheelNaming: View {
     @Binding var slots: [FixtureMapping.Slot]
     @Binding var probe: Int
     @Binding var sweeping: Bool
+    var ring = false             // a ring round the lens: "off" and "white" instead of the wheel's "open"
+
+    private var choices: [(String, [Double])] {
+        ring ? [("off", [0, 0, 0]), ("white", [1, 1, 1])] + Self.colours.dropFirst() : Self.colours
+    }
 
     static let colours: [(String, [Double])] = [
         ("open", [1, 1, 1]), ("red", [1, 0, 0]), ("orange", [1, 0.45, 0]), ("yellow", [1, 0.9, 0]),
@@ -160,10 +175,10 @@ private struct WheelNaming: View {
                         .frame(width: 14, height: 14).overlay(Circle().stroke(.secondary.opacity(0.5)))
                     Picker("", selection: Binding(get: { slots[i].name }, set: { name in
                         slots[i].name = name
-                        if let c = Self.colours.first(where: { $0.0 == name }) { slots[i].rgb = c.1 }
+                        if let c = choices.first(where: { $0.0 == name }) { slots[i].rgb = c.1 }
                     })) {
-                        if !Self.colours.contains(where: { $0.0 == slots[i].name }) { Text(slots[i].name).tag(slots[i].name) }
-                        ForEach(Self.colours, id: \.0) { Text($0.0).tag($0.0) }
+                        if !choices.contains(where: { $0.0 == slots[i].name }) { Text(slots[i].name).tag(slots[i].name) }
+                        ForEach(choices, id: \.0) { Text($0.0).tag($0.0) }
                     }
                     .labelsHidden().frame(width: 130)
                     Button("Remove", systemImage: "minus.circle") { slots.remove(at: i) }

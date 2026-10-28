@@ -5,7 +5,8 @@ gives it, lets you try values on the real fixture (the light test's raw mode, am
 roles into your copy of the definition: every fixture of that model plays by it.
 
 A channel is either played by the show (a role: dimmer, a colour, pan or tilt, optionally for one cell of a
-bar) or held at a value (an effect channel parked on a useful setting, a macro on a colour, a shutter open).
+bar, the colour of an LED ring or strip round a head's lens) or held at a value (an effect channel parked on a
+useful setting, a macro on a colour, a shutter open).
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ ROLES = [
     {"role": "magenta", "label": "Magenta", "group": "Colour", "cell": False, "light": True, "check": 0},
     {"role": "yellow", "label": "Yellow", "group": "Colour", "cell": False, "light": True, "check": 0},
     {"role": "color_wheel", "label": "Colour wheel", "group": "Colour", "cell": False, "light": False, "check": 0},
+    {"role": "ring_color", "label": "Ring colour", "group": "Colour", "cell": False, "light": False, "check": 0},
     {"role": "pan", "label": "Pan", "group": "Position", "cell": False, "light": False, "check": 128},
     {"role": "pan_fine", "label": "Pan (fine)", "group": "Position", "cell": False, "light": False, "check": 0},
     {"role": "tilt", "label": "Tilt", "group": "Position", "cell": False, "light": False, "check": 128},
@@ -57,6 +59,7 @@ CHECK = [
     {"answer": "Blue", "role": "blue"},
     {"answer": "White", "role": "white"},
     {"answer": "Colours change (wheel)", "role": "color_wheel"},
+    {"answer": "A ring or strip changes colour", "role": "ring_color"},
     {"answer": "Gobos change", "role": "hold", "attr": "gobo", "value": 0},
     {"answer": "Prism", "role": "hold", "attr": "prism", "value": 0},
     {"answer": "Focus", "role": "hold", "attr": "focus", "value": 128},
@@ -123,15 +126,23 @@ def describe(key: str, mode: str) -> dict:
         "checked": bool(made.get("checked")) or not made,
         "check": CHECK,
         "wheel": defn.get("color_wheel", {}).get("slots", []),
+        "ring": defn.get("ring_color", {}).get("slots", []),
     }
 
 
 def apply(
-    key: str, mode: str, kind: str, channels: list[dict], wheel: list[dict] | None = None, checked: bool = False
+    key: str,
+    mode: str,
+    kind: str,
+    channels: list[dict],
+    wheel: list[dict] | None = None,
+    checked: bool = False,
+    ring: list[dict] | None = None,
 ) -> list[str]:
     """Save a mode's channels ({"role", "cell", "value"} per channel, in order; a held one may get its "attr",
     what the check found it does) into your copy of the definition. `wheel`: the colour wheel's slots as named in
-    the check; `checked`: every channel was checked on the fixture. Returns the problems (nothing saved if any)."""
+    the check; `ring`: the ring colour channel's colours, the same way; `checked`: every channel was checked on the
+    fixture. Returns the problems (nothing saved if any)."""
     defn = copy.deepcopy(fxlib.get(key))
     defn.pop("key", None)
     if refusal(defn):
@@ -170,13 +181,16 @@ def apply(
     if not any(r in LIGHT for r in roles):
         problems.append("No channel lights it: give one a dimmer or a colour")
     slots = _slots(wheel, problems) if wheel else None
+    ring_slots = _slots(ring, problems) if ring else None
     if problems:
         return problems
 
-    if "color_wheel" in roles and (slots or "color_wheel" not in defn):
-        from amadeus.library import generic
+    from amadeus.library import generic
 
+    if "color_wheel" in roles and (slots or "color_wheel" not in defn):
         defn["color_wheel"] = generic.wheel(slots)
+    if "ring_color" in roles and (ring_slots or "ring_color" not in defn):
+        defn["ring_color"] = generic.ring(ring_slots)
     if "made" in defn:
         _follow_names(defn, mode, old, new, checked)
     defn["modes"][mode] = new
@@ -192,7 +206,7 @@ ATTR = re.compile(r"[a-z][a-z0-9_]{0,40}")
 
 
 def _slots(wheel: list[dict], problems: list[str]) -> list[dict]:
-    """The colour wheel's slots as named in the check or Colours…: {"name", "from", "to", "rgb"}, open first."""
+    """A colour channel's slots as named in the check or Colours…: {"name", "from", "to", "rgb"}, in DMX order."""
     out = []
     for s in wheel:
         try:

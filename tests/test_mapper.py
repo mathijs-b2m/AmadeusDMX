@@ -159,3 +159,40 @@ def test_tried_light_stays_under_the_brightness_limiter(library, tmp_path):
         assert list(buf[:5]) == [255, 128, 128, 40, 255]  # programs and unknowns as they are: they aren't light
     finally:
         limiter.use(before)
+
+
+def test_a_ring_round_the_lens_wears_the_beams_colour_and_rests_with_the_head(library, monkeypatch):
+    chans = [{"role": "pan"}, {"role": "tilt"}, {"role": "red"}, {"role": "green"}, {"role": "ring_color"}]
+    ring = [
+        {"name": "red", "from": 20, "to": 39, "rgb": [1, 0, 0]},
+        {"name": "off", "from": 0, "to": 19, "rgb": [0, 0, 0]},  # added last, lowest on the channel
+        {"name": "green", "from": 40, "to": 59, "rgb": [0, 1, 0]},
+        {"name": "white", "from": 60, "to": 79, "rgb": [1, 1, 1]},
+    ]
+    assert mapper.apply("test/effect", "5ch", "par", chans, ring=ring) == []
+    defn = fxlib.get("test/effect")
+    assert [s["name"] for s in defn["ring_color"]["slots"]] == ["off", "red", "green", "white"]
+    assert [s["name"] for s in mapper.describe("test/effect", "5ch")["ring"]] == ["off", "red", "green", "white"]
+
+    clock = [100.0]
+    monkeypatch.setattr(fxlib.time, "monotonic", lambda: clock[0])
+    fxlib._rings.clear()
+    fx = {"id": "ring1", "fixture": "test/effect", "mode": "5ch", "universe": 1, "address": 1, "x": 0.5}
+
+    def ring_at(t, **state):
+        clock[0] = t
+        buf = bytearray(512)
+        fxlib.patch(buf, fx, {"ring1": State(**state)})
+        return buf[4]
+
+    assert ring_at(100.0, dimmer=0.0) == 9  # resting: off
+    assert ring_at(100.1, dimmer=1.0, r=1.0) == 29  # the first hit: red at once
+    assert ring_at(100.3, dimmer=1.0, r=1.0, g=1.0, b=1.0) == 29  # a white flash doesn't blip it
+    assert ring_at(100.4, dimmer=1.0, r=1.0) == 29
+    assert ring_at(101.0, dimmer=0.0) == 29  # between notes it stays lit
+    assert ring_at(101.2, dimmer=1.0, g=1.0) == 29  # a new colour, not yet lasted
+    assert ring_at(102.3, dimmer=1.0, g=1.0) == 49  # …now it has
+    assert ring_at(106.0, dimmer=0.0) == 9  # the head rests: off
+
+    assert mapper.apply("test/effect", "5ch", "par", chans) == []  # mapped again without naming: the named colours stay
+    assert fxlib.get("test/effect")["ring_color"]["slots"][0]["name"] == "off"

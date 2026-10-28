@@ -285,7 +285,7 @@ def create_fixture(a: dict) -> dict:
         made = generic.from_chart(
             str(a.get("manufacturer", "")), str(a.get("model", "")), str(a.get("type", "")),
             list(a.get("channels") or []), str(a.get("mode", "")), a.get("colour_wheel") or None,
-            a.get("physical") or {}, str(a.get("source", "")),
+            a.get("physical") or {}, str(a.get("source", "")), a.get("ring_colour") or None,
         )  # fmt: skip
         if "problems" in made:
             raise ValueError("Not made: " + "; ".join(made["problems"]))
@@ -454,6 +454,12 @@ TOOLS = {
                                                 "name": {"type": "string"}, "from": {"type": "integer"},
                                                 "to": {"type": "integer"},
                                                 "rgb": {"type": "array", "items": {"type": "number"}}}}},
+                           "ring_colour": {"type": "array", "description": "a ring_color channel's colours (an LED "
+                                           "ring or strip round the lens), \"off\" with rgb [0,0,0] among them",
+                                           "items": {"type": "object", "properties": {
+                                               "name": {"type": "string"}, "from": {"type": "integer"},
+                                               "to": {"type": "integer"},
+                                               "rgb": {"type": "array", "items": {"type": "number"}}}}},
                            "physical": {"type": "object", "properties": {
                                "watts": {"type": "number"}, "beam_deg": {"type": "number"},
                                "beam_deg_max": {"type": "number"}, "pan_deg": {"type": "number"},

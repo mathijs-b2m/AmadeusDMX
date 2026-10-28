@@ -338,10 +338,12 @@ def from_chart(
     wheel_slots: list[dict] | None = None,
     physical: dict | None = None,
     source: str = "",
+    ring_slots: list[dict] | None = None,
 ) -> dict:
     """Make a fixture in your library from the DMX chart in its manual: each channel {"name", "role" (a role in
     mapper.ROLES, or "hold"), "value" (what a held channel stays at: shutter open, no strobe, gobo open), "cell"
-    (a bar's cell), "ranges" ([[from, to, what]], the chart's own words)}, in the chart's order. Like a fixture
+    (a bar's cell), "ranges" ([[from, to, what]], the chart's own words)}, in the chart's order; `wheel_slots` and
+    `ring_slots` the colour wheel's and an LED ring's colours as the chart gives them. Like a fixture
     made from a template, it is not checked yet: the Set page's channel check does that on the real fixture.
     Returns {"key", "mode"} or {"problems"} (then nothing is made)."""
     from amadeus.library import mapper
@@ -372,7 +374,7 @@ def from_chart(
          "attr": held(str(c.get("name", "")))}
         for c in channels
     ]  # fmt: skip
-    problems = mapper.apply(key, first, CHART_KINDS[type_], roles, wheel_slots)
+    problems = mapper.apply(key, first, CHART_KINDS[type_], roles, wheel_slots, ring=ring_slots)
     if problems:
         fxlib.path_of(key).unlink(missing_ok=True)
         fxlib.library.cache_clear()
@@ -412,6 +414,34 @@ def wheel(slots: list[dict] | None = None) -> dict:
         "slots": [
             {"name": name, "from": i * width, "to": (i + 1) * width - 1, "rgb": rgb}
             for i, (name, rgb) in enumerate(WHEEL_SLOTS)
+        ],
+    }
+
+
+RING_SLOTS = [
+    ("off", [0.0, 0.0, 0.0]),
+    ("red", [1.0, 0.0, 0.0]),
+    ("green", [0.0, 1.0, 0.0]),
+    ("blue", [0.0, 0.2, 1.0]),
+    ("yellow", [1.0, 0.9, 0.0]),
+    ("magenta", [1.0, 0.0, 0.8]),
+    ("cyan", [0.0, 0.9, 1.0]),
+    ("white", [1.0, 1.0, 1.0]),
+]
+
+
+def ring(slots: list[dict] | None = None) -> dict:
+    """The colours of an LED ring or strip round a head's lens, on one channel: the named slots, else a guess (off
+    and seven colours across 0–127) until they are named."""
+    if slots:
+        return {"verified": True, "slots": slots}
+    width = 128 // len(RING_SLOTS)
+    return {
+        "_note": "A guess at the ring's colours; name them with Colours… in the mapper.",
+        "verified": False,
+        "slots": [
+            {"name": name, "from": i * width, "to": (i + 1) * width - 1, "rgb": rgb}
+            for i, (name, rgb) in enumerate(RING_SLOTS)
         ],
     }
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 from functools import cache
 from pathlib import Path
 
@@ -262,6 +263,51 @@ def has_wheel(defn: dict) -> bool:
     return "color_wheel" in defn
 
 
+# ---------------------------------------------------------------- LED rings
+
+# An LED ring or strip round a head's lens, on one channel of colour macros (named in the mapper). It wears the
+# beam's colour while the head plays and goes off when it rests, but it plays the phrase, not the notes: it stays
+# lit a while after the beam went dark and takes a new colour only once that colour has lasted (no blips).
+RING_REST_S = 3.0  # dark this long: the head rests, the ring goes off
+RING_SETTLE_S = 1.0  # a colour lasts this long before the ring takes it (a white flash doesn't change it)
+_rings: dict[str, dict] = {}  # fixture id → {"lit": when its beam last shone, "slot", "want", "since"}
+
+
+def _ring_off(slot: dict) -> bool:
+    return max(slot["rgb"]) <= 0.0 or bool(OFF_WORDS.search(slot["name"]))
+
+
+def ring_colour(slots: list[dict], rgb, white: float = 0.0) -> dict | None:
+    """The ring's colour nearest the beam's (an unsaturated beam: its white, if it has one); None: none fits."""
+    lit = [s for s in slots if not _ring_off(s)]
+    if white > 0.5 or max(rgb) - min(rgb) < 0.2:
+        return min(lit, key=lambda s: max(s["rgb"]) - min(s["rgb"]), default=None) if lit else None
+    want = _chroma(rgb)
+    coloured = [s for s in lit if max(s["rgb"]) - min(s["rgb"]) >= 0.2]
+    return min(coloured, key=lambda s: sum((a - b) ** 2 for a, b in zip(_chroma(s["rgb"]), want)), default=None)
+
+
+def ring_value(defn: dict, fx_id: str, s, now: float | None = None) -> int:
+    """The ring colour channel's value for a head in state `s` (the middle of its slot)."""
+    slots = defn.get("ring_color", {}).get("slots", [])
+    if not slots:
+        return 0
+    now = time.monotonic() if now is None else now
+    r = _rings.setdefault(fx_id, {"lit": -1e9, "slot": None, "want": None, "since": now})
+    if s.dimmer > 0.02 and max(s.r, s.g, s.b, s.white) > 0.02:
+        r["lit"] = now
+        want = ring_colour(slots, (s.r, s.g, s.b), s.white)
+        if want is not None and want != r["want"]:
+            r["want"], r["since"] = want, now
+        if r["want"] is not None and (r["slot"] is None or now - r["since"] >= RING_SETTLE_S):
+            r["slot"] = r["want"]
+    if r["slot"] is None or now - r["lit"] > RING_REST_S:
+        r["slot"] = None
+        off = next((x for x in slots if _ring_off(x)), None)
+        return (off["from"] + off["to"]) // 2 if off else 0
+    return (r["slot"]["from"] + r["slot"]["to"]) // 2
+
+
 # ---------------------------------------------------------------- patching
 
 
@@ -400,6 +446,8 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
             v = defn["laser"]["color_modes"][first.lcolor]  # laser multicolour modes
         elif a == "color_wheel":
             v = (slot["from"] + slot["to"]) // 2
+        elif a == "ring_color":
+            v = ring_value(defn, fx.get("id", ""), first)
         elif a == "zoom" and "tight" in c:  # the show's zoom between the lens's tightest and widest
             v = round(c["tight"] + (c["wide"] - c["tight"]) * zoom_of(s))
         elif a.startswith("laser_") and "laser" in defn:

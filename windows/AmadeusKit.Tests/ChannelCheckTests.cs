@@ -84,6 +84,36 @@ public class ChannelCheckTests
     }
 
     [Fact]
+    public void ARingGetsItsOwnUsualColoursAndIsSavedLikeTheWheel()
+    {
+        var m = Mapping() with { Wheel = [] };
+        Assert.Empty(m.Ring);  // no "ring" from the engine: none
+        var a = new FixtureMapping.Answer("Ring colours change", "ring_color", null, null);
+        var answered = m.Answered(a, 3);
+        Assert.Equal(8, answered.Ring.Count);
+        Assert.Equal(("off", 0, 15), (answered.Ring[0].Name, answered.Ring[0].From, answered.Ring[0].To));
+        Assert.Equal("white", answered.Ring[7].Name);
+        Assert.Empty(answered.Wheel);  // the wheel is left alone
+        Assert.False(SetupAPI.MappingBody(answered, false, false, false).ContainsKey("ring"));
+        Assert.True(SetupAPI.MappingBody(answered, false, false, true).ContainsKey("ring"));
+        Assert.True(SetupAPI.MappingBody(answered, true, false, false).ContainsKey("ring"));
+        Assert.False(SetupAPI.MappingBody(Mapping(), true, true, true).ContainsKey("ring"));  // no ring_color channel
+
+        var mm = new MapperModel { Mapping = answered with { Ring = [] } };
+        Assert.True(mm.IsRing(3) && !mm.IsRing(2));
+        Assert.Equal(7, mm.OpenWheel(ring: true));
+        Assert.Equal(8, mm.Mapping!.Ring.Count);
+        mm.SetSlot(0, sl => sl with { Name = "red" }, ring: true);
+        Assert.Equal("red", mm.Mapping.Ring[0].Name);
+
+        var decoded = J.DecodeOrThrow(J.Utf8("""
+            {"key":"k","name":"n","mode":"m","kind":"moving_head","kinds":{},"roles":[],"channels":[],"plays":true,"mapped":true,"refusal":"",
+             "ring":[{"name":"off","from":0,"to":9,"rgb":[0,0,0]}]}
+            """), FixtureMapping.From);
+        Assert.Equal(("off", 9), (decoded.Ring[0].Name, decoded.Ring[0].To));
+    }
+
+    [Fact]
     public void AnOlderEngineWithoutTheCheckStillDecodes()
     {
         var m = J.DecodeOrThrow(J.Utf8("""

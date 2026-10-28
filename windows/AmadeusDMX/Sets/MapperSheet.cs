@@ -32,8 +32,9 @@ public sealed class MapperSheet
     bool _checking;                      // a channel is being checked (_check.Index)
     CancellationTokenSource? _checkLoop;
     bool _checkedAll;                    // every channel was checked: saved as checked
-    int? _colours;                       // the colour wheel channel whose colours are being named
+    int? _colours;                       // the colour wheel (or ring colour) channel whose colours are being named
     IReadOnlyList<FixtureMapping.Slot> _loadedWheel = [];   // the wheel as loaded: saved again only when changed
+    IReadOnlyList<FixtureMapping.Slot> _loadedRing = [];
 
     static ContentControl Host() => new()
     {
@@ -188,6 +189,7 @@ public sealed class MapperSheet
         {
             _m.Mapping = await _model.Api.Mapping(_target.Key, _target.Mode);
             _loadedWheel = _m.Mapping.Wheel;
+            _loadedRing = _m.Mapping.Ring;
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _error = e.Message; }
         Header();
@@ -202,7 +204,8 @@ public sealed class MapperSheet
         Footer();
         try
         {
-            _problemList = await _model.Api.SaveMapping(m, _checkedAll, wheel: !FixtureMapping.SameWheel(m.Wheel, _loadedWheel));
+            _problemList = await _model.Api.SaveMapping(m, _checkedAll, wheel: !FixtureMapping.SameWheel(m.Wheel, _loadedWheel),
+                                                          ring: !FixtureMapping.SameWheel(m.Ring, _loadedRing));
             if (_problemList.Count == 0)
             {
                 StopTrying();
@@ -233,11 +236,11 @@ public sealed class MapperSheet
         StartProbing();
     }
 
-    /// The colour wheel's colours, shown one by one on the fixture (the light on, the head in the middle).
+    /// The colour wheel's (or the ring's) colours, shown one by one on the fixture (the light on, the head in the middle).
     void OpenColours(int i)
     {
         StopTrying();
-        _check.Probe = _m.OpenWheel();
+        _check.Probe = _m.OpenWheel(ring: _m.IsRing(i));
         _check.Sweeping = false;
         _colours = i;
         StartProbing();
@@ -418,17 +421,19 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
         return box;
     }
 
-    /// Which cell of a bar it belongs to, for a role that can be a cell's; a colour wheel's colours.
+    /// Which cell of a bar it belongs to, for a role that can be a cell's; a colour wheel's (or a ring's) colours.
     void Cell()
     {
         var role = m.Mapping!.Roles.FirstOrDefault(r => r.RoleName == Channel.Role);
         _cell.Content = role?.Cell == true
             ? Form.Stepper(Channel.Cell, 0, 64, v => v == 0 ? "Whole" : $"Cell {v}", v => m.SetCell(index, v))
                 .Tooltip("Which cell of a bar it belongs to (Whole: the fixture as one)")
-            : Channel.Role == "color_wheel"
+            : Channel.Role is "color_wheel" or "ring_color"
                 ? UI.Button("Colours…", () => colours?.Invoke()).Disabled(colours is null)
                     .Tooltip(colours is null ? "Give the fixture a start address and a DMX output to see its colours"
-                                             : "Show each colour of the wheel on the fixture, name it and set its values")
+                             : Channel.Role == "ring_color"
+                             ? "Show each colour of the ring on the fixture, name it and set its values (name the one where it is off \"off\")"
+                             : "Show each colour of the wheel on the fixture, name it and set its values")
                 : null;
     }
 

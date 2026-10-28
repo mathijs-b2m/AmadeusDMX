@@ -13,7 +13,8 @@ POST /api/test-light         {"fixture": id, "rig": {...}, "on": bool}: keep tha
                              "raw": [v, …] sends those values to its channels instead (the DMX mapper)
 GET  /api/fixture/map?key=…&mode=…   a mode channel by channel, with the library's names and ranges (DMX mapper)
 POST /api/fixture/map        {"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}: save a hand mapping
-                             ("wheel": colour wheel slots and "checked": true from the channel-by-channel check)
+                             ("wheel": colour wheel slots, "ring": a ring colour channel's, "checked": true from
+                             the channel-by-channel check)
 GET  /api/fixture/templates?type=spot&channels=9   common layouts to make a fixture without a brand from
 POST /api/fixture/new        {"manufacturer", "model", "template", "channels", …}: make it in your library
 POST /api/fixture/gdtf       {"name", "data": base64 .gdtf}: convert a GDTF file into your library (key, mode)

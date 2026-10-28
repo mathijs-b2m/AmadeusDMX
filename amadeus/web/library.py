@@ -97,14 +97,14 @@ def get_mapping(req):
 
 
 def save_mapping(req):
-    """{"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}: save a hand mapping (nothing saved if
-    there are problems)."""
+    """{"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}, optionally "wheel" and "ring" (the colour
+    wheel's and the ring's named colours) and "checked": save a hand mapping (nothing saved if there are problems)."""
     from amadeus.library import mapper
 
     b = req.body()
     checked = bool(b.get("checked"))
     problems = mapper.apply(
-        b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])), b.get("wheel"), checked
+        b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])), b.get("wheel"), checked, b.get("ring")
     )
     if not problems:
         event(f"{req.client} mapped {b['key']} {b['mode']} by hand{' (checked on the fixture)' if checked else ''}")

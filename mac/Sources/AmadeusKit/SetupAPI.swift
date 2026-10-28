@@ -434,13 +434,16 @@ public struct SetupAPI: Sendable {
     }
 
     /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it). `checked`:
-    /// every channel was checked on the fixture; `wheel`: the colour wheel's colours were named (saved with it, as
-    /// they are after a check too).
-    public func saveMapping(_ m: FixtureMapping, checked: Bool = false, wheel: Bool = false) async throws -> [String] {
+    /// every channel was checked on the fixture; `wheel`, `ring`: the colour wheel's or the ring's colours were named
+    /// (saved with it, as they are after a check too).
+    public func saveMapping(_ m: FixtureMapping, checked: Bool = false, wheel: Bool = false, ring: Bool = false) async throws -> [String] {
         let chans = m.channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value, "attr": $0.attr] as [String: Any] }
         var body: [String: Any] = ["key": m.key, "mode": m.mode, "kind": m.kind, "channels": chans, "checked": checked]
         if checked || wheel, m.channels.contains(where: { $0.role == "color_wheel" }), !m.wheel.isEmpty {
             body["wheel"] = m.wheel.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
+        }
+        if checked || ring, m.channels.contains(where: { $0.role == "ring_color" }), !m.ring.isEmpty {
+            body["ring"] = m.ring.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
         }
         let r: SaveResult = try await post("api/fixture/map", body)
         return r.problems ?? []
@@ -570,7 +573,7 @@ public struct FixtureMapping: Decodable, Sendable {
         public var attr: String?
         public var value: Int?
     }
-    /// A colour of the wheel: its DMX values and how it looks.
+    /// A colour of the wheel (or of a ring round the lens): its DMX values and how it looks.
     public struct Slot: Decodable, Sendable, Hashable, Identifiable {
         public var name: String
         public var from: Int
@@ -615,9 +618,10 @@ public struct FixtureMapping: Decodable, Sendable {
     public var checked: Bool
     public var check: [Answer]
     public var wheel: [Slot]
+    public var ring: [Slot]              // the colours of an LED ring or strip round the lens (a ring_color channel)
 
     enum CodingKeys: String, CodingKey {
-        case key, name, mode, kind, kinds, roles, channels, plays, mapped, refusal, made, checked, check, wheel
+        case key, name, mode, kind, kinds, roles, channels, plays, mapped, refusal, made, checked, check, wheel, ring
     }
 
     public init(from decoder: Decoder) throws {
@@ -636,6 +640,7 @@ public struct FixtureMapping: Decodable, Sendable {
         checked = try c.decodeIfPresent(Bool.self, forKey: .checked) ?? true
         check = try c.decodeIfPresent([Answer].self, forKey: .check) ?? []
         wheel = try c.decodeIfPresent([Slot].self, forKey: .wheel) ?? []
+        ring = try c.decodeIfPresent([Slot].self, forKey: .ring) ?? []
     }
 
     /// The values sent while channel `probe` is checked at `value`: the others hold the light on and the head in
@@ -663,11 +668,18 @@ public struct FixtureMapping: Decodable, Sendable {
         if a.role == "color_wheel", wheel.isEmpty {  // the usual cheap wheel until its colours are named
             wheel = Self.usualWheel
         }
+        if a.role == "ring_color", ring.isEmpty { ring = Self.usualRing }
     }
 
     public static let usualWheel: [Slot] = [
         ("open", [1, 1, 1]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
         ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("orange", [1, 0.45, 0]),
+    ].enumerated().map { i, s in Slot(name: s.0, from: i * 16, to: i * 16 + 15, rgb: s.1) }
+
+    /// A guess at a ring's colours until they are named (amadeus/library/generic.py RING_SLOTS).
+    public static let usualRing: [Slot] = [
+        ("off", [0, 0, 0]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
+        ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("white", [1, 1, 1]),
     ].enumerated().map { i, s in Slot(name: s.0, from: i * 16, to: i * 16 + 15, rgb: s.1) }
 }
 

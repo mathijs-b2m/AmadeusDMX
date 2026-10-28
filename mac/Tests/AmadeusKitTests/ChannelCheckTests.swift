@@ -42,11 +42,19 @@ private func mapping() throws -> FixtureMapping {
     #expect(m.channels[3].role == "hold" && m.channels[3].attr == "channel_4")
 }
 
+@Test func aRingRoundTheLensGetsItsColoursToName() throws {
+    var m = try mapping()
+    #expect(m.ring.isEmpty)
+    m.answer(.init(answer: "A ring or strip changes colour", role: "ring_color"), for: 3)
+    #expect(m.channels[3].role == "ring_color" && m.ring == FixtureMapping.usualRing && m.ring[0].name == "off")
+    #expect(m.wheel.count == 2)  // the wheel's own colours stay
+}
+
 @Test func anOlderEngineWithoutTheCheckStillDecodes() throws {
     let json = #"""
     {"key":"k","name":"n","mode":"m","kind":"par","kinds":{},"roles":[{"role":"dimmer","label":"Dimmer","group":"Intensity","cell":true}],
      "channels":[],"plays":false,"mapped":false,"refusal":""}
     """#
     let m = try JSONDecoder().decode(FixtureMapping.self, from: Data(json.utf8))
-    #expect(!m.made && m.checked && m.check.isEmpty && m.roles[0].check == nil)
+    #expect(!m.made && m.checked && m.check.isEmpty && m.roles[0].check == nil && m.ring.isEmpty)
 }
