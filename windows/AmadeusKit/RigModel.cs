@@ -160,10 +160,10 @@ public sealed record Truss
 /// A fixture definition (fixtures/BRAND/MODEL.json), the parts placement and drawing need.
 public sealed class FixtureDefinition
 {
-    public sealed record PhysicalInfo(double? BeamDeg, double? BeamDegMax, double? Lumens, double[]? SizeMM)
+    public sealed record PhysicalInfo(double? BeamDeg, double? BeamDegMax, double? Lumens, double[]? SizeMM, double? FieldDeg = null)
     {
         public static PhysicalInfo From(JsonElement c) => new(J.Val(c, "beam_deg", J.Double), J.Val(c, "beam_deg_max", J.Double),
-            J.Val(c, "lumens", J.Double), J.Ref(c, "size_mm", J.ArrayOf(J.Double)));
+            J.Val(c, "lumens", J.Double), J.Ref(c, "size_mm", J.ArrayOf(J.Double)), J.Val(c, "field_deg", J.Double));
     }
 
     public string Manufacturer { get; init; } = "";
@@ -571,6 +571,11 @@ public static class RigElements
                     Rot = f.RotDeg,
                     Truss = f.Truss,
                 };
+                if (kind == FixtureKind.Head)
+                {
+                    info.Flux = BeamLight.Flux(def?.Physical?.Lumens);
+                    if (def?.Physical?.FieldDeg is { } fd && fd > info.BeamDeg) info.Field = fd / info.BeamDeg;
+                }
                 if (kind == FixtureKind.Head) info.Up = f.Up;
                 info.Size = def is null ? null : def.Size.ToArray();
                 if (n > 1) { info.Cells = n; info.Length = length; }

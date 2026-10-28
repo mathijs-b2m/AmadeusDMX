@@ -298,8 +298,21 @@ public sealed class SetView(AppModel model, MainWindow window)
                 "Its DMX mode, universe and address, and its name, are edited here. Select several to patch them in a row.");
             return;
         }
-        _patchInspector = new PatchInspector(_selection, SetLayout.Fixtures(_layout), Definition, Change, RenameFixture, _typing);
+        _patchInspector = new PatchInspector(_selection, SetLayout.Fixtures(_layout), Definition, Change, RenameFixture, _typing, SaveLens);
         _inspector.Content = _patchInspector.Build();
+    }
+
+    /// A fixture's lens, saved into your copy of it: its definition read again, its beams follow.
+    async Task<IReadOnlyList<string>> SaveLens(string key, double beamDeg, double? zoomTo, double? lumens)
+    {
+        if (!await model.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+        var problems = await model.Api.SaveLens(key, beamDeg, zoomTo, lumens);
+        if (problems.Count == 0)
+        {
+            _names[key] = model.Workspace?.Definition(key);
+            Flash($"Saved the lens of {_names[key]?.Name ?? key}");
+        }
+        return problems;
     }
 
     void ShowFlash()

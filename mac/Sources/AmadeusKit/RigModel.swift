@@ -216,6 +216,8 @@ public struct FixtureDefinition: Decodable, Sendable {
         return max(1, heads.count)
     }
     public func channels(_ mode: String) -> Int { modes[mode]?.count ?? 0 }
+    /// A zoom channel in any mode: the lens has a tightest and a widest beam.
+    public var hasZoom: Bool { modes.values.joined().contains { $0["attr"]?.string == "zoom" } }
     /// Does the show light anything in this mode? (amadeus/library/mapper.py `plays`) A fixture that plays
     /// nothing (only effect, macro or unnamed channels) is one for the DMX mapper.
     public func plays(_ mode: String) -> Bool {

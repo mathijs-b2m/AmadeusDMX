@@ -228,3 +228,14 @@ def test_the_visualiser_draws_the_ring_in_the_colour_the_dmx_gives_it(library, m
     assert buf[4] == 29  # the DMX, asked at the same moment, agrees
     monkeypatch.setattr(fxlib.time, "monotonic", lambda: 60.0)
     assert ring_of("ring1", feed.fixture_fields({e: State() for e in ids})) is None  # resting: off
+
+
+def test_a_fixtures_lens_is_set_as_its_manual_gives_it(library):
+    key = "beamz/fuze75s-spot"
+    assert fxlib.set_lens(key, 0.2) and fxlib.set_lens(key, 10, 8)  # problems: nothing saved
+    assert fxlib.set_lens(key, 6.5, 30, 2200) == []
+    phys = fxlib.get(key)["physical"]
+    assert phys["beam_deg"] == 6.5 and phys["beam_deg_max"] == 30 and phys["lumens"] == 2200
+    assert fxlib.set_lens(key, 4) == []  # no zoom range any more; the light stays as it was
+    phys = fxlib.get(key)["physical"]
+    assert phys["beam_deg"] == 4 and "beam_deg_max" not in phys and phys["lumens"] == 2200

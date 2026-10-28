@@ -11,7 +11,9 @@ public sealed class PatchInspector(
     /// Change the set's fixtures (the action gets them to change); saved at once.
     Action<string, Action<List<Dictionary<string, JSONValue>>>> apply,
     Action<string, string> rename,
-    PatchInspector.Typing typing)
+    PatchInspector.Typing typing,
+    /// Saves a fixture's lens (key, beam angle, widest, lumens): the problems; then the definition is read again.
+    Func<string, double, double?, double?, Task<IReadOnlyList<string>>>? saveLens = null)
 {
     readonly Patch _patch = new(fixtures, Patch.ChannelsFrom(definition));
     readonly string _key = string.Join("\n", ids.Order(StringComparer.Ordinal));
@@ -183,6 +185,8 @@ public sealed class PatchInspector(
             Form.Section(def?.Name ?? key, [Form.Row("Name", UI.HStack(8, _name.MinWidth(180), renameButton)), Form.Row("DMX mode", mode)]),
             Form.Section("DMX patch", patch),
         };
+        if (def is not null && saveLens is not null && def.ElementKind is not (FixtureKind.Smoke or FixtureKind.Laser))
+            sections.Add(LensSection(key, def, saveLens));
         if (def?.IsMoving == true)
             sections.Add(Form.Section("Motion",
             [
@@ -192,6 +196,47 @@ public sealed class PatchInspector(
                     v => Set("Invert Tilt", id, x => { if (v) x["tilt_invert"] = true; else x.Remove("tilt_invert"); }))),
             ]));
         return sections;
+    }
+
+    /// A fixture's lens and light as its manual gives them (POST /api/fixture/lens): the beam angle (with a zoom: its
+    /// tightest and widest) and the lumens. The show's zoom and the visualisers' beams follow them; every fixture of
+    /// this model in your sets changes with it (Swift: LensSection).
+    static FrameworkElement LensSection(string key, FixtureDefinition def, Func<string, double, double?, double?, Task<IReadOnlyList<string>>> save)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var zoom = def.Modes.Values.Any(m => m.Any(c => c.GetValueOrDefault("attr")?.String == "zoom"));
+        string Num(double? v) => v is { } x && x > 0 ? x.ToString("0.#", inv) : "";
+        double? Parse(TextBox t) => double.TryParse(t.Text.Trim(), System.Globalization.NumberStyles.Float, inv, out var v) && v > 0 ? v : null;
+        var beam = new TextBox { Text = Num(def.Physical?.BeamDeg ?? 25), Width = 90 };
+        beam.Tooltip("The manual's beam angle: where the light is half the centre's (not the wider field angle)");
+        var wide = new TextBox { Text = Num(def.Physical?.BeamDegMax), PlaceholderText = "no zoom range", Width = 120 };
+        wide.Tooltip("How wide the zoom opens: the manual gives it as e.g. 4°–40°");
+        var lumens = new TextBox { Text = Num(def.Physical?.Lumens), PlaceholderText = "unknown", Width = 120 };
+        lumens.Tooltip("Lumens from the manual: the visualiser draws the beam as bright as its light over its width");
+        var problems = UI.VStack(6);
+        var saving = false;
+        var saveButton = UI.Button("Save", async () =>
+        {
+            if (saving) return;
+            if (Parse(beam) is not { } b) { problems.Children.Clear(); problems.Children.Add(Form.Note("exclamationmark.triangle.fill", "Give the beam angle in degrees.", Tint.Orange)); return; }
+            saving = true;
+            try
+            {
+                var found = await save(key, b, zoom ? Parse(wide) : null, Parse(lumens));
+                problems.Children.Clear();
+                foreach (var p in found) problems.Children.Add(Form.Note("exclamationmark.triangle.fill", p, Tint.Orange));
+            }
+            catch (Exception e) { problems.Children.Clear(); problems.Children.Add(Form.Note("exclamationmark.triangle.fill", e.Message, Tint.Orange)); }
+            finally { saving = false; }
+        }).Prominent();
+        return Form.Section("Lens",
+        [
+            Form.Row(zoom ? "Beam angle, tightest (°)" : "Beam angle (°)", beam),
+            zoom ? Form.Row("Beam angle, widest (°)", wide) : null,
+            Form.Row("Light output (lm)", lumens),
+            saveButton,
+            problems,
+        ], $"For every {def.Name} in your sets. The visualiser draws its beam this wide, as bright as its light allows, dimmer the further it throws.");
     }
 
     // MARK: several

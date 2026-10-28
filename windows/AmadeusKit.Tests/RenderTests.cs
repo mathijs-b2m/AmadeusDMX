@@ -284,8 +284,10 @@ public class RenderTests
         r.PrepareFrame(f, StageRenderer.Now(), new(1280, 720));
         Assert.Equal(1280, f.Width);
         Assert.Equal(720, f.Height);
-        // 4 heads (one through a prism: 3 rays, one with a gobo: a gobo beam), 8 cells, 2 pars, the strobe and the smoke plume
-        Assert.Equal(3 + 2 + 8 + 2 + 1 + 1, f.Beams.Count);
+        // 4 heads (one through a prism: 3 rays, one with a gobo: a gobo beam; a head's ray is two cones, its field and its
+        // core, BeamLight), 8 cells, 2 pars, the strobe and the smoke plume
+        Assert.Equal((3 + 2) * 2 + 8 + 2 + 1 + 1, f.Beams.Count);
+        Assert.Contains(f.Beams, b => b.Extra.Y == BeamLight.RefRadius);   // a head's shaft: its light over its width
         Assert.Single(f.GoboBeams);
         Assert.Single(f.GoboDecals);   // it lands on the floor
         Assert.Equal(14, f.Lines.Count);   // 7 laser beams: a glow and a core each
@@ -316,7 +318,9 @@ public class RenderTests
         Assert.True(b.DirRadius.W > b.Wheel.W && float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0);
         var d = Assert.Single(f.GoboDecals);
         Assert.Equal(b.ApexLen, d.ApexLen);
-        Assert.Equal(b.Color.W * 0.75f, d.Color.W, 5);
+        // the shaft as bright as its light at half its width, the picture as its light over its size (BeamLight)
+        float R = b.DirRadius.W, r0 = b.Wheel.W;
+        Assert.Equal(b.Color.W / BeamLight.Gain((r0 + R) / 2) * 0.75f * BeamLight.Gain(R), d.Color.W, 5);
         Assert.Equal((b.DirRadius.W - b.Wheel.W) / b.ApexLen.W, d.DirK.W, 5);
         // half a turn a second on the renderer's clock: a tenth of a second later it has turned 0.1π further
         var before = b.Axis.W;
@@ -328,7 +332,7 @@ public class RenderTests
         var r2 = new StageRenderer { Input = () => (plain, frame) };
         r2.PrepareFrame(f, now, new(800, 600));
         Assert.Empty(f.GoboBeams);
-        Assert.Equal(3 + 3 + 8 + 2 + 1 + 1, f.Beams.Count);
+        Assert.Equal((3 + 3) * 2 + 8 + 2 + 1 + 1, f.Beams.Count);
     }
 
     [Fact]

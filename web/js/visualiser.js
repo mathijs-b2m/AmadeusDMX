@@ -172,14 +172,38 @@ function beamEnd(pos, d, st, nearCam = 4) {
   return { p: [pos[0] + d[0] * t, pos[1] + d[1] * t, pos[2] + d[2] * t], t, surf };
 }
 
-function drawBeam(P, from, to, len, beamDeg, c, a) {
+// How bright a head's beam is drawn (mac/Sources/AmadeusKit/BeamLight.swift, windows/AmadeusKit/BeamLight.cs): at its
+// real beam angle with a faint field cone round it; its light is the engine's flux. A shaft in the haze is as bright as
+// its light over its width there (fading as it widens with the throw), a spot as bright as its light over its size;
+// both against a reference beam, a 4° beam 4 m out (gain 1).
+const BeamLight = {
+  refRadius: 4 * Math.tan(2 * Math.PI / 180),
+  fieldGlow: 0.12,  // the field cone's light against the beam's own
+  maxGain: 3,       // the most a narrow beam close to its lens is brightened
+  field: 1.8,       // field angle over beam angle when the fixture doesn't say
+  haze: 0.3,        // the haze shaft's strength (the spot's is 0.8)
+  fieldDeg: (beamDeg, field) => Math.min(beamDeg * field, beamDeg + 30),
+  gain: radius => Math.min(BeamLight.maxGain, BeamLight.refRadius / Math.max(radius, 0.02)),
+  // a head's shaft along its length (0 at the lens .. 1 at the end): its light over its width there, a little lost
+  // in the haze on the way, softly ending (the Mac's beam shader)
+  stops(len, R, r0 = 0.04) {
+    return [0, 0.25, 0.5, 0.75, 0.875, 1].map(u => {
+      const x = Math.min(1, Math.max(0, (u - 0.75) / 0.25)), soft = 1 - 0.5 * x * x * (3 - 2 * x);
+      return [u, BeamLight.gain(r0 + (R - r0) * u) * Math.exp(-u * len * 0.035) * soft];
+    });
+  },
+};
+
+// stops: [[0..1 along, alpha factor], …] for a shaft's own fade (a head's, BeamLight); without: the plain fade
+function drawBeam(P, from, to, len, beamDeg, c, a, stops = null) {
   const s = P(from), e = P(to);
   if (!s || !e) return;
   const rEnd = Math.max(2, len * Math.tan(beamDeg * Math.PI / 360) * e[3]);
   const rStart = Math.max(1.5, 0.05 * s[3]);
   const dx = e[0] - s[0], dy = e[1] - s[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
   const g = ctx.createLinearGradient(s[0], s[1], e[0], e[1]);
-  g.addColorStop(0, rgb(c, 0.75 * a)); g.addColorStop(1, rgb(c, 0.12 * a));
+  if (stops) stops.forEach(([u, k]) => g.addColorStop(u, rgb(c, Math.min(1, k * a))));
+  else { g.addColorStop(0, rgb(c, 0.75 * a)); g.addColorStop(1, rgb(c, 0.12 * a)); }
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(s[0] + nx * rStart, s[1] + ny * rStart); ctx.lineTo(e[0] + nx * rEnd, e[1] + ny * rEnd);
@@ -442,19 +466,33 @@ function draw() {
         const r = [0, 1, 2].map(m => d[m] + off * (Math.cos(a) * u[m] / ul + Math.sin(a) * v[m] / ul));
         const rl = Math.hypot(...r); return r.map(x => x / rl);
       }) : [d];
-      // the real lens with the zoom the show sends (wider: same light over a bigger area, softer); frost: wide
+      // the real lens with the zoom the show sends (the same light spread wider: dimmer, BeamLight); frost: wide, soft
       const frost = fxName === "frost", zoom = frame.zoom?.[i] ?? 0;
       const lens = fx.beam_deg + ((fx.beam_wide ?? fx.beam_deg) - fx.beam_deg) * zoom;
-      const spread = frost ? Math.max(fx.beam_wide ?? 25, 25) * 1.2 : lens * (gobo ? 1.25 : 1.6);
-      const strength = frost ? (fx.output_wide ?? 1) : (fx.output ?? 1) + ((fx.output_wide ?? 1) - (fx.output ?? 1)) * zoom;
-      const alpha = (frost ? dim * 0.45 : rays.length > 1 ? dim * 0.6 : dim) * density * strength;
+      const light = (rays.length > 1 ? dim * 0.6 : dim) * density * (fx.flux ?? 1);
+      const tan = deg => Math.tan(deg * Math.PI / 360);
       rays.forEach(rd => {
-        const end = beamEnd(fx.pos, rd, st);
-        const b = drawBeam(P, fx.pos, end.p, end.t, spread, c, alpha);
-        if (b && end.surf !== "air") {
-          const wobble = gobo && gobo[4] ? Math.sin(frame.t * gobo[4] * 2 * Math.PI) * 0.25 : 0;
-          const pic = gobo ? (gobo[2] < 0.5 ? gobo[0] : gobo[1]) : -1;  // the wheel between two: the nearer one
-          spots.push({ ...b, c, dim: alpha, surf: end.surf, d: rd, gobo: pic, turn: (gobo?.[5] ? 0 : goboTurn[i] || 0) + wobble });
+        const end = beamEnd(fx.pos, rd, st), lands = end.surf !== "air";
+        if (gobo) {
+          // a gobo is projected with the lens as it is: its shaft as bright as its light at half its width, its
+          // picture as its light over its size
+          const deg = Math.max(lens, 1), R = Math.max(0.06, end.t * tan(deg)), a = light * 1.1;
+          const b = drawBeam(P, fx.pos, end.p, end.t, deg, c, a * BeamLight.gain((0.05 + R) / 2));
+          if (b && lands) {
+            const wobble = gobo[4] ? Math.sin(frame.t * gobo[4] * 2 * Math.PI) * 0.25 : 0;
+            const pic = gobo[2] < 0.5 ? gobo[0] : gobo[1];  // the wheel between two: the nearer one
+            spots.push({ ...b, c, dim: a * 0.75 * BeamLight.gain(R), surf: end.surf, d: rd, gobo: pic,
+                         turn: (gobo[5] ? 0 : goboTurn[i] || 0) + wobble });
+          }
+          return;
+        }
+        // the field cone first (a faint glow round it), then the core at the beam angle
+        const beamDeg = frost ? Math.max(fx.beam_wide ?? 25, 25) : Math.max(lens, 0.5);
+        const field = frost ? 1.4 : (fx.field ?? BeamLight.field);
+        for (const [deg, k] of [[BeamLight.fieldDeg(beamDeg, field), BeamLight.fieldGlow], [beamDeg, 1]]) {
+          const R = Math.max(0.03, end.t * tan(deg));
+          const b = drawBeam(P, fx.pos, end.p, end.t, deg, c, light * k * BeamLight.haze, BeamLight.stops(end.t, R));
+          if (b && lands) spots.push({ ...b, c, dim: light * k * 0.8 * BeamLight.gain(R), surf: end.surf, d: rd, gobo: -1 });
         }
       });
     } else if (fx.kind === "laser") {

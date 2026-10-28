@@ -265,8 +265,9 @@ public sealed record FixtureInfo
     public string Mount { get; set; }
     public double BeamDeg { get; set; }
     public double BeamWide { get; set; }
-    public double Output { get; set; } = 1;
-    public double OutputWide { get; set; } = 1;
+    /// Its light against the reference beam (BeamLight), and its field angle as a multiple of the beam angle.
+    public double Flux { get; set; } = 1;
+    public double Field { get; set; } = BeamLight.Field;
     // drawing facts (newer engines): the fixture it belongs to, its housing, rotation, cells, static aim
     public string? Fixture { get; set; }
     public string? Body { get; set; }
@@ -297,8 +298,8 @@ public sealed record FixtureInfo
             J.Ref(c, "label", J.String) ?? id, new Vec3(p[0], p[1], p.Length > 2 ? p[2] : 0),
             J.Ref(c, "mount", J.String) ?? "stand", beamDeg, J.Val(c, "beam_wide", J.Double) ?? beamDeg)
         {
-            Output = J.Val(c, "output", J.Double) ?? 1,
-            OutputWide = J.Val(c, "output_wide", J.Double) ?? 1,
+            Flux = J.Val(c, "flux", J.Double) ?? 1,
+            Field = J.Val(c, "field", J.Double) ?? BeamLight.Field,
             Fixture = J.Ref(c, "fixture", J.String),
             Body = J.Ref(c, "body", J.String),
             Rot = J.Val(c, "rot", J.Double) ?? 0,
@@ -316,7 +317,7 @@ public sealed record FixtureInfo
     {
         ["id"] = Id, ["kind"] = Kind.RawValue(), ["label"] = Label,
         ["pos"] = JSONValue.Of([Pos.X, Pos.Y, Pos.Z]), ["mount"] = Mount,
-        ["beam_deg"] = BeamDeg, ["beam_wide"] = BeamWide, ["output"] = Output, ["output_wide"] = OutputWide,
+        ["beam_deg"] = BeamDeg, ["beam_wide"] = BeamWide, ["flux"] = Flux, ["field"] = Field,
     });
 }
 

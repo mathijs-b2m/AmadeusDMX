@@ -17,6 +17,7 @@ POST /api/fixture/map        {"key", "mode", "kind", "channels": [{"role", "cell
                              the channel-by-channel check)
 GET  /api/fixture/templates?type=spot&channels=9   common layouts to make a fixture without a brand from
 POST /api/fixture/new        {"manufacturer", "model", "template", "channels", …}: make it in your library
+POST /api/fixture/lens       {"key", "beam_deg", "beam_deg_max"?, "lumens"?}: its lens and light, as the manual says
 POST /api/fixture/gdtf       {"name", "data": base64 .gdtf}: convert a GDTF file into your library (key, mode)
 GET  /api/directors          decision models available right now (rules, OpenAI, local Ollama decision models)
 POST /api/director           {"director": "..."}: switch the decision model (saved in the rig file on its own)

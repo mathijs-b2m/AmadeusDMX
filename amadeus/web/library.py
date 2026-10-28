@@ -111,6 +111,18 @@ def save_mapping(req):
     return {"saved": not problems, "problems": problems}
 
 
+def save_lens(req):
+    """{"key", "beam_deg", "beam_deg_max"?, "lumens"?}: a fixture's lens and light as its manual gives them."""
+    b = req.body()
+    lumens = b.get("lumens")
+    problems = fxlib.set_lens(
+        b["key"], float(b["beam_deg"]), float(b.get("beam_deg_max") or 0) or None, float(lumens) if lumens else None
+    )
+    if not problems:
+        event(f"{req.client} set the lens of {b['key']}: {b['beam_deg']}° (zoom to {b.get('beam_deg_max')}), {lumens} lm")
+    return {"saved": not problems, "problems": problems}
+
+
 def fixture_templates(req):
     """The common layouts a new fixture is made from, closest to `type` and `channels` first."""
     from amadeus.library import generic
@@ -120,7 +132,7 @@ def fixture_templates(req):
 
 
 def new_fixture(req):
-    """{"manufacturer", "model", "template", "channels", "type", "watts", "pan_deg", "tilt_deg"}: make a fixture in
+    """{"manufacturer", "model", "template", "channels", "type", "watts", "pan_deg", "tilt_deg", "beam_deg"}: make a fixture in
     your library from a template; returns {"key", "mode"} or {"problems"}."""
     from amadeus.library import generic
 
@@ -134,6 +146,7 @@ def new_fixture(req):
         int(b.get("watts") or 0),
         int(b.get("pan_deg") or 540),
         int(b.get("tilt_deg") or 270),
+        float(b.get("beam_deg") or 0),
     )
     if "key" in r:
         event(f"{req.client} made {r['key']} ({r['mode']}) from the template {b.get('template')}")
@@ -181,4 +194,5 @@ POST = {
     "/api/label": identify_label,
     "/api/fixture/map": save_mapping,
     "/api/fixture/new": new_fixture,
+    "/api/fixture/lens": save_lens,
 }

@@ -15,7 +15,7 @@ public sealed class NewFixtureSheet
     readonly AppModel _model;
     readonly Action<string, string> _made;
     readonly Action _changed;   // whether it can be made may have changed
-    readonly TextBox _manufacturer, _name, _watts;
+    readonly TextBox _manufacturer, _name, _watts, _beam;
     readonly ContentControl _type = Host(), _turns = Host(), _problems = Host();
     readonly ListView _list = new() { SelectionMode = ListViewSelectionMode.Single, Height = 180 };
     readonly TextBlock _preview = UI.Text("", Font.MonoCaption).Secondary().Wrap(3);
@@ -39,6 +39,8 @@ public sealed class NewFixtureSheet
         _name.TextChanged += (_, _) => _changed();
         _watts = new TextBox { PlaceholderText = "optional", Width = 120 };
         _watts.Tooltip("From the label: how bright the show thinks it is");
+        _beam = new TextBox { PlaceholderText = "optional, typical for the type", Width = 220 };
+        _beam.Tooltip("The manual's beam angle (not the field angle): the visualiser draws its beam this wide");
         _list.SelectionChanged += (_, _) =>
         {
             if (_quiet || _list.SelectedItem is not ListViewItem { Tag: string id }) return;
@@ -71,6 +73,7 @@ public sealed class NewFixtureSheet
                 channels,
                 _turns,
                 Form.Row("Power (W)", _watts),
+                Form.Row("Beam angle (°)", _beam),
             ]),
             UI.Text("Closest layouts", Font.Headline),
             _list,
@@ -165,7 +168,8 @@ public sealed class NewFixtureSheet
         {
             var watts = int.TryParse(_watts.Text.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var w) ? w : 0;
             if (!await _model.EnsureSetupService()) throw SetupAPIException.NotRunningError();
-            var r = await _model.Api.NewFixture(_manufacturer.Text, _name.Text, template, _channels, _kindType, watts, _panDeg, _tiltDeg);
+            var beam = double.TryParse(_beam.Text.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var b) ? b : 0;
+            var r = await _model.Api.NewFixture(_manufacturer.Text, _name.Text, template, _channels, _kindType, watts, _panDeg, _tiltDeg, beam);
             if (r is { Key: { } key, Mode: { } mode })
             {
                 _made(key, mode);

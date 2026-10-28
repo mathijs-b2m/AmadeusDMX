@@ -404,6 +404,16 @@ public sealed class SetupAPI
         return body;
     }
 
+    /// A fixture's lens and light as its manual gives them, into your copy of it; returns the problems (nothing saved if any).
+    public async Task<IReadOnlyList<string>> SaveLens(string key, double beamDeg, double? zoomTo, double? lumens, CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object?> { ["key"] = key, ["beam_deg"] = beamDeg };
+        if (zoomTo is { } z) body["beam_deg_max"] = z;
+        if (lumens is { } l) body["lumens"] = l;
+        var r = await Post("api/fixture/lens", body, SaveResult.From, ct: ct);
+        return r.Problems ?? (r.Error is { } e ? [e] : []);
+    }
+
     /// The common layouts a fixture without a brand is made from, the closest to `type` and `channels` first.
     public Task<AmadeusKit.FixtureTemplates> FixtureTemplates(string type = "", int channels = 0, CancellationToken ct = default) =>
         Get("api/fixture/templates", AmadeusKit.FixtureTemplates.From,
@@ -411,10 +421,10 @@ public sealed class SetupAPI
 
     /// Makes a fixture in your library from a template; returns its key and mode, or the problems.
     public Task<AmadeusKit.NewFixture> NewFixture(string manufacturer, string model, string template, int channels, string type,
-                                                  int watts, int panDeg, int tiltDeg, CancellationToken ct = default) =>
+                                                  int watts, int panDeg, int tiltDeg, double beamDeg = 0, CancellationToken ct = default) =>
         Post("api/fixture/new", new
         {
-            manufacturer, model, template, channels, type, watts, pan_deg = panDeg, tilt_deg = tiltDeg,
+            manufacturer, model, template, channels, type, watts, pan_deg = panDeg, tilt_deg = tiltDeg, beam_deg = beamDeg,
         }, AmadeusKit.NewFixture.From, ct: ct);
 
     // MARK: importing a venue's documents (amadeus/web/importer.py)

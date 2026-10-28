@@ -148,6 +148,34 @@ def save(key: str, data: dict) -> Path:
     return path
 
 
+def set_lens(key: str, beam_deg: float, beam_deg_max: float | None = None, lumens: float | None = None) -> list[str]:
+    """A fixture's lens as its manual gives it, into your copy of the definition: the beam angle (with a zoom: its
+    tightest), the zoom's widest (0 or None: no zoom range) and the light it puts out (None: as it was). The show's
+    zoom and the visualisers' beams follow it. Returns the problems (nothing saved if any)."""
+    defn = json.loads(json.dumps(get(key)))
+    defn.pop("key", None)
+    problems = []
+    if not 0.5 <= beam_deg <= 120:
+        problems.append("A beam angle is 0.5° to 120° (the manual's \"beam angle\", not the field angle)")
+    if beam_deg_max and not beam_deg < beam_deg_max <= 120:
+        problems.append("The zoom's widest angle is wider than its tightest, at most 120°")
+    if lumens is not None and not 0 < lumens <= 200_000:
+        problems.append("Light output is in lumens: more than 0, at most 200,000")
+    if problems:
+        return problems
+    phys = defn.setdefault("physical", {})
+    phys["beam_deg"] = round(float(beam_deg), 1)
+    if beam_deg_max:
+        phys["beam_deg_max"] = round(float(beam_deg_max), 1)
+    else:
+        phys.pop("beam_deg_max", None)
+    if lumens is not None:
+        phys["lumens"] = round(float(lumens))
+        phys.pop("_lumens_note", None)
+    save(key, defn)
+    return []
+
+
 def get(key: str) -> dict:
     lib = library()
     if key not in lib:

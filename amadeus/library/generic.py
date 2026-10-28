@@ -262,6 +262,7 @@ def create(
     watts: int = 0,
     pan_deg: int = 540,
     tilt_deg: int = 270,
+    beam_deg: float = 0,
 ) -> dict:
     """Make a fixture in your library from a template; returns {"key", "mode"} (or {"problems"})."""
     manufacturer, model = manufacturer.strip(), model.strip()
@@ -287,7 +288,7 @@ def create(
         "kind": kind,
         "source": f"Made from the template '{TEMPLATES[template]['label']}': check it channel by channel on the "
         "fixture (Set page, Check Channels)",
-        "physical": {"beam_deg": beam},
+        "physical": {"beam_deg": float(beam_deg) if 0.5 <= beam_deg <= 120 else beam},
         "modes": {mode: [{k: v for k, v in c.items() if k in ("attr", "default")} for c in chans]},
         "made": {
             "template": template,

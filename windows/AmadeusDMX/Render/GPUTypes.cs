@@ -32,7 +32,7 @@ public struct BeamInstance(Vector4 apexLen, Vector4 dirRadius, Vector4 color, Ve
     public Vector4 ApexLen = apexLen;       // xyz apex, w length
     public Vector4 DirRadius = dirRadius;   // xyz direction, w end radius
     public Vector4 Color = color;           // rgb, a intensity
-    public Vector4 Extra = extra;           // x lens radius
+    public Vector4 Extra = extra;           // x lens radius, y reference radius (BeamLight; 0: the plain fade)
 
     public const int Size = 64;
 }

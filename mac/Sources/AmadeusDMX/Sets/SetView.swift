@@ -107,7 +107,11 @@ struct SetView: View {
                 } else {
                     PatchInspector(ids: selection, fixtures: layout["fixtures"] as? [[String: Any]] ?? [],
                                      definition: { key in names[key] ?? model.workspace?.definition(key) },
-                                     apply: change, rename: renameFixture)
+                                     apply: change, rename: renameFixture,
+                                     redefined: { key in
+                                         names[key] = model.workspace?.definition(key)
+                                         flash("Saved the lens of \(names[key]?.name ?? key)")
+                                     })
                 }
                 if let message {
                     Text(message).font(.callout).padding(10).glassEffect(.regular, in: .capsule).padding(12)

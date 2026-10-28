@@ -16,6 +16,7 @@ struct NewFixtureSheet: View {
     @State private var type = "spot"
     @State private var channels = 9
     @State private var watts = 0
+    @State private var beamDeg = 0.0
     @State private var panDeg = 540
     @State private var tiltDeg = 270
     @State private var catalogue: FixtureTemplates?
@@ -49,10 +50,12 @@ struct NewFixtureSheet: View {
                 }
                 TextField("Power (W)", value: $watts, format: .number, prompt: Text("optional"))
                     .help("From the label: how bright the show thinks it is")
+                TextField("Beam angle (°)", value: $beamDeg, format: .number, prompt: Text("optional, typical for the type"))
+                    .help("The manual's beam angle (not the field angle): the visualiser draws its beam this wide")
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(height: moving ? 260 : 226)
+            .frame(height: moving ? 296 : 262)
 
             Text("Closest layouts").font(.headline)
             List(catalogue?.templates ?? [], selection: Binding(get: { template }, set: { template = $0; autoPicked = false })) { t in
@@ -112,7 +115,7 @@ struct NewFixtureSheet: View {
         do {
             let r = try await model.api.newFixture(manufacturer: manufacturer, model: name, template: template,
                                                    channels: channels, type: type, watts: watts,
-                                                   panDeg: panDeg, tiltDeg: tiltDeg)
+                                                   panDeg: panDeg, tiltDeg: tiltDeg, beamDeg: beamDeg)
             if let key = r.key, let mode = r.mode {
                 made(key, mode)
                 dismiss()
