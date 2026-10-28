@@ -35,6 +35,7 @@ HEAD_MIN_M = 1.2  # a head on a tower: at least this high (more go on stands)
 TOWER_SHARE = 0.2  # share of the heads on the towers, when there are trusses too
 FLOOR_FROM = 16  # a set with this many heads or more…
 FLOOR_SHARE = 0.25  # …puts this share of them on the stage floor
+FLOOR_PAR_M = 0.25  # a par or bar on the floor: its lens this high (its body is 10 cm round it)
 ROLES = ("head", "laser", "strobe", "blinder", "bar", "par")
 
 
@@ -110,8 +111,9 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
     front = [((straight or horiz)[0], "front")] if horiz else []
     m.row(m.trusses(by_role["strobe"], front, "strobe", share=0.4), y=-0.3, z=0.25, mount="floor", span=0.3)
     m.row(m.ends(by_role["blinder"], front[0][0] if front else None), y=-0.2, z=0.9, mount="stand", span=0.76)
-    m.row(by_role["bar"], y=-0.3, z=0.15, mount="floor", span=0.8)
-    m.row(by_role["par"], y=back_y - 0.5, z=0.15, mount="floor", span=0.8)
+    # a par or bar on its bracket: its lens this high, clear of the floor (and of a big rig's 15 cm deck)
+    m.row(by_role["bar"], y=-0.3, z=FLOOR_PAR_M, mount="floor", span=0.8)
+    m.row(by_role["par"], y=back_y - 0.5, z=FLOOR_PAR_M, mount="floor", span=0.8)
     return {**{k: v for k, v in attached.items() if k not in taken}, **numbered(merged, m.out)}
 
 
