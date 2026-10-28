@@ -171,7 +171,8 @@ def refine_beats(beat_frames: np.ndarray, onset_env: np.ndarray, fps: float, spa
         j = lo + int(np.argmax(onset_env[lo:hi]))
         y0, y1, y2 = onset_env[j - 1], onset_env[j], onset_env[min(j + 1, n - 1)]
         den = y0 - 2 * y1 + y2
-        t[k] = (j + (0.5 * (y0 - y2) / den if den < 0 else 0.0)) / fps
+        # (the top lies between the neighbours; an almost flat onset can put the parabola's anywhere)
+        t[k] = (j + (float(np.clip(0.5 * (y0 - y2) / den, -1.0, 1.0)) if den < 0 else 0.0)) / fps
     if len(t) < 2 * span + 1:
         return t
     out = t.copy()
