@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from amadeus.rig import hangsheet, templates
+from amadeus.rig import templates
 from amadeus.rig import trusses as T
 
 
@@ -41,16 +41,3 @@ def test_a_stand_goes_no_higher_or_lower_than_it_does():
 def test_the_mobile_dj_templates_use_light_stands(template):
     rig = templates.rig(template, width=5.0, height=2.5)
     assert rig["trusses"] and all(T.is_stand(t) for t in rig["trusses"])
-
-
-def test_a_stand_carrying_too_much_is_called_out():
-    t = T.stand("s", "tbar", 1.0, 2.0, -0.8, 2.5, max_kg=10)
-    heavy = "chauvet/colorado-pxl-curve-12"  # 34.5 kg
-    rig = {"stage": {"width_m": 4.0}, "trusses": [t], "fixtures": []}
-    for k, u in enumerate((-0.3, 0.3)):
-        f = {"id": f"h{k}", "fixture": heavy, "universe": 1, "address": 1 + 20 * k}
-        rig["fixtures"].append(T.place(f, t, u, 4.0))
-    assert "s" in hangsheet.overloaded(rig)
-    assert "TOO HEAVY" in hangsheet.html(rig, "set", "rig")
-    t["max_kg"] = 500
-    assert hangsheet.overloaded(rig) == {}

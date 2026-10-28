@@ -335,7 +335,7 @@ def check_show(a: dict) -> dict:
     """What would stop the set from saving, channel overlaps, fixtures not mounted, fixtures that stay dark."""
     from amadeus.dmx import outputs
     from amadeus.library import fixtures as fxlib
-    from amadeus.rig import hangsheet, store
+    from amadeus.rig import store
 
     show = _show(a)
     merged = show.load()
@@ -357,7 +357,6 @@ def check_show(a: dict) -> dict:
         "not_patched": [f["id"] for f in merged.get("fixtures", []) if not fxlib.patched(f)],
         "unknown_fixture_definition": missing,
         "stays_dark": dark,
-        "overloaded": hangsheet.overloaded(merged),
     }
 
 

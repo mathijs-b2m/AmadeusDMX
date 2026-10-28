@@ -206,16 +206,6 @@ def layout(merged: dict) -> dict:
     return {"width_m": W, "structures": structures, "floor": floor, "waiting": waiting, "patch": rows}
 
 
-def overloaded(merged: dict) -> dict[str, str]:
-    """Light stands carrying more than they take (`max_kg`), as far as the fixtures' weights are known."""
-    out = {}
-    for st in layout(merged)["structures"]:
-        limit = st["truss"].get("max_kg")
-        if limit and st["kg"] > limit:
-            out[st["id"]] = f"≈ {st['kg']:.0f} kg on it, it takes {limit:g} kg"
-    return out
-
-
 # ---- the page --------------------------------------------------------------------------------------------------
 
 
@@ -383,9 +373,6 @@ def _load(st: dict) -> str:
         parts.append(f"≈ {st['watts']} W")
     if st["kg"]:
         parts.append(f"≈ {st['kg']:.0f} kg" + (f" + {st['kg_unknown']} of unknown weight" if st["kg_unknown"] else ""))
-    limit = st["truss"].get("max_kg")
-    if limit:
-        parts.append(f"takes {limit:g} kg" + (" — TOO HEAVY" if st["kg"] > limit else ""))
     return " · ".join(parts)
 
 

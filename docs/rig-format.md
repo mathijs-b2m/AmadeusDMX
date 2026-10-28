@@ -83,9 +83,9 @@ beams off the ceiling.
 **Light stands.** The cheaper kind of truss: a tube of about 40 mm on tripod stands instead of a 30 cm box truss.
 `"type": "bridge"` is a light bridge, a bar with a stand under each end; `"type": "tbar"` a T-bar stand, a short bar
 on one stand under its middle. `z_m` is the bar's height and the stands go down to the floor. Fixtures clamp to the
-tube on the same four sides as on a box truss, only closer to it. `max_kg` (what it takes) and `min_height_m`/`max_height_m`
-(how low and high it goes) are the maker's figures: the editor keeps it in that range, and the hang sheet and `check_show` say
-when the fixtures on it weigh more. The editor offers a 3 m bridge up to 3 m (60 kg), a 3 m bridge up to 2.65 m
+tube on the same four sides as on a box truss, only closer to it. `min_height_m`/`max_height_m` (how low and high
+it goes) are the maker's figures and the editor keeps it in that range; `max_kg` is what the maker says it takes,
+for your information only. The editor offers a 3 m bridge up to 3 m (60 kg), a 3 m bridge up to 2.65 m
 (25 kg), a 1.2 m T-bar stand up to 3.5 m (50 kg) and a 1 m one up to 2.5 m (10 kg), the usual budget ones; any
 other size works.
 
