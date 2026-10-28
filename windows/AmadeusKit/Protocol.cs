@@ -571,6 +571,8 @@ public sealed class Frame
     public GoboState?[] Gobo { get; init; } = [];
     /// Per element: a head's zoom, 0 tightest .. 1 widest (null: no zoom).
     public float?[] Zoom { get; init; } = [];
+    /// Per element: the colour of a head's LED ring round the lens (null: off, or no ring).
+    public Vector3?[] Ring { get; init; } = [];
     public IReadOnlyList<DeckInfo>? Decks { get; init; }
     /// What the laser guard did this frame: laser id → "zone 'Audience'" / "blanked (…)".
     public IReadOnlyDictionary<string, string>? LaserGuard { get; init; }
@@ -608,6 +610,8 @@ public sealed class Frame
         return g.Length >= 6 ? new GoboState((int)g[0], (int)g[1], g[2], g[3], g[4], g[5] > 0.5f) : null;
     }
 
+    static Vector3? RingOf(JsonElement e) => Direction(e);   // [r, g, b]: three numbers, read like a direction
+
     static float? ZoomOf(JsonElement e) => e.ValueKind == JsonValueKind.Null ? null : J.Float(e);
 
     static LaserBeam[]? Beams(JsonElement e)
@@ -631,6 +635,7 @@ public sealed class Frame
         Lz = J.Ref(c, "lz", J.ArrayOf(Beams)) ?? [],
         Gobo = J.Try(() => J.Ref(c, "gobo", J.ArrayOf(GoboOf))) ?? [],
         Zoom = J.Try(() => J.Ref(c, "zoom", J.ArrayOf(ZoomOf))) ?? [],
+        Ring = J.Try(() => J.Ref(c, "ring", J.ArrayOf(RingOf))) ?? [],
         Decks = J.Ref(c, "decks", J.ArrayOf(DeckInfo.From)),
         LaserGuard = J.Try(() => J.Ref(c, "guard", J.DictOf(J.String))),
         Link = J.Try(() => J.Ref(c, "link", LinkStatus.From)),
