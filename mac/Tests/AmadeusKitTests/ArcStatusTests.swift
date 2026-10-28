@@ -29,3 +29,11 @@ import Testing
     let room = Room(stage: st, fixtures: [])
     #expect(room.hit([0, 0, 2], [0, 0, 1]).surface == .air)  // straight up: no ceiling
 }
+
+@Test func aHeadsRingColourDecodesPerElement() throws {
+    let json = #"{"type": "frame", "t": 1, "phrase": 0, "fx": [[1, 1, 0, 0, 0, 0.5, 0.5], [0, 0, 0, 0, 0, 0.5, 0.5]], "ring": [[1, 0, 0], null]}"#
+    guard case .frame(let f) = try #require(FeedMessage.decode(Data(json.utf8))) else { Issue.record("not a frame"); return }
+    #expect(f.ring.count == 2 && f.ring[0] == SIMD3(1, 0, 0) && f.ring[1] == nil)
+    guard case .frame(let older) = try #require(FeedMessage.decode(Data(#"{"type": "frame", "t": 1, "phrase": 0}"#.utf8))) else { return }
+    #expect(older.ring.isEmpty)  // an engine without rings
+}

@@ -251,6 +251,7 @@ public class ProtocolTests
         Assert.Empty(f.Bands);
         Assert.Empty(f.Gobo);
         Assert.Empty(f.Zoom);
+        Assert.Empty(f.Ring);
     }
 
     // the hello's gobo pictures and a frame's gobo and zoom, in the format of docs/protocols.md
@@ -296,6 +297,19 @@ public class ProtocolTests
         var bad = DecodeFrame("""{"type": "frame", "gobo": [["a", 1, 0, 0, 0, 0]], "zoom": ["wide"]}""");
         Assert.Empty(bad.Gobo);
         Assert.Empty(bad.Zoom);
+    }
+
+    [Fact]
+    public void AHeadsRingColourDecodesPerElement()
+    {
+        var f = DecodeFrame("""
+            {"type": "frame", "t": 1, "phrase": 0, "fx": [[1, 1, 0, 0, 0, 0.5, 0.5], [0, 0, 0, 0, 0, 0.5, 0.5]],
+             "ring": [[1, 0, 0], null]}
+            """);
+        Assert.Equal(2, f.Ring.Length);
+        Assert.Equal(new System.Numerics.Vector3(1, 0, 0), f.Ring[0]);
+        Assert.Null(f.Ring[1]);
+        Assert.Empty(DecodeFrame("""{"type": "frame", "t": 1, "phrase": 0}""").Ring);  // an engine without rings
     }
 }
 

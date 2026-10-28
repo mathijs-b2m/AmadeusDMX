@@ -125,6 +125,12 @@ class Feed:
             for e in rig["elements"]
             if e["kind"] == "head"
         }
+        # heads with an LED ring round the lens (a ring_color channel): its colour is drawn round the lens
+        self.rings = {
+            e: (fx["id"], defn)
+            for e, (fx, defn) in self.head_fk.items()
+            if "ring_color" in defn and any(c["attr"] == "ring_color" for c in fxlib.channels(defn, fx["mode"]))
+        }
         self.lite_every = max(1, round(1.0 / (period * LITE_HZ)))
         self.tick = 0
         self.on_message: Callable[[dict], None] | None = None  # what a client asks for (the operator's controls)
@@ -181,8 +187,8 @@ class Feed:
 
     def fixture_fields(self, states: dict, lasers: dict | None = None) -> dict:
         """Every element's colour and level as the fixtures really show it, each head's beam effect (what it
-        really plays), gobo, zoom and direction (computed back from its DMX pan/tilt), and the beams each laser
-        draws."""
+        really plays), gobo, zoom and direction (computed back from its DMX pan/tilt), the colour of its LED ring,
+        and the beams each laser draws."""
         shown = self.real.step(states, self.period)
         beams = self.real.beams(states, self.period)
         fx = []
@@ -208,6 +214,9 @@ class Feed:
             out["zoom"] = [round(beams[e][2], 3) if e in beams and beams[e][2] is not None else None for e in self.ids]
         if lasers:
             out["lz"] = [lasers.get(e) for e in self.ids]
+        if self.rings:  # each head's LED ring: its colour [r, g, b] (None: off, or no ring)
+            slots = {e: fxlib.ring_slot(defn, fid, states[e]) for e, (fid, defn) in self.rings.items()}
+            out["ring"] = [[round(v, 3) for v in slots[e]["rgb"]] if slots.get(e) else None for e in self.ids]
         if self.smokes:  # each smoke machine's output now, 0..1
             out["fog"] = {e: round(states[e].dimmer, 2) for e in self.smokes}
         return out

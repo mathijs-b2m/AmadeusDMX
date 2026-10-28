@@ -1,6 +1,7 @@
 // The fixtures as they look: a moving head is a base, a yoke that pans and a head that tilts to where its beam
 // points; a moving bar tilts on its yoke ends; pixel bars, pars, strobes, blinders and lasers have their
-// housings, and every lens glows in the colour the fixture plays. Sized from the fixture's real dimensions.
+// housings, and every lens glows in the colour the fixture plays (a head's LED ring round it too). Sized from the
+// fixture's real dimensions.
 //
 // What never moves (bases, bar housings, cans, boxes) is built once with the scenery; the moving parts and the
 // lenses are built every frame from the show's frame (beam directions, colours).
@@ -301,6 +302,10 @@ final class FixtureModels {
                 let front = u.p + d * (g.headL * 0.35)
                 m.cylinder(front, d, radius: g.headR * 1.04, length: 0.025 * s, headCol * 1.6, emissive: em, caps: false)
                 let (dim, lc) = light(i, frame, hl)
+                if let rc = frame.flatMap({ i < $0.ring.count ? $0.ring[i] : nil }), rc.max() > 0.01 {
+                    // an LED ring round the lens, in the colour it plays (the lens drawn over its middle)
+                    m.disc(front + d * 0.0015, d, radius: (g.lensR + g.headR) / 2, rc / rc.max(), emissive: 1.4)
+                }
                 lens(&m, front + d * 0.003, d, g.lensR, dim, lc, glow: u.shape == .washHead ? 0.6 : 1.6)
                 if u.shape == .washHead {   // the LEDs of a wash: one in the middle, a ring around it
                     let b = Basis.along(d, hint: t)

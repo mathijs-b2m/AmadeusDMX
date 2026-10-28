@@ -1,7 +1,7 @@
 // The fixtures as they look: a moving head is a base, a yoke that pans and a head that tilts to where its beam
 // points; a moving bar tilts on its yoke ends; pixel bars, pars, strobes, blinders and lasers have their
-// housings, and every lens glows in the colour the fixture plays. Sized from the fixture's real dimensions
-// (mac/Sources/AmadeusDMX/Render/FixtureModels.swift).
+// housings, and every lens glows in the colour the fixture plays (a head's LED ring round it too). Sized from the
+// fixture's real dimensions (mac/Sources/AmadeusDMX/Render/FixtureModels.swift).
 //
 // What never moves (bases, bar housings, cans, boxes) is built once with the scenery; the moving parts and the
 // lenses are built every frame from the show's frame (beam directions, colours).
@@ -373,6 +373,11 @@ public sealed class FixtureModels
                     var front = u.P + d * (g.HeadL * 0.35f);
                     m.Cylinder(front, d, radius: g.HeadR * 1.04f, length: 0.025f * s, headCol * 1.6f, emissive: em, caps: false);
                     var (dim, lc) = Light(i, frame, hl);
+                    if (frame is not null && i < frame.Ring.Length && frame.Ring[i] is { } rc && Max(rc) > 0.01f)
+                    {
+                        // an LED ring round the lens, in the colour it plays (the lens drawn over its middle)
+                        m.Disc(front + d * 0.0015f, d, radius: (g.LensR + g.HeadR) / 2, rc / Max(rc), emissive: 1.4f);
+                    }
                     Lens(m, front + d * 0.003f, d, g.LensR, dim, lc, glow: u.Shape == Shape.WashHead ? 0.6f : 1.6f);
                     if (u.Shape == Shape.WashHead)   // the LEDs of a wash: one in the middle, a ring around it
                     {
