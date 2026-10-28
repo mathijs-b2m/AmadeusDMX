@@ -215,11 +215,12 @@ def ceiling_top_deg(head_pos, st: dict) -> float | None:
     return math.degrees(math.atan2(room, run)) if room > 0 else 0.0
 
 
-def room_safe_v(d: np.ndarray, head_pos, st: dict) -> np.ndarray:
+def room_safe_v(d: np.ndarray, head_pos, st: dict, sideways: bool = False) -> np.ndarray:
     """Default limits for moving-head beams (rows of unit directions), for every rig unless switched off:
     off the ceiling (`ceiling_guard`: up only so far that the beam reaches the ceiling at least the room's depth
     away) and not backwards (`back_guard`: never back past the rig towards the stage and the DJ, unless steeply
-    down onto the floor near the fixture)."""
+    down onto the floor near the fixture, or steeply up). A beam aimed back is turned that steep, or `sideways`
+    (in a row of heads that runs it along the row, into the others; from a tower, across the stage)."""
     d = np.asarray(d, dtype=float)
     el = np.degrees(np.arcsin(np.clip(d[:, 2], -1, 1)))
     az = np.degrees(np.arctan2(d[:, 0], d[:, 1]))
@@ -233,7 +234,12 @@ def room_safe_v(d: np.ndarray, head_pos, st: dict) -> np.ndarray:
         h = np.cos(np.radians(el))
         limit = np.degrees(np.arccos(np.clip(-BACK_Y / np.maximum(h, 1e-6), -1, 1)))  # the widest |azimuth| allowed
         back = (np.abs(az) > limit) & (el > BACK_DOWN_DEG)
-        az = np.where(back, np.sign(az + 1e-9) * limit, az)
+        if sideways:
+            az = np.where(back, np.sign(az + 1e-9) * limit, az)
+        else:
+            steep = np.degrees(np.arccos(np.clip(BACK_Y / np.maximum(np.abs(np.cos(np.radians(az))), 1e-6), -1, 1)))
+            upward = (el > 0) & (steep <= (top if top is not None else 90.0))  # (under a low ceiling: down instead)
+            el = np.where(back, np.where(upward, steep, np.maximum(-steep, BACK_DOWN_DEG)), el)
         changed |= back
     if not changed.any():
         return d

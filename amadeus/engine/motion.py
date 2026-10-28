@@ -99,6 +99,9 @@ TRUSS_AIMS = {"down": {"crowd": "down", "stage": "down"}, "audience": {"stage": 
 DOWN_LOWEST_DEG = -88.0  # a tilt wave played down stays this side of straight down (past it the beam flips over)
 
 
+RIG_CLEAR_M = 0.5  # a beam passing this close by another head shines into it
+
+
 LOW_HEAD_M = 1.0  # heads below this (on the floor) aim up and over the crowd instead of down onto it
 
 
@@ -242,9 +245,13 @@ class MotionMixin:
         ]
 
     def _aim_name(self, name: str, j: int) -> str:
-        """The director's aim for head j, turned by its truss's aim."""
+        """The director's aim for head j, turned by its truss's aim. A head on the floor can't play up the back wall
+        while beams may not point back (the back guard would bend them down into the floor next to it): it plays up."""
         mode = self.truss_aim[j] if getattr(self, "truss_aim", None) else None
-        return TRUSS_AIMS.get(mode, {}).get(name, name)
+        name = TRUSS_AIMS.get(mode, {}).get(name, name)
+        if name == "stage" and self.head_pos[j][2] < LOW_HEAD_M and self.stage.get("back_guard", True):
+            return "sky"
+        return name
 
     def _fit_aim(self, name: str, head_pos) -> dict:
         """An aim for this head: floor heads aim up over the crowd; outdoors the sky aim reaches higher; an aim up
@@ -317,7 +324,7 @@ class MotionMixin:
             out /= np.linalg.norm(out) + 1e-9
         if self.zones.heads:  # artistic zones: off the walls/set, inside the keep-in area
             out = self.zones.filter(head_pos, out[None])[0]
-        out = geometry.room_safe_v(out[None], head_pos, self.stage)[0]
+        out = self._room_safe_v(out[None], j)[0]
         return geometry.eye_safe(out, head_pos[2], self.stage)
 
     # ---------------------------------------------------------------- pour
@@ -664,8 +671,26 @@ class MotionMixin:
             out = out / (np.linalg.norm(out, axis=1, keepdims=True) + 1e-9)
         if self.zones.heads:
             out = self.zones.filter(head_pos, out)
-        out = geometry.room_safe_v(out, head_pos, self.stage)  # off the ceiling, not back at the DJ
+        out = self._room_safe_v(out, j)  # off the ceiling, not back at the DJ, not into the rig
         return self._eye_safe_v(out, head_pos[2])
+
+    def _room_safe_v(self, out: np.ndarray, j: int) -> np.ndarray:
+        """The room's limits for head j's beams (geometry.room_safe_v). A beam aimed back turns steep, or sideways
+        where steep would shine into the rig (a tower: into the head under it): whichever passes fewer heads, for
+        the whole phrase (switching between them would jump)."""
+        head_pos = self.head_pos[j]
+        steep = geometry.room_safe_v(out, head_pos, self.stage)
+        if not self.stage.get("back_guard", True) or len(self.heads) < 2 or np.array_equal(steep, out):
+            return steep
+        side = geometry.room_safe_v(out, head_pos, self.stage, sideways=True)
+        return side if self._into_rig(side, j) < self._into_rig(steep, j) else steep
+
+    def _into_rig(self, dirs: np.ndarray, j: int) -> int:
+        """How many of head j's beams (rows of `dirs`) pass close by another head."""
+        v = np.delete(np.asarray(self.head_pos, dtype=float), j, axis=0) - self.head_pos[j]  # (N-1, 3)
+        s = dirs @ v.T  # (T, N-1): how far along each beam each other head is
+        across = np.sqrt(np.maximum((v * v).sum(axis=1)[None, :] - s * s, 0.0))
+        return int(((s > RIG_CLEAR_M) & (s < 10.0) & (across < RIG_CLEAR_M)).any(axis=1).sum())
 
     def _head_dirs_v(self, ts: np.ndarray, j: int) -> np.ndarray:
         """A head's target directions over time: per phrase, with the crossfade and the move-in-black before drops."""

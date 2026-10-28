@@ -48,9 +48,8 @@ import numpy as np
 from amadeus.engine import motion
 from amadeus.engine.state import State
 from amadeus.library import fixtures as fxlib
-from amadeus.rig import geometry
 
-VERSION = 3  # bump when the program changes what the heads do (their trajectories are cached)
+VERSION = 4  # bump when the program changes what the heads do (their trajectories are cached)
 RETRIGGER_S = 0.33  # a fixture is not hit again within this (no flicker faster than ~3 Hz)
 PRE_IMPACT_S = 0.5  # heads move to their next picture this long before an impact, in the dark
 WHITE = (1.0, 1.0, 1.0)
@@ -635,5 +634,5 @@ class CinematicMixin:
         head_pos = self.head_pos[j]
         if self.zones.heads:
             out = self.zones.filter(head_pos, out)
-        out = geometry.room_safe_v(out, head_pos, self.stage)  # off the ceiling, not back at the DJ
+        out = self._room_safe_v(out, j)  # off the ceiling, not back at the DJ, not into the rig
         return self._eye_safe_v(out, head_pos[2])

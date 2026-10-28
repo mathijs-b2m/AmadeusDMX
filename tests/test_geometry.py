@@ -42,7 +42,9 @@ def test_beams_stay_off_the_ceiling_and_never_shine_back_at_the_dj():
     )
     out = g.room_safe_v(np.array([up, back, back_down, crowd]), (0, -1, 2.2), room)
     assert np.degrees(np.arcsin(out[0, 2])) < 3  # a living room: about level, not onto the ceiling
-    assert out[1, 1] >= -g.BACK_Y - 1e-9  # not back at the DJ
+    el = np.degrees(np.arcsin(out[1, 2]))
+    assert out[1, 1] >= -g.BACK_Y - 1e-9 or el <= g.BACK_DOWN_DEG + 1e-6  # not back at the DJ…
+    assert abs(out[1, 0]) < 0.2  # …and steeper instead of turned sideways (level along the rig, into its fixtures)
     assert np.allclose(out[2], back_down) and np.allclose(out[3], crowd)  # steeply down, and onto the crowd: fine
     free = {**room, "ceiling_guard": False, "back_guard": False}
     assert np.allclose(g.room_safe_v(np.array([up, back]), (0, -1, 2.2), free), [up, back])  # switched off
