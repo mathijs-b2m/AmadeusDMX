@@ -124,7 +124,10 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// A round truss's length follows its diameter and arc (they are what is edited).
     public mutating func normalise() {
         if isRing { lengthM = (arc * .pi / 180 * radius * 1000).rounded() / 1000 }
-        if isStand { zM = min(max(zM, minHeightM ?? 0), maxHeightM ?? zM) }  // a stand goes as high as it does
+        if isStand {  // a stand goes as high (and as low) as it does
+            let z = max(zM, minHeightM ?? 0)
+            zM = min(z, maxHeightM ?? z)
+        }
     }
 
     /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.

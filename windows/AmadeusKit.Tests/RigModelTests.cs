@@ -257,7 +257,7 @@ public class RigModelTests
         var d = new RigDocument("r", "s", Encoding.UTF8.GetBytes(json));
         var bridge = d.Trusses.Single(t => t.Id == "bridge1");
         Assert.Equal(2.65, bridge.ZM);  // clamped to what it goes up to
-        Assert.Equal(0.5, d.Trusses.Single(t => t.Id == "stand1").ZM);  // without a top it stays where it is (as trusses.py)
+        Assert.Equal(1.05, d.Trusses.Single(t => t.Id == "stand1").ZM);  // raised to its lowest, with or without a top
         Assert.Equal(1.05, d.Trusses.Single(t => t.Id == "stand2").ZM);  // and down to
         Assert.Equal(4.5, d.Trusses.Single(t => t.Id == "front").ZM);  // a box truss isn't a stand
 

@@ -32,6 +32,9 @@ def test_a_stand_goes_no_higher_or_lower_than_it_does():
     assert T.normalise(t)["z_m"] == 3.5
     t["z_m"] = 0.5
     assert T.normalise(t)["z_m"] == 1.6
+    del t["max_height_m"]  # only a lowest
+    t["z_m"] = 0.5
+    assert T.normalise(t)["z_m"] == 1.6
 
 
 @pytest.mark.parametrize("template", ["stands", "bridge"])

@@ -122,7 +122,8 @@ def normalise(t: dict) -> dict:
     if is_ring(t):
         t["length_m"] = round(math.radians(ring_arc(t)) * ring_radius(t), 3)
     if is_stand(t):  # a stand goes as high (and as low) as it does
-        t["z_m"] = min(max(t["z_m"], t.get("min_height_m") or 0.0), t.get("max_height_m") or t["z_m"])
+        z = max(t["z_m"], t.get("min_height_m") or 0.0)
+        t["z_m"] = min(z, t.get("max_height_m") or z)
     return t
 
 

@@ -148,7 +148,11 @@ public sealed record Truss
     public void Normalise()
     {
         if (IsRing) LengthM = RigDocument.Round(Arc * Math.PI / 180 * Radius, 1000);
-        if (IsStand) ZM = Math.Min(Math.Max(ZM, MinHeightM ?? 0), MaxHeightM ?? ZM);  // a stand goes as high as it does
+        if (IsStand)  // a stand goes as high (and as low) as it does
+        {
+            var z = Math.Max(ZM, MinHeightM ?? 0);
+            ZM = Math.Min(z, MaxHeightM ?? z);
+        }
     }
 
     /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.
