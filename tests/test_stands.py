@@ -41,3 +41,17 @@ def test_a_stand_goes_no_higher_or_lower_than_it_does():
 def test_the_mobile_dj_templates_use_light_stands(template):
     rig = templates.rig(template, width=5.0, height=2.5)
     assert rig["trusses"] and all(T.is_stand(t) for t in rig["trusses"])
+
+
+def test_four_small_heads_go_side_by_side_on_a_tbar():
+    """A light stand's bar is short: heads go a hand apart, by their housing, not a box truss's 60 cm."""
+    from collections import defaultdict
+
+    from amadeus.rig import automount
+
+    m = automount._Mounter(5.0, defaultdict(list))
+    t = T.stand("s", "tbar", 1.2, 1.0, -0.8, 3.0)
+    us = m._free(t, "under", 4, "head", automount.USE, width=0.25)
+    assert len(us) == 4 and us == sorted(us) and us[0] == pytest.approx(-us[-1])
+    assert all(b - a >= 0.25 + automount.STAND_GAP - 1e-9 for a, b in zip(us, us[1:]))
+    assert len(m._free(t, "under", 4, "head", automount.USE, width=0.4)) == 3  # bigger heads: fewer

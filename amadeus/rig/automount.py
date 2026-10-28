@@ -29,6 +29,7 @@ from amadeus.rig import trusses as T
 SPACING = {"head": 0.6, "laser": 0.6, "strobe": 0.5, "blinder": 0.6, "bar": 1.1, "par": 0.5}
 MIN_SPACING = {"head": 0.45, "laser": 0.45, "strobe": 0.4, "blinder": 0.45, "bar": 0.9, "par": 0.35}
 USE = 0.9  # share of a truss's length fixtures are spread over
+STAND_GAP = 0.05  # on a light stand's bar: housings this far apart (it is short, and nothing else hangs there)
 LOW_TRUSS_M = 2.2  # a truss lower than this (a riser at the back) carries fixtures on top, not hanging under
 LASER_MIN_M = 2.0  # a laser on a tower: at least this high
 HEAD_MIN_M = 1.2  # a head on a tower: at least this high (more go on stands)
@@ -290,6 +291,12 @@ def mirrored(fixtures: list[dict], spots: list[float]) -> list[tuple[dict, float
     return out
 
 
+def _housing(f: dict) -> float:
+    """A fixture's housing width (m): what it takes up along a bar."""
+    size = fxlib.get(f["fixture"]).get("physical", {}).get("size_mm") or []
+    return size[0] / 1000 if len(size) == 3 and size[0] > 0 else 0.3
+
+
 class _Mounter:
     def __init__(self, width: float, used: dict, standing: list[dict] | None = None, deck: float = 0.0):
         self.W, self.used, self.out = width, used, {}
@@ -302,22 +309,28 @@ class _Mounter:
         self.used[(t["id"], side)].append(u)
         self.out[f["id"]] = {k: v for k, v in spot.items() if k != "id"}
 
-    def _free(self, t: dict, side: str, n: int, kind: str, share: float) -> list[float]:
-        """Up to `n` positions on a truss side, spread evenly and symmetric, clear of what hangs there."""
+    def _free(self, t: dict, side: str, n: int, kind: str, share: float, width: float = 0.3) -> list[float]:
+        """Up to `n` positions on a truss side, spread evenly and symmetric, clear of what hangs there. On a light
+        stand's bar, fixtures `width` wide (their housing) go side by side, a hand apart."""
         if T.is_full_ring(t):  # round a circle: evenly all the way round, no ends to keep clear
             return self._round(t, side, n, kind)
         span = t["length_m"] * share
+        step, least = SPACING[kind], MIN_SPACING[kind]
+        if T.is_stand(t):
+            span, step = max(0.0, t["length_m"] - STAND_GAP), width + STAND_GAP
+            least = step
         busy = self.used.get((t["id"], side), [])
         if not busy:
-            k = min(n, int(span / SPACING[kind]) + 1)  # a comfortable spacing: a big set goes to the floor too
-            while k > 1 and span / k < MIN_SPACING[kind]:  # a short bar (a T-bar stand): no closer than that
+            k = min(n, int(span / step + 1e-9) + 1)  # a comfortable spacing: a big set goes to the floor too
+            if T.is_stand(t):  # side by side, centred on the bar
+                return [(i - (k - 1) / 2) * step for i in range(k)]
+            while k > 1 and span / k < least:  # a short truss: no closer than that
                 k -= 1
             if k <= 0:
                 return []
             return [-span / 2 + span * (i + 0.5) / k for i in range(k)] if k > 1 else [0.0]
-        step = SPACING[kind]
-        slots = [-span / 2 + step * i for i in range(int(span / step) + 1)]
-        slots = [s for s in slots if all(abs(s - b) >= MIN_SPACING[kind] for b in busy)]
+        slots = [-span / 2 + step * i for i in range(int(span / step + 1e-9) + 1)]
+        slots = [s for s in slots if all(abs(s - b) >= least for b in busy)]
         if len(slots) <= n:
             return slots
         return [slots[round(i * (len(slots) - 1) / (n - 1))] for i in range(n)] if n > 1 else [slots[len(slots) // 2]]
@@ -347,17 +360,18 @@ class _Mounter:
         if not fixtures or not sides:
             return list(fixtures)
         total = sum(t["length_m"] for t, _ in sides)
+        width = max(_housing(f) for f in fixtures)
         left = list(fixtures)
         for i, (t, side) in enumerate(sides):
             want = len(left) if i == len(sides) - 1 else round(len(fixtures) * t["length_m"] / total)
-            spots = self._free(t, side, min(want, len(left)), kind, share)
+            spots = self._free(t, side, min(want, len(left)), kind, share, width)
             for f, u in mirrored(left[: len(spots)], spots):
                 self._put(f, t, u, side)
             left = left[len(spots) :]
         for t, side in sides:  # overflow: squeeze more onto trusses that still have room
             if not left:
                 break
-            spots = self._free(t, side, len(left), kind, share)
+            spots = self._free(t, side, len(left), kind, share, width)
             for f, u in mirrored(left[: len(spots)], spots):
                 self._put(f, t, u, side)
             left = left[len(spots) :]

@@ -137,6 +137,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public const double Grid = 0.25;      // snapping step (m)
     public const double Spacing = 0.6;    // fixtures dropped or dragged as a group: this far apart on a truss
+    public const double StandGap = 0.05;  // on a light stand's bar: housings this far apart (a box truss: 15 cm)
     public const string PayloadPrefix = "fixtures:";
 
     /// Swift's `rounded()`: halves away from zero.
@@ -542,11 +543,12 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     /// Fixtures in a row along a truss, centred as near `u` as there is room (or one above the other on a tower),
     /// `spacing` apart, clear of the fixtures already on that side of the truss.
-    static void Arrange(RigDocument d, IReadOnlyList<string> ids, Truss t, double u, string? side, Func<PlacedFixture, double> width)
+    internal static void Arrange(RigDocument d, IReadOnlyList<string> ids, Truss t, double u, string? side, Func<PlacedFixture, double> width)
     {
         var n = (double)ids.Count;
         var own = ids.Select(id => d.Fixtures.FirstOrDefault(f => f.Id == id)).OfType<PlacedFixture>().Select(width).DefaultIfEmpty(0.4).Max();
-        var step = t.Vertical ? 0.6 : Math.Max(Spacing, own + 0.15);
+        var gap = t.IsStand ? StandGap : 0.15;
+        var step = t.Vertical ? 0.6 : t.IsStand ? own + gap : Math.Max(Spacing, own + gap);
         var span = step * (n - 1);
         // keep the whole row on the truss
         double lo = t.Vertical ? 0.3 : -t.LengthM / 2, hi = t.Vertical ? t.LengthM - 0.3 : t.LengthM / 2;
@@ -555,9 +557,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
             .Where(f => !mine.Contains(f.Id) && f.Truss == t.Id && (t.Vertical || (f.Side ?? "under") == (side ?? "under")))
             .Where(f => f.TrussPos is not null)
             .Select(f => (Pos: f.TrussPos!.Value, Width: t.Vertical ? 0.45 : width(f))).ToList();
-        bool Fits(double start) =>  // housings at least 15 cm apart
+        bool Fits(double start) =>  // housings at least `gap` apart
             start >= lo - 1e-6 && start + span <= hi + 1e-6
-            && Enumerable.Range(0, ids.Count).All(k => busy.All(b => Math.Abs(start + step * k - b.Pos) >= (own + b.Width) / 2 + 0.15));
+            && Enumerable.Range(0, ids.Count).All(k => busy.All(b => Math.Abs(start + step * k - b.Pos) >= (own + b.Width) / 2 + gap - 1e-6));
         var wanted = Math.Max(lo, Math.Min(hi - span, u - span / 2));
         // the nearest free stretch: try further and further to either side
         double? found = null;

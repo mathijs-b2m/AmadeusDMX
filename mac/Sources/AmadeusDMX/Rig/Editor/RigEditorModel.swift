@@ -87,6 +87,7 @@ final class RigEditorModel: StageEditing {
     }
     static let grid = 0.25        // snapping step (m)
     static let spacing = 0.6      // fixtures dropped or dragged as a group: this far apart on a truss
+    static let standGap = 0.05    // on a light stand's bar: housings this far apart (a box truss: 15 cm)
     static let payloadPrefix = "fixtures:"
 
     init?(workspace: Workspace, rig: String, set: String) {
@@ -407,7 +408,8 @@ final class RigEditorModel: StageEditing {
                                 width: (PlacedFixture) -> Double) {
         let n = Double(ids.count)
         let own = ids.compactMap { id in d.fixtures.first { $0.id == id } }.map(width).max() ?? 0.4
-        let step = t.vertical ? 0.6 : max(spacing, own + 0.15)
+        let gap = t.isStand ? standGap : 0.15
+        let step = t.vertical ? 0.6 : t.isStand ? own + gap : max(spacing, own + gap)
         let span = step * (n - 1)
         // keep the whole row on the truss
         let lo = t.vertical ? 0.3 : -t.lengthM / 2, hi = t.vertical ? t.lengthM - 0.3 : t.lengthM / 2
@@ -415,10 +417,10 @@ final class RigEditorModel: StageEditing {
         let busy = d.fixtures.filter { f in
             !mine.contains(f.id) && f.truss == t.id && (t.vertical || (f.side ?? "under") == (side ?? "under"))
         }.compactMap { f in f.trussPos.map { ($0, t.vertical ? 0.45 : width(f)) } }
-        func fits(_ start: Double) -> Bool {   // housings at least 15 cm apart
+        func fits(_ start: Double) -> Bool {   // housings at least `gap` apart
             start >= lo - 1e-6 && start + span <= hi + 1e-6
                 && (0..<ids.count).allSatisfy { k in
-                    busy.allSatisfy { abs(start + step * Double(k) - $0.0) >= (own + $0.1) / 2 + 0.15 }
+                    busy.allSatisfy { abs(start + step * Double(k) - $0.0) >= (own + $0.1) / 2 + gap - 1e-6 }
                 }
         }
         let wanted = max(lo, min(hi - span, u - span / 2))

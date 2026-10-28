@@ -246,8 +246,11 @@ struct Scenery {
             m.cylinder(SIMD3(p.x, p.y, (z - 0.02) / 2), [0, 0, 1], radius: 0.025, length: z - 0.02, color * 0.85,
                        emissive: emissive, segments: 8)
             let hub = SIMD3<Float>(p.x, p.y, min(0.7, z * 0.3))
-            for k in 0..<3 {  // three legs out from the hub to the floor, one towards the audience
-                let a = Float(k) / 3 * 2 * .pi + .pi / 2 + r
+            // three legs out from the hub to the floor: a bridge's with one leg in along the bar (as a crew sets it,
+            // so the others stick out least past its ends), a T-bar's with one towards the audience
+            let first = t.type == "tbar" ? r + .pi / 2 : atan2(Float(t.yM) - p.y, Float(t.xM) - p.x)
+            for k in 0..<3 {
+                let a = Float(k) / 3 * 2 * .pi + first
                 let foot = SIMD3<Float>(p.x + cos(a) * spread, p.y + sin(a) * spread, 0.01)
                 let v = hub - foot
                 m.cylinder((hub + foot) / 2, simd_normalize(v), radius: 0.015, length: simd_length(v), color * 0.85,
