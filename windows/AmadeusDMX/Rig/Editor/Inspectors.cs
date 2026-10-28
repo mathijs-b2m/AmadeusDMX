@@ -340,6 +340,17 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         return t.IsFullRing ? $"Ø {d} m circle" : t.Arc == 180 ? $"Ø {d} m half circle" : $"Ø {d} m, {(int)t.Arc}° arc";
     }
 
+    /// "Takes 60 kg, goes 1.2 to 2.65 m high": a light stand's limits as the maker gives them.
+    public static string StandLimits(Truss t)
+    {
+        var parts = new List<string>();
+        if (t.MaxKg is { } kg) parts.Add($"takes {Format.Number(kg)} kg");
+        if (t.MaxHeightM is { } top)
+            parts.Add(t.MinHeightM is { } bottom ? $"goes {Format.Number(bottom)} to {Format.Number(top)} m high" : $"goes up to {Format.Number(top)} m");
+        var s = string.Join(", ", parts);
+        return (s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..]) + ".";
+    }
+
     Truss T => editor.Doc.Trusses.FirstOrDefault(t => t.Id == id) ?? new Truss(id, 1, 0, 0, 0);
 
     public FrameworkElement Build()
@@ -347,11 +358,15 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         var truss = T;
         var s = UI.VStack(18);
         s.Children.Add(EditorUI.Section(null,
-            UI.HStack(10, UI.Icon(truss.Vertical ? "building.columns" : truss.IsRing ? EditorUI.Symbol("circle") : "square.split.bottomrightquarter", 22)
+            UI.HStack(10, UI.Icon(truss.Vertical ? "building.columns" : truss.IsRing ? EditorUI.Symbol("circle")
+                                  : truss.IsStand ? "lamp.floor" : "square.split.bottomrightquarter", 22)
                               .Foreground(Tint.Accent),
                       UI.VStack(2, UI.Text(truss.Id, Font.Headline),
-                                UI.Text(truss.Vertical ? "Tower, box truss 30 cm" : truss.IsRing ? $"Round truss, {RingName(truss)}" : "Box truss (quatro), 30 cm",
-                                        Font.Caption).Secondary())),
+                                UI.Text(truss.Vertical ? "Tower, box truss 30 cm" : truss.IsRing ? $"Round truss, {RingName(truss)}"
+                                        : truss.Type == "tbar" ? "T-bar stand, on one tripod" : truss.IsStand ? "Light bridge, on two tripods"
+                                        : "Box truss (quatro), 30 cm", Font.Caption).Secondary())),
+            truss.IsStand && (truss.MaxKg is not null || truss.MaxHeightM is not null)
+                ? UI.Text(StandLimits(truss), Font.Caption).Secondary().Wrap() : null,
             truss.IsRing ? UI.Text("Heads on a ring play it as a circle: crowns of beams out of it, cones, twisters, waves running round.", Font.Caption)
                 .Secondary().Wrap() : null));
 
@@ -379,8 +394,11 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         size.Add(EditorUI.ValueSlider(editor, "Depth (y)", () => T.YM, v => editor.UpdateTruss(id, t => t.YM = v), -14, 4, 0.25));
         if (!truss.Vertical)
         {
-            size.Add(EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
-                                          () => 0.5, () => Math.Max(2, editor.Doc.Stage.CeilingM), 0.1));
+            size.Add(truss.IsStand
+                ? EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
+                                       () => T.MinHeightM ?? 1, () => Math.Max((T.MinHeightM ?? 1) + 0.1, T.MaxHeightM ?? 4), 0.05)
+                : EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
+                                       () => 0.5, () => Math.Max(2, editor.Doc.Stage.CeilingM), 0.1));
             size.Add(EditorUI.ValueSlider(editor, "Rotation", () => T.RotDeg, v => editor.UpdateTruss(id, t => t.RotDeg = v), -180, 180, 15, "°"));
         }
         s.Children.Add(EditorUI.Section("Size and Place", size));

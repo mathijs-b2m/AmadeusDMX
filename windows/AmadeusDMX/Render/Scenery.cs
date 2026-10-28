@@ -160,7 +160,10 @@ public sealed class Scenery
             }
             else
             {
-                TrussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
+                if (t.IsStand)
+                    LightStand(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
+                else
+                    TrussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
                 if (sel && !t.IsRing)  // the end handles: drag one to stretch or turn the truss
                 {
                     var r = (float)t.RotDeg * MathF.PI / 180;
@@ -271,6 +274,33 @@ public sealed class Scenery
         Quad(P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1), P(-1, -1, -1), color, normal: -ay, emissive: emissive);
         Quad(P(1, 1, -1), P(1, 1, 1), P(1, -1, 1), P(1, -1, -1), color, normal: ax, emissive: emissive);
         Quad(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, 1), P(-1, 1, -1), color, normal: -ax, emissive: emissive);
+    }
+
+    /// A light stand: its bar (a 40 mm tube) and a tripod under each end of a bridge, under the middle of a T-bar,
+    /// from the floor up to the bar.
+    void LightStand(Truss t, Vector3 color, float emissive)
+    {
+        var m = new MeshBuilder();
+        float z = (float)t.ZM, r = (float)t.RotDeg * MathF.PI / 180;
+        m.Cylinder(V(t.XM, t.YM, z), V(MathF.Cos(r), MathF.Sin(r), 0), radius: 0.02f, length: (float)t.LengthM, color,
+                   emissive: emissive, segments: 10);
+        var spread = MathF.Min(0.75f, 0.25f + z * 0.15f);  // a taller stand stands wider
+        foreach (var f in t.StandFeet)
+        {
+            float px = (float)f.X, py = (float)f.Y;
+            m.Cylinder(V(px, py, (z - 0.02f) / 2), V(0, 0, 1), radius: 0.025f, length: z - 0.02f, color * 0.85f,
+                       emissive: emissive, segments: 8);
+            var hub = V(px, py, MathF.Min(0.7f, z * 0.3f));
+            for (var k = 0; k < 3; k++)  // three legs out from the hub to the floor, one towards the audience
+            {
+                var a = k / 3f * 2 * MathF.PI + MathF.PI / 2 + r;
+                var foot = V(px + MathF.Cos(a) * spread, py + MathF.Sin(a) * spread, 0.01f);
+                var v = hub - foot;
+                m.Cylinder((hub + foot) / 2, Vector3.Normalize(v), radius: 0.015f, length: v.Length(), color * 0.85f,
+                           emissive: emissive, segments: 6);
+            }
+        }
+        Vertices.AddRange(m.V);
     }
 
     /// A horizontal quatro truss from the set: four chords along it and lacing, turned with it.

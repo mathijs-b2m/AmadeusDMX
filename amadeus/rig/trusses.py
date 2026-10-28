@@ -12,6 +12,12 @@ A round truss (`"shape": "circle"`) hangs flat: a full circle, or an arc of `arc
 `u` from the arc's middle, to the right seen from the audience); a fixture on it is turned with the arc, so
 its front (and the truss's "front" face) faces out of the circle and the "back" face into it.
 
+A light stand (`"type": "bridge"` or `"tbar"`) is the cheaper kind: a ~40 mm tube instead of a 30 cm box truss,
+standing on tripods. A light bridge has a stand under each end of its bar, a T-bar one under its middle; `z_m` is
+the bar's height (the stands go down to the floor). Fixtures clamp to the tube like to a box truss's sides, only
+closer. It may say what it takes (`max_kg`) and how high it goes (`min_height_m`, `max_height_m`), as the maker
+gives them.
+
 A truss's `aim` says where the heads on it play: `"audience"` (out towards the crowd, never back at the stage), or
 `"down"` (onto the crowd under it). Without one it is automatic: a truss hanging over the crowd (its centre at least
 OVER_CROWD_M in front of the stage edge) plays down, any other plays wherever the director aims.
@@ -26,6 +32,8 @@ import math
 
 HANG_DROP = 0.42  # a fixture under (or on top of) a truss: its centre this far below (above) the truss centre
 SIDE_OUT = 0.4  # a fixture on the front/back face: its centre this far out from the truss centre
+TUBE_DROP = 0.28  # the same on a light stand's tube (40 mm, not 30 cm)
+TUBE_OUT = 0.27
 TOWER_OUT = 0.32  # a fixture on a tower's face: its centre this far out from the tower's centre
 TOWER_TOP = 0.3  # a fixture on top of a tower: its centre this far above the top
 SIDES = ("under", "top", "front", "back")
@@ -33,6 +41,8 @@ TOWER_SIDES = ("front", "back", "left", "right", "top")
 DIAMETERS_M = (2.0, 3.0, 4.0, 5.0, 6.0, 8.0)  # round truss as it is sold (the usual sizes; any other works too)
 DEFAULT_DIAMETER_M = 4.0
 ARCS_DEG = (360.0, 180.0)  # a full circle or a half circle (any arc works)
+STANDS = ("bridge", "tbar")  # light stands: a bridge on two tripods, a T-bar on one
+STAND_INSET_M = 0.05  # a light bridge's stands: this far in from the bar's ends
 AIMS = ("audience", "down")  # where a truss's heads play (`aim`); none: automatic
 OVER_CROWD_M = 1.0  # a truss this far in front of the stage edge hangs over the crowd: automatic is down
 
@@ -44,6 +54,41 @@ def is_ring(t: dict) -> bool:
 
 def is_full_ring(t: dict) -> bool:
     return is_ring(t) and ring_arc(t) >= 359.5
+
+
+def is_stand(t: dict) -> bool:
+    """A light stand: a bridge or a T-bar (a tube on tripods), not a box truss."""
+    return t.get("type") in STANDS and not t.get("vertical") and not is_ring(t)
+
+
+def stand_feet(t: dict) -> list[tuple[float, float]]:
+    """Where a light stand's tripods stand (x, y): under both ends of a bridge, under the middle of a T-bar."""
+    if not is_stand(t):
+        return []
+    if t["type"] == "tbar":
+        return [(t["x_m"], t["y_m"])]
+    u = max(0.0, t["length_m"] / 2 - STAND_INSET_M)
+    return [point(t, -u)[:2], point(t, u)[:2]]
+
+
+def stand(
+    tid: str,
+    kind: str,
+    length: float,
+    x: float,
+    y: float,
+    z: float,
+    max_kg: float | None = None,
+    max_height: float | None = None,
+) -> dict:
+    """A light stand: a bridge (`kind` "bridge") or a T-bar ("tbar"), its bar `length` long at `z` high."""
+    t = {"id": tid, "type": kind, "length_m": round(length, 2), "x_m": round(x, 2), "y_m": round(y, 2),
+         "z_m": round(min(z, max_height or z), 2)}  # fmt: skip
+    if max_kg:
+        t["max_kg"] = max_kg
+    if max_height:
+        t["max_height_m"] = max_height
+    return t
 
 
 def ring_arc(t: dict) -> float:
@@ -76,6 +121,9 @@ def normalise(t: dict) -> dict:
     """A round truss's `length_m` follows its diameter and arc (they are what is edited)."""
     if is_ring(t):
         t["length_m"] = round(math.radians(ring_arc(t)) * ring_radius(t), 3)
+    if is_stand(t):  # a stand goes as high (and as low) as it does
+        z = max(t["z_m"], t.get("min_height_m") or 0.0)
+        t["z_m"] = min(z, t.get("max_height_m") or z)
     return t
 
 
@@ -150,14 +198,15 @@ def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> 
     rot = math.degrees(ring_angle(t, u)) - 90.0 if is_ring(t) else t.get("rot_deg", 0.0)
     r = math.radians(rot)
     nx, ny = -math.sin(r), math.cos(r)  # the face towards the audience (on a ring: out of the circle)
+    drop, out = (TUBE_DROP, TUBE_OUT) if is_stand(t) else (HANG_DROP, SIDE_OUT)
     if side == "top":
-        z += HANG_DROP
+        z += drop
     elif side == "front":
-        x, y = x + nx * SIDE_OUT, y + ny * SIDE_OUT
+        x, y = x + nx * out, y + ny * out
     elif side == "back":
-        x, y = x - nx * SIDE_OUT, y - ny * SIDE_OUT
+        x, y = x - nx * out, y - ny * out
     else:
-        z -= HANG_DROP
+        z -= drop
     f.update(
         truss_pos_m=round(u, 3),
         truss_side=side,

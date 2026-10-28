@@ -224,4 +224,54 @@ public class RigModelTests
         Assert.Equal(-1.0, els[2].Pos.Y);  // hang: 1 m behind the stage edge by default
         Assert.Equal(3, els[2].BeamDeg);
     }
+
+    [Fact]
+    public void ALightStandsTripodsStandUnderItsEndsOrItsMiddle()
+    {
+        var bridge = new Truss("bridge1", 3, 4, -1, 2.5) { Type = "bridge" };
+        Assert.True(bridge.IsStand);
+        var feet = bridge.StandFeet;
+        Assert.Equal(2, feet.Count);
+        Assert.Equal(4 - 1.5 + Truss.StandInsetM, feet[0].X, 9);
+        Assert.Equal(4 + 1.5 - Truss.StandInsetM, feet[1].X, 9);
+        Assert.All(feet, f => Assert.Equal(-1, f.Y, 9));
+        var tbar = new Truss("stand1", 1.2, 2, -0.8, 2.5, rotDeg: 30) { Type = "tbar" };
+        Assert.Equal([new Vec2(2, -0.8)], tbar.StandFeet);
+        Assert.Empty(new Truss("t", 3, 4, -1, 4).StandFeet);  // a box truss has none
+        Assert.False(new Truss("t", 3, 4, -1, 4, vertical: true) { Type = "tbar" }.IsStand);
+    }
+
+    [Fact]
+    public void ALightStandGoesOnlyAsHighAsItDoesAndKeepsItsLimits()
+    {
+        var json = """
+            {"stage": {"width_m": 8}, "trusses": [
+              {"id": "bridge1", "type": "bridge", "length_m": 3, "x_m": 4, "y_m": -0.8, "z_m": 3.4, "max_kg": 25,
+               "min_height_m": 1.2, "max_height_m": 2.65},
+              {"id": "stand1", "type": "tbar", "length_m": 1, "x_m": 1, "y_m": -0.8, "z_m": 0.5, "min_height_m": 1.05},
+              {"id": "stand2", "type": "tbar", "length_m": 1, "x_m": 7, "y_m": -0.8, "z_m": 0.5, "min_height_m": 1.05,
+               "max_height_m": 2.5},
+              {"id": "front", "type": "quatro", "length_m": 6, "x_m": 4, "y_m": -1, "z_m": 4.5, "max_height_m": 3}],
+             "fixtures": []}
+            """;
+        var d = new RigDocument("r", "s", Encoding.UTF8.GetBytes(json));
+        var bridge = d.Trusses.Single(t => t.Id == "bridge1");
+        Assert.Equal(2.65, bridge.ZM);  // clamped to what it goes up to
+        Assert.Equal(1.05, d.Trusses.Single(t => t.Id == "stand1").ZM);  // raised to its lowest, with or without a top
+        Assert.Equal(1.05, d.Trusses.Single(t => t.Id == "stand2").ZM);  // and down to
+        Assert.Equal(4.5, d.Trusses.Single(t => t.Id == "front").ZM);  // a box truss isn't a stand
+
+        var o = bridge.ToJSON().Object!;
+        Assert.Equal(25, o["max_kg"].Number);
+        Assert.Equal(1.2, o["min_height_m"].Number);
+        Assert.Equal(2.65, o["max_height_m"].Number);
+        var again = Truss.From(bridge.ToJSON());
+        Assert.Equal(bridge, again);
+        var plain = new Truss("t", 3, 4, -1, 4).ToJSON().Object!;  // absent stays absent
+        Assert.False(plain.ContainsKey("max_kg") || plain.ContainsKey("min_height_m") || plain.ContainsKey("max_height_m"));
+        var t = d.Trusses.Single(t => t.Id == "stand1");
+        t.ZM = 9;
+        t.Normalise();
+        Assert.Equal(9, t.ZM);  // no max: it isn't held down
+    }
 }

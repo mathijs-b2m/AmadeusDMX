@@ -68,6 +68,8 @@ final class RigEditorModel: StageEditing {
 
     static let hangDrop = 0.42    // a fixture under a truss: its beam centre below the truss centre
     static let sideOut = 0.4      // a fixture on the front/back face: its centre out from the truss centre
+    static let tubeDrop = 0.28    // the same on a light stand's tube (40 mm, not 30 cm)
+    static let tubeOut = 0.27
     static let sides = ["under", "top", "front", "back"]
     static let towerSides = ["front", "back", "left", "right", "top"]
     static let towerOut = 0.32    // a fixture on a tower's face: its centre out from the tower's centre
@@ -213,6 +215,19 @@ final class RigEditorModel: StageEditing {
         selection = .truss(t.id)
     }
 
+    /// A light stand (a bridge or a T-bar) just behind the stage edge, at the height it goes up to; T-bars in pairs
+    /// left and right of the middle.
+    func addStand(_ p: Truss.StandPreset) {
+        let W = doc.width, tbars = doc.trusses.filter { $0.type == "tbar" }.count
+        var t = Truss(id: newTrussID(p.type == "tbar" ? "stand" : "bridge"), lengthM: p.lengthM,
+                      xM: p.type == "tbar" ? (tbars % 2 == 0 ? W * 0.18 : W * 0.82) : W / 2,
+                      yM: -0.8 - Double(p.type == "tbar" ? tbars / 2 : doc.trusses.filter { $0.type == "bridge" }.count) * 1.2,
+                      zM: min(p.maxHeightM, doc.stage.ceilingM - 0.5))
+        t.type = p.type; t.maxKg = p.maxKg; t.maxHeightM = p.maxHeightM; t.minHeightM = p.minHeightM
+        change(p.type == "tbar" ? "Add T-Bar Stand" : "Add Light Bridge") { $0.trusses.append(t) }
+        selection = .truss(t.id)
+    }
+
     /// A round truss (a circle, or a half circle opening towards the audience) over the middle of the stage.
     func addRing(diameter: Double, arc: Double = 360) {
         let W = doc.width
@@ -295,11 +310,12 @@ final class RigEditorModel: StageEditing {
             let p = t.point(u), r = t.directionDeg(u) * .pi / 180, n = SIMD2(-sin(r), cos(r))
             var q = SIMD2(p.x, p.y), z = p.z
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
+            let drop = t.isStand ? tubeDrop : hangDrop, out = t.isStand ? tubeOut : sideOut
             switch side {
-            case "top": z += hangDrop
-            case "front": q += n * sideOut
-            case "back": q -= n * sideOut
-            default: z -= hangDrop
+            case "top": z += drop
+            case "front": q += n * out
+            case "back": q -= n * out
+            default: z -= drop
             }
             f.side = side
             f.mount = side == "top" ? "stand" : "hang"

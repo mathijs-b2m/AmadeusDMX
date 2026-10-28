@@ -310,6 +310,8 @@ class _Mounter:
         busy = self.used.get((t["id"], side), [])
         if not busy:
             k = min(n, int(span / SPACING[kind]) + 1)  # a comfortable spacing: a big set goes to the floor too
+            while k > 1 and span / k < MIN_SPACING[kind]:  # a short bar (a T-bar stand): no closer than that
+                k -= 1
             if k <= 0:
                 return []
             return [-span / 2 + span * (i + 0.5) / k for i in range(k)] if k > 1 else [0.0]

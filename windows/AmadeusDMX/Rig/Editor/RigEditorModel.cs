@@ -114,6 +114,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public const double HangDrop = 0.42;   // a fixture under a truss: its beam centre below the truss centre
     public const double SideOut = 0.4;     // a fixture on the front/back face: its centre out from the truss centre
+    public const double TubeDrop = 0.28;   // the same on a light stand's tube (40 mm, not 30 cm)
+    public const double TubeOut = 0.27;
     public static readonly string[] Sides = ["under", "top", "front", "back"];
     public static readonly string[] TowerSides = ["front", "back", "left", "right", "top"];
     public const double TowerOut = 0.32;   // a fixture on a tower's face: its centre out from the tower's centre
@@ -332,6 +334,23 @@ public sealed class RigEditorModel : Observable, IStageEditing
         Selection = EditorSelection.Truss(t.Id);
     }
 
+    /// A light stand (a bridge or a T-bar) just behind the stage edge, at the height it goes up to; T-bars in pairs
+    /// left and right of the middle.
+    public void AddStand(Truss.StandPreset p)
+    {
+        var W = Doc.Width;
+        var tbars = Doc.Trusses.Count(x => x.Type == "tbar");
+        var t = new Truss(NewTrussID(p.Type == "tbar" ? "stand" : "bridge"), p.LengthM,
+                          p.Type == "tbar" ? (tbars % 2 == 0 ? W * 0.18 : W * 0.82) : W / 2,
+                          -0.8 - (p.Type == "tbar" ? tbars / 2 : Doc.Trusses.Count(x => x.Type == "bridge")) * 1.2,
+                          Math.Min(p.MaxHeightM, Doc.Stage.CeilingM - 0.5))
+        {
+            Type = p.Type, MaxKg = p.MaxKg, MaxHeightM = p.MaxHeightM, MinHeightM = p.MinHeightM,
+        };
+        Change(p.Type == "tbar" ? "Add T-Bar Stand" : "Add Light Bridge", d => d.Trusses.Add(t));
+        Selection = EditorSelection.Truss(t.Id);
+    }
+
     /// A round truss (a circle, or a half circle opening towards the audience) over the middle of the stage.
     public void AddRing(double diameter, double arc = 360)
     {
@@ -424,12 +443,13 @@ public sealed class RigEditorModel : Observable, IStageEditing
             var q = p.XY;
             var z = p.Z;
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
+            double drop = t.IsStand ? TubeDrop : HangDrop, outward = t.IsStand ? TubeOut : SideOut;
             switch (side)
             {
-                case "top": z += HangDrop; break;
-                case "front": q += n * SideOut; break;
-                case "back": q -= n * SideOut; break;
-                default: z -= HangDrop; break;
+                case "top": z += drop; break;
+                case "front": q += n * outward; break;
+                case "back": q -= n * outward; break;
+                default: z -= drop; break;
             }
             f.Side = side;
             f.Mount = side == "top" ? "stand" : "hang";

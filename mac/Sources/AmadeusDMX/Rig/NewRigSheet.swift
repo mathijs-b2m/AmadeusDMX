@@ -4,12 +4,13 @@ import AmadeusKit
 import SwiftUI
 
 enum RigTemplate: String, CaseIterable, Identifiable {
-    case floor, stands, booth, club, stage, ring   // amadeus/rig/templates.py
+    case floor, stands, bridge, booth, club, stage, ring   // amadeus/rig/templates.py
     var id: String { rawValue }
     var title: String {
         switch self {
         case .floor: "Empty Room"
         case .stands: "Two Stands"
+        case .bridge: "Light Bridge"
         case .booth: "Truss over the Booth"
         case .club: "Club"
         case .stage: "Concert Stage"
@@ -19,7 +20,8 @@ enum RigTemplate: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .floor: "Fixtures on the floor and on tripods."
-        case .stands: "A mobile DJ: a lighting stand left and right of the booth."
+        case .stands: "A mobile DJ: a T-bar stand left and right of the booth."
+        case .bridge: "A mobile DJ: a bar over the booth on two stands."
         case .booth: "One truss over the DJ."
         case .club: "Two trusses over the booth, front and back."
         case .stage: "Two overhead trusses, a low one at the back, a tower each side."
@@ -31,6 +33,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         switch self {
         case .floor: (4, 2.5, 8)
         case .stands: (5, 2.5, 10)
+        case .bridge: (5, 3, 10)
         case .booth: (6, 3.5, 12)
         case .club: (10, 4.5, 15)
         case .stage: (16, 7, 25)
@@ -63,6 +66,10 @@ struct RigSketch: View {
                 }
             case .stands:
                 tower(w * 0.2, h * 0.35); tower(w * 0.8 - 4, h * 0.35)
+                bar(w * 0.2 - 10, h * 0.35, 24); bar(w * 0.8 - 14, h * 0.35, 24)
+            case .bridge:
+                tower(w * 0.27, h * 0.3); tower(w * 0.73 - 4, h * 0.3)
+                bar(w * 0.25, h * 0.3, w * 0.5)
             case .booth:
                 bar(w * 0.2, h * 0.25, w * 0.6)
             case .club:
@@ -123,7 +130,7 @@ struct NewRigSheet: View {
             Form {
                 TextField("Name", text: $name)
                 SizeRow(title: "Stage width", value: $width, range: 2...30, step: 0.5)
-                if template != .floor { SizeRow(title: template == .stands ? "Stand height" : "Truss height", value: $height, range: 2...12, step: 0.5) }
+                if template != .floor { SizeRow(title: template == .stands || template == .bridge ? "Stand height" : "Truss height", value: $height, range: 2...12, step: 0.5) }
                 SizeRow(title: "Room depth", value: $depth, range: 4...40, step: 1)
                 Toggle("LED wall behind the DJ", isOn: $screen)
             }

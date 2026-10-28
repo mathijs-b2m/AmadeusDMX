@@ -31,6 +31,10 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     public var arcDeg: Double?
     /// Where the heads on it play: "audience" or "down"; nil: automatic (down when it hangs over the crowd).
     public var aim: String?
+    /// A light stand's (type "bridge" or "tbar") limits as the maker gives them: what it takes, how high it goes.
+    public var maxKg: Double?
+    public var maxHeightM: Double?
+    public var minHeightM: Double?
 
     /// The usual round truss sizes (any other works too) and arcs.
     public static let ringDiameters: [Double] = [2, 3, 4, 5, 6, 8]
@@ -38,8 +42,27 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, type, lengthM = "length_m", xM = "x_m", yM = "y_m", zM = "z_m", rotDeg = "rot_deg", vertical
-        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", aim
+        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m"
     }
+
+    /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
+    public struct StandPreset: Sendable, Hashable {
+        public let type: String, lengthM: Double, minHeightM: Double?, maxHeightM: Double, maxKg: Double
+        public var title: String {
+            let what = type == "tbar" ? "T-bar stand" : "Light bridge"
+            return "\(what) \(lengthM.formatted()) m · up to \(maxHeightM.formatted()) m, \(maxKg.formatted()) kg"
+        }
+    }
+    /// The usual budget ones: 3 m bridges up to 3 m (60 kg) and 2.65 m (25 kg), a sturdy T-bar stand up to 3.5 m
+    /// (50 kg) and a light one up to 2.5 m (10 kg).
+    public static let standPresets: [StandPreset] = [
+        StandPreset(type: "bridge", lengthM: 3, minHeightM: nil, maxHeightM: 3, maxKg: 60),
+        StandPreset(type: "bridge", lengthM: 3, minHeightM: 1.2, maxHeightM: 2.65, maxKg: 25),
+        StandPreset(type: "tbar", lengthM: 1.2, minHeightM: 1.6, maxHeightM: 3.5, maxKg: 50),
+        StandPreset(type: "tbar", lengthM: 1, minHeightM: 1.05, maxHeightM: 2.5, maxKg: 10),
+    ]
+    /// A light bridge's stands: this far in from the bar's ends.
+    public static let standInsetM = 0.05
 
     public init(id: String, lengthM: Double, xM: Double, yM: Double, zM: Double, rotDeg: Double = 0, vertical: Bool = false) {
         self.id = id; self.lengthM = lengthM; self.xM = xM; self.yM = yM; self.zM = zM; self.rotDeg = rotDeg
@@ -60,6 +83,9 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         diameterM = try c.decodeIfPresent(Double.self, forKey: .diameterM)
         arcDeg = try c.decodeIfPresent(Double.self, forKey: .arcDeg)
         aim = try c.decodeIfPresent(String.self, forKey: .aim)
+        maxKg = try c.decodeIfPresent(Double.self, forKey: .maxKg)
+        maxHeightM = try c.decodeIfPresent(Double.self, forKey: .maxHeightM)
+        minHeightM = try c.decodeIfPresent(Double.self, forKey: .minHeightM)
         normalise()
     }
 
@@ -82,6 +108,15 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     }
 
     public var isRing: Bool { shape == "circle" && !vertical }
+    /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.
+    public var isStand: Bool { (type == "bridge" || type == "tbar") && !vertical && !isRing }
+    /// Where a light stand's tripods stand: under both ends of a bridge, under the middle of a T-bar.
+    public var standFeet: [SIMD2<Double>] {
+        guard isStand else { return [] }
+        if type == "tbar" { return [SIMD2(xM, yM)] }
+        let u = max(0, lengthM / 2 - Self.standInsetM)
+        return [-u, u].map { SIMD2(point($0).x, point($0).y) }
+    }
     public var isFullRing: Bool { isRing && arc >= 359.5 }
     public var arc: Double { min(360, max(10, arcDeg ?? 360)) }
     public var radius: Double { (diameterM ?? 4) / 2 }
@@ -89,6 +124,10 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// A round truss's length follows its diameter and arc (they are what is edited).
     public mutating func normalise() {
         if isRing { lengthM = (arc * .pi / 180 * radius * 1000).rounded() / 1000 }
+        if isStand {  // a stand goes as high (and as low) as it does
+            let z = max(zM, minHeightM ?? 0)
+            zM = min(z, maxHeightM ?? z)
+        }
     }
 
     /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.

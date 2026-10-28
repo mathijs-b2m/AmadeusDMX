@@ -399,7 +399,8 @@ TOOLS = {
     "create_rig": (create_rig, False, "A new rig (a venue) from a template, or a copy of another (copy_of). "
                    "Becomes the active rig unless make_active is false.", _schema({
                        "name": {"type": "string"},
-                       "template": {"type": "string", "enum": ["floor", "stands", "booth", "club", "stage", "ring"]},
+                       "template": {"type": "string",
+                                    "enum": ["floor", "stands", "bridge", "booth", "club", "stage", "ring"]},
                        "width_m": {"type": "number", "description": "stage width (default 8)"},
                        "truss_height_m": {"type": "number", "description": "default 4.5"},
                        "room_depth_m": {"type": "number", "description": "room in front of the stage (default 15)"},

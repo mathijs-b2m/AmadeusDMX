@@ -11,6 +11,7 @@ from amadeus.rig import trusses as T
 TEMPLATES = {
     "floor": "An empty room: fixtures on the floor and on stands.",
     "stands": "A mobile DJ: two T-bar stands left and right of the booth.",
+    "bridge": "A mobile DJ: a light bridge over the booth (a bar on two stands).",
     "booth": "One truss over the DJ booth.",
     "club": "Two trusses over the booth, front and back.",
     "stage": "A concert stage: two overhead trusses, a low truss at the back and a tower on each side.",
@@ -39,7 +40,9 @@ def rig(template: str, width: float = 8.0, height: float = 4.5, depth: float = 1
     trusses: list[dict] = []
     if template == "stands":
         for k, x in enumerate((W * 0.18, W * 0.82)):
-            trusses.append(_truss(f"stand{k + 1}", min(height, 3.0), x, -0.8, 0, vertical=True))
+            trusses.append(T.stand(f"stand{k + 1}", "tbar", 1.0, x, -0.8, height))
+    elif template == "bridge":  # the usual 3 m bar (narrower on a small stage), just behind the booth
+        trusses.append(T.stand("bridge", "bridge", min(3.0, max(1.5, W - 1)), W / 2, -0.8, height))
     elif template == "booth":
         trusses.append(_truss("truss1", _length(W * 0.75), W / 2, -1.2, height))
     elif template == "club":

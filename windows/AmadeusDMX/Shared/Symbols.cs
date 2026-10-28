@@ -60,6 +60,8 @@ public static class Symbols
         ["airplane"] = "\uE709", ["headphones"] = "\uE7F6", ["gamecontroller"] = "\uE7FC", ["circle"] = "\uEA3A",
         // the Set page, the wizard
         ["rays"] = "\uE945", ["lightbulb"] = "\uEA80",
+        // the rig editor
+        ["lamp.floor"] = "\uEA80",
     };
 
     public static string Glyph(string symbol) =>

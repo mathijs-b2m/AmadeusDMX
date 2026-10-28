@@ -89,6 +89,11 @@ public sealed class RigStep(AppModel model, WizardModel w)
                     break;
                 case RigTemplate.Stands:
                     Tower(w * 0.2, h * 0.35); Tower(w * 0.8 - 4, h * 0.35);
+                    Bar(w * 0.2 - 10, h * 0.35, 24); Bar(w * 0.8 - 14, h * 0.35, 24);
+                    break;
+                case RigTemplate.Bridge:
+                    Tower(w * 0.27, h * 0.3); Tower(w * 0.73 - 4, h * 0.3);
+                    Bar(w * 0.25, h * 0.3, w * 0.5);
                     break;
                 case RigTemplate.Booth:
                     Bar(w * 0.2, h * 0.25, w * 0.6);
