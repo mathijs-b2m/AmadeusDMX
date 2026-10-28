@@ -291,9 +291,12 @@ public sealed class Scenery
             m.Cylinder(V(px, py, (z - 0.02f) / 2), V(0, 0, 1), radius: 0.025f, length: z - 0.02f, color * 0.85f,
                        emissive: emissive, segments: 8);
             var hub = V(px, py, MathF.Min(0.7f, z * 0.3f));
-            for (var k = 0; k < 3; k++)  // three legs out from the hub to the floor, one towards the audience
+            // three legs out from the hub to the floor: a bridge's with one leg in along the bar (as a crew sets it,
+            // so the others stick out least past its ends), a T-bar's with one towards the audience
+            var first = t.Type == "tbar" ? r + MathF.PI / 2 : MathF.Atan2((float)t.YM - py, (float)t.XM - px);
+            for (var k = 0; k < 3; k++)
             {
-                var a = k / 3f * 2 * MathF.PI + MathF.PI / 2 + r;
+                var a = k / 3f * 2 * MathF.PI + first;
                 var foot = V(px + MathF.Cos(a) * spread, py + MathF.Sin(a) * spread, 0.01f);
                 var v = hub - foot;
                 m.Cylinder((hub + foot) / 2, Vector3.Normalize(v), radius: 0.015f, length: v.Length(), color * 0.85f,

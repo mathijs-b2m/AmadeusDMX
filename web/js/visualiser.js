@@ -354,8 +354,10 @@ function drawTruss(P, t, line) {
     for (const u of t.type === "tbar" ? [0] : [-(L / 2 - 0.05), L / 2 - 0.05]) {
       const [fx, fy] = on(u);
       line([fx, fy, 0], [fx, fy, z], col);
+      // a bridge's tripods with one leg in along the bar (they stick out least past its ends), a T-bar's to the crowd
+      const first = t.type === "tbar" ? r + Math.PI / 2 : Math.atan2(t.y_m - fy, t.x_m - fx);
       for (let k = 0; k < 3; k++) {
-        const a = k / 3 * 2 * Math.PI + Math.PI / 2 + r;
+        const a = k / 3 * 2 * Math.PI + first;
         line([fx, fy, hub], [fx + Math.cos(a) * spread, fy + Math.sin(a) * spread, 0], "#2a2e3a");
       }
     }

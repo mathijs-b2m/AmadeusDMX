@@ -462,6 +462,26 @@ public class RigEditorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void FourFixturesFitSideBySideOnAT_BarStand()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        e.AddStand(Truss.StandPresets[2]);  // a 1.2 m T-bar
+        var id = e.Selection!.Value.TrussId!;
+        e.AddFixtures("dts/katana", "Extended", 4);
+        var d = e.Doc;
+        var ids = d.Fixtures.Where(f => f.Truss == id).Select(f => f.Id).ToList();
+        Assert.Equal(4, ids.Count);
+        foreach (var f in d.Fixtures.Where(f => f.Truss == id)) { f.Truss = null; f.TrussPos = null; f.Mount = "floor"; }
+        // dropped as a group: 25 cm heads side by side, 5 cm apart (on a box truss they'd be 60 cm apart)
+        RigEditorModel.Arrange(d, ids, Tr(e, id), 0, null, _ => 0.25);
+        var us = d.Fixtures.Where(f => f.Truss == id).Select(f => f.TrussPos!.Value).OrderBy(u => u).ToList();
+        Assert.Equal(4, us.Count);
+        Assert.All(us, u => Assert.InRange(u, -0.6 - 1e-6, 0.6 + 1e-6));  // all on the bar
+        Assert.All(us.Zip(us.Skip(1)), p => Assert.Equal(0.25 + RigEditorModel.StandGap, p.Second - p.First, 6));
+    }
+
+    [Fact]
     public void RotatingATrussTurnsItsFixturesWithIt()
     {
         using var w = new EditorWorkspace();

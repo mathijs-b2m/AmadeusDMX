@@ -9,6 +9,7 @@ import pytest
 
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import automount, manage, store, templates
+from amadeus.rig import trusses as T
 from amadeus.rig.loader import load_rig_dict
 
 SETS = Path(__file__).parent / "sets"
@@ -116,7 +117,13 @@ def test_automount_hangs_everything_sensibly(config, template, set_name):
             assert f["z_m"] > 0.5, f"head {f['id']} on the floor"
     for (tid, side), spots in on_side.items():
         us = sorted(u for u, _ in spots)
-        assert all(b - a >= 0.39 for a, b in zip(us, us[1:])), f"crowded on {tid}/{side}: {us}"
+        if T.is_stand(trusses[tid]):  # a stand's short bar: side by side, housings a hand apart
+            least = (
+                max(automount._housing({"fixture": m}) for _, m in spots) + automount.STAND_GAP - 2e-3
+            )  # positions are kept to the mm
+        else:
+            least = 0.39
+        assert all(b - a >= least for a, b in zip(us, us[1:])), f"crowded on {tid}/{side}: {sorted(spots)}"
         if not trusses[tid].get("vertical"):  # every model mirrored around the middle (up to an odd one out)
             for model in {m for _, m in spots}:
                 pos = sorted(round(u, 2) for u, m in spots if m == model)
