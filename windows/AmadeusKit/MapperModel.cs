@@ -62,24 +62,33 @@ public sealed class MapperModel : Observable
         if (Mapping is { } m) Mapping = m.Answered(a, index);
     }
 
-    /// The colour wheel's slots, as named in the check.
-    public void SetWheel(IReadOnlyList<FixtureMapping.Slot> slots)
+    /// The colour wheel's slots (`ring`: the ring's), as named in the check.
+    public void SetWheel(IReadOnlyList<FixtureMapping.Slot> slots, bool ring = false)
     {
-        if (Mapping is { } m) Mapping = m with { Wheel = slots };
+        if (Mapping is { } m) Mapping = ring ? m with { Ring = slots } : m with { Wheel = slots };
     }
 
-    /// The mapper's Colours…: the usual wheel when it has none yet; the value to show first (the first colour's middle).
-    public int OpenWheel()
+    /// The colour wheel's slots, or the ring's.
+    public IReadOnlyList<FixtureMapping.Slot> Slots(bool ring) => (ring ? Mapping?.Ring : Mapping?.Wheel) ?? [];
+
+    /// Is channel `index` a ring's colours (ring_color) rather than a colour wheel's?
+    public bool IsRing(int index) => Mapping is { } m && index >= 0 && index < m.Channels.Count && m.Channels[index].Role == "ring_color";
+
+    /// The mapper's Colours…: the usual wheel (or ring) when it has none yet; the value to show first (the first
+    /// colour's middle).
+    public int OpenWheel(bool ring = false)
     {
-        if (Mapping is { Wheel.Count: 0 } m) Mapping = m with { Wheel = FixtureMapping.UsualWheel };
-        return Mapping?.Wheel.FirstOrDefault()?.Mid ?? 0;
+        if (ring && Mapping is { Ring.Count: 0 } r) Mapping = r with { Ring = FixtureMapping.UsualRing };
+        if (!ring && Mapping is { Wheel.Count: 0 } m) Mapping = m with { Wheel = FixtureMapping.UsualWheel };
+        return Slots(ring).FirstOrDefault()?.Mid ?? 0;
     }
 
-    public void SetSlot(int index, Func<FixtureMapping.Slot, FixtureMapping.Slot> change)
+    public void SetSlot(int index, Func<FixtureMapping.Slot, FixtureMapping.Slot> change, bool ring = false)
     {
-        if (Mapping is not { } m || index < 0 || index >= m.Wheel.Count) return;
-        var list = m.Wheel.ToList();
+        var slots = Slots(ring);
+        if (Mapping is null || index < 0 || index >= slots.Count) return;
+        var list = slots.ToList();
         list[index] = change(list[index]);
-        Mapping = m with { Wheel = list };
+        SetWheel(list, ring);
     }
 }

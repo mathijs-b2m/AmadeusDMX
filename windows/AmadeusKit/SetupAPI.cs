@@ -380,16 +380,17 @@ public sealed class SetupAPI
         Get("api/fixture/map", FixtureMapping.From, new Dictionary<string, string> { ["key"] = key, ["mode"] = mode }, ct);
 
     /// Saves a hand mapping into your copy of the definition (every fixture of that model plays by it). `checked`:
-    /// every channel was checked on the fixture, and the colour wheel's slots named then are saved with it.
-    public async Task<IReadOnlyList<string>> SaveMapping(FixtureMapping m, bool @checked = false, bool wheel = false, CancellationToken ct = default)
+    /// every channel was checked on the fixture, and the colour wheel's (or the ring's) slots named then are saved with it.
+    public async Task<IReadOnlyList<string>> SaveMapping(FixtureMapping m, bool @checked = false, bool wheel = false, bool ring = false,
+                                                         CancellationToken ct = default)
     {
-        var r = await Post("api/fixture/map", MappingBody(m, @checked, wheel), SaveResult.From, ct: ct);
+        var r = await Post("api/fixture/map", MappingBody(m, @checked, wheel, ring), SaveResult.From, ct: ct);
         return r.Problems ?? [];
     }
 
-    /// SaveMapping's body: `checked`: every channel was checked on the fixture; `wheel`: the colour wheel's colours
-    /// were named (saved with it, as they are after a check too).
-    internal static Dictionary<string, object?> MappingBody(FixtureMapping m, bool @checked, bool wheel)
+    /// SaveMapping's body: `checked`: every channel was checked on the fixture; `wheel`, `ring`: the colour wheel's or
+    /// the ring's colours were named (saved with it, as they are after a check too).
+    internal static Dictionary<string, object?> MappingBody(FixtureMapping m, bool @checked, bool wheel, bool ring = false)
     {
         var chans = m.Channels.Select(c => new { role = c.Role, cell = c.Cell, value = c.Value, attr = c.Attr }).ToList();
         var body = new Dictionary<string, object?>
@@ -398,6 +399,8 @@ public sealed class SetupAPI
         };
         if ((@checked || wheel) && m.Channels.Any(c => c.Role == "color_wheel") && m.Wheel.Count > 0)
             body["wheel"] = m.Wheel.Select(w => new { name = w.Name, from = w.From, to = w.To, rgb = w.Rgb }).ToList();
+        if ((@checked || ring) && m.Channels.Any(c => c.Role == "ring_color") && m.Ring.Count > 0)
+            body["ring"] = m.Ring.Select(w => new { name = w.Name, from = w.From, to = w.To, rgb = w.Rgb }).ToList();
         return body;
     }
 
@@ -588,7 +591,7 @@ public sealed record FixtureMapping
             new(J.Req(c, "answer", J.String), J.Req(c, "role", J.String), J.Ref(c, "attr", J.String), J.Val(c, "value", J.Int));
     }
 
-    /// A colour of the wheel: its DMX values and how it looks.
+    /// A colour of the wheel (or of a ring round the lens): its DMX values and how it looks.
     public sealed record Slot(string Name, int From, int To, IReadOnlyList<double> Rgb)
     {
         public static Slot Decode(JsonElement c) =>
@@ -643,6 +646,7 @@ public sealed record FixtureMapping
     public bool Checked { get; init; } = true;
     public IReadOnlyList<Answer> Check { get; init; } = [];
     public IReadOnlyList<Slot> Wheel { get; init; } = [];
+    public IReadOnlyList<Slot> Ring { get; init; } = [];   // the colours of an LED ring or strip round the lens (a ring_color channel)
 
     public static FixtureMapping From(JsonElement c) => new()
     {
@@ -652,6 +656,7 @@ public sealed record FixtureMapping
         Refusal = J.Req(c, "refusal", J.String),
         Made = J.Val(c, "made", J.Bool) ?? false, Checked = J.Val(c, "checked", J.Bool) ?? true,
         Check = J.Ref(c, "check", J.ArrayOf(Answer.From)) ?? [], Wheel = J.Ref(c, "wheel", J.ArrayOf(Slot.Decode)) ?? [],
+        Ring = J.Ref(c, "ring", J.ArrayOf(Slot.Decode)) ?? [],
     };
 
     /// The values sent while channel `probe` is checked at `value`: the others hold the light on and the head in
@@ -681,7 +686,11 @@ public sealed record FixtureMapping
         if (a.Role != "hold") ch = ch with { Cell = 0 };
         list[i] = ch;
         // a colour wheel: the usual cheap wheel until its colours are named
-        return this with { Channels = list, Wheel = a.Role == "color_wheel" && Wheel.Count == 0 ? UsualWheel : Wheel };
+        return this with
+        {
+            Channels = list, Wheel = a.Role == "color_wheel" && Wheel.Count == 0 ? UsualWheel : Wheel,
+            Ring = a.Role == "ring_color" && Ring.Count == 0 ? UsualRing : Ring,
+        };
     }
 
     /// The same colours, slot by slot (Swift's `==` on [Slot]: a record compares its Rgb list by reference here).
@@ -689,10 +698,17 @@ public sealed record FixtureMapping
         a.Count == b.Count && a.Zip(b).All(p => p.First.Name == p.Second.Name && p.First.From == p.Second.From
                                                 && p.First.To == p.Second.To && p.First.Rgb.SequenceEqual(p.Second.Rgb));
 
-    public static readonly IReadOnlyList<Slot> UsualWheel =new (string Name, double[] Rgb)[]
+    public static readonly IReadOnlyList<Slot> UsualWheel = new (string Name, double[] Rgb)[]
     {
         ("open", [1, 1, 1]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
         ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("orange", [1, 0.45, 0]),
+    }.Select((s, i) => new Slot(s.Name, i * 16, i * 16 + 15, s.Rgb)).ToList();
+
+    /// A guess at a ring's colours until they are named (amadeus/library/generic.py RING_SLOTS).
+    public static readonly IReadOnlyList<Slot> UsualRing = new (string Name, double[] Rgb)[]
+    {
+        ("off", [0, 0, 0]), ("red", [1, 0, 0]), ("green", [0, 1, 0]), ("blue", [0, 0.2, 1]),
+        ("yellow", [1, 0.9, 0]), ("magenta", [1, 0, 0.8]), ("cyan", [0, 0.9, 1]), ("white", [1, 1, 1]),
     }.Select((s, i) => new Slot(s.Name, i * 16, i * 16 + 15, s.Rgb)).ToList();
 }
 

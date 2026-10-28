@@ -1,7 +1,7 @@
 // The DMX mapper's check, channel by channel on the real fixture: one channel sweeps slowly from 0 to 255 while
 // the others keep the light on and the head in the middle, and you say what the fixture does. That puts right what
-// the manual (or the layout a fixture was made from) has wrong; a colour wheel's colours are named on the way, or on
-// their own from the mapper's Colours… (ColourWheelEditor) (mac/Sources/AmadeusDMX/Sets/ChannelCheck.swift).
+// the manual (or the layout a fixture was made from) has wrong; a colour wheel's (or LED ring's) colours are named on
+// the way, or on their own from the mapper's Colours… (ColourWheelEditor) (mac/Sources/AmadeusDMX/Sets/ChannelCheck.swift).
 using System.Numerics;
 
 namespace AmadeusDMX;
@@ -63,6 +63,7 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
             answers,
             ch.Role == "hold" ? Hold(ch) : null,
             ch.Role == "color_wheel" ? new WheelNaming(m, s).Build() : null,
+            ch.Role == "ring_color" ? new WheelNaming(m, s, ring: true).Build() : null,
             UI.HStack(8,
                 UI.Button("Previous", () => Go(s.Index - 1), "chevron.left").Disabled(s.Index == 0),
                 UI.Spacer(),
@@ -145,25 +146,29 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
     }
 }
 
-/// The mapper's Colours…: the colour wheel's colours named and their values put right, without the whole check.
-/// `s.Index` is not used: the wheel's channel is `index`.
+/// The mapper's Colours…: the colour wheel's (or the ring's) colours named and their values put right, without the
+/// whole check. `s.Index` is not used: the wheel's channel is `index`.
 public sealed class ColourWheelEditor(MapperModel m, int index, ChannelCheckState s, Action done)
 {
+    bool Ring => m.IsRing(index);
+
     public FrameworkElement Build() => UI.Scroll(UI.VStack(14,
         UI.HStack(8,
-            UI.Text("Colour Wheel", Font.Title3).Bold(),
+            UI.Text(Ring ? "Ring Colour" : "Colour Wheel", Font.Title3).Bold(),
             UI.Text($"channel {m.Mapping!.Channels[index].N}").Secondary(),
             UI.Spacer(),
             UI.Button("Done", done).Prominent()),
-        UI.Text("The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
+        UI.Text(Ring ? "The light is on and the head in the middle. Show each colour of the ring round the lens, say what you see, and set its values. Name the one where the ring is off \"off\": the ring rests with the head. Sweep goes through the whole channel."
+                     : "The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
             .Secondary().Wrap(),
         ChannelCheck.Probing(s),
-        new WheelNaming(m, s).Build()
+        new WheelNaming(m, s, Ring).Build()
     ).Padding(16));
 }
 
-/// The colour wheel's colours: show each on the fixture, say what it is, put its values right.
-sealed class WheelNaming(MapperModel m, ChannelCheckState s)
+/// The colour wheel's (or a ring's) colours: show each on the fixture, say what it is, put its values right.
+/// `ring`: a ring round the lens: "off" and "white" instead of the wheel's "open".
+sealed class WheelNaming(MapperModel m, ChannelCheckState s, bool ring = false)
 {
     static readonly (string Name, double[] Rgb)[] Colours =
     [
@@ -173,9 +178,12 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s)
         ("warm white", [1, 0.8, 0.55]),
     ];
 
+    (string Name, double[] Rgb)[] Choices =>
+        ring ? [("off", [0, 0, 0]), ("white", [1, 1, 1]), .. Colours.Skip(1)] : Colours;
+
     readonly ContentControl _host = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
 
-    IReadOnlyList<FixtureMapping.Slot> Slots => m.Mapping?.Wheel ?? [];
+    IReadOnlyList<FixtureMapping.Slot> Slots => m.Slots(ring);
 
     public FrameworkElement Build()
     {
@@ -191,7 +199,7 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s)
         var add = UI.Button("Add a Colour", () =>
         {
             var from = Math.Min((Slots.Count > 0 ? Slots[^1].To : -1) + 1, 255);
-            m.SetWheel([.. Slots, new FixtureMapping.Slot("red", from, Math.Min(from + 15, 255), [1, 0, 0])]);
+            m.SetWheel([.. Slots, new FixtureMapping.Slot("red", from, Math.Min(from + 15, 255), [1, 0, 0])], ring);
             _host.Rebuild(Body);
         }, "plus");
         rows.Children.Add(add);
@@ -213,7 +221,7 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s)
             t.TextChanged += (_, _) =>
             {
                 if (int.TryParse(t.Text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var x))
-                    m.SetSlot(i, sl => set(sl, Math.Clamp(x, 0, 255)));
+                    m.SetSlot(i, sl => set(sl, Math.Clamp(x, 0, 255)), ring);
             };
             return t;
         }
@@ -223,12 +231,12 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s)
             Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Tint.From(Rgb(slot.Rgb))),
             Stroke = Theme.Brush("TextFillColorSecondaryBrush"), StrokeThickness = 1,
         };
-        var names = Colours.Select(c => c.Name).ToList();
+        var names = Choices.Select(c => c.Name).ToList();
         if (!names.Contains(slot.Name)) names.Insert(0, slot.Name);
         var picker = UI.Picker(names, slot.Name, n => n, n =>
         {
-            var known = Colours.Where(c => c.Name == n).Select(c => c.Rgb).FirstOrDefault();
-            m.SetSlot(i, sl => sl with { Name = n, Rgb = known ?? sl.Rgb });
+            var known = Choices.Where(c => c.Name == n).Select(c => c.Rgb).FirstOrDefault();
+            m.SetSlot(i, sl => sl with { Name = n, Rgb = known ?? sl.Rgb }, ring);
             _host.Rebuild(Body);
         }).Frame(width: 130);
         var remove = UI.IconButton("minus.circle", "Remove", () =>
@@ -236,7 +244,7 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s)
             var list = Slots.ToList();
             if (list.Count <= 1 || i >= list.Count) return;
             list.RemoveAt(i);
-            m.SetWheel(list);
+            m.SetWheel(list, ring);
             _host.Rebuild(Body);
         }).Disabled(Slots.Count <= 1);
         return UI.HStack(8, show, Number(slot.From, (sl, x) => sl with { From = x }), UI.Text("–"),
