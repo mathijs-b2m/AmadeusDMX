@@ -4,7 +4,7 @@ import numpy as np
 import soundfile as sf
 
 from amadeus.audio.analysis import analyze
-from amadeus.audio.beats import attack_offset, constant_grid
+from amadeus.audio.beats import attack_offset, constant_grid, refine_beats
 
 SR = 44100
 BEAT = 31 / 64  # 123.87 BPM: not a round number of analysis frames
@@ -73,3 +73,15 @@ def test_constant_grid_stays_inside_the_track():
     grid = constant_grid(beats, low_rise, fps)
     assert grid is not None
     assert np.round(grid * fps).max() < len(low_rise)
+
+
+def test_refine_beats_stays_near_the_tracker():
+    """An onset still rising past the window's edge, on an almost straight line: the parabola through it has
+    its top seconds away (a cinematic intro put its first beat 0.19 s before the track started)."""
+    fps = 50.0
+    frames = np.array([6, 31, 56, 81])
+    env = np.zeros(100)
+    for b in frames:
+        env[b + 1], env[b + 2], env[b + 3] = 0.0, 0.5 + 1e-9, 1.0  # the top of the window, still rising
+    t = refine_beats(frames, env, fps)
+    assert np.all(np.abs(t * fps - frames) <= 3)

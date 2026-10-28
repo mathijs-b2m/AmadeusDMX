@@ -130,6 +130,7 @@ def facts(a: Analysis) -> dict:
     """What the genre call rests on: how much of the track grooves, the bass pump, tempo, melody, and how much
     it sounds like disco (with the style model installed)."""
     frames = (a.beats * a.fps).astype(int)
+    frames = frames[frames >= 0]  # (the attack shift, or an older analysis, can put the first before 0)
     if len(frames) < 24:
         return {"groove": 0.0, "pump_db": 0.0, "bpm": round(a.bpm, 1), "tonal": 0.0, "hat_density": 0.0, "dembow": 0.0}
     beat_len = int(round(np.median(np.diff(frames))))
