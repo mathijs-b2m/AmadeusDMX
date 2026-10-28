@@ -287,11 +287,12 @@ def ring_colour(slots: list[dict], rgb, white: float = 0.0) -> dict | None:
     return min(coloured, key=lambda s: sum((a - b) ** 2 for a, b in zip(_chroma(s["rgb"]), want)), default=None)
 
 
-def ring_value(defn: dict, fx_id: str, s, now: float | None = None) -> int:
-    """The ring colour channel's value for a head in state `s` (the middle of its slot)."""
+def ring_slot(defn: dict, fx_id: str, s, now: float | None = None) -> dict | None:
+    """The colour a head's ring wears in state `s` (None: off, or it has no named colours). The DMX and the
+    visualiser both ask; asked again at the same moment it answers the same."""
     slots = defn.get("ring_color", {}).get("slots", [])
     if not slots:
-        return 0
+        return None
     now = time.monotonic() if now is None else now
     r = _rings.setdefault(fx_id, {"lit": -1e9, "slot": None, "want": None, "since": now})
     if s.dimmer > 0.02 and max(s.r, s.g, s.b, s.white) > 0.02:
@@ -301,11 +302,18 @@ def ring_value(defn: dict, fx_id: str, s, now: float | None = None) -> int:
             r["want"], r["since"] = want, now
         if r["want"] is not None and (r["slot"] is None or now - r["since"] >= RING_SETTLE_S):
             r["slot"] = r["want"]
-    if r["slot"] is None or now - r["lit"] > RING_REST_S:
+    if r["slot"] is not None and now - r["lit"] > RING_REST_S:
         r["slot"] = None
-        off = next((x for x in slots if _ring_off(x)), None)
-        return (off["from"] + off["to"]) // 2 if off else 0
-    return (r["slot"]["from"] + r["slot"]["to"]) // 2
+    return r["slot"]
+
+
+def ring_value(defn: dict, fx_id: str, s, now: float | None = None) -> int:
+    """The ring colour channel's value for a head in state `s` (the middle of its slot; off when it rests)."""
+    slot = ring_slot(defn, fx_id, s, now)
+    if slot is None:
+        slots = defn.get("ring_color", {}).get("slots", [])
+        slot = next((x for x in slots if _ring_off(x)), None)
+    return (slot["from"] + slot["to"]) // 2 if slot else 0
 
 
 # ---------------------------------------------------------------- patching

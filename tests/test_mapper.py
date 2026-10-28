@@ -196,3 +196,35 @@ def test_a_ring_round_the_lens_wears_the_beams_colour_and_rests_with_the_head(li
 
     assert mapper.apply("test/effect", "5ch", "par", chans) == []  # mapped again without naming: the named colours stay
     assert fxlib.get("test/effect")["ring_color"]["slots"][0]["name"] == "off"
+
+
+def test_the_visualiser_draws_the_ring_in_the_colour_the_dmx_gives_it(library, monkeypatch):
+    from amadeus.engine.realism import Realism
+    from amadeus.show import feed as feedlib
+
+    chans = [{"role": "pan"}, {"role": "tilt"}, {"role": "red"}, {"role": "green"}, {"role": "ring_color"}]
+    ring = [
+        {"name": "off", "from": 0, "to": 19, "rgb": [0, 0, 0]},
+        {"name": "red", "from": 20, "to": 39, "rgb": [1, 0, 0]},
+    ]
+    assert mapper.apply("test/effect", "5ch", "par", chans, ring=ring) == []
+    fx = {"id": "ring1", "fixture": "test/effect", "mode": "5ch", "universe": 1, "address": 1, "x": 0.5}
+    plain = {"id": "fuze", "fixture": "beamz/fuze75b-beam", "universe": 1, "address": 20, "x": 0.2}
+    plain["mode"] = fxlib.default_mode(fxlib.get(plain["fixture"]))
+    rig = {"fixtures": [fx, plain], "elements": [e for f in (fx, plain) for e in fxlib.expand(f)]}
+    feed = feedlib.Feed({**rig, "safety": {"max_flash_hz": 3}}, Realism(rig), 0.025)
+    feed.head_fk = {}  # no geometry needed for this
+    monkeypatch.setattr(fxlib.time, "monotonic", lambda: 50.0)
+    fxlib._rings.clear()
+    ids = feed.ids
+
+    def ring_of(eid, out):
+        return out["ring"][ids.index(eid)]
+
+    out = feed.fixture_fields({e: State(dimmer=1.0, r=1.0) for e in ids})
+    assert ring_of("ring1", out) == [1, 0, 0] and ring_of("fuze", out) is None
+    buf = bytearray(512)
+    fxlib.patch(buf, fx, {"ring1": State(dimmer=1.0, r=1.0)})
+    assert buf[4] == 29  # the DMX, asked at the same moment, agrees
+    monkeypatch.setattr(fxlib.time, "monotonic", lambda: 60.0)
+    assert ring_of("ring1", feed.fixture_fields({e: State() for e in ids})) is None  # resting: off

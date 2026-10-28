@@ -574,6 +574,11 @@ function draw() {
     const g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], R);
     g.addColorStop(0, rgb(c, dim)); g.addColorStop(0.25, rgb(c, dim * (flare > 1.5 ? 0.6 : 0.4))); g.addColorStop(1, rgb(c, 0));
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], R, 0, 7); ctx.fill();
+    const ring = frame.ring?.[i];  // a head's LED ring round the lens, in the colour it plays
+    if (ring) {
+      ctx.strokeStyle = rgb(ring, 0.9); ctx.lineWidth = Math.max(1, size * 0.22);
+      ctx.beginPath(); ctx.arc(p[0], p[1], size * 0.75, 0, 7); ctx.stroke();
+    }
   });
 }
 requestAnimationFrame(draw);
