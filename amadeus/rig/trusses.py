@@ -71,8 +71,16 @@ def stand_feet(t: dict) -> list[tuple[float, float]]:
     return [point(t, -u)[:2], point(t, u)[:2]]
 
 
-def stand(tid: str, kind: str, length: float, x: float, y: float, z: float, max_kg: float | None = None,
-          max_height: float | None = None) -> dict:
+def stand(
+    tid: str,
+    kind: str,
+    length: float,
+    x: float,
+    y: float,
+    z: float,
+    max_kg: float | None = None,
+    max_height: float | None = None,
+) -> dict:
     """A light stand: a bridge (`kind` "bridge") or a T-bar ("tbar"), its bar `length` long at `z` high."""
     t = {"id": tid, "type": kind, "length_m": round(length, 2), "x_m": round(x, 2), "y_m": round(y, 2),
          "z_m": round(min(z, max_height or z), 2)}  # fmt: skip

@@ -347,6 +347,20 @@ function drawTruss(P, t, line) {
     return;
   }
   const ax = [Math.cos(r), Math.sin(r)], nx = [-Math.sin(r), Math.cos(r)];
+  if (t.type === "bridge" || t.type === "tbar") {  // a light stand: the bar, a tripod under each end (a T-bar: the middle)
+    const z = t.z_m, on = u => [t.x_m + ax[0] * u, t.y_m + ax[1] * u, z];
+    line(on(-L / 2), on(L / 2), col);
+    const spread = Math.min(0.75, 0.25 + z * 0.15), hub = Math.min(0.7, z * 0.3);
+    for (const u of t.type === "tbar" ? [0] : [-(L / 2 - 0.05), L / 2 - 0.05]) {
+      const [fx, fy] = on(u);
+      line([fx, fy, 0], [fx, fy, z], col);
+      for (let k = 0; k < 3; k++) {
+        const a = k / 3 * 2 * Math.PI + Math.PI / 2 + r;
+        line([fx, fy, hub], [fx + Math.cos(a) * spread, fy + Math.sin(a) * spread, 0], "#2a2e3a");
+      }
+    }
+    return;
+  }
   const at = (u, sv, sz) => [t.x_m + ax[0] * u + nx[0] * sv, t.y_m + ax[1] * u + nx[1] * sv, t.z_m + sz];
   for (const [sv, sz] of [[-h, -h], [h, -h], [h, h], [-h, h]]) line(at(-L / 2, sv, sz), at(L / 2, sv, sz), col);
   for (let u = -L / 2; u < L / 2 - 0.25; u += 0.5) {
