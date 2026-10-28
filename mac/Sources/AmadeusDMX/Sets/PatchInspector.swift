@@ -11,6 +11,8 @@ struct PatchInspector: View {
     /// Change the set's fixtures (the closure gets them, returns them changed); saved at once.
     let apply: (String, (inout [[String: Any]]) -> Void) -> Void
     let rename: (String, String) -> Void
+    /// A fixture definition changed (its lens): read it again.
+    var redefined: (String) -> Void = { _ in }
 
     @State private var name = ""
     @State private var address = ""
@@ -160,6 +162,9 @@ struct PatchInspector: View {
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
+        if let def, ![FixtureKind.smoke, .laser].contains(def.elementKind) {
+            LensSection(key: key, definition: def, saved: redefined)
+        }
         if def?.isMoving == true {
             SwiftUI.Section("Motion") {
                 Toggle("Invert pan", isOn: Binding(get: { f["pan_invert"] as? Bool ?? false }, set: { v in
@@ -233,5 +238,74 @@ struct PatchInspector: View {
     private static func set(_ all: inout [[String: Any]], _ id: String, _ body: (inout [String: Any]) -> Void) {
         guard let i = all.firstIndex(where: { $0["id"] as? String == id }) else { return }
         body(&all[i])
+    }
+}
+
+/// A fixture's lens and light as its manual gives them (POST /api/fixture/lens): the beam angle (with a zoom: its
+/// tightest and widest) and the lumens. The show's zoom and the visualisers' beams follow them; every fixture of
+/// this model in your sets changes with it.
+struct LensSection: View {
+    @Environment(AppModel.self) private var model
+    let key: String
+    let definition: FixtureDefinition
+    let saved: (String) -> Void
+
+    @State private var beam = 0.0
+    @State private var zoomTo = 0.0
+    @State private var lumens = 0.0
+    @State private var problems: [String] = []
+    @State private var busy = false
+
+    private var phys: FixtureDefinition.Physical? { definition.physical }
+    private var changed: Bool {
+        beam != (phys?.beamDeg ?? 25) || (definition.hasZoom && zoomTo != (phys?.beamDegMax ?? 0))
+            || lumens != (phys?.lumens ?? 0)
+    }
+
+    var body: some View {
+        SwiftUI.Section {
+            TextField(definition.hasZoom ? "Beam angle, tightest (°)" : "Beam angle (°)", value: $beam, format: .number)
+                .help("The manual's beam angle: where the light is half the centre's (not the wider field angle)")
+            if definition.hasZoom {
+                TextField("Beam angle, widest (°)", value: $zoomTo, format: .number, prompt: Text("no zoom range"))
+                    .help("How wide the zoom opens: the manual gives it as e.g. 4°–40°")
+            }
+            TextField("Light output (lm)", value: $lumens, format: .number, prompt: Text("unknown"))
+                .help("Lumens from the manual: the visualiser draws the beam as bright as its light over its width")
+            if changed {
+                HStack {
+                    Button("Save") { Task { await save() } }.buttonStyle(.borderedProminent).disabled(busy)
+                    Button("Revert") { sync() }
+                }
+            }
+            ForEach(problems, id: \.self) { p in
+                Label(p, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } header: {
+            Text("Lens")
+        } footer: {
+            Text("For every \(definition.name) in your sets. The visualiser draws its beam this wide, as bright as its light "
+                 + "allows, dimmer the further it throws.")
+        }
+        .onAppear(perform: sync)
+        .onChange(of: key) { sync() }
+    }
+
+    private func sync() {
+        beam = phys?.beamDeg ?? 25
+        zoomTo = phys?.beamDegMax ?? 0
+        lumens = phys?.lumens ?? 0
+        problems = []
+    }
+
+    private func save() async {
+        busy = true
+        defer { busy = false }
+        do {
+            problems = try await model.api.saveLens(key: key, beamDeg: beam, zoomTo: definition.hasZoom && zoomTo > 0 ? zoomTo : nil,
+                                                    lumens: lumens > 0 ? lumens : nil)
+            if problems.isEmpty { saved(key) }
+        } catch { problems = [error.localizedDescription] }
     }
 }

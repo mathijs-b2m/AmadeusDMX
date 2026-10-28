@@ -50,6 +50,8 @@ public struct Stage: Codable, Sendable, Equatable {
     public var widthM: Double
     public var ceilingM: Double
     public var roomDepthM: Double
+    /// The hall's width, its side walls the same distance either side of the stage; nil: 2 m either side.
+    public var roomWidthM: Double?
     /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
     public var deckM = 0.0
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
@@ -60,8 +62,14 @@ public struct Stage: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case deckM = "deck_m", backGuard = "back_guard", outdoor
+        case deckM = "deck_m", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m"
     }
+
+    /// The room either side of the stage when the rig doesn't give the hall's width (amadeus/rig/geometry.py).
+    public static let roomSideM = 2.0
+
+    /// The hall's width: as the rig gives it, never narrower than the stage.
+    public var roomWidth: Double { max(widthM, roomWidthM ?? widthM + 2 * Self.roomSideM) }
 
     /// Whether a spot (x: fraction of the stage width) is on the stage: behind its front edge, across its width.
     public static func onStage(x: Double, yM: Double) -> Bool { yM <= 0 && x >= 0 && x <= 1 }
@@ -82,6 +90,7 @@ public struct Stage: Codable, Sendable, Equatable {
         ceilingGuard = try c.decodeIfPresent(Bool.self, forKey: .ceilingGuard) ?? true
         backGuard = try c.decodeIfPresent(Bool.self, forKey: .backGuard) ?? true
         outdoor = try c.decodeIfPresent(Bool.self, forKey: .outdoor) ?? false
+        roomWidthM = try c.decodeIfPresent(Double.self, forKey: .roomWidthM)
     }
 }
 
@@ -101,8 +110,9 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
     public var mount: String
     public var beamDeg: Double
     public var beamWide: Double
-    public var output: Double
-    public var outputWide: Double
+    /// Its light against the reference beam (BeamLight), and its field angle as a multiple of the beam angle.
+    public var flux: Double
+    public var field: Double
     // drawing facts (newer engines): the fixture it belongs to, its housing, rotation, cells, static aim
     public var fixture: String?
     public var body: String?
@@ -119,11 +129,11 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
     public init(id: String, kind: FixtureKind, label: String, pos: SIMD3<Double>, mount: String, beamDeg: Double,
                 beamWide: Double? = nil) {
         self.id = id; self.kind = kind; self.label = label; self.pos = pos; self.mount = mount
-        self.beamDeg = beamDeg; self.beamWide = beamWide ?? beamDeg; output = 1; outputWide = 1
+        self.beamDeg = beamDeg; self.beamWide = beamWide ?? beamDeg; flux = 1; field = BeamLight.field
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, label, pos, mount, beamDeg = "beam_deg", beamWide = "beam_wide", output, outputWide = "output_wide"
+        case id, kind, label, pos, mount, beamDeg = "beam_deg", beamWide = "beam_wide", flux, field
         case fixture, body, rot, size, cells, length, dir, up, truss
     }
 
@@ -137,8 +147,8 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
         mount = try c.decodeIfPresent(String.self, forKey: .mount) ?? "stand"
         beamDeg = try c.decodeIfPresent(Double.self, forKey: .beamDeg) ?? 25
         beamWide = try c.decodeIfPresent(Double.self, forKey: .beamWide) ?? beamDeg
-        output = try c.decodeIfPresent(Double.self, forKey: .output) ?? 1
-        outputWide = try c.decodeIfPresent(Double.self, forKey: .outputWide) ?? 1
+        flux = try c.decodeIfPresent(Double.self, forKey: .flux) ?? 1
+        field = try c.decodeIfPresent(Double.self, forKey: .field) ?? BeamLight.field
         fixture = try c.decodeIfPresent(String.self, forKey: .fixture)
         body = try c.decodeIfPresent(String.self, forKey: .body)
         rot = try c.decodeIfPresent(Double.self, forKey: .rot) ?? 0
@@ -155,7 +165,7 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
         try c.encode(id, forKey: .id); try c.encode(kind, forKey: .kind); try c.encode(label, forKey: .label)
         try c.encode([pos.x, pos.y, pos.z], forKey: .pos); try c.encode(mount, forKey: .mount)
         try c.encode(beamDeg, forKey: .beamDeg); try c.encode(beamWide, forKey: .beamWide)
-        try c.encode(output, forKey: .output); try c.encode(outputWide, forKey: .outputWide)
+        try c.encode(flux, forKey: .flux); try c.encode(field, forKey: .field)
     }
 }
 

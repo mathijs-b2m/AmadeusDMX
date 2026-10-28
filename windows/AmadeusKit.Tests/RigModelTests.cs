@@ -51,6 +51,29 @@ public class RigModelTests
     }
 
     [Fact]
+    public void HeadsGroupedByHandAreSavedAndCanGoBackToAutomatic()
+    {
+        var d = Document();
+        d.SetGroup(["a", "b"], "  floor left ");
+        Assert.True(d.Group("a") == "floor left" && d.Group("b") == "floor left" && d.GroupNames.SequenceEqual(["floor left"]));
+        d.SetGroup(["b"], "");
+        var saved = new RigDocument("r", "s", d.Json());
+        Assert.True(saved.Group("a") == "floor left" && saved.Group("b") is null);
+    }
+
+    [Fact]
+    public void TheHallIsTwoMetresEitherSideUnlessTheRigSaysHowWide()
+    {
+        var st = new Stage(widthM: 4);
+        Assert.True(st.RoomWidth == 8 && new Room(st, []).Side == 2 && !st.ToJSON().Object!.ContainsKey("room_width_m"));
+        st.RoomWidthM = 20;
+        var back = Stage.From(System.Text.Json.JsonDocument.Parse(Encoding.UTF8.GetBytes(st.ToJSON().ToString())).RootElement);
+        Assert.True(back.RoomWidthM == 20 && new Room(back, []).Side == 8);
+        st.RoomWidthM = 2;  // never narrower than the stage
+        Assert.True(st.RoomWidth == 4 && new Room(st, []).Side == 0);
+    }
+
+    [Fact]
     public void ACloneIsItsOwn()
     {
         var d = Document();

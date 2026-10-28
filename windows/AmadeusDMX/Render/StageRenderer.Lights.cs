@@ -37,17 +37,39 @@ public sealed partial class StageRenderer
             }
         }
 
+        // a head's beam (BeamLight): the lens's beam angle, a faint field round it; the shaft as bright as its light
+        // over its width, the spot as bright as its light over its size
+        void HeadBeam(Vector3 p, Vector3 d, float beamDeg, float field, Vector3 color, float light)
+        {
+            var (len, surf) = room.Hit(p, d, 30);
+            var lands = Lands(surf);
+            var n = Room.Normal(surf);
+            var squash = MathF.Max(1, MathF.Min(3, 1 / MathF.Max(0.25f, MathF.Abs(Vector3.Dot(d, n)))));
+            Span<(float Deg, float K)> cones = [(BeamLight.FieldDeg(beamDeg, field), BeamLight.FieldGlow), (beamDeg, 1)];
+            foreach (var (deg, k) in cones)
+            {
+                var R = MathF.Max(0.03f, len * MathF.Tan(deg * MathF.PI / 360));
+                beams.Add(new BeamInstance(new(p, len), new(d, R), new(color, light * k * BeamLight.Haze),
+                                           new(0.04f, BeamLight.RefRadius, 0, 0)));
+                if (lands)
+                    decals.Add(new DecalInstance(new(p + d * len, MathF.Max(0.06f, R * 1.15f)), new(n, squash),
+                                                 new(color, light * k * 0.8f * BeamLight.Gain(R))));
+            }
+        }
+
+        // the light over the width, as HeadBeam: in the haze where it is halfway, on the surface where it lands
         void GoboBeam(Vector3 p, Vector3 d, float spreadDeg, Vector3 color, float intensity, Vector4 wheel, Vector4 axis)
         {
             var (len, surf) = room.Hit(p, d, 30);
             float r0 = wheel.W, R = MathF.Max(r0 + 0.01f, len * MathF.Tan(spreadDeg * MathF.PI / 360));
-            goboBeams.Add(new GoboBeamInstance(new(p, len), new(d, R), new(color, intensity), wheel, axis));
+            float haze = BeamLight.Gain((r0 + R) / 2), spot = BeamLight.Gain(R);
+            goboBeams.Add(new GoboBeamInstance(new(p, len), new(d, R), new(color, intensity * haze), wheel, axis));
             if (Lands(surf))
             {
                 var n = Room.Normal(surf);
                 var squash = MathF.Max(1, MathF.Min(3, 1 / MathF.Max(0.25f, MathF.Abs(Vector3.Dot(d, n)))));
                 goboDecals.Add(new GoboDecalInstance(new(p + d * len, MathF.Max(0.12f, R * 1.15f)), new(n, squash),
-                                                     new(color, intensity * 0.75f), new(p, len),
+                                                     new(color, intensity * 0.75f * spot), new(p, len),
                                                      new(d, (R - r0) / MathF.Max(len, 1e-3f)), wheel, axis));
             }
         }
@@ -87,11 +109,10 @@ public sealed partial class StageRenderer
                                               ?? Vector3.Normalize(rest + new Vector3(0, 0.6f, 0)));
                     var name = (frame is not null && i < frame.Beam.Length ? frame.Beam[i] : null) ?? "open";
                     var gobo = highlight.Contains(fx.Id) ? null : frame is not null && i < frame.Gobo.Length ? frame.Gobo[i] : null;
-                    // the lens with the zoom the show sends: between its tightest and widest beam, as bright as the light
-                    // packed into it
+                    // the lens with the zoom the show sends: between its tightest and widest beam (the same light spread
+                    // wider: dimmer, BeamLight)
                     var zoom = frame is not null && i < frame.Zoom.Length ? frame.Zoom[i] : null;
                     var lens = (float)fx.BeamDeg + (float)(fx.BeamWide - fx.BeamDeg) * (zoom ?? 0);
-                    var zoomed = (float)fx.Output + (float)(fx.OutputWide - fx.Output) * (zoom ?? 0);
                     // the gobo's picture across the beam: along the head's tilt axis (pan turns it with the head)
                     var tilt = Vector3.Cross(rest, d);
                     if (tilt.Length() > 0.15f) GoboAxis[fx.Id] = Vector3.Normalize(tilt);
@@ -116,11 +137,9 @@ public sealed partial class StageRenderer
                         }
                         nRays = 3;
                     }
-                    var frost = name == "frost";
-                    var spread = frost ? MathF.Max((float)fx.BeamWide, 25) * 1.2f : MathF.Max(lens * 1.6f, 2.5f);
-                    var strength = frost ? (float)fx.OutputWide : zoomed;
-                    var a0 = (frost ? dim * 0.45f : nRays > 1 ? dim * 0.6f : dim) * density * strength * 0.75f;
-                    if (highlight.Contains(fx.Id)) a0 = 2.5f;
+                    var frost = name == "frost";   // a frost spreads it wide and soft
+                    var a0 = (nRays > 1 ? dim * 0.6f : dim) * density * (float)fx.Flux;
+                    if (highlight.Contains(fx.Id)) a0 = MathF.Max(a0, 1.5f);
                     if (gobo is { } g && GoboSlices > 0)
                     {
                         // a shaking gobo wobbles on its wheel: a little to and fro, a little turned
@@ -132,12 +151,14 @@ public sealed partial class StageRenderer
                         // a gobo is projected with the lens as it is (the haze cone's extra width would blur the pattern); its
                         // shafts a little brighter than a plain beam's haze, as the metal between them takes most of the light
                         for (var k = 0; k < nRays; k++)
-                            GoboBeam(p, rays[k], spreadDeg: MathF.Max(lens * 1.25f, 2.5f), color: col, intensity: a0 * 1.5f, wheel: wheel,
+                            GoboBeam(p, rays[k], spreadDeg: MathF.Max(lens, 1), color: col, intensity: a0 * 1.1f, wheel: wheel,
                                      axis: new Vector4(across, rot));
                     }
                     else
                     {
-                        for (var k = 0; k < nRays; k++) Beam(p, rays[k], spreadDeg: spread, color: col, intensity: a0);
+                        for (var k = 0; k < nRays; k++)
+                            HeadBeam(p, rays[k], beamDeg: frost ? MathF.Max((float)fx.BeamWide, 25) : MathF.Max(lens, 0.5f),
+                                     field: frost ? 1.4f : (float)fx.Field, color: col, light: a0);
                     }
                     // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
                     // smaller for the cells of a bar (many small lenses, not one big one)

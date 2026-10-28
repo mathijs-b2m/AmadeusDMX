@@ -148,7 +148,10 @@ public struct FixtureDefinition: Decodable, Sendable {
         public var beamDegMax: Double?
         public var lumens: Double?
         public var sizeMM: [Double]?
-        enum CodingKeys: String, CodingKey { case beamDeg = "beam_deg", beamDegMax = "beam_deg_max", lumens, sizeMM = "size_mm" }
+        public var fieldDeg: Double?
+        enum CodingKeys: String, CodingKey {
+            case beamDeg = "beam_deg", beamDegMax = "beam_deg_max", lumens, sizeMM = "size_mm", fieldDeg = "field_deg"
+        }
     }
     public var manufacturer: String
     public var model: String
@@ -213,6 +216,8 @@ public struct FixtureDefinition: Decodable, Sendable {
         return max(1, heads.count)
     }
     public func channels(_ mode: String) -> Int { modes[mode]?.count ?? 0 }
+    /// A zoom channel in any mode: the lens has a tightest and a widest beam.
+    public var hasZoom: Bool { modes.values.joined().contains { $0["attr"]?.string == "zoom" } }
     /// Does the show light anything in this mode? (amadeus/library/mapper.py `plays`) A fixture that plays
     /// nothing (only effect, macro or unnamed channels) is one for the DMX mapper.
     public func plays(_ mode: String) -> Bool {
@@ -365,6 +370,20 @@ public struct RigDocument: Equatable {
         updateRaw(id) { o in o.merge(fields) { _, new in new } }
     }
 
+    /// The head group a fixture is put in by hand (amadeus/rig/groups.py); nil: grouped by where it stands.
+    public func group(_ id: String) -> String? { rawFixture(id)["group"]?.string }
+
+    /// The hand-made group names on this rig, sorted.
+    public var groupNames: [String] {
+        Array(Set(fixtures.filter { !$0.waiting }.compactMap { group($0.id) })).sorted()
+    }
+
+    /// These fixtures into one hand-made group, or back to grouping by where they stand (nil or blank).
+    public mutating func setGroup(_ ids: Set<String>, _ name: String?) {
+        let name = name?.trimmingCharacters(in: .whitespaces) ?? ""
+        for id in ids { updateRaw(id) { o in o["group"] = name.isEmpty ? nil : .string(name) } }
+    }
+
     public func rawFixture(_ id: String) -> [String: JSONValue] {
         (raw["fixtures"]?.array ?? []).compactMap(\.object).first { $0["id"]?.string == id } ?? [:]
     }
@@ -454,6 +473,10 @@ public enum RigElements {
                                        beamWide: def?.physical?.beamDegMax)
                 info.fixture = f.id
                 info.body = def?.kind
+                if kind == .head {
+                    info.flux = BeamLight.flux(lumens: def?.physical?.lumens)
+                    if let fd = def?.physical?.fieldDeg, fd > info.beamDeg { info.field = fd / info.beamDeg }
+                }
                 info.rot = f.rotDeg
                 info.truss = f.truss
                 if kind == .head { info.up = f.up }

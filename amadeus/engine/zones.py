@@ -102,9 +102,10 @@ def sky_or_ceiling(st: dict) -> float:
 def room_length(pos: np.ndarray, d: np.ndarray, st: dict) -> np.ndarray:
     """How far each beam travels before a room surface (floor, ceiling, the far walls), at most 40 m."""
     W, depth, ceil = st["width_m"], st.get("room_depth_m", 6.0), sky_or_ceiling(st)
+    side = geometry.room_side(st)
     t = np.full(len(d), 40.0)
     with np.errstate(divide="ignore", invalid="ignore"):
-        for k, lim_lo, lim_hi in ((2, 0.0, ceil), (1, -40.0, depth), (0, -2.0, W + 2.0)):
+        for k, lim_lo, lim_hi in ((2, 0.0, ceil), (1, -40.0, depth), (0, -side, W + side)):
             lo = (lim_lo - pos[k]) / d[:, k]
             hi = (lim_hi - pos[k]) / d[:, k]
             for cand in (lo, hi):
@@ -115,9 +116,10 @@ def room_length(pos: np.ndarray, d: np.ndarray, st: dict) -> np.ndarray:
 def room_length_many(pos: np.ndarray, d: np.ndarray, st: dict) -> np.ndarray:
     """room_length for many beams, each from its own position (pos (N, 3))."""
     W, depth, ceil = st["width_m"], st.get("room_depth_m", 6.0), sky_or_ceiling(st)
+    side = geometry.room_side(st)
     t = np.full(len(d), 40.0)
     with np.errstate(divide="ignore", invalid="ignore"):
-        for k, lim_lo, lim_hi in ((2, 0.0, ceil), (1, -40.0, depth), (0, -2.0, W + 2.0)):
+        for k, lim_lo, lim_hi in ((2, 0.0, ceil), (1, -40.0, depth), (0, -side, W + side)):
             for lim in (lim_lo, lim_hi):
                 cand = (lim - pos[:, k]) / d[:, k]
                 t = np.where((cand > 1e-6) & (cand < t), cand, t)

@@ -25,6 +25,8 @@ DEFAULT_STAGE = {
     "ceiling_m": 4.5,
     "outdoor": False,  # an open-air stage: no ceiling, the sky is free for beams (ceiling_m is then ignored)
     "room_depth_m": 6.0,  # from the stage edge to the far wall (beams stop there in the visualiser)
+    # "room_width_m": the hall's width, its side walls the same distance either side of the stage; when it isn't
+    # given, ROOM_SIDE_M either side
     "deck_m": 0.0,  # the stage's height above the hall floor (heights count from the hall floor)
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …
@@ -32,6 +34,15 @@ DEFAULT_STAGE = {
     "ceiling_guard": True,  # moving-head beams stay off the ceiling (they reach it no nearer than CEILING_RUN_M)
     "back_guard": True,  # … and never swing back past the rig towards the stage and the DJ
 }
+ROOM_SIDE_M = 2.0  # the room either side of the stage when the rig doesn't give the hall's width
+
+
+def room_side(st: dict) -> float:
+    """How far the side walls stand out from each edge of the stage (never inside it)."""
+    w = float(st["width_m"])
+    return max(0.0, (float(st.get("room_width_m") or w + 2 * ROOM_SIDE_M) - w) / 2)
+
+
 CEILING_RUN_M = (4.0, 10.0)  # a beam going up reaches the ceiling at least the room's depth away (in this range)
 CEILING_CLEAR_M = 0.3  # (measured from this far under the ceiling)
 BACK_Y = 0.2  # a beam may point back at most this much (y of the unit direction; 0.2 ≈ 12° past straight down/up)

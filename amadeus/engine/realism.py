@@ -22,9 +22,23 @@ from amadeus.library import fixtures as fxlib
 from amadeus.library import gobos
 
 WHEEL_SLOTS_PER_S = 14.0  # a typical colour wheel moves about 14 slots per second (shortest way round)
-REF_INTENSITY = 1500 / 4**2  # lumens per square degree that counts as a full-strength beam (a 4° 1,500 lm beam)
+REF_LUMENS = 1500.0  # the light of a beam drawn at full strength (a Sharpy's); the visualisers scale from it
+FLUX_RANGE = (0.25, 2.5)  # how much weaker or stronger than that a head is drawn (the square root of its lumens' share)
+FIELD = 1.8  # field angle (10 % of the centre's light) over beam angle (50 %): a smooth lens; physical.field_deg says
 GOBO_SLOTS_PER_S = 9.0  # a gobo wheel moves about this many slots per second
 ZOOM_PER_S = 2.5  # a zoom motor goes from tight to wide in about 0.4 s
+
+
+def beam_info(lumens, tight: float, wide: float, head: bool, field_deg=None) -> dict:
+    """How the visualisers draw a fixture's beam: the lens (beam angle, tightest and widest), the field angle as a
+    multiple of it (where the light fades out), and its flux: the light it puts out against a reference beam. The
+    visualisers make the shaft brighter the narrower it is and the spot dimmer the further it throws (the same
+    light over more of the air and the floor); a head without lumens counts as the reference."""
+    flux = 1.0
+    if head and lumens:
+        flux = min(FLUX_RANGE[1], max(FLUX_RANGE[0], math.sqrt(float(lumens) / REF_LUMENS)))
+    field = float(field_deg) / tight if field_deg and float(field_deg) > tight else FIELD
+    return {"beam_deg": tight, "beam_wide": wide, "field": round(field, 3), "flux": round(flux, 3)}
 
 
 class Realism:
@@ -44,12 +58,7 @@ class Realism:
             tight = float(phys.get("beam_deg", 25) or 25)
             wide = float(phys.get("beam_deg_max", tight))
             has_zoom = "zoom" in attrs and wide > tight
-            lumens = phys.get("lumens")
-            if e["kind"] == "head" and lumens:
-                output = min(1.0, max(0.3, math.sqrt(lumens / tight**2 / REF_INTENSITY)))
-                output_wide = min(1.0, max(0.15, math.sqrt(lumens / wide**2 / REF_INTENSITY)))
-            else:
-                output = output_wide = 1.0
+            beam = beam_info(phys.get("lumens"), tight, wide if has_zoom else tight, e["kind"] == "head", phys.get("field_deg"))
             # no colour channels at all: the lamp's own colour (halogen lamps glow warm, strobes are white,
             # blacklights UV)
             fixed = None
@@ -67,8 +76,7 @@ class Realism:
                 "cmy": "cyan" in attrs,
                 "tight": tight,
                 "wide": wide if has_zoom else tight,
-                "output": output,
-                "output_wide": output_wide if has_zoom else output,
+                "beam": beam,
                 "zoom": has_zoom,
             }
         self.wheel_pos: dict[str, float] = {}  # current (continuous) slot position per wheel fixture
@@ -104,13 +112,7 @@ class Realism:
 
     def hello_info(self, eid: str) -> dict:
         """Static per-fixture facts for the visualiser."""
-        i = self.info[eid]
-        return {
-            "beam_deg": i["tight"],
-            "beam_wide": i["wide"],
-            "output": round(i["output"], 3),
-            "output_wide": round(i["output_wide"], 3),
-        }
+        return self.info[eid]["beam"]
 
     def step(self, states: dict, dt: float) -> dict[str, tuple[float, float, float, float, float]]:
         """(dimmer, r, g, b, white) as the fixtures really show it, per element."""

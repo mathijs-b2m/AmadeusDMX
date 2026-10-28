@@ -89,6 +89,10 @@ struct EditorInspector: View {
                 ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
             }
             ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
+            ValueSlider(title: "Room width", value: Binding(get: { editor.doc.stage.roomWidth }, set: { v in
+                editor.updateStage("Change Room Width") { $0.roomWidthM = v }
+            }), range: editor.doc.width...max(80, editor.doc.width), step: 1)
+            .help("The hall's width, wall to wall: beams end on its side walls and the haze fills it. The stage stands in its middle")
             ValueSlider(title: "Stage height", value: Binding(get: { editor.doc.stage.deckM }, set: { editor.setStageHeight($0) }),
                         range: 0...3, step: 0.1)
                 .help("How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage")
@@ -243,10 +247,62 @@ private struct MultiFixtureInspector: View {
                 .pickerStyle(.segmented)
             }
         }
+        let heads = fixtures.filter { !$0.waiting && editor.definition($0.key)?.isMoving == true }
+        if !heads.isEmpty {
+            HeadGroupSection(editor: editor, ids: Set(heads.map(\.id)))
+        }
         SwiftUI.Section {
             Button("Auto-Mount These", systemImage: "wand.and.stars") { Task { await editor.autoMount(model, ids: Array(ids)) } }
             Button("Rotate 90°", systemImage: "rotate.right") { editor.rotateSelection(by: 90) }
             Button("Unmount (Back to Waiting)", systemImage: "arrow.down.to.line") { editor.unmount(ids) }
+        }
+    }
+}
+
+/// The head group of the selected moving heads (amadeus/rig/groups.py): Automatic groups them by where they
+/// stand (one row per depth and height, a tower, a ring); a name puts them in a group of their own.
+struct HeadGroupSection: View {
+    let editor: RigEditorModel
+    let ids: Set<String>
+    @State private var draft = ""
+
+    var body: some View {
+        let names = Set(ids.map { editor.doc.group($0) ?? "" })
+        let current = names.count == 1 ? names.first! : nil
+        SwiftUI.Section {
+            LabeledContent("Group") {
+                HStack(spacing: 4) {
+                    TextField("Group", text: $draft, prompt: Text(current == nil ? "Mixed" : "Automatic"))
+                        .labelsHidden()
+                        .multilineTextAlignment(.trailing)
+                        .onSubmit { editor.setGroup(ids, draft) }
+                    Menu {
+                        Button("Automatic") { editor.setGroup(ids, nil) }
+                        let groups = editor.doc.groupNames
+                        if !groups.isEmpty { Divider() }
+                        ForEach(groups, id: \.self) { g in Button(g) { editor.setGroup(ids, g) } }
+                    } label: {
+                        Image(systemName: "chevron.up.chevron.down")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("Put them in a group already on this rig, or back to Automatic")
+                }
+            }
+            .onAppear { draft = current ?? "" }
+            .onChange(of: current) { _, v in draft = v ?? "" }
+            .onChange(of: ids) { draft = current ?? "" }
+            if let current, !current.isEmpty {
+                let count = editor.doc.fixtures.filter { !$0.waiting && editor.doc.group($0.id) == current }.count
+                LabeledContent("Heads in it", value: "\(count)")
+            }
+        } header: {
+            Text("Head Group")
+        } footer: {
+            Text("The show plays a group as one line: fans, waves and chases run through it, and the groups answer each "
+                 + "other. Automatic groups heads by where they stand: a row at one depth and height, a tower, a ring. "
+                 + "Type a name to group heads that don't stand in a line, such as a scattered floor.")
         }
     }
 }
@@ -454,6 +510,9 @@ struct FixtureInspector: View {
                 Text("Moving fixtures aim themselves; the rotation tells the engine where their front is.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+        }
+        if def?.isMoving == true && !fixture.waiting {
+            HeadGroupSection(editor: editor, ids: [fixture.id])
         }
         SwiftUI.Section {
             if fixture.waiting {

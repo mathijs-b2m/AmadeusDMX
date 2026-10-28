@@ -35,17 +35,37 @@ extension StageRenderer {
             }
         }
 
+        // a head's beam (BeamLight): the lens's beam angle, a faint field round it; the shaft as bright as its light
+        // over its width, the spot as bright as its light over its size
+        func headBeam(_ p: SIMD3<Float>, _ d: SIMD3<Float>, beamDeg: Float, field: Float, color: SIMD3<Float>, light: Float) {
+            let (len, surf) = room.hit(p, d, maxLen: 30)
+            let lands = lands(surf)
+            let n = Room.normal(surf)
+            let squash = max(1, min(3, 1 / max(0.25, abs(simd_dot(d, n)))))
+            for (deg, k) in [(BeamLight.fieldDeg(beamDeg, field), BeamLight.fieldGlow), (beamDeg, Float(1))] {
+                let R = max(0.03, len * tan(deg * .pi / 360))
+                beams.append(BeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, light * k * BeamLight.haze),
+                                          extra: [0.04, BeamLight.refRadius, 0, 0]))
+                if lands {
+                    decals.append(DecalInstance(centerRadius: SIMD4(p + d * len, max(0.06, R * 1.15)), normal: SIMD4(n, squash),
+                                                color: SIMD4(color, light * k * 0.8 * BeamLight.gain(radius: R))))
+                }
+            }
+        }
+
+        // the light over the width, as headBeam: in the haze where it is halfway, on the surface where it lands
         func goboBeam(_ p: SIMD3<Float>, _ d: SIMD3<Float>, spreadDeg: Float, color: SIMD3<Float>, intensity: Float,
                       wheel: SIMD4<Float>, axis: SIMD4<Float>) {
             let (len, surf) = room.hit(p, d, maxLen: 30)
             let r0 = wheel.w, R = max(r0 + 0.01, len * tan(spreadDeg * .pi / 360))
-            goboBeams.append(GoboBeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, intensity),
+            let haze = BeamLight.gain(radius: (r0 + R) / 2), spot = BeamLight.gain(radius: R)
+            goboBeams.append(GoboBeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, intensity * haze),
                                               wheel: wheel, axis: axis))
             if lands(surf) {
                 let n = Room.normal(surf)
                 let squash = max(1, min(3, 1 / max(0.25, abs(simd_dot(d, n)))))
                 goboDecals.append(GoboDecalInstance(centerRadius: SIMD4(p + d * len, max(0.12, R * 1.15)), normal: SIMD4(n, squash),
-                                                    color: SIMD4(color, intensity * 0.75), apexLen: SIMD4(p, len),
+                                                    color: SIMD4(color, intensity * 0.75 * spot), apexLen: SIMD4(p, len),
                                                     dirK: SIMD4(d, (R - r0) / max(len, 1e-3)), wheel: wheel, axis: axis))
             }
         }
@@ -76,11 +96,10 @@ extension StageRenderer {
                 d = simd_normalize(d)
                 let name = frame.flatMap { i < $0.beam.count ? $0.beam[i] : nil } ?? "open"
                 let gobo = highlight.contains(fx.id) ? nil : frame.flatMap { i < $0.gobo.count ? $0.gobo[i] : nil }
-                // the lens with the zoom the show sends: between its tightest and widest beam, as bright as the light
-                // packed into it
+                // the lens with the zoom the show sends: between its tightest and widest beam (the same light spread
+                // wider: dimmer, BeamLight)
                 let zoom = frame.flatMap { i < $0.zoom.count ? $0.zoom[i] : nil }
                 let lens = Float(fx.beamDeg) + Float(fx.beamWide - fx.beamDeg) * (zoom ?? 0)
-                let zoomed = Float(fx.output) + Float(fx.outputWide - fx.output) * (zoom ?? 0)
                 // the gobo's picture across the beam: along the head's tilt axis (pan turns it with the head)
                 let tilt = simd_cross(rest, d)
                 if simd_length(tilt) > 0.15 { goboAxis[fx.id] = simd_normalize(tilt) }
@@ -99,11 +118,9 @@ extension StageRenderer {
                         return simd_normalize(d + 0.07 * (cos(a) * a1 + sin(a) * a2))
                     }
                 }
-                let frost = name == "frost"
-                let spread = frost ? max(Float(fx.beamWide), 25) * 1.2 : max(lens * 1.6, 2.5)
-                let strength = frost ? Float(fx.outputWide) : zoomed
-                var a = (frost ? dim * 0.45 : rays.count > 1 ? dim * 0.6 : dim) * density * strength * 0.75
-                if highlight.contains(fx.id) { a = 2.5 }
+                let frost = name == "frost"   // a frost spreads it wide and soft
+                var a = (rays.count > 1 ? dim * 0.6 : dim) * density * Float(fx.flux)
+                if highlight.contains(fx.id) { a = max(a, 1.5) }
                 if let g = gobo, goboSlices > 0 {
                     // a shaking gobo wobbles on its wheel: a little to and fro, a little turned
                     let wobble = g.shake > 0 ? sin(t * g.shake * 2 * .pi) : 0
@@ -113,11 +130,13 @@ extension StageRenderer {
                     // a gobo is projected with the lens as it is (the haze cone's extra width would blur the pattern); its
                     // shafts a little brighter than a plain beam's haze, as the metal between them takes most of the light
                     for r in rays {
-                        goboBeam(p, r, spreadDeg: max(lens * 1.25, 2.5), color: col, intensity: a * 1.5, wheel: wheel,
-                                 axis: SIMD4(across, rot))
+                        goboBeam(p, r, spreadDeg: max(lens, 1), color: col, intensity: a * 1.1, wheel: wheel, axis: SIMD4(across, rot))
                     }
                 } else {
-                    for r in rays { beam(p, r, spreadDeg: spread, color: col, intensity: a) }
+                    for r in rays {
+                        headBeam(p, r, beamDeg: frost ? max(Float(fx.beamWide), 25) : max(lens, 0.5), field: frost ? 1.4 : Float(fx.field),
+                                 color: col, light: a)
+                    }
                 }
                 // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
                 // smaller for the cells of a bar (many small lenses, not one big one)

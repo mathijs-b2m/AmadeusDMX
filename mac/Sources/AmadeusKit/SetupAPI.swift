@@ -449,6 +449,15 @@ public struct SetupAPI: Sendable {
         return r.problems ?? []
     }
 
+    /// A fixture's lens and light as its manual gives them, into your copy of it; returns the problems (nothing saved if any).
+    public func saveLens(key: String, beamDeg: Double, zoomTo: Double?, lumens: Double?) async throws -> [String] {
+        var body: [String: Any] = ["key": key, "beam_deg": beamDeg]
+        if let zoomTo { body["beam_deg_max"] = zoomTo }
+        if let lumens { body["lumens"] = lumens }
+        let r: SaveResult = try await post("api/fixture/lens", body)
+        return r.problems ?? (r.error.map { [$0] } ?? [])
+    }
+
     /// The common layouts a fixture without a brand is made from, the closest to `type` and `channels` first.
     public func fixtureTemplates(type: String = "", channels: Int = 0) async throws -> FixtureTemplates {
         try await get("api/fixture/templates", query: ["type": type, "channels": String(channels)])
@@ -456,10 +465,10 @@ public struct SetupAPI: Sendable {
 
     /// Makes a fixture in your library from a template; returns its key and mode, or the problems.
     public func newFixture(manufacturer: String, model: String, template: String, channels: Int, type: String,
-                           watts: Int, panDeg: Int, tiltDeg: Int) async throws -> NewFixture {
+                           watts: Int, panDeg: Int, tiltDeg: Int, beamDeg: Double = 0) async throws -> NewFixture {
         try await post("api/fixture/new", ["manufacturer": manufacturer, "model": model, "template": template,
                                            "channels": channels, "type": type, "watts": watts,
-                                           "pan_deg": panDeg, "tilt_deg": tiltDeg])
+                                           "pan_deg": panDeg, "tilt_deg": tiltDeg, "beam_deg": beamDeg])
     }
 }
 

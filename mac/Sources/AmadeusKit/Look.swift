@@ -49,6 +49,7 @@ public struct Room: Sendable {
         outdoor = stage.outdoor
         deck = Float(stage.deckM)
         depth = Float(stage.roomDepthM)
+        side = Float(stage.roomWidth - stage.widthM) / 2
         let trussBack = trusses.map { t -> Double in
             t.vertical ? t.yM : t.pieces().map { min($0.0.y, $0.1.y) }.min() ?? t.yM
         }

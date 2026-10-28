@@ -38,7 +38,7 @@ cbuffer BlurParams : register(b2)
     float4 blurStep;    // xy one texel along the pass's direction (uv), z sigma (texels)
 };
 
-struct BeamInstance { float4 apexLen; float4 dirRadius; float4 colorIntensity; float4 extra; };  // extra.x = lens radius
+struct BeamInstance { float4 apexLen; float4 dirRadius; float4 colorIntensity; float4 extra; };  // extra.x = lens radius, y = reference radius (BeamLight)
 struct SpriteInstance { float4 centerSize; float4 colorIntensity; float4 extra; };              // extra.x = hardness
 struct DecalInstance { float4 centerRadius; float4 normal; float4 colorIntensity; };
 struct LineInstance { float4 p0Width; float4 p1; float4 colorIntensity; };

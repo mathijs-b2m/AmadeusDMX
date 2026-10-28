@@ -311,6 +311,29 @@ public class ProtocolTests
         Assert.Null(f.Ring[1]);
         Assert.Empty(DecodeFrame("""{"type": "frame", "t": 1, "phrase": 0}""").Ring);  // an engine without rings
     }
+
+    [Fact]
+    public void AHeadsFluxAndFieldDecodeAndDrawAsBeamLight()
+    {
+        var h = DecodeHello("""
+            {"type": "hello", "fixtures": [{"id": "a", "kind": "head", "pos": [1, 0, 3], "beam_deg": 4, "flux": 1.6, "field": 1.5},
+                                           {"id": "b", "kind": "head", "pos": [2, 0, 3], "beam_deg": 4}]}
+            """);
+        Assert.Equal(1.6, h.Fixtures[0].Flux);
+        Assert.Equal(1.5, h.Fixtures[0].Field);
+        Assert.Equal(1, h.Fixtures[1].Flux);                    // an older engine: the reference light, a smooth lens
+        Assert.Equal(BeamLight.Field, h.Fixtures[1].Field);
+        // the reference beam (4° at 4 m) has gain 1; a narrower one is brighter (at most 3), a wider one dimmer
+        Assert.Equal(1, BeamLight.Gain(4 * MathF.Tan(2 * MathF.PI / 180)), 4);
+        Assert.Equal(BeamLight.MaxGain, BeamLight.Gain(0.001f));
+        Assert.True(BeamLight.Gain(1) < 0.2f);
+        Assert.Equal(7.2f, BeamLight.FieldDeg(4, 1.8f), 4);
+        Assert.Equal(70, BeamLight.FieldDeg(40, 1.8f));         // a wide wash's glow at most 30° wider
+        Assert.Equal(1, BeamLight.Flux(1500));
+        Assert.Equal(1, BeamLight.Flux(null));
+        Assert.Equal(0.25, BeamLight.Flux(10));
+        Assert.Equal(2.5, BeamLight.Flux(1e6));
+    }
 }
 
 static class TestHelpers

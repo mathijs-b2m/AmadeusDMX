@@ -38,3 +38,22 @@ private func document() throws -> RigDocument {
     let a = try #require(((out?["fixtures"] as? [[String: Any]]) ?? []).first { $0["id"] as? String == "a" })
     #expect(a["pan_invert"] as? Bool == true && a["pan_home_deg"] as? Double == 90)
 }
+
+@Test func headsGroupedByHandAreSavedAndCanGoBackToAutomatic() throws {
+    var d = try document()
+    d.setGroup(["a", "b"], "  floor left ")
+    #expect(d.group("a") == "floor left" && d.group("b") == "floor left" && d.groupNames == ["floor left"])
+    d.setGroup(["b"], "")
+    let saved = try RigDocument(rig: "r", set: "s", data: d.json())
+    #expect(saved.group("a") == "floor left" && saved.group("b") == nil)
+}
+
+@Test func theHallIsTwoMetresEitherSideUnlessTheRigSaysHowWide() throws {
+    var st = try JSONDecoder().decode(Stage.self, from: Data(#"{"width_m": 4}"#.utf8))
+    #expect(st.roomWidth == 8 && Room(stage: st, fixtures: []).side == 2)
+    st.roomWidthM = 20
+    let back = try JSONDecoder().decode(Stage.self, from: JSONEncoder().encode(st))
+    #expect(back.roomWidthM == 20 && Room(stage: back, fixtures: []).side == 8)
+    st.roomWidthM = 2  // never narrower than the stage
+    #expect(st.roomWidth == 4 && Room(stage: st, fixtures: []).side == 0)
+}

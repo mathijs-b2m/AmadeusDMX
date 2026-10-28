@@ -160,10 +160,10 @@ public sealed record Truss
 /// A fixture definition (fixtures/BRAND/MODEL.json), the parts placement and drawing need.
 public sealed class FixtureDefinition
 {
-    public sealed record PhysicalInfo(double? BeamDeg, double? BeamDegMax, double? Lumens, double[]? SizeMM)
+    public sealed record PhysicalInfo(double? BeamDeg, double? BeamDegMax, double? Lumens, double[]? SizeMM, double? FieldDeg = null)
     {
         public static PhysicalInfo From(JsonElement c) => new(J.Val(c, "beam_deg", J.Double), J.Val(c, "beam_deg_max", J.Double),
-            J.Val(c, "lumens", J.Double), J.Ref(c, "size_mm", J.ArrayOf(J.Double)));
+            J.Val(c, "lumens", J.Double), J.Ref(c, "size_mm", J.ArrayOf(J.Double)), J.Val(c, "field_deg", J.Double));
     }
 
     public string Manufacturer { get; init; } = "";
@@ -451,6 +451,20 @@ public sealed class RigDocument
     public void Calibrate(string id, IReadOnlyDictionary<string, JSONValue> fields) =>
         UpdateRaw(id, o => { foreach (var (k, v) in fields) o[k] = v; });
 
+    /// The head group a fixture is put in by hand (amadeus/rig/groups.py); null: grouped by where it stands.
+    public string? Group(string id) => RawFixture(id).GetValueOrDefault("group")?.String;
+
+    /// The hand-made group names on this rig, sorted.
+    public IReadOnlyList<string> GroupNames =>
+        [.. Fixtures.Where(f => !f.Waiting).Select(f => Group(f.Id)).OfType<string>().Distinct().Order(StringComparer.Ordinal)];
+
+    /// These fixtures into one hand-made group, or back to grouping by where they stand (null or blank).
+    public void SetGroup(IEnumerable<string> ids, string? name)
+    {
+        var n = name?.Trim() ?? "";
+        foreach (var id in ids) UpdateRaw(id, o => Put(o, "group", n.Length == 0 ? null : JSONValue.Of(n)));
+    }
+
     public IReadOnlyDictionary<string, JSONValue> RawFixture(string id) =>
         (Raw.GetValueOrDefault("fixtures")?.Array ?? []).Select(v => v.Object).OfType<IReadOnlyDictionary<string, JSONValue>>()
         .FirstOrDefault(o => o.GetValueOrDefault("id")?.String == id) ?? new Dictionary<string, JSONValue>();
@@ -557,6 +571,11 @@ public static class RigElements
                     Rot = f.RotDeg,
                     Truss = f.Truss,
                 };
+                if (kind == FixtureKind.Head)
+                {
+                    info.Flux = BeamLight.Flux(def?.Physical?.Lumens);
+                    if (def?.Physical?.FieldDeg is { } fd && fd > info.BeamDeg) info.Field = fd / info.BeamDeg;
+                }
                 if (kind == FixtureKind.Head) info.Up = f.Up;
                 info.Size = def is null ? null : def.Size.ToArray();
                 if (n > 1) { info.Cells = n; info.Length = length; }
