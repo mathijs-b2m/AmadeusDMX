@@ -47,3 +47,13 @@ private func document() throws -> RigDocument {
     let saved = try RigDocument(rig: "r", set: "s", data: d.json())
     #expect(saved.group("a") == "floor left" && saved.group("b") == nil)
 }
+
+@Test func theHallIsTwoMetresEitherSideUnlessTheRigSaysHowWide() throws {
+    var st = try JSONDecoder().decode(Stage.self, from: Data(#"{"width_m": 4}"#.utf8))
+    #expect(st.roomWidth == 8 && Room(stage: st, fixtures: []).side == 2)
+    st.roomWidthM = 20
+    let back = try JSONDecoder().decode(Stage.self, from: JSONEncoder().encode(st))
+    #expect(back.roomWidthM == 20 && Room(stage: back, fixtures: []).side == 8)
+    st.roomWidthM = 2  // never narrower than the stage
+    #expect(st.roomWidth == 4 && Room(stage: st, fixtures: []).side == 0)
+}

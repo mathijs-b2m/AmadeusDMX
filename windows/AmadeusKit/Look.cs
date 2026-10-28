@@ -58,6 +58,7 @@ public sealed record Room
         Outdoor = stage.Outdoor;
         Deck = (float)stage.DeckM;
         Depth = (float)stage.RoomDepthM;
+        Side = (float)(stage.RoomWidth - stage.WidthM) / 2;
         var trussBack = (trusses ?? []).Select(t => t.Vertical ? t.YM : t.Pieces().Select(p => Math.Min(p.A.Y, p.B.Y)).DefaultIfEmpty(t.YM).Min());
         var rear = fixtures.Select(f => f.Pos.Y).Concat(trussBack).DefaultIfEmpty(-1).Min();
         Back = Math.Min(-2.5f, (float)rear - 1.5f);

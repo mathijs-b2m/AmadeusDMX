@@ -1,6 +1,8 @@
 import numpy as np
+import pytest
 
 from amadeus.engine import zones
+from amadeus.rig import geometry
 
 WALL = {
     "id": "w",
@@ -54,3 +56,12 @@ def test_a_sweep_turned_into_a_keep_in_zone_keeps_moving():
     assert all(zs._inside(z, pos, out).all() for z in zs.keep_in)  # inside…
     spread = np.degrees(np.arccos(np.clip(out @ out.T, -1, 1))).max()
     assert spread > 20  # …and still a sweep (each turned in on its own: about 2°)
+
+
+def test_side_walls_stand_where_the_hall_is_wide():
+    st = geometry.stage({"stage": {"width_m": 4, "ceiling_m": 4, "room_depth_m": 10}})
+    pos, sideways = np.array([2.0, 1.0, 1.0]), np.array([[1.0, 0.0, 0.0]])
+    assert zones.room_length(pos, sideways, st)[0] == pytest.approx(4.0)  # 2 m past the stage by default
+    st["room_width_m"] = 20
+    assert zones.room_length(pos, sideways, st)[0] == pytest.approx(10.0)
+    assert zones.room_length_many(pos[None], sideways, st)[0] == pytest.approx(10.0)

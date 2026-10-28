@@ -123,6 +123,9 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             d.Stage.Outdoor ? null
                 : EditorUI.ValueSlider(editor, "Ceiling", () => editor.Doc.Stage.CeilingM, v => editor.UpdateStage(s => s.CeilingM = v), 2.5, 20, 0.5),
             EditorUI.ValueSlider(editor, "Room depth", () => editor.Doc.Stage.RoomDepthM, v => editor.UpdateStage(s => s.RoomDepthM = v), 3, 60, 1),
+            EditorUI.ValueSlider(editor, "Room width", () => editor.Doc.Stage.RoomWidth, v => editor.UpdateStage("Change Room Width", s => s.RoomWidthM = v),
+                () => editor.Doc.Width, () => Math.Max(80, editor.Doc.Width), 1)
+                .Tooltip("The hall's width, wall to wall: beams end on its side walls and the haze fills it. The stage stands in its middle"),
             EditorUI.NumberField(editor, "Stage height", () => editor.Doc.Stage.DeckM, editor.SetDeck, 0, 3, 0.1,
                 help: "How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage"),
             EditorUI.Toggle(editor, "LED wall behind the DJ", () => editor.Doc.HasScreen, editor.SetScreen),

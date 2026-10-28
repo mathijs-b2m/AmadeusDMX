@@ -50,6 +50,8 @@ public struct Stage: Codable, Sendable, Equatable {
     public var widthM: Double
     public var ceilingM: Double
     public var roomDepthM: Double
+    /// The hall's width, its side walls the same distance either side of the stage; nil: 2 m either side.
+    public var roomWidthM: Double?
     /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
     public var deckM = 0.0
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
@@ -60,8 +62,14 @@ public struct Stage: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case deckM = "deck_m", backGuard = "back_guard", outdoor
+        case deckM = "deck_m", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m"
     }
+
+    /// The room either side of the stage when the rig doesn't give the hall's width (amadeus/rig/geometry.py).
+    public static let roomSideM = 2.0
+
+    /// The hall's width: as the rig gives it, never narrower than the stage.
+    public var roomWidth: Double { max(widthM, roomWidthM ?? widthM + 2 * Self.roomSideM) }
 
     /// Whether a spot (x: fraction of the stage width) is on the stage: behind its front edge, across its width.
     public static func onStage(x: Double, yM: Double) -> Bool { yM <= 0 && x >= 0 && x <= 1 }
@@ -82,6 +90,7 @@ public struct Stage: Codable, Sendable, Equatable {
         ceilingGuard = try c.decodeIfPresent(Bool.self, forKey: .ceilingGuard) ?? true
         backGuard = try c.decodeIfPresent(Bool.self, forKey: .backGuard) ?? true
         outdoor = try c.decodeIfPresent(Bool.self, forKey: .outdoor) ?? false
+        roomWidthM = try c.decodeIfPresent(Double.self, forKey: .roomWidthM)
     }
 }
 

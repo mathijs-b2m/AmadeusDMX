@@ -89,6 +89,10 @@ struct EditorInspector: View {
                 ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
             }
             ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
+            ValueSlider(title: "Room width", value: Binding(get: { editor.doc.stage.roomWidth }, set: { v in
+                editor.updateStage("Change Room Width") { $0.roomWidthM = v }
+            }), range: editor.doc.width...max(80, editor.doc.width), step: 1)
+            .help("The hall's width, wall to wall: beams end on its side walls and the haze fills it. The stage stands in its middle")
             ValueSlider(title: "Stage height", value: Binding(get: { editor.doc.stage.deckM }, set: { editor.setStageHeight($0) }),
                         range: 0...3, step: 0.1)
                 .help("How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage")

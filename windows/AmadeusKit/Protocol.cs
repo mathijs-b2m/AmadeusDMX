@@ -197,6 +197,8 @@ public sealed record Stage
     public double WidthM { get; set; } = 6;
     public double CeilingM { get; set; } = 4.5;
     public double RoomDepthM { get; set; } = 6;
+    /// The hall's width, its side walls the same distance either side of the stage; null: 2 m either side.
+    public double? RoomWidthM { get; set; }
     /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
     public double DeckM { get; set; }
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
@@ -210,22 +212,34 @@ public sealed record Stage
         WidthM = widthM; CeilingM = ceilingM; RoomDepthM = roomDepthM;
     }
 
+    /// The room either side of the stage when the rig doesn't give the hall's width (amadeus/rig/geometry.py).
+    public const double RoomSideM = 2;
+
+    /// The hall's width: as the rig gives it, never narrower than the stage.
+    public double RoomWidth => Math.Max(WidthM, RoomWidthM ?? WidthM + 2 * RoomSideM);
+
     public static Stage From(JsonElement c) => new()
     {
         WidthM = J.Val(c, "width_m", J.Double) ?? 6,
         CeilingM = J.Val(c, "ceiling_m", J.Double) ?? 4.5,
         RoomDepthM = J.Val(c, "room_depth_m", J.Double) ?? 6,
+        RoomWidthM = J.Val(c, "room_width_m", J.Double),
         DeckM = J.Val(c, "deck_m", J.Double) ?? 0,
         CeilingGuard = J.Val(c, "ceiling_guard", J.Bool) ?? true,
         BackGuard = J.Val(c, "back_guard", J.Bool) ?? true,
         Outdoor = J.Val(c, "outdoor", J.Bool) ?? false,
     };
 
-    public JSONValue ToJSON() => JSONValue.Of(new Dictionary<string, JSONValue>
+    public JSONValue ToJSON()
     {
-        ["width_m"] = WidthM, ["ceiling_m"] = CeilingM, ["room_depth_m"] = RoomDepthM, ["deck_m"] = DeckM,
-        ["ceiling_guard"] = CeilingGuard, ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
-    });
+        var o = new Dictionary<string, JSONValue>
+        {
+            ["width_m"] = WidthM, ["ceiling_m"] = CeilingM, ["room_depth_m"] = RoomDepthM, ["deck_m"] = DeckM,
+            ["ceiling_guard"] = CeilingGuard, ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
+        };
+        if (RoomWidthM is { } w) o["room_width_m"] = w;
+        return JSONValue.Of(o);
+    }
 }
 
 public enum FixtureKind { Head, Laser, Blinder, Par, Strobe, Smoke, Other }

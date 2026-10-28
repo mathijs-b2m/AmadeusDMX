@@ -21,6 +21,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from amadeus.library import fixtures as fxlib
+from amadeus.rig import geometry
 
 FOG_FPS = 20
 
@@ -63,13 +64,14 @@ def machine(element_id: str, defn: dict) -> Machine:
 
 
 def room_volume(stage: dict) -> float:
-    """The room's air in m³: as the rig says, else the stage width (plus the room either side), the depth in
+    """The room's air in m³: as the rig says, else the hall's width (the stage plus the room either side), the depth in
     front (plus the stage) and the ceiling."""
     if stage.get("room_volume_m3"):
         return float(stage["room_volume_m3"])
     if stage.get("outdoor"):  # open air: the haze only has to fill the air over the stage and the crowd
         return (stage["width_m"] + 8.0) * (stage["room_depth_m"] + 6.0) * OUTDOOR_HAZE_M
-    return (stage["width_m"] + 4.0) * (stage["room_depth_m"] + 3.0) * stage["ceiling_m"]
+    hall = stage["width_m"] + 2 * geometry.room_side(stage)
+    return hall * (stage["room_depth_m"] + 3.0) * stage["ceiling_m"]
 
 
 def plan(

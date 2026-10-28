@@ -158,7 +158,7 @@ function camera(W, H) {
 
 function beamEnd(pos, d, st, nearCam = 4) {
   // the room: floor, ceiling, far wall (audience side), back wall and side walls: beams stop where they would
-  const depth = st.room_depth_m || 6, side = 2.0, W = st.width_m;
+  const W = st.width_m, depth = st.room_depth_m || 6, side = Math.max(0, ((st.room_width_m || W + 4) - W) / 2);
   const hits = [];
   if (d[2] < -1e-3) hits.push([-pos[2] / d[2], "floor"]);
   if (d[2] > 1e-3 && !st.outdoor) hits.push([(st.ceiling_m - pos[2]) / d[2], "ceiling"]);  // outdoors: the sky
