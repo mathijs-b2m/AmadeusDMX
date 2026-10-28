@@ -37,6 +37,7 @@ final class StageMTKView: MTKView {
     weak var controller: StageController?
     private var last: NSPoint = .zero
     private var dragging = false
+    private var responderWatch: NSKeyValueObservation?
 
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -44,6 +45,7 @@ final class StageMTKView: MTKView {
     // don't draw while minimised (occlusion state is unreliable with Stage Manager: it paused visible windows)
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        responderWatch = nil
         guard let w = window else { return }
         for (name, paused) in [(NSWindow.didMiniaturizeNotification, true), (NSWindow.didDeminiaturizeNotification, false)] {
             NotificationCenter.default.addObserver(forName: name, object: w, queue: .main) { [weak self] _ in
@@ -62,6 +64,23 @@ final class StageMTKView: MTKView {
         }
         isPaused = false
         registerForDraggedTypes([.string])
+        // a click in the sidebar leaves the keys with it, where ↑↓ and W/S switch pages: they walk and fly here instead
+        responderWatch = w.observe(\.firstResponder, options: [.initial, .new]) { [weak self] w, _ in
+            MainActor.assumeIsolated { self?.takeKeys(from: w.firstResponder) }
+        }
+    }
+
+    /// The window's sidebar is the first pane of its outermost split view (a page's own lists stay as they are).
+    private func takeKeys(from responder: NSResponder?) {
+        guard let list = responder as? NSTableView, !isHiddenOrHasHiddenAncestor else { return }
+        var split: NSSplitView?
+        var v = superview
+        while let s = v { if let s = s as? NSSplitView { split = s }; v = s.superview }
+        guard let sidebar = split?.arrangedSubviews.first, list.isDescendant(of: sidebar), !isDescendant(of: sidebar) else { return }
+        DispatchQueue.main.async { [weak self] in  // not while the click is still selecting the row
+            guard let self, self.window?.firstResponder === list else { return }
+            self.window?.makeFirstResponder(self)
+        }
     }
 
     private func ray(_ e: NSEvent) -> (SIMD3<Float>, SIMD3<Float>)? { ray(windowPoint: e.locationInWindow) }
