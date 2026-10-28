@@ -109,15 +109,31 @@ public sealed partial class StageView : SwapChainPanel
         {
             root.Changed += OnRootChanged;
             _visible = root.IsHostVisible;
+            TakeKeys(FocusManager.GetFocusedElement(root));   // the sidebar item that brought this page up
         }
+        FocusManager.GotFocus -= OnFocusMoved;   // once, though WinUI can load a view twice before unloading it
+        FocusManager.GotFocus += OnFocusMoved;
         Resize();
         Schedule();
+    }
+
+    // a click in the sidebar leaves the keys with it, where ↑↓ move through the pages: they walk and fly here instead
+    void OnFocusMoved(object? sender, FocusManagerGotFocusEventArgs e) => TakeKeys(e.NewFocusedElement);
+
+    void TakeKeys(object? focused)
+    {
+        if (focused is not NavigationViewItem { FocusState: FocusState.Pointer } item || item.XamlRoot != XamlRoot || !_loaded) return;
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (_loaded && XamlRoot is { } root && ReferenceEquals(FocusManager.GetFocusedElement(root), item)) FocusForKeys();
+        });
     }
 
     void OnUnloaded(object sender, RoutedEventArgs e)
     {
         if (IsLoaded) return;   // moved to another parent (WinUI can send the new Loaded before the old Unloaded)
         _loaded = false;
+        FocusManager.GotFocus -= OnFocusMoved;
         if (XamlRoot is { } root) root.Changed -= OnRootChanged;
         StopLoop();
         if (_controller.View == this) _controller.View = null;
