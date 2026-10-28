@@ -335,7 +335,7 @@ def check_show(a: dict) -> dict:
     """What would stop the set from saving, channel overlaps, fixtures not mounted, fixtures that stay dark."""
     from amadeus.dmx import outputs
     from amadeus.library import fixtures as fxlib
-    from amadeus.rig import store
+    from amadeus.rig import hangsheet, store
 
     show = _show(a)
     merged = show.load()
@@ -357,6 +357,7 @@ def check_show(a: dict) -> dict:
         "not_patched": [f["id"] for f in merged.get("fixtures", []) if not fxlib.patched(f)],
         "unknown_fixture_definition": missing,
         "stays_dark": dark,
+        "overloaded": hangsheet.overloaded(merged),
     }
 
 
@@ -399,7 +400,7 @@ TOOLS = {
     "create_rig": (create_rig, False, "A new rig (a venue) from a template, or a copy of another (copy_of). "
                    "Becomes the active rig unless make_active is false.", _schema({
                        "name": {"type": "string"},
-                       "template": {"type": "string", "enum": ["floor", "stands", "booth", "club", "stage", "ring"]},
+                       "template": {"type": "string", "enum": ["floor", "stands", "bridge", "booth", "club", "stage", "ring"]},
                        "width_m": {"type": "number", "description": "stage width (default 8)"},
                        "truss_height_m": {"type": "number", "description": "default 4.5"},
                        "room_depth_m": {"type": "number", "description": "room in front of the stage (default 15)"},

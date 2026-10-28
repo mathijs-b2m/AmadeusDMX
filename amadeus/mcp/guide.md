@@ -27,7 +27,10 @@ of the stage, the back is negative. `z` is height.
 
 A truss: `{"id", "type": "quatro", "length_m", "x_m" (its centre), "y_m", "z_m", "rot_deg"}`; a tower adds
 `"vertical": true` (then `length_m` is its height and `z_m` its middle); a round truss `"shape": "circle"`,
-`diameter_m`, `arc_deg`. A truss may say where its heads play: `"aim": "audience"` or `"down"`.
+`diameter_m`, `arc_deg`. A light stand is the cheap kind: `"type": "bridge"` (a bar on a tripod at each end) or
+`"tbar"` (a T-bar on one tripod), `z_m` the bar's height, with `max_kg`, `min_height_m` and `max_height_m` from the maker when known;
+`check_show` lists the stands carrying more than that (`overloaded`). A truss may say where its heads play:
+`"aim": "audience"` or `"down"`.
 
 A fixture's placement: `x`, `y_m`, `z_m`, `mount` (`hang`, `stand`, `floor`), `rot_deg` (counter-clockwise seen
 from above), and on a truss `truss` (its id), `truss_pos_m` (from the truss's centre along it; from the base on
@@ -47,7 +50,7 @@ the rest when it loads the rig. If in doubt, let `automount` place it and adjust
    user which DMX mode their fixtures are set to when it matters: a wrong mode drives the wrong channels. When
    the library hasn't got the exact model, see below: never patch another one instead.
 4. After every change, `check_show`, and tell the user what it says: problems, overlapping addresses, fixtures
-   not mounted or not patched, and fixtures the show keeps dark (converted lasers, smoke without a level).
+   not mounted or not patched, light stands carrying too much, and fixtures the show keeps dark (converted lasers, smoke without a level).
 5. Keep a venue's rig symmetric where the room is: what hangs stage left mirrors stage right. Fixed lights
    (pars, washes, blinders) point at the stage or the crowd, never at a wall.
 6. A new venue gets its own rig (`create_rig` from the nearest template, then adjust); the user's gear stays the

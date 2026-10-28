@@ -80,6 +80,19 @@ the sky aim goes higher and wider, the directors aim at the sky far more often (
 show), and smoke clears in about a minute instead of five. Indoors nothing changes: the ceiling guard keeps
 beams off the ceiling.
 
+**Light stands.** The cheaper kind of truss: a tube of about 40 mm on tripod stands instead of a 30 cm box truss.
+`"type": "bridge"` is a light bridge, a bar with a stand under each end; `"type": "tbar"` a T-bar stand, a short bar
+on one stand under its middle. `z_m` is the bar's height and the stands go down to the floor. Fixtures clamp to the
+tube on the same four sides as on a box truss, only closer to it. `max_kg` (what it takes) and `min_height_m`/`max_height_m`
+(how low and high it goes) are the maker's figures: the editor keeps it in that range, and the hang sheet and `check_show` say
+when the fixtures on it weigh more. The editor offers a 3 m bridge up to 3 m (60 kg), a 3 m bridge up to 2.65 m
+(25 kg), a 1.2 m T-bar stand up to 3.5 m (50 kg) and a 1 m one up to 2.5 m (10 kg), the usual budget ones; any
+other size works.
+
+```json
+{"id": "bridge", "type": "bridge", "length_m": 3, "x_m": 4, "y_m": -0.8, "z_m": 3, "max_kg": 60, "max_height_m": 3}
+```
+
 **Round truss.** A truss with `"shape": "circle"` hangs flat as a full circle, or as an arc of `arc_deg` (180: a
 half circle), `diameter_m` across; `x_m`/`y_m` are the circle's centre and the middle of an arc faces the audience
 (turned by `rot_deg`). Round truss is sold in a few sizes: the editor offers Ø 2, 3, 4, 5, 6 and 8 m (any other

@@ -206,6 +206,16 @@ def layout(merged: dict) -> dict:
     return {"width_m": W, "structures": structures, "floor": floor, "waiting": waiting, "patch": rows}
 
 
+def overloaded(merged: dict) -> dict[str, str]:
+    """Light stands carrying more than they take (`max_kg`), as far as the fixtures' weights are known."""
+    out = {}
+    for st in layout(merged)["structures"]:
+        limit = st["truss"].get("max_kg")
+        if limit and st["kg"] > limit:
+            out[st["id"]] = f"≈ {st['kg']:.0f} kg on it, it takes {limit:g} kg"
+    return out
+
+
 # ---- the page --------------------------------------------------------------------------------------------------
 
 
@@ -373,6 +383,9 @@ def _load(st: dict) -> str:
         parts.append(f"≈ {st['watts']} W")
     if st["kg"]:
         parts.append(f"≈ {st['kg']:.0f} kg" + (f" + {st['kg_unknown']} of unknown weight" if st["kg_unknown"] else ""))
+    limit = st["truss"].get("max_kg")
+    if limit:
+        parts.append(f"takes {limit:g} kg" + (" — TOO HEAVY" if st["kg"] > limit else ""))
     return " · ".join(parts)
 
 
@@ -468,7 +481,8 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
             deck = float(merged.get("stage", {}).get("deck_m", 0.0))
             trim = (f"{t['z_m'] - deck:.1f} m above the stage ({t['z_m']:.1f} m above the hall floor)"
                     if deck > 0 and t["y_m"] < 0 else f"{t['z_m']:.1f} m")  # fmt: skip
-            what = f"truss {t['length_m']:.1f} m long, at {trim}, {abs(t['y_m']):.1f} m " + (
+            noun = {"bridge": "light bridge", "tbar": "T-bar stand"}.get(t.get("type", "")) if T.is_stand(t) else None
+            what = f"{noun or 'truss'} {t['length_m']:.1f} m long, at {trim}, {abs(t['y_m']):.1f} m " + (
                 "upstage of" if t["y_m"] < 0 else "in front of") + " the stage edge"  # fmt: skip
         p.append(f"<section><h2>{_e(st['id'])}</h2><p class='sub'>{_e(what)} · {_e(_load(st))}</p>")
         if st["kind"] == "truss":

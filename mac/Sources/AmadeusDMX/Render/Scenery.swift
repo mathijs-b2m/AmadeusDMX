@@ -129,7 +129,11 @@ struct Scenery {
                     box(x - 0.13, x + 0.13, y - 0.13, y + 0.13, z - 0.13, z + 0.13, handle, emissive: 1.5)
                 }
             } else {
-                trussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
+                if t.isStand {
+                    lightStand(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
+                } else {
+                    trussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
+                }
                 if sel && !t.isRing {  // the end handles: drag one to stretch or turn the truss
                     let r = Float(t.rotDeg) * .pi / 180, ax = SIMD3<Float>(cos(r), sin(r), 0)
                     for e: Float in [-1, 1] {
@@ -227,6 +231,30 @@ struct Scenery {
         quad(P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1), P(-1, -1, -1), color, normal: -ay, emissive: emissive)
         quad(P(1, 1, -1), P(1, 1, 1), P(1, -1, 1), P(1, -1, -1), color, normal: ax, emissive: emissive)
         quad(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, 1), P(-1, 1, -1), color, normal: -ax, emissive: emissive)
+    }
+
+    /// A light stand: its bar (a 40 mm tube) and a tripod under each end of a bridge, under the middle of a T-bar,
+    /// from the floor up to the bar.
+    private mutating func lightStand(_ t: Truss, color: SIMD3<Float>, emissive: Float) {
+        var m = MeshBuilder()
+        let z = Float(t.zM), r = Float(t.rotDeg) * .pi / 180
+        m.cylinder(SIMD3(Float(t.xM), Float(t.yM), z), [cos(r), sin(r), 0], radius: 0.02, length: Float(t.lengthM), color,
+                   emissive: emissive, segments: 10)
+        let spread = min(0.75, 0.25 + z * 0.15)  // a taller stand stands wider
+        for f in t.standFeet {
+            let p = SIMD2<Float>(Float(f.x), Float(f.y))
+            m.cylinder(SIMD3(p.x, p.y, (z - 0.02) / 2), [0, 0, 1], radius: 0.025, length: z - 0.02, color * 0.85,
+                       emissive: emissive, segments: 8)
+            let hub = SIMD3<Float>(p.x, p.y, min(0.7, z * 0.3))
+            for k in 0..<3 {  // three legs out from the hub to the floor, one towards the audience
+                let a = Float(k) / 3 * 2 * .pi + .pi / 2 + r
+                let foot = SIMD3<Float>(p.x + cos(a) * spread, p.y + sin(a) * spread, 0.01)
+                let v = hub - foot
+                m.cylinder((hub + foot) / 2, simd_normalize(v), radius: 0.015, length: simd_length(v), color * 0.85,
+                           emissive: emissive, segments: 6)
+            }
+        }
+        vertices += m.v
     }
 
     /// A horizontal quatro truss from the set: four chords along it and lacing, turned with it.

@@ -309,6 +309,17 @@ struct HeadGroupSection: View {
 
 private func metres(_ v: Double) -> String { String(format: "%.2f m", v) }
 
+/// "Takes 60 kg, goes 1.2 to 2.65 m high": a light stand's limits as the maker gives them.
+func standLimits(_ t: Truss) -> String {
+    var parts: [String] = []
+    if let kg = t.maxKg { parts.append("takes \(kg.formatted()) kg") }
+    if let top = t.maxHeightM {
+        parts.append(t.minHeightM.map { "goes \($0.formatted()) to \(top.formatted()) m high" } ?? "goes up to \(top.formatted()) m")
+    }
+    let s = parts.joined(separator: ", ")
+    return s.prefix(1).uppercased() + s.dropFirst() + "."
+}
+
 /// "Ø 4 m circle" / "Ø 6 m half circle".
 func ringName(_ t: Truss) -> String {
     let d = (t.diameterM ?? 4).formatted()
@@ -323,13 +334,18 @@ struct TrussInspector: View {
         let id = truss.id
         SwiftUI.Section {
             HStack {
-                Image(systemName: truss.vertical ? "building.columns" : truss.isRing ? "circle" : "square.split.bottomrightquarter")
+                Image(systemName: truss.vertical ? "building.columns" : truss.isRing ? "circle"
+                      : truss.isStand ? "lamp.floor" : "square.split.bottomrightquarter")
                     .font(.title2).foregroundStyle(.tint)
                 VStack(alignment: .leading) {
                     Text(truss.id).font(.headline)
                     Text(truss.vertical ? "Tower, box truss 30 cm" : truss.isRing ? "Round truss, \(ringName(truss))"
+                         : truss.type == "tbar" ? "T-bar stand, on one tripod" : truss.isStand ? "Light bridge, on two tripods"
                          : "Box truss (quatro), 30 cm").font(.caption).foregroundStyle(.secondary)
                 }
+            }
+            if truss.isStand, truss.maxKg != nil || truss.maxHeightM != nil {
+                Text(standLimits(truss)).font(.caption).foregroundStyle(.secondary)
             }
             if truss.isRing {
                 Text("Heads on a ring play it as a circle: crowns of beams out of it, cones, twisters, waves running round.")
@@ -365,7 +381,9 @@ struct TrussInspector: View {
             ValueSlider(title: "Across (x)", value: binding(\.xM), range: -6...(editor.doc.width + 6), step: 0.25)
             ValueSlider(title: "Depth (y)", value: binding(\.yM), range: -14...4, step: 0.25)
             if !truss.vertical {
-                ValueSlider(title: "Height", value: binding(\.zM), range: 0.5...max(2, editor.doc.stage.ceilingM), step: 0.1)
+                ValueSlider(title: "Height", value: binding(\.zM), range: truss.isStand
+                            ? (truss.minHeightM ?? 1)...max((truss.minHeightM ?? 1) + 0.1, truss.maxHeightM ?? 4)
+                            : 0.5...max(2, editor.doc.stage.ceilingM), step: truss.isStand ? 0.05 : 0.1)
                 ValueSlider(title: "Rotation", value: binding(\.rotDeg), range: -180...180, step: 15, unit: "°")
             }
         }

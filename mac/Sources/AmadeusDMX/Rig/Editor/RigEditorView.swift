@@ -182,6 +182,11 @@ struct RigEditorView: View {
                             Button("\(Int(l)) m tower") { editor.addTruss(length: l, vertical: true) }
                         }
                     }
+                    SwiftUI.Section("Light stands (bar on tripods)") {
+                        ForEach(Truss.standPresets, id: \.self) { p in
+                            Button(p.title) { editor.addStand(p) }
+                        }
+                    }
                 } label: {
                     Label("Truss", systemImage: "square.split.bottomrightquarter")
                 }
