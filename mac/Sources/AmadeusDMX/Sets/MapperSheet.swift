@@ -35,8 +35,9 @@ struct MapperSheet: View {
     @State private var sweeping = true
     @State private var checkLoop: Task<Void, Never>?
     @State private var checkedAll = false    // every channel was checked: saved as checked
-    @State private var colours: Int?         // the colour wheel channel whose colours are being named
+    @State private var colours: Int?         // the colour wheel (or ring colour) channel whose colours are being named
     @State private var loadedWheel: [FixtureMapping.Slot] = []   // the wheel as loaded: saved again only when changed
+    @State private var loadedRing: [FixtureMapping.Slot] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -174,6 +175,7 @@ struct MapperSheet: View {
         do {
             mapping = try await model.api.mapping(key: target.key, mode: target.mode)
             loadedWheel = mapping?.wheel ?? []
+            loadedRing = mapping?.ring ?? []
         }
         catch { self.error = error.localizedDescription }
     }
@@ -183,7 +185,7 @@ struct MapperSheet: View {
         saving = true
         defer { saving = false }
         do {
-            problems = try await model.api.saveMapping(m, checked: checkedAll, wheel: m.wheel != loadedWheel)
+            problems = try await model.api.saveMapping(m, checked: checkedAll, wheel: m.wheel != loadedWheel, ring: m.ring != loadedRing)
             if problems.isEmpty { stopTrying(); saved(); dismiss() }
         } catch { problems = [error.localizedDescription] }
     }
@@ -200,12 +202,14 @@ struct MapperSheet: View {
         startProbing()
     }
 
-    /// The colour wheel's colours, shown one by one on the fixture (the light on, the head in the middle).
+    /// The colour wheel's (or the ring's) colours, shown one by one on the fixture (the light on, the head in the middle).
     private func openColours(_ i: Int) {
         stopTrying()
-        if mapping?.wheel.isEmpty ?? false { mapping?.wheel = FixtureMapping.usualWheel }
+        let ring = mapping?.channels[i].role == "ring_color"
+        if ring, mapping?.ring.isEmpty ?? false { mapping?.ring = FixtureMapping.usualRing }
+        if !ring, mapping?.wheel.isEmpty ?? false { mapping?.wheel = FixtureMapping.usualWheel }
         colours = i
-        probe = mapping?.wheel.first?.mid ?? 0
+        probe = (ring ? mapping?.ring.first?.mid : mapping?.wheel.first?.mid) ?? 0
         sweeping = false
         startProbing()
     }
@@ -290,7 +294,7 @@ private struct ChannelRow: View {
     let roles: [FixtureMapping.Role]
     let address: Int?
     let universe: Int
-    let colours: (() -> Void)?   // name the colour wheel's colours (nil: can't be tried on the lights now)
+    let colours: (() -> Void)?   // name the colour wheel's or the ring's colours (nil: can't be tried on the lights now)
     let changed: () -> Void
 
     private var role: FixtureMapping.Role? { roles.first { $0.role == channel.role } }
@@ -334,11 +338,13 @@ private struct ChannelRow: View {
                 Stepper(channel.cell == 0 ? "Whole" : "Cell \(channel.cell)", value: $channel.cell, in: 0...64)
                     .frame(width: 110, alignment: .leading)
                     .help("Which cell of a bar it belongs to (Whole: the fixture as one)")
-            } else if channel.role == "color_wheel" {
+            } else if channel.role == "color_wheel" || channel.role == "ring_color" {
                 Button("Colours…") { colours?() }
                     .disabled(colours == nil)
                     .frame(width: 110, alignment: .leading)
                     .help(colours == nil ? "Give the fixture a start address and a DMX output to see its colours"
+                                         : channel.role == "ring_color"
+                                         ? "Show each colour of the ring on the fixture, name it and set its values (name the one where it is off \"off\")"
                                          : "Show each colour of the wheel on the fixture, name it and set its values")
             } else {
                 Color.clear.frame(width: 110, height: 1)
