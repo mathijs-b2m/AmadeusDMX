@@ -23,7 +23,8 @@ ROW_SPAN_M = 4.0  # a truss never spans a longer gap than this without a fixture
 FACE_NEAR_M = 1.0  # fixed lights drawn this close beside a row of heads hang on the face of that truss
 HIGH_M = 1.8  # hanging higher than this: on a truss
 FLOOR_M = 0.6  # lower than this: on the floor
-FLOOR_LIFT = {"head": 0.3, "strobe": 0.25, "par": 0.25, "bar": 0.25}  # a fixture's height is its centre (a head's: its tilt axis), this far
+# a fixture's height is its centre (a head's: its tilt axis), this far
+FLOOR_LIFT = {"head": 0.3, "strobe": 0.25, "par": 0.25, "bar": 0.25}
 FLOOR_LIFT_M = 0.15  # (else this far) above what it stands on, as automount puts them: the documents give the floor
 
 

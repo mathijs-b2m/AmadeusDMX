@@ -170,7 +170,8 @@ def test_a_head_is_drawn_with_its_light_and_field():
     from amadeus.engine.realism import beam_info
 
     b = beam_info(6000, 2.0, 2.0, True)
-    assert b["beam_deg"] == 2.0 and b["field"] == 1.8 and b["flux"] == 2.0  # four times the reference light: twice as bright
+    # four times the reference light: twice as bright
+    assert b["beam_deg"] == 2.0 and b["field"] == 1.8 and b["flux"] == 2.0
     assert beam_info(None, 14.0, 14.0, True)["flux"] == 1.0  # no lumens: the reference
     assert beam_info(10, 14.0, 14.0, True)["flux"] == 0.25  # never fainter than this
     assert beam_info(1500, 10.0, 30.0, True, field_deg=13)["field"] == 1.3  # the fixture's own field angle

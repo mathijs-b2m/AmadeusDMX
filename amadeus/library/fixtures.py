@@ -156,7 +156,7 @@ def set_lens(key: str, beam_deg: float, beam_deg_max: float | None = None, lumen
     defn.pop("key", None)
     problems = []
     if not 0.5 <= beam_deg <= 120:
-        problems.append("A beam angle is 0.5° to 120° (the manual's \"beam angle\", not the field angle)")
+        problems.append('A beam angle is 0.5° to 120° (the manual\'s "beam angle", not the field angle)')
     if beam_deg_max and not beam_deg < beam_deg_max <= 120:
         problems.append("The zoom's widest angle is wider than its tightest, at most 120°")
     if lumens is not None and not 0 < lumens <= 200_000:

@@ -119,7 +119,9 @@ def save_lens(req):
         b["key"], float(b["beam_deg"]), float(b.get("beam_deg_max") or 0) or None, float(lumens) if lumens else None
     )
     if not problems:
-        event(f"{req.client} set the lens of {b['key']}: {b['beam_deg']}° (zoom to {b.get('beam_deg_max')}), {lumens} lm")
+        event(
+            f"{req.client} set the lens of {b['key']}: {b['beam_deg']}° (zoom to {b.get('beam_deg_max')}), {lumens} lm"
+        )
     return {"saved": not problems, "problems": problems}
 
 
@@ -132,8 +134,8 @@ def fixture_templates(req):
 
 
 def new_fixture(req):
-    """{"manufacturer", "model", "template", "channels", "type", "watts", "pan_deg", "tilt_deg", "beam_deg"}: make a fixture in
-    your library from a template; returns {"key", "mode"} or {"problems"}."""
+    """{"manufacturer", "model", "template", "channels", "type", "watts", "pan_deg", "tilt_deg", "beam_deg"}: make a
+    fixture in your library from a template; returns {"key", "mode"} or {"problems"}."""
     from amadeus.library import generic
 
     b = req.body()

@@ -58,7 +58,9 @@ class Realism:
             tight = float(phys.get("beam_deg", 25) or 25)
             wide = float(phys.get("beam_deg_max", tight))
             has_zoom = "zoom" in attrs and wide > tight
-            beam = beam_info(phys.get("lumens"), tight, wide if has_zoom else tight, e["kind"] == "head", phys.get("field_deg"))
+            beam = beam_info(
+                phys.get("lumens"), tight, wide if has_zoom else tight, e["kind"] == "head", phys.get("field_deg")
+            )
             # no colour channels at all: the lamp's own colour (halogen lamps glow warm, strobes are white,
             # blacklights UV)
             fixed = None
