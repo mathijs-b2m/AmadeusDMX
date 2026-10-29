@@ -83,8 +83,9 @@ def test_room_volume_from_the_stage():
     assert fog.room_volume({"room_volume_m3": 900}) == 900
     assert fog.room_volume({"width_m": 6, "room_depth_m": 6, "ceiling_m": 4.5}) == pytest.approx(10 * 9 * 4.5)
     # the hall's width when the rig gives it (never narrower than the stage)
-    assert fog.room_volume({"width_m": 4, "room_width_m": 20, "room_depth_m": 6, "ceiling_m": 4}) == pytest.approx(20 * 9 * 4)
-    assert fog.room_volume({"width_m": 6, "room_width_m": 3, "room_depth_m": 6, "ceiling_m": 4}) == pytest.approx(6 * 9 * 4)
+    room = {"room_depth_m": 6, "ceiling_m": 4}
+    assert fog.room_volume({"width_m": 4, "room_width_m": 20, **room}) == pytest.approx(20 * 9 * 4)
+    assert fog.room_volume({"width_m": 6, "room_width_m": 3, **room}) == pytest.approx(6 * 9 * 4)
 
 
 def test_the_rules_director_fogs_in_arcs():
