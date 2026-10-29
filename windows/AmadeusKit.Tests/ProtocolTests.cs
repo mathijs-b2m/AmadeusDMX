@@ -313,6 +313,20 @@ public class ProtocolTests
     }
 
     [Fact]
+    public void ABeeEyesLensesAndTurningDecodePerElement()
+    {
+        var f = DecodeFrame("""
+            {"type": "frame", "t": 1, "phrase": 0, "fx": [[1, 1, 0, 0, 0, 0.5, 0.5], [0, 0, 0, 0, 0, 0.5, 0.5]],
+             "bee": [[-0.25, 1, 0, 1], null]}
+            """);
+        Assert.Equal(2, f.Bee.Length);
+        Assert.Equal(new BeeState(-0.25f, [1, 0, 1]), f.Bee[0]);
+        Assert.Null(f.Bee[1]);
+        using var hello = System.Text.Json.JsonDocument.Parse("""{"id": "big1", "kind": "head", "pos": [1, 2, 4], "lenses": 19}""");
+        Assert.Equal(19, FixtureInfo.From(hello.RootElement).Lenses);
+    }
+
+    [Fact]
     public void AHeadsFluxAndFieldDecodeAndDrawAsBeamLight()
     {
         var h = DecodeHello("""

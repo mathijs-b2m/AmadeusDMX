@@ -68,6 +68,7 @@ public sealed partial class StageRenderer
     internal readonly Dictionary<string, float> GoboTurn = [];
     internal readonly Dictionary<string, Vector3> GoboAxis = [];
     internal float GoboT;
+    internal readonly Dictionary<string, float> BeeRoll = [];   // each bee eye's front, turned this far (radians)
     float _exposure = 1.0f;
     public float Exposure { get => _exposure; set { _exposure = value; Wake(); } }
 
@@ -422,7 +423,7 @@ public sealed partial class StageRenderer
         out_.U = u;
 
         // the fixtures' moving parts and lenses: where the beams point, in the colours they play
-        if (Scenery is { } sc && inp is not null) sc.Models.Dynamic(inp.Fixtures, frame, Highlight, out_.Parts);
+        if (Scenery is { } sc && inp is not null) sc.Models.Dynamic(inp.Fixtures, frame, Highlight, out_.Parts, BeeRoll);
     }
 
     // MARK: the gobo pictures (the CPU half of StageRenderer+Setup's buildGobos)
