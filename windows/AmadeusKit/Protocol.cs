@@ -255,6 +255,14 @@ public static class FixtureKinds
     public static string RawValue(this FixtureKind k) => k.ToString().ToLowerInvariant();
 }
 
+/// A bee eye's front this frame: how fast it turns (turns per second, negative the other way) and each lens's light.
+public sealed record BeeState(float Turns, float[] Lit)
+{
+    public bool Equals(BeeState? o) => o is not null && Turns == o.Turns && Lit.SequenceEqual(o.Lit);
+
+    public override int GetHashCode() => HashCode.Combine(Turns, Lit.Length);
+}
+
 /// One light element as the visualiser sees it (a fixture can have several, e.g. a multi-cell bar).
 public sealed record FixtureInfo
 {
@@ -280,6 +288,8 @@ public sealed record FixtureInfo
     public Vec3? Up { get; set; }
     /// The truss it is clamped to (nil: on the floor, or on its own stand).
     public string? Truss { get; set; }
+    /// A bee eye's lenses: a honeycomb on its front, a narrow beam each (null: one lens).
+    public int? Lenses { get; set; }
 
     public FixtureInfo(string id, FixtureKind kind, string label, Vec3 pos, string mount, double beamDeg, double? beamWide = null)
     {
@@ -309,6 +319,7 @@ public sealed record FixtureInfo
             Dir = Vector(c, "dir"),
             Up = Vector(c, "up"),
             Truss = J.Ref(c, "truss", J.String),
+            Lenses = J.Val(c, "lenses", J.Int),
         };
     }
 
@@ -588,6 +599,9 @@ public sealed class Frame
     public float?[] Zoom { get; init; } = [];
     /// Per element: the colour of a head's LED ring round the lens (null: off, or no ring).
     public Vector3?[] Ring { get; init; } = [];
+    /// Per element: a bee eye's front, how fast it turns (turns/s, negative the other way) and each lens lit
+    /// 0 .. 1 (null: not a bee eye).
+    public BeeState?[] Bee { get; init; } = [];
     public IReadOnlyList<DeckInfo>? Decks { get; init; }
     /// What the laser guard did this frame: laser id → "zone 'Audience'" / "blanked (…)".
     public IReadOnlyDictionary<string, string>? LaserGuard { get; init; }
@@ -609,6 +623,7 @@ public sealed class Frame
         Beam = dirs.Select(d => d is null ? null : "open").ToArray();
         Dirs = dirs;
         Lz = new LaserBeam[]?[fx.Length];
+        Bee = [];
     }
 
     static Vector3? Direction(JsonElement e)
@@ -626,6 +641,13 @@ public sealed class Frame
     }
 
     static Vector3? RingOf(JsonElement e) => Direction(e);   // [r, g, b]: three numbers, read like a direction
+
+    static BeeState? BeeOf(JsonElement e)
+    {
+        if (e.ValueKind == JsonValueKind.Null) return null;
+        var b = J.Array(e, J.Float);
+        return b.Length >= 2 ? new BeeState(b[0], b[1..]) : null;
+    }
 
     static float? ZoomOf(JsonElement e) => e.ValueKind == JsonValueKind.Null ? null : J.Float(e);
 
@@ -651,6 +673,7 @@ public sealed class Frame
         Gobo = J.Try(() => J.Ref(c, "gobo", J.ArrayOf(GoboOf))) ?? [],
         Zoom = J.Try(() => J.Ref(c, "zoom", J.ArrayOf(ZoomOf))) ?? [],
         Ring = J.Try(() => J.Ref(c, "ring", J.ArrayOf(RingOf))) ?? [],
+        Bee = J.Try(() => J.Ref(c, "bee", J.ArrayOf(BeeOf))) ?? [],
         Decks = J.Ref(c, "decks", J.ArrayOf(DeckInfo.From)),
         LaserGuard = J.Try(() => J.Ref(c, "guard", J.DictOf(J.String))),
         Link = J.Try(() => J.Ref(c, "link", LinkStatus.From)),

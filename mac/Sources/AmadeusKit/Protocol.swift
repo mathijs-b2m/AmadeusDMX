@@ -101,6 +101,12 @@ public enum FixtureKind: String, Codable, Sendable {
     }
 }
 
+/// A bee eye's front this frame: how fast it turns (turns per second, negative the other way) and each lens's light.
+public struct BeeState: Sendable, Equatable {
+    public var turns: Float
+    public var lit: [Float]
+}
+
 /// One light element as the visualiser sees it (a fixture can have several, e.g. a multi-cell bar).
 public struct FixtureInfo: Codable, Sendable, Identifiable {
     public var id: String
@@ -125,6 +131,8 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
     public var up: SIMD3<Double>?
     /// The truss it is clamped to (nil: on the floor, or on its own stand).
     public var truss: String?
+    /// A bee eye's lenses: a honeycomb on its front, a narrow beam each (nil: one lens).
+    public var lenses: Int?
 
     public init(id: String, kind: FixtureKind, label: String, pos: SIMD3<Double>, mount: String, beamDeg: Double,
                 beamWide: Double? = nil) {
@@ -134,7 +142,7 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, kind, label, pos, mount, beamDeg = "beam_deg", beamWide = "beam_wide", flux, field
-        case fixture, body, rot, size, cells, length, dir, up, truss
+        case fixture, body, rot, size, cells, length, dir, up, truss, lenses
     }
 
     public init(from decoder: Decoder) throws {
@@ -158,6 +166,7 @@ public struct FixtureInfo: Codable, Sendable, Identifiable {
         if let d = try c.decodeIfPresent([Double].self, forKey: .dir), d.count == 3 { dir = SIMD3(d[0], d[1], d[2]) }
         if let u = try c.decodeIfPresent([Double].self, forKey: .up), u.count == 3 { up = SIMD3(u[0], u[1], u[2]) }
         truss = try c.decodeIfPresent(String.self, forKey: .truss)
+        lenses = try c.decodeIfPresent(Int.self, forKey: .lenses)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -388,6 +397,9 @@ public struct Frame: Decodable, Sendable {
     public var zoom: [Float?]
     /// Per element: the colour of a head's LED ring round the lens (nil: off, or no ring).
     public var ring: [SIMD3<Float>?]
+    /// Per element: a bee eye's front, how fast it turns (turns/s, negative the other way) and each lens lit
+    /// 0 .. 1 (nil: not a bee eye).
+    public var bee: [BeeState?]
     public var decks: [DeckInfo]?
     /// What the laser guard did this frame: laser id → "zone 'Audience'" / "blanked (…)".
     public var laserGuard: [String: String]?
@@ -400,12 +412,12 @@ public struct Frame: Decodable, Sendable {
     /// The show arc (live mode).
     public var arc: ArcStatus?
 
-    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, gobo, zoom, ring, decks, laserGuard = "guard", link, lite, fog, arc }
+    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, gobo, zoom, ring, bee, decks, laserGuard = "guard", link, lite, fog, arc }
 
     /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
     public init(fx: [[Float]], dirs: [SIMD3<Float>?]) {
         t = 0; phrase = 0; bp = nil; self.fx = fx; bands = []; beam = dirs.map { $0 == nil ? nil : "open" }
-        self.dirs = dirs; lz = fx.map { _ in nil }; gobo = []; zoom = []; ring = []; decks = nil; laserGuard = nil; link = nil; lite = false; fog = [:]; arc = nil
+        self.dirs = dirs; lz = fx.map { _ in nil }; gobo = []; zoom = []; ring = []; bee = []; decks = nil; laserGuard = nil; link = nil; lite = false; fog = [:]; arc = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -431,6 +443,9 @@ public struct Frame: Decodable, Sendable {
         zoom = (try? c.decodeIfPresent([Float?].self, forKey: .zoom)) ?? nil ?? []
         ring = ((try? c.decodeIfPresent([[Float]?].self, forKey: .ring)) ?? nil ?? []).map { r in
             r.flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
+        }
+        bee = ((try? c.decodeIfPresent([[Float]?].self, forKey: .bee)) ?? nil ?? []).map { b in
+            b.flatMap { $0.count >= 2 ? BeeState(turns: $0[0], lit: Array($0.dropFirst())) : nil }
         }
         decks = try c.decodeIfPresent([DeckInfo].self, forKey: .decks)
         laserGuard = try? c.decodeIfPresent([String: String].self, forKey: .laserGuard)

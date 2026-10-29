@@ -1,7 +1,8 @@
 // The lights of one frame: beams, spots on surfaces, lens flares and laser lines, from the feed's frame
 // (mac/Sources/AmadeusDMX/Render/StageRenderer+Lights.swift). A head with a gobo in its beam draws it as a gobo beam:
 // the pattern in the haze and projected where it lands, turning, shaking and sliding on its wheel as the frame says;
-// its zoom sets how wide the beam opens.
+// its zoom sets how wide the beam opens. A bee eye shines a narrow beam out of every lens it lights, fanning a little
+// apart and opening with the zoom, turning with its front.
 using System.Numerics;
 
 using Frame = AmadeusKit.Frame;   // not WinUI's Frame (the app's global usings)
@@ -74,6 +75,33 @@ public sealed partial class StageRenderer
             }
         }
 
+        // one lens's beam of a bee eye: the core only (its neighbours are its glow), its spot where it lands
+        void LensBeam(Vector3 p, Vector3 d, float beamDeg, Vector3 color, float light)
+        {
+            var (len, surf) = room.Hit(p, d, 30);
+            var R = MathF.Max(0.02f, len * MathF.Tan(beamDeg * MathF.PI / 360));
+            beams.Add(new BeamInstance(new(p, len), new(d, R), new(color, light * BeamLight.Haze), new(0.02f, BeamLight.RefRadius, 0, 0)));
+            if (Lands(surf))
+            {
+                var n = Room.Normal(surf);
+                var squash = MathF.Max(1, MathF.Min(3, 1 / MathF.Max(0.25f, MathF.Abs(Vector3.Dot(d, n)))));
+                decals.Add(new DecalInstance(new(p + d * len, MathF.Max(0.05f, R * 1.15f)), new(n, squash),
+                                             new(color, light * 0.8f * BeamLight.Gain(R))));
+            }
+        }
+
+        // the lens glows in the model; a flare only when the head points at the viewer (audience scanning), smaller for
+        // the cells of a bar or a bee eye's lenses (many small lenses, not one big one)
+        void Flare(Vector3 p, Vector3 d, Vector3 col, float dim, int cells)
+        {
+            var glare = MathF.Pow(MathF.Max(0, Vector3.Dot(d, Vector3.Normalize(eye - p))), 8);
+            if (glare <= 0.05f) return;
+            var cellK = 1 / MathF.Sqrt(Math.Max(1, cells));
+            var size = MathF.Min(0.08f + 0.3f * glare, MathF.Max(0.1f, (eye - p).Length() * 0.035f)) * cellK;
+            sprites.Add(new SpriteInstance(new(p, size), new(col, MathF.Min(2.0f, dim * glare * 2) * cellK),
+                                           new(glare > 0.6f ? 1 : 0.3f, 0, 0, 0)));
+        }
+
         // gobos turn and shake with the renderer's own clock (smooth between the show's frames)
         var gdt = MathF.Min(0.2f, MathF.Max(0, t - GoboT));
         GoboT = t;
@@ -83,6 +111,8 @@ public sealed partial class StageRenderer
         {
             var fx = inp.Fixtures[i];
             var p = fx.Pos.ToFloat();
+            if (frame is not null && i < frame.Bee.Length && frame.Bee[i] is { } turning)   // a bee eye's front turns, lit or not
+                BeeRoll[fx.Id] = (BeeRoll.GetValueOrDefault(fx.Id) + turning.Turns * 2 * MathF.PI * gdt) % (2 * MathF.PI);
             float dim = 0;
             var col = Vector3.One;
             if (frame is not null && i < frame.Fx.Length)
@@ -137,6 +167,28 @@ public sealed partial class StageRenderer
                         }
                         nRays = 3;
                     }
+                    if (fx.Lenses is { } nl && nl > 0)
+                    {
+                        // a bee eye: a narrow beam from each lens it lights, fanning apart a little more as the zoom opens
+                        var bee = frame is not null && i < frame.Bee.Length ? frame.Bee[i] : null;
+                        var face = FixtureModels.BeeFace(FixtureModels.HeadScale(fx), nl);
+                        var (spots, rings) = FixtureModels.Honeycomb(nl);
+                        var ax = FixtureModels.BeeBasis(rest, d, BeeRoll.GetValueOrDefault(fx.Id));
+                        var fan = MathF.Tan((7 + lens * 0.3f) * MathF.PI / 180) / Math.Max(rings, 1);
+                        var each = dim * density * (float)fx.Flux * 1.1f / MathF.Sqrt(nl);
+                        if (highlight.Contains(fx.Id)) each = MathF.Max(each, 1.5f / MathF.Sqrt(nl));
+                        for (var k = 0; k < spots.Length; k++)
+                        {
+                            var q = spots[k];
+                            var share = highlight.Contains(fx.Id) ? 1 : bee is null ? 1 : k < bee.Lit.Length ? bee.Lit[k] : 1;
+                            if (share <= 0.01f) continue;
+                            var off = ax.X * q.X + ax.Y * q.Y;
+                            LensBeam(p + d * face.Front + off * face.Pitch, Vector3.Normalize(d + off * fan), beamDeg: MathF.Max(lens, 0.5f),
+                                     color: col, light: each * share);
+                        }
+                        Flare(p, d, col, dim, cells: nl);
+                        continue;
+                    }
                     var frost = name == "frost";   // a frost spreads it wide and soft
                     var a0 = (nRays > 1 ? dim * 0.6f : dim) * density * (float)fx.Flux;
                     if (highlight.Contains(fx.Id)) a0 = MathF.Max(a0, 1.5f);
@@ -160,17 +212,7 @@ public sealed partial class StageRenderer
                             HeadBeam(p, rays[k], beamDeg: frost ? MathF.Max((float)fx.BeamWide, 25) : MathF.Max(lens, 0.5f),
                                      field: frost ? 1.4f : (float)fx.Field, color: col, light: a0);
                     }
-                    // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
-                    // smaller for the cells of a bar (many small lenses, not one big one)
-                    var toEye = Vector3.Normalize(eye - p);
-                    var glare = MathF.Pow(MathF.Max(0, Vector3.Dot(d, toEye)), 8);
-                    if (glare > 0.05f)
-                    {
-                        var cellK = 1 / MathF.Sqrt(Math.Max(1, fx.Cells ?? 1));
-                        var size = MathF.Min(0.08f + 0.3f * glare, MathF.Max(0.1f, (eye - p).Length() * 0.035f)) * cellK;
-                        sprites.Add(new SpriteInstance(new(p, size), new(col, MathF.Min(2.0f, dim * glare * 2) * cellK),
-                                                       new(glare > 0.6f ? 1 : 0.3f, 0, 0, 0)));
-                    }
+                    Flare(p, d, col, dim, cells: fx.Cells ?? 1);
                     break;
                 }
                 case FixtureKind.Laser:

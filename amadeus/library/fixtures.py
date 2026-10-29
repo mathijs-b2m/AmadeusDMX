@@ -208,6 +208,118 @@ def cell_motors(defn: dict, mode: str) -> bool:
     return any(c["attr"] == "tilt" and "head" in c for c in channels(defn, mode))
 
 
+# A bee eye (Clay Paky B-EYE, a "big bee eye" wash): a head whose front is a honeycomb of small lenses, each its own
+# narrow beam, the beams opening with the zoom. The visualisers draw its lenses and their beams.
+BEE_EYE = re.compile(r"bee[\s-]?eyes?|(?<![a-z])b-eye", re.I)
+HONEYCOMB = (7, 19, 37, 61)  # lenses in full rings round the middle one
+
+
+def bee_eye(defn: dict) -> int:
+    """How many lenses a bee eye has (0: not a bee eye): the definition's `physical.lenses`, else the model's
+    "19x40W", else its pixels (a red channel each), else a K10's 19."""
+    if defn.get("kind") != "moving_head":
+        return 0
+    if defn.get("physical", {}).get("lenses"):
+        return int(defn["physical"]["lenses"])
+    if not BEE_EYE.search(defn.get("model", "")):
+        return 0
+    if m := re.search(r"(\d{1,2})\s*x\s*\d+\s*w", defn["model"], re.I):
+        return int(m.group(1))
+    if re.search(r"\bk(15|20|25)\b", defn["model"], re.I):  # the bigger B-EYEs
+        return 37
+    reds = max((sum(c["attr"] == "red" for c in ch) for ch in defn.get("modes", {}).values()), default=0)
+    return min(HONEYCOMB, key=lambda n: abs(n - reds)) if reds >= 7 else 19
+
+
+def honeycomb(n: int) -> list[tuple[int, int, float]]:
+    """A bee eye's lenses in the order its pixels are numbered: the middle one, then ring by ring, each from the top
+    clockwise as you face it. Per lens: (ring, place on the ring, angle in turns from the top). The visualisers lay
+    them out the same way (FixtureModels)."""
+    out = [(0, 0, 0.0)]
+    r = 1
+    while len(out) < n:
+        out += [(r, k, k / (6 * r)) for k in range(6 * r)][: n - len(out)]
+        r += 1
+    return out
+
+
+# A bee eye plays the head's beam effect with its own channels: an open beam (or frost) lights every lens; a gobo is
+# a pattern of lit and dark lenses, of the gobo's style (the show picks one as it picks a gobo); a prism is the
+# flower (three petals round the middle); rotation and spin turn the front (its barrel roll), slow when calm and
+# fast in a drop, mirrored heads the other way.
+BEE_PATTERNS = (  # (style, name, lit(ring, place, angle, outer ring))
+    ("rings", "outer ring", lambda r, k, a, R: r == R),
+    ("rings", "inner rings", lambda r, k, a, R: r < R),
+    ("rings", "bullseye", lambda r, k, a, R: r % 2 == 0),
+    ("dots", "every other", lambda r, k, a, R: r == 0 or k % 2 == 0),
+    ("dots", "corners", lambda r, k, a, R: r > 0 and k % r == 0 and r == R),
+    ("shapes", "star", lambda r, k, a, R: r == 0 or k % r == 0),
+    ("shapes", "halves", lambda r, k, a, R: r == 0 or a < 0.5),
+    ("curves", "spiral", lambda r, k, a, R: r == 0 or int((a + r / 9) * 6) % 2 == 0),
+    ("curves", "crescent", lambda r, k, a, R: r > 0 and (a + 1 / 12) % 1 < 0.42),
+)
+BEE_FLOWER = lambda r, k, a, R: r == 0 or int(a * 6) % 2 == 0  # noqa: E731  the prism: three petals
+ROLL_FX = ("gobo_rotate", "gobo_spin", "prism_spin")  # effects that turn the front
+ROLL_TURNS_S = 0.5  # how fast the front turns at the roll's fastest (estimated: no maker says)
+
+
+def bee_gobo_groups() -> dict[str, list[int]]:
+    """A bee eye's lens patterns by style, as a wheel's gobos (1-based into BEE_PATTERNS)."""
+    out: dict[str, list[int]] = {}
+    for i, (style, _, _) in enumerate(BEE_PATTERNS):
+        out.setdefault(style, []).append(i + 1)
+    return out
+
+
+def bee_look(n: int, s) -> tuple[list[float], float]:
+    """What a bee eye with `n` lenses plays for state `s`: each lens's share of the light (0 dark .. 1 lit) and how its
+    front turns (turns per second, negative the other way; 0 still)."""
+    fx = getattr(s, "fx", "open")
+    cells = honeycomb(n)
+    outer = cells[-1][0]
+    if fx.startswith("prism"):
+        lit = BEE_FLOWER
+    elif fx.startswith("gobo"):
+        lit = BEE_PATTERNS[getattr(s, "gobo", 0) % len(BEE_PATTERNS)][2]
+    else:
+        lit = None
+    shares = [1.0 if lit is None or lit(r, k, a, outer) else 0.0 for r, k, a in cells]
+    turns = 0.0
+    if fx in ROLL_FX:
+        turns = ROLL_TURNS_S * (0.15 + 0.85 * min(max(getattr(s, "fx_speed", 0.5), 0.0), 1.0))
+        turns = -turns if getattr(s, "fx_reverse", False) else turns
+    return shares, turns
+
+
+def roll_value(c: dict, turns: float) -> int:
+    """A bee eye's barrel roll channel for a front turning `turns` per second: its still position when 0, else the
+    speed in the clockwise (or counter-clockwise) range, both [slow, fast]."""
+    rng = c.get("cw") if turns > 0 else c.get("ccw") if turns < 0 else None
+    if turns == 0 or not rng:
+        return int(c.get("default", 0))
+    k = min(abs(turns) / ROLL_TURNS_S, 1.0)
+    return round(rng[0] + (rng[1] - rng[0]) * k)
+
+
+def pixels(defn: dict, chans: list[dict]) -> list[int]:
+    """Per channel: the bee eye lens (pixel) its colour belongs to, -1 for the rest. A channel's own `pixel`
+    (0-based) wins; else the colour channels that repeat are the pixels in order, after any master colour
+    channels before them (a mode with 20 reds for 19 lenses: the first is the master)."""
+    n = bee_eye(defn)
+    out = [-1] * len(chans)
+    if not n:
+        return out
+    if any("pixel" in c for c in chans):
+        return [int(c["pixel"]) if "pixel" in c else -1 for c in chans]
+    for colour in ("red", "green", "blue", "white", *DARK_EMITTERS):
+        idx = [i for i, c in enumerate(chans) if c["attr"] == colour]
+        if len(idx) < n:
+            continue
+        for k, i in enumerate(idx[len(idx) - n :]):
+            out[i] = k
+    return out
+
+
 # Fixtures that can hurt eyes: risk group 2 and 3 (IEC 62471, `physical.risk_group` from the manual or label).
 # This is alpha software: those stay dark with real lights. Without a rating we estimate it from the light
 # packed into each beam: a Sharpy or a Pointe counts, a Fuze, a Katana or a wash doesn't.
@@ -419,6 +531,8 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         if has_wheel(defn)
         else None
     )
+    px = pixels(defn, chans)  # a bee eye's lenses: lit in the pattern it plays, its front turning
+    shares, turns = bee_look(n, first) if (n := bee_eye(defn)) else ([], 0.0)
     overrides = {}
     shown = beam_effect(defn, chans, getattr(first, "fx", "open"))
     for attr, val in defn.get("beam_fx", {}).get(shown, {}).items():
@@ -439,8 +553,12 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         # Per-head colour without per-head dimmers: master dimmer full, intensity goes into RGB.
         scale = s.dimmer if rgb_level else 1.0
         level = min(max(max(s.dimmer, s.white), 0), 1, ceiling)  # a dimmer channel's level, under the limiter
+        if 0 <= px[off] < len(shares):  # a bee eye's lens: its share of the pattern
+            scale *= shares[px[off]]
         if a in overrides:
             v = overrides[a]
+        elif a == "lens_roll":  # a bee eye's barrel roll
+            v = roll_value(c, turns)
         elif a == "fog":  # smoke output: the element's level (engine/fog.py), above the value where smoke starts
             on = c.get("on_from", 1)
             v = 0 if s.dimmer <= 0 else on + round(min(s.dimmer, 1.0) * (255 - on))

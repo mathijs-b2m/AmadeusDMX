@@ -1,7 +1,7 @@
 // The fixtures as they look: a moving head is a base, a yoke that pans and a head that tilts to where its beam
 // points; a moving bar tilts on its yoke ends; pixel bars, pars, strobes, blinders and lasers have their
-// housings, and every lens glows in the colour the fixture plays (a head's LED ring round it too). Sized from the
-// fixture's real dimensions.
+// housings, and every lens glows in the colour the fixture plays (a head's LED ring round it too; a bee eye's
+// honeycomb of lenses lit in the pattern it plays, its front turning). Sized from the fixture's real dimensions.
 //
 // What never moves (bases, bar housings, cans, boxes) is built once with the scenery; the moving parts and the
 // lenses are built every frame from the show's frame (beam directions, colours).
@@ -74,7 +74,7 @@ struct MeshBuilder {
 
 /// The rig's fixtures as models.
 final class FixtureModels {
-    enum Shape { case beamHead, spotHead, washHead, movingBar, curveBar, parBar, par, strobe, blinder, laser, smoke }
+    enum Shape { case beamHead, spotHead, washHead, beeHead, movingBar, curveBar, parBar, par, strobe, blinder, laser, smoke }
 
     struct Unit {
         var id: String
@@ -133,19 +133,63 @@ final class FixtureModels {
             case "blinder": shape = .blinder
             case "laser": shape = .laser
             case "smoke": shape = .smoke
-            case "moving_head": shape = f.beamDeg <= 6 ? .beamHead : f.beamDeg <= 20 ? .spotHead : .washHead
+            case "moving_head":
+                shape = (f.lenses ?? 0) > 0 ? .beeHead : f.beamDeg <= 6 ? .beamHead : f.beamDeg <= 20 ? .spotHead : .washHead
             default: shape = f.kind == .head ? .spotHead : idx.count > 1 ? .parBar : .par
             }
             if shape == .laser { up = simd_normalize(SIMD3(0, 1, 0.15)) }
-            // heads: the model's height against a typical 55 cm head
-            let scale = shape == .beamHead || shape == .spotHead || shape == .washHead
-                ? min(1.5, max(0.6, (size.map { max($0.x, $0.z) } ?? 0.55) / 0.55)) : 1
+            let scale = Self.isHead(shape) ? Self.headScale(f) : 1
             let length = Float(f.length ?? Double(size?.x ?? 1))
             let stand = f.mount == "stand" && f.truss == nil && p.z > 0.6
             units.append(Unit(id: k, shape: shape, idx: idx, p: p, up: up, across: across, length: length, scale: scale,
                               size: size, selected: selected.contains("fixture:\(k)"), hovered: selected.contains("hover:fixture:\(k)"),
                               onStand: stand))
         }
+    }
+
+    static func isHead(_ s: Shape) -> Bool { [.beamHead, .spotHead, .washHead, .beeHead].contains(s) }
+
+    /// A head's model size: its height against a typical 55 cm head.
+    static func headScale(_ f: FixtureInfo) -> Float {
+        let size = f.size.flatMap { $0.count >= 3 ? Float(max($0[0], $0[2])) : nil }
+        return min(1.5, max(0.6, (size ?? 0.55) / 0.55))
+    }
+
+    // MARK: bee eyes
+
+    /// A bee eye's lenses on its front, in the order of its pixels (amadeus/library/fixtures.py honeycomb): the middle
+    /// one, then ring by ring, each from the top clockwise as you face it; one lens apart, the outer ring's corners
+    /// `rings` out.
+    static func honeycomb(_ n: Int) -> (spots: [SIMD2<Float>], rings: Int) {
+        var out: [SIMD2<Float>] = [.zero], r = 0
+        func corner(_ c: Int, _ r: Int) -> SIMD2<Float> {
+            let a = Float(c) * .pi / 3
+            return SIMD2(sin(a), cos(a)) * Float(r)   // a ring's corners, from the top round
+        }
+        while out.count < n {
+            r += 1
+            for k in 0..<(6 * r) where out.count < n {
+                let c = k / r, j = Float(k % r) / Float(r)
+                out.append(corner(c, r) + (corner(c + 1, r) - corner(c, r)) * j)
+            }
+        }
+        return (out, r)
+    }
+
+    /// Where a bee eye's lenses sit: the front's distance from the tilt axis, the lens spacing and a lens's radius.
+    static func beeFace(scale s: Float, lenses n: Int) -> (front: Float, pitch: Float, lensR: Float) {
+        let rings = Float(honeycomb(n).rings), faceR = 0.175 * s
+        let pitch = faceR * 0.9 / (rings + 0.5)
+        return (0.24 * s * 0.35, pitch, pitch * 0.44)
+    }
+
+    /// The face's axes: x and y across it (a lens at (u, v) sits at x·u + y·v), turned `roll` radians. The same for
+    /// the model and its beams.
+    static func beeBasis(up: SIMD3<Float>, d: SIMD3<Float>, roll: Float) -> (x: SIMD3<Float>, y: SIMD3<Float>) {
+        var t = simd_cross(up, d)
+        if simd_length(t) < 0.05 { t = abs(d.z) > 0.9 ? [1, 0, 0] : simd_cross(d, [0, 0, 1]) }
+        let b = Basis.along(d, hint: t)
+        return (b.x * cos(roll) + b.y * sin(roll), b.y * cos(roll) - b.x * sin(roll))
     }
 
     // MARK: the parts that never move (built with the scenery)
@@ -170,14 +214,14 @@ final class FixtureModels {
             if u.onStand {  // its own stand, under the fixture's lowest point
                 let bottom: Float
                 switch u.shape {
-                case .beamHead, .spotHead, .washHead: bottom = u.p.z - (headGeometry(u).armLen + 0.12 * u.scale)
+                case .beamHead, .spotHead, .washHead, .beeHead: bottom = u.p.z - (headGeometry(u).armLen + 0.12 * u.scale)
                 case .movingBar, .curveBar: bottom = u.p.z - 0.25
                 default: bottom = u.p.z - 0.2
                 }
                 tripod(&m, at: u.p, top: bottom, u.selected ? Self.pick : u.hovered ? Self.lit : Self.standColor, em: em)
             }
             switch u.shape {
-            case .beamHead, .spotHead, .washHead:
+            case .beamHead, .spotHead, .washHead, .beeHead:
                 let s = u.scale, g = headGeometry(u)
                 let b = Basis.along(u.up, hint: u.across)
                 let baseC = u.p - u.up * (g.armLen + 0.06 * s)
@@ -265,18 +309,20 @@ final class FixtureModels {
         switch u.shape {
         case .beamHead: return HeadGeometry(headR: 0.1 * s, headL: 0.3 * s, lensR: 0.08 * s, armOffset: 0.14 * s, armLen: 0.22 * s)
         case .washHead: return HeadGeometry(headR: 0.17 * s, headL: 0.2 * s, lensR: 0.155 * s, armOffset: 0.2 * s, armLen: 0.26 * s)
+        case .beeHead: return HeadGeometry(headR: 0.19 * s, headL: 0.24 * s, lensR: 0.175 * s, armOffset: 0.22 * s, armLen: 0.27 * s)
         default: return HeadGeometry(headR: 0.13 * s, headL: 0.4 * s, lensR: 0.09 * s, armOffset: 0.17 * s, armLen: 0.26 * s)
         }
     }
 
-    func dynamic(fixtures: [FixtureInfo], frame: Frame?, highlight: Set<String>) -> [SolidVertex] {
+    /// `roll`: each bee eye's front, turned this far (radians, the renderer's clock).
+    func dynamic(fixtures: [FixtureInfo], frame: Frame?, highlight: Set<String>, roll: [String: Float] = [:]) -> [SolidVertex] {
         var m = MeshBuilder()
         m.v.reserveCapacity(units.count * 400)
         for u in units {
             let col = u.selected ? Self.pick : u.hovered ? Self.lit : Self.yokeColor, em: Float = u.selected ? 0.7 : u.hovered ? 0.3 : 0
             let hl = u.idx.contains { highlight.contains(fixtures[$0].id) }
             switch u.shape {
-            case .beamHead, .spotHead, .washHead:
+            case .beamHead, .spotHead, .washHead, .beeHead:
                 let i = u.idx[0], g = headGeometry(u), s = u.scale
                 var d = frame.flatMap { i < $0.dirs.count ? $0.dirs[i] : nil } ?? simd_normalize(u.up + SIMD3(0, 0.6, 0))
                 d = simd_normalize(d)
@@ -306,7 +352,18 @@ final class FixtureModels {
                     // an LED ring round the lens, in the colour it plays (the lens drawn over its middle)
                     m.disc(front + d * 0.0015, d, radius: (g.lensR + g.headR) / 2, rc / rc.max(), emissive: 1.4)
                 }
-                lens(&m, front + d * 0.003, d, g.lensR, dim, lc, glow: u.shape == .washHead ? 0.6 : 1.6)
+                if u.shape == .beeHead, let n = fixtures[i].lenses {
+                    // a honeycomb of lenses in a dark face, each lit as the pattern says, the front turning
+                    m.disc(front + d * 0.003, d, radius: g.lensR, Self.glassColor * 0.6, emissive: 0)
+                    let bee = frame.flatMap { i < $0.bee.count ? $0.bee[i] : nil }
+                    let face = Self.beeFace(scale: s, lenses: n), ax = Self.beeBasis(up: u.up, d: d, roll: roll[fixtures[i].id] ?? 0)
+                    for (k, q) in Self.honeycomb(n).spots.enumerated() {
+                        let share = hl ? 1 : bee.map { k < $0.lit.count ? $0.lit[k] : 1 } ?? 1
+                        lens(&m, front + d * 0.006 + (ax.x * q.x + ax.y * q.y) * face.pitch, d, face.lensR, dim * share, lc, glow: 1.8)
+                    }
+                } else {
+                    lens(&m, front + d * 0.003, d, g.lensR, dim, lc, glow: u.shape == .washHead ? 0.6 : 1.6)
+                }
                 if u.shape == .washHead {   // the LEDs of a wash: one in the middle, a ring around it
                     let b = Basis.along(d, hint: t)
                     for k in 0..<7 {

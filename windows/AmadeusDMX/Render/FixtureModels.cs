@@ -1,7 +1,8 @@
 // The fixtures as they look: a moving head is a base, a yoke that pans and a head that tilts to where its beam
 // points; a moving bar tilts on its yoke ends; pixel bars, pars, strobes, blinders and lasers have their
-// housings, and every lens glows in the colour the fixture plays (a head's LED ring round it too). Sized from the
-// fixture's real dimensions (mac/Sources/AmadeusDMX/Render/FixtureModels.swift).
+// housings, and every lens glows in the colour the fixture plays (a head's LED ring round it too; a bee eye's
+// honeycomb of lenses lit in the pattern it plays, its front turning). Sized from the fixture's real dimensions
+// (mac/Sources/AmadeusDMX/Render/FixtureModels.swift).
 //
 // What never moves (bases, bar housings, cans, boxes) is built once with the scenery; the moving parts and the
 // lenses are built every frame from the show's frame (beam directions, colours).
@@ -91,7 +92,7 @@ public sealed class MeshBuilder
 /// The rig's fixtures as models.
 public sealed class FixtureModels
 {
-    public enum Shape { BeamHead, SpotHead, WashHead, MovingBar, CurveBar, ParBar, Par, Strobe, Blinder, Laser, Smoke }
+    public enum Shape { BeamHead, SpotHead, WashHead, BeeHead, MovingBar, CurveBar, ParBar, Par, Strobe, Blinder, Laser, Smoke }
 
     public sealed record Unit
     {
@@ -158,13 +159,11 @@ public sealed class FixtureModels
                 "blinder" => Shape.Blinder,
                 "laser" => Shape.Laser,
                 "smoke" => Shape.Smoke,
-                "moving_head" => f.BeamDeg <= 6 ? Shape.BeamHead : f.BeamDeg <= 20 ? Shape.SpotHead : Shape.WashHead,
+                "moving_head" => (f.Lenses ?? 0) > 0 ? Shape.BeeHead : f.BeamDeg <= 6 ? Shape.BeamHead : f.BeamDeg <= 20 ? Shape.SpotHead : Shape.WashHead,
                 _ => f.Kind == FixtureKind.Head ? Shape.SpotHead : idx.Length > 1 ? Shape.ParBar : Shape.Par,
             };
             if (shape == Shape.Laser) up = Vector3.Normalize(new Vector3(0, 1, 0.15f));
-            // heads: the model's height against a typical 55 cm head
-            var scale = shape is Shape.BeamHead or Shape.SpotHead or Shape.WashHead
-                ? MathF.Min(1.5f, MathF.Max(0.6f, (size is { } sz ? MathF.Max(sz.X, sz.Z) : 0.55f) / 0.55f)) : 1;
+            var scale = IsHead(shape) ? HeadScale(f) : 1;
             var length = (float)(f.Length ?? (double)(size?.X ?? 1));
             var stand = f.Mount == "stand" && f.Truss is null && p.Z > 0.6f;
             _units.Add(new Unit
@@ -173,6 +172,60 @@ public sealed class FixtureModels
                 Selected = selected.Contains($"fixture:{k}"), Hovered = selected.Contains($"hover:fixture:{k}"), OnStand = stand,
             });
         }
+    }
+
+    public static bool IsHead(Shape s) => s is Shape.BeamHead or Shape.SpotHead or Shape.WashHead or Shape.BeeHead;
+
+    /// A head's model size: its height against a typical 55 cm head.
+    public static float HeadScale(FixtureInfo f)
+    {
+        float? size = f.Size is { Length: >= 3 } s ? (float)Math.Max(s[0], s[2]) : null;
+        return MathF.Min(1.5f, MathF.Max(0.6f, (size ?? 0.55f) / 0.55f));
+    }
+
+    // MARK: bee eyes
+
+    /// A bee eye's lenses on its front, in the order of its pixels (amadeus/library/fixtures.py honeycomb): the middle
+    /// one, then ring by ring, each from the top clockwise as you face it; one lens apart, the outer ring's corners
+    /// `rings` out.
+    public static (Vector2[] Spots, int Rings) Honeycomb(int n)
+    {
+        var output = new List<Vector2> { Vector2.Zero };
+        var r = 0;
+        static Vector2 Corner(int c, int r)
+        {
+            var a = c * MathF.PI / 3;
+            return new Vector2(MathF.Sin(a), MathF.Cos(a)) * r;   // a ring's corners, from the top round
+        }
+        while (output.Count < n)
+        {
+            r += 1;
+            for (var k = 0; k < 6 * r && output.Count < n; k++)
+            {
+                int c = k / r;
+                var j = (float)(k % r) / r;
+                output.Add(Corner(c, r) + (Corner(c + 1, r) - Corner(c, r)) * j);
+            }
+        }
+        return (output.ToArray(), r);
+    }
+
+    /// Where a bee eye's lenses sit: the front's distance from the tilt axis, the lens spacing and a lens's radius.
+    public static (float Front, float Pitch, float LensR) BeeFace(float scale, int lenses)
+    {
+        float s = scale, rings = Honeycomb(lenses).Rings, faceR = 0.175f * s;
+        var pitch = faceR * 0.9f / (rings + 0.5f);
+        return (0.24f * s * 0.35f, pitch, pitch * 0.44f);
+    }
+
+    /// The face's axes: x and y across it (a lens at (u, v) sits at x·u + y·v), turned `roll` radians. The same for
+    /// the model and its beams.
+    public static (Vector3 X, Vector3 Y) BeeBasis(Vector3 up, Vector3 d, float roll)
+    {
+        var t = Vector3.Cross(up, d);
+        if (t.Length() < 0.05f) t = MathF.Abs(d.Z) > 0.9f ? new Vector3(1, 0, 0) : Vector3.Cross(d, new(0, 0, 1));
+        var b = Basis.Along(d, t);
+        return (b.X * MathF.Cos(roll) + b.Y * MathF.Sin(roll), b.Y * MathF.Cos(roll) - b.X * MathF.Sin(roll));
     }
 
     // MARK: the parts that never move (built with the scenery)
@@ -203,7 +256,7 @@ public sealed class FixtureModels
             {
                 var bottom = u.Shape switch
                 {
-                    Shape.BeamHead or Shape.SpotHead or Shape.WashHead => u.P.Z - (HeadGeometryOf(u).ArmLen + 0.12f * u.Scale),
+                    Shape.BeamHead or Shape.SpotHead or Shape.WashHead or Shape.BeeHead => u.P.Z - (HeadGeometryOf(u).ArmLen + 0.12f * u.Scale),
                     Shape.MovingBar or Shape.CurveBar => u.P.Z - 0.25f,
                     _ => u.P.Z - 0.2f,
                 };
@@ -211,7 +264,7 @@ public sealed class FixtureModels
             }
             switch (u.Shape)
             {
-                case Shape.BeamHead or Shape.SpotHead or Shape.WashHead:
+                case Shape.BeamHead or Shape.SpotHead or Shape.WashHead or Shape.BeeHead:
                 {
                     var s = u.Scale;
                     var g = HeadGeometryOf(u);
@@ -326,14 +379,17 @@ public sealed class FixtureModels
         {
             Shape.BeamHead => new(0.1f * s, 0.3f * s, 0.08f * s, 0.14f * s, 0.22f * s),
             Shape.WashHead => new(0.17f * s, 0.2f * s, 0.155f * s, 0.2f * s, 0.26f * s),
+            Shape.BeeHead => new(0.19f * s, 0.24f * s, 0.175f * s, 0.22f * s, 0.27f * s),
             _ => new(0.13f * s, 0.4f * s, 0.09f * s, 0.17f * s, 0.26f * s),
         };
     }
 
     static Vector3? Dir(Frame? frame, int i) => frame is not null && i < frame.Dirs.Length ? frame.Dirs[i] : null;
 
-    /// The moving parts and lenses for this frame, into `m` (cleared first).
-    public void Dynamic(IReadOnlyList<FixtureInfo> fixtures, Frame? frame, IReadOnlySet<string> highlight, MeshBuilder m)
+    /// The moving parts and lenses for this frame, into `m` (cleared first). `roll`: each bee eye's front, turned this
+    /// far (radians, the renderer's clock).
+    public void Dynamic(IReadOnlyList<FixtureInfo> fixtures, Frame? frame, IReadOnlySet<string> highlight, MeshBuilder m,
+                        IReadOnlyDictionary<string, float>? roll = null)
     {
         m.Clear();
         if (m.V.Capacity < _units.Count * 400) m.V.Capacity = _units.Count * 400;
@@ -344,7 +400,7 @@ public sealed class FixtureModels
             var hl = u.Idx.Any(i => highlight.Contains(fixtures[i].Id));
             switch (u.Shape)
             {
-                case Shape.BeamHead or Shape.SpotHead or Shape.WashHead:
+                case Shape.BeamHead or Shape.SpotHead or Shape.WashHead or Shape.BeeHead:
                 {
                     var i = u.Idx[0];
                     var g = HeadGeometryOf(u);
@@ -378,7 +434,25 @@ public sealed class FixtureModels
                         // an LED ring round the lens, in the colour it plays (the lens drawn over its middle)
                         m.Disc(front + d * 0.0015f, d, radius: (g.LensR + g.HeadR) / 2, rc / Max(rc), emissive: 1.4f);
                     }
-                    Lens(m, front + d * 0.003f, d, g.LensR, dim, lc, glow: u.Shape == Shape.WashHead ? 0.6f : 1.6f);
+                    if (u.Shape == Shape.BeeHead && fixtures[i].Lenses is { } n)
+                    {
+                        // a honeycomb of lenses in a dark face, each lit as the pattern says, the front turning
+                        m.Disc(front + d * 0.003f, d, radius: g.LensR, GlassColor * 0.6f, emissive: 0);
+                        var bee = frame is not null && i < frame.Bee.Length ? frame.Bee[i] : null;
+                        var face = BeeFace(s, n);
+                        var ax = BeeBasis(u.Up, d, roll?.GetValueOrDefault(fixtures[i].Id) ?? 0);
+                        var spots = Honeycomb(n).Spots;
+                        for (var k = 0; k < spots.Length; k++)
+                        {
+                            var q = spots[k];
+                            var share = hl ? 1 : bee is null ? 1 : k < bee.Lit.Length ? bee.Lit[k] : 1;
+                            Lens(m, front + d * 0.006f + (ax.X * q.X + ax.Y * q.Y) * face.Pitch, d, face.LensR, dim * share, lc, glow: 1.8f);
+                        }
+                    }
+                    else
+                    {
+                        Lens(m, front + d * 0.003f, d, g.LensR, dim, lc, glow: u.Shape == Shape.WashHead ? 0.6f : 1.6f);
+                    }
                     if (u.Shape == Shape.WashHead)   // the LEDs of a wash: one in the middle, a ring around it
                     {
                         var b = Basis.Along(d, t);

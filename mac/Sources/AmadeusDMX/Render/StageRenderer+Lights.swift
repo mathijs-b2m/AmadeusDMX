@@ -1,6 +1,7 @@
 // The lights of one frame: beams, spots on surfaces, lens flares and laser lines, from the feed's frame. A head with a
 // gobo in its beam draws it as a gobo beam: the pattern in the haze and projected where it lands, turning, shaking
-// and sliding on its wheel as the frame says; its zoom sets how wide the beam opens.
+// and sliding on its wheel as the frame says; its zoom sets how wide the beam opens. A bee eye shines a narrow beam
+// out of every lens it lights, fanning a little apart and opening with the zoom, turning with its front.
 import AmadeusKit
 import Metal
 import MetalKit
@@ -70,12 +71,40 @@ extension StageRenderer {
             }
         }
 
+        // one lens's beam of a bee eye: the core only (its neighbours are its glow), its spot where it lands
+        func lensBeam(_ p: SIMD3<Float>, _ d: SIMD3<Float>, beamDeg: Float, color: SIMD3<Float>, light: Float) {
+            let (len, surf) = room.hit(p, d, maxLen: 30)
+            let R = max(0.02, len * tan(beamDeg * .pi / 360))
+            beams.append(BeamInstance(apexLen: SIMD4(p, len), dirRadius: SIMD4(d, R), color: SIMD4(color, light * BeamLight.haze),
+                                      extra: [0.02, BeamLight.refRadius, 0, 0]))
+            if lands(surf) {
+                let n = Room.normal(surf)
+                let squash = max(1, min(3, 1 / max(0.25, abs(simd_dot(d, n)))))
+                decals.append(DecalInstance(centerRadius: SIMD4(p + d * len, max(0.05, R * 1.15)), normal: SIMD4(n, squash),
+                                            color: SIMD4(color, light * 0.8 * BeamLight.gain(radius: R))))
+            }
+        }
+
+        // the lens glows in the model; a flare only when the head points at the viewer (audience scanning), smaller for
+        // the cells of a bar or a bee eye's lenses (many small lenses, not one big one)
+        func flare(_ p: SIMD3<Float>, _ d: SIMD3<Float>, _ col: SIMD3<Float>, _ dim: Float, cells: Int) {
+            let glare = pow(max(0, simd_dot(d, simd_normalize(eye - p))), 8)
+            guard glare > 0.05 else { return }
+            let cellK = 1 / Float(max(1, cells)).squareRoot()
+            let size = min(0.08 + 0.3 * glare, max(0.1, simd_length(eye - p) * 0.035)) * cellK
+            sprites.append(SpriteInstance(centerSize: SIMD4(p, size), color: SIMD4(col, min(2.0, dim * glare * 2) * cellK),
+                                          extra: [glare > 0.6 ? 1 : 0.3, 0, 0, 0]))
+        }
+
         // gobos turn and shake with the renderer's own clock (smooth between the show's frames)
         let gdt = min(0.2, max(0, t - goboT))
         goboT = t
 
         for (i, fx) in inp.fixtures.enumerated() {
             let p = SIMD3<Float>(Float(fx.pos.x), Float(fx.pos.y), Float(fx.pos.z))
+            if let bee = frame.flatMap({ i < $0.bee.count ? $0.bee[i] : nil }) {   // a bee eye's front turns, lit or not
+                beeRoll[fx.id] = ((beeRoll[fx.id] ?? 0) + bee.turns * 2 * .pi * gdt).truncatingRemainder(dividingBy: 2 * .pi)
+            }
             var dim: Float = 0, col = SIMD3<Float>(repeating: 1)
             if let frame, i < frame.fx.count {
                 let v = frame.fx[i]
@@ -118,6 +147,25 @@ extension StageRenderer {
                         return simd_normalize(d + 0.07 * (cos(a) * a1 + sin(a) * a2))
                     }
                 }
+                if let n = fx.lenses, n > 0 {
+                    // a bee eye: a narrow beam from each lens it lights, fanning apart a little more as the zoom opens
+                    let bee = frame.flatMap { i < $0.bee.count ? $0.bee[i] : nil }
+                    let face = FixtureModels.beeFace(scale: FixtureModels.headScale(fx), lenses: n)
+                    let (spots, rings) = FixtureModels.honeycomb(n)
+                    let ax = FixtureModels.beeBasis(up: rest, d: d, roll: beeRoll[fx.id] ?? 0)
+                    let fan = tan((7 + lens * 0.3) * .pi / 180) / Float(max(rings, 1))
+                    var each = dim * density * Float(fx.flux) * 1.1 / Float(n).squareRoot()
+                    if highlight.contains(fx.id) { each = max(each, 1.5 / Float(n).squareRoot()) }
+                    for (k, q) in spots.enumerated() {
+                        let share = highlight.contains(fx.id) ? 1 : bee.map { k < $0.lit.count ? $0.lit[k] : 1 } ?? 1
+                        if share <= 0.01 { continue }
+                        let off = ax.x * q.x + ax.y * q.y
+                        lensBeam(p + d * face.front + off * face.pitch, simd_normalize(d + off * fan), beamDeg: max(lens, 0.5),
+                                 color: col, light: each * share)
+                    }
+                    flare(p, d, col, dim, cells: n)
+                    continue
+                }
                 let frost = name == "frost"   // a frost spreads it wide and soft
                 var a = (rays.count > 1 ? dim * 0.6 : dim) * density * Float(fx.flux)
                 if highlight.contains(fx.id) { a = max(a, 1.5) }
@@ -138,16 +186,7 @@ extension StageRenderer {
                                  color: col, light: a)
                     }
                 }
-                // the lens glows in the model; a flare only when the head points at the viewer (audience scanning),
-                // smaller for the cells of a bar (many small lenses, not one big one)
-                let toEye = simd_normalize(eye - p)
-                let glare = pow(max(0, simd_dot(d, toEye)), 8)
-                if glare > 0.05 {
-                    let cellK = 1 / Float(max(1, fx.cells ?? 1)).squareRoot()
-                    let size = min(0.08 + 0.3 * glare, max(0.1, simd_length(eye - p) * 0.035)) * cellK
-                    sprites.append(SpriteInstance(centerSize: SIMD4(p, size), color: SIMD4(col, min(2.0, dim * glare * 2) * cellK),
-                                                  extra: [glare > 0.6 ? 1 : 0.3, 0, 0, 0]))
-                }
+                flare(p, d, col, dim, cells: fx.cells ?? 1)
             case .laser:
                 guard let beamsLZ = frame.flatMap({ i < $0.lz.count ? $0.lz[i] : nil }), !beamsLZ.isEmpty else {
                     if highlight.contains(fx.id) {
