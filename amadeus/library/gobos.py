@@ -26,6 +26,7 @@ from functools import cache
 import numpy as np
 
 from amadeus import paths
+from amadeus.library import fixtures as fxlib
 
 CATALOG = paths.FIXTURES / "catalog" / "gobos.json.gz"
 SIZE = 128  # pixels across a gobo picture
@@ -108,7 +109,9 @@ def style(key: str) -> str:
 
 def groups(defn: dict) -> dict[str, list[int]]:
     """The gobos of the "gobo" effect by style (1-based, like hand-made gobo_groups, which win). Pictures and words
-    are in none: the show doesn't put "Happy Birthday" on the wall by itself."""
+    are in none: the show doesn't put "Happy Birthday" on the wall by itself. A bee eye's are its lens patterns."""
+    if fxlib.bee_eye(defn):
+        return fxlib.bee_gobo_groups()
     own = {k: v for k, v in defn.get("gobo_groups", {}).items() if not k.startswith("_")}
     if own:
         return own
@@ -121,7 +124,9 @@ def groups(defn: dict) -> dict[str, list[int]]:
 
 def usable(defn: dict) -> list[int]:
     """The gobos of the "gobo" effect the show may pick when the style asked for isn't on the wheel (1-based): any
-    but the pictures and words, unless that is all there is."""
+    but the pictures and words, unless that is all there is. A bee eye: any of its lens patterns."""
+    if fxlib.bee_eye(defn):
+        return list(range(1, len(fxlib.BEE_PATTERNS) + 1))
     keys = wheel(defn, "gobo") or [""]
     if defn.get("gobo_groups"):
         return list(range(1, len(keys) + 1))

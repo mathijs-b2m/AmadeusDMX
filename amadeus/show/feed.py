@@ -55,6 +55,8 @@ def element_info(rig: dict, e: dict, real=None) -> dict:
         info["length"] = round(fxlib.bar_length_m(fx, defn), 3)
     if e["kind"] == "head":
         info["up"] = [round(float(v), 3) for v in geometry.mount_up(fx)]
+        if lenses := fxlib.bee_eye(defn):  # a honeycomb of lenses, a beam each
+            info["lenses"] = lenses
     if e["kind"] in ("par", "blinder", "strobe", "smoke"):  # a smoke machine: where its nozzle blows
         info["dir"] = [round(float(v), 3) for v in geometry.static_dir(fx, e["kind"])]
     if real is not None:  # real lens, zoom range and beam strength
@@ -131,6 +133,8 @@ class Feed:
             for e, (fx, defn) in self.head_fk.items()
             if "ring_color" in defn and any(c["attr"] == "ring_color" for c in fxlib.channels(defn, fx["mode"]))
         }
+        # bee eyes: which of their lenses are lit and how fast the front turns
+        self.bees = {e: n for e, (_, defn) in self.head_fk.items() if (n := fxlib.bee_eye(defn))}
         self.lite_every = max(1, round(1.0 / (period * LITE_HZ)))
         self.tick = 0
         self.on_message: Callable[[dict], None] | None = None  # what a client asks for (the operator's controls)
@@ -187,8 +191,8 @@ class Feed:
 
     def fixture_fields(self, states: dict, lasers: dict | None = None) -> dict:
         """Every element's colour and level as the fixtures really show it, each head's beam effect (what it
-        really plays), gobo, zoom and direction (computed back from its DMX pan/tilt), the colour of its LED ring,
-        and the beams each laser draws."""
+        really plays), gobo, zoom and direction (computed back from its DMX pan/tilt), the colour of its LED ring, a
+        bee eye's lit lenses and turning front, and the beams each laser draws."""
         shown = self.real.step(states, self.period)
         beams = self.real.beams(states, self.period)
         fx = []
@@ -217,6 +221,10 @@ class Feed:
         if self.rings:  # each head's LED ring: its colour [r, g, b] (None: off, or no ring)
             slots = {e: fxlib.ring_slot(defn, fid, states[e]) for e, (fid, defn) in self.rings.items()}
             out["ring"] = [[round(v, 3) for v in slots[e]["rgb"]] if slots.get(e) else None for e in self.ids]
+        if self.bees:  # each bee eye: [turns per second, then each lens 0 dark / 1 lit] (None: not a bee eye)
+            looks = {e: fxlib.bee_look(n, states[e]) for e, n in self.bees.items() if e in states}
+            out["bee"] = [[round(looks[e][1], 3), *(round(v, 2) for v in looks[e][0])] if e in looks else None
+                          for e in self.ids]  # fmt: skip
         if self.smokes:  # each smoke machine's output now, 0..1
             out["fog"] = {e: round(states[e].dimmer, 2) for e in self.smokes}
         return out

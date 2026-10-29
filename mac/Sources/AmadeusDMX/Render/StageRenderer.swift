@@ -66,6 +66,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var goboTurn: [String: Float] = [:]
     var goboAxis: [String: SIMD3<Float>] = [:]
     var goboT: Float = 0
+    var beeRoll: [String: Float] = [:]   // each bee eye's front, turned this far (radians)
     var sceneryBuffer: MTLBuffer?
     var sceneryCount = 0
     var wallBuffer: MTLBuffer?
@@ -411,7 +412,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
             }
             // the fixtures' moving parts and lenses: where the beams point, in the colours they play
             if let s = scenery, let inp {
-                let parts = s.models.dynamic(fixtures: inp.fixtures, frame: frame, highlight: highlight)
+                let parts = s.models.dynamic(fixtures: inp.fixtures, frame: frame, highlight: highlight, roll: beeRoll)
                 if !parts.isEmpty, let buf = device.makeBuffer(bytes: parts, length: parts.count * MemoryLayout<SolidVertex>.stride) {
                     enc.setRenderPipelineState(solidPipe)
                     enc.setDepthStencilState(solidDepth)

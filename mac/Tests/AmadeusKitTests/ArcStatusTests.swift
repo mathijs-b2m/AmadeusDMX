@@ -37,3 +37,11 @@ import Testing
     guard case .frame(let older) = try #require(FeedMessage.decode(Data(#"{"type": "frame", "t": 1, "phrase": 0}"#.utf8))) else { return }
     #expect(older.ring.isEmpty)  // an engine without rings
 }
+
+@Test func aBeeEyesLensesAndTurningDecodePerElement() throws {
+    let json = #"{"type": "frame", "t": 1, "phrase": 0, "fx": [[1, 1, 0, 0, 0, 0.5, 0.5], [0, 0, 0, 0, 0, 0.5, 0.5]], "bee": [[-0.25, 1, 0, 1], null]}"#
+    guard case .frame(let f) = try #require(FeedMessage.decode(Data(json.utf8))) else { Issue.record("not a frame"); return }
+    #expect(f.bee.count == 2 && f.bee[0] == BeeState(turns: -0.25, lit: [1, 0, 1]) && f.bee[1] == nil)
+    let hello = #"{"id": "big1", "kind": "head", "pos": [1, 2, 4], "lenses": 19}"#
+    #expect(try JSONDecoder().decode(FixtureInfo.self, from: Data(hello.utf8)).lenses == 19)
+}

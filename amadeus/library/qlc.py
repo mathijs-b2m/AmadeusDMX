@@ -27,7 +27,7 @@ FIXTURES_DIR = REPO_DIR / "resources" / "fixtures"
 REPO_URL = "https://github.com/mcallegari/qlcplus.git"
 RAW_URL = "https://raw.githubusercontent.com/mcallegari/qlcplus/master/resources/fixtures/{path}"
 NS = {"q": "http://www.qlcplus.org/FixtureDefinition"}
-CONVERTER_VERSION = 8
+CONVERTER_VERSION = 9
 
 PRESET_ATTR = {
     "IntensityMasterDimmer": "dimmer",
@@ -218,6 +218,20 @@ def _rotation(caps: list[dict]) -> dict:
     return spin
 
 
+def _roll(caps: list[dict]) -> dict | None:
+    """A bee eye's barrel roll (its front turning): a still position (its first value) and the speeds each way,
+    [slow, fast], from the presets or the names ("Clockwise Barrel Roll", "Anti-clockwise …"). None: no turning."""
+    out = {"attr": "lens_roll", "default": caps[0]["min"] if caps else 0}
+    for c in caps:
+        n, pre = c["name"].lower(), c["preset"]
+        ccw = pre.startswith("RotationCounterClockwise") or re.search(r"anti|counter", n)
+        if not (pre.startswith("Rotation") and "Stop" not in pre) and "clockwise" not in n:
+            continue
+        fast_first = "FastToSlow" in pre or "fast to slow" in n
+        out.setdefault("ccw" if ccw else "cw", [c["max"], c["min"]] if fast_first else [c["min"], c["max"]])
+    return out if "cw" in out or "ccw" in out else None
+
+
 def _classify(ch) -> dict:
     name = ch.get("Name", "")
     preset = ch.get("Preset", "")
@@ -315,6 +329,8 @@ def _classify(ch) -> dict:
         }
     if group == "Shutter":
         return {"attr": "shutter", "default": _quiet_default(caps, default)}
+    if group in ("Beam", "Effect") and re.search(r"barrel|roll|^rotat", name, re.I) and (roll := _roll(caps)):
+        return roll
     attr = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "channel"
     return {"attr": attr, "default": _quiet_default(caps, default)}
 
@@ -471,8 +487,9 @@ def _refine(out: dict, ftype: str):
     if "pan" in attrs and "tilt" in attrs:
         out["kind"] = "moving_head"
         for m in out["modes"].values():  # one beam: cells of a moving head (beam + aura) light together
-            for c in m:
-                c.pop("head", None)
+            for c in m:  # (a bee eye's lenses keep their number: the show lights them in patterns)
+                if (h := c.pop("head", None)) and fxlib.BEE_EYE.search(out["model"]):
+                    c["pixel"] = h - 1
     elif "tilt" in attrs:
         out["kind"] = "moving_bar"  # cells on one tilting bar (DTS Katana, COLORband PiX-M)
         phys["pan_deg"] = 0
