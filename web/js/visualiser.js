@@ -22,6 +22,23 @@ $("legend").innerHTML = SECTIONS.map(s => `<span><i style="background:var(--${s}
 
 // gobo pictures (the hello's): light passes where they are light; drawn tinted in the beam's colour into the spots
 let goboPics = [], goboTint = new Map(), goboTurn = {}, goboClock = performance.now();
+let beeRoll = {};  // each bee eye's front, turned this far (radians)
+
+// A bee eye's lenses on its front, in the order of its pixels (amadeus/library/fixtures.py honeycomb, the Mac's
+// FixtureModels): the middle one, then ring by ring from the top round; one lens apart. And how many rings.
+function honeycomb(n) {
+  const out = [[0, 0]];
+  const corner = (c, r) => [Math.sin(c * Math.PI / 3) * r, Math.cos(c * Math.PI / 3) * r];
+  let r = 0;
+  while (out.length < n) {
+    r += 1;
+    for (let k = 0; k < 6 * r && out.length < n; k++) {
+      const c = Math.floor(k / r), j = (k % r) / r, a = corner(c, r), b = corner(c + 1, r);
+      out.push([a[0] + (b[0] - a[0]) * j, a[1] + (b[1] - a[1]) * j]);
+    }
+  }
+  return { spots: out, rings: r };
+}
 function goboTinted(k, c) {
   const im = goboPics[k];
   if (!im || !im.complete || !im.naturalWidth) return null;
@@ -487,6 +504,28 @@ function draw() {
       const lens = fx.beam_deg + ((fx.beam_wide ?? fx.beam_deg) - fx.beam_deg) * zoom;
       const light = (rays.length > 1 ? dim * 0.6 : dim) * density * (fx.flux ?? 1);
       const tan = deg => Math.tan(deg * Math.PI / 360);
+      if (fx.lenses) {  // a bee eye: a narrow beam from each lens it lights, fanning apart as the zoom opens, turning
+        const bee = frame.bee?.[i], n = fx.lenses, { spots: cells, rings } = honeycomb(n);
+        if (bee) beeRoll[i] = ((beeRoll[i] || 0) + bee[0] * 2 * Math.PI * gdt) % (2 * Math.PI);
+        const up = fx.up || [0, 0, -1], cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+        let t = cr(up, d);
+        if (Math.hypot(...t) < 0.05) t = Math.abs(d[2]) > 0.9 ? [1, 0, 0] : cr(d, [0, 0, 1]);
+        const tl = Math.hypot(...t), bx = t.map(x => x / tl), by = cr(d, bx), ro = beeRoll[i] || 0;
+        const ax = bx.map((x, m) => x * Math.cos(ro) + by[m] * Math.sin(ro)), ay = by.map((y, m) => y * Math.cos(ro) - bx[m] * Math.sin(ro));
+        const scale = Math.min(1.5, Math.max(0.6, Math.max(fx.size?.[0] ?? 0.55, fx.size?.[2] ?? 0.55) / 0.55));
+        const pitch = 0.175 * scale * 0.9 / (rings + 0.5), front = 0.24 * scale * 0.35;
+        const fan = Math.tan((7 + lens * 0.3) * Math.PI / 180) / Math.max(rings, 1), each = light * 1.1 / Math.sqrt(n);
+        cells.forEach((q, k) => {
+          const share = bee ? (bee[k + 1] ?? 1) : 1; if (share <= 0.01) return;
+          const off = [0, 1, 2].map(m => ax[m] * q[0] + ay[m] * q[1]);
+          const from = [0, 1, 2].map(m => fx.pos[m] + d[m] * front + off[m] * pitch);
+          let rd = [0, 1, 2].map(m => d[m] + off[m] * fan); const rl = Math.hypot(...rd); rd = rd.map(x => x / rl);
+          const end = beamEnd(from, rd, st), deg = Math.max(lens, 0.5), R = Math.max(0.02, end.t * tan(deg));
+          const b = drawBeam(P, from, end.p, end.t, deg, c, each * share * BeamLight.haze, BeamLight.stops(end.t, R));
+          if (b && end.surf !== "air") spots.push({ ...b, c, dim: each * share * 0.8 * BeamLight.gain(R), surf: end.surf, d: rd, gobo: -1 });
+        });
+        return;
+      }
       rays.forEach(rd => {
         const end = beamEnd(fx.pos, rd, st), lands = end.surf !== "air";
         if (gobo) {
@@ -632,6 +671,16 @@ function draw() {
     if (ring) {
       ctx.strokeStyle = rgb(ring, 0.9); ctx.lineWidth = Math.max(1, size * 0.22);
       ctx.beginPath(); ctx.arc(p[0], p[1], size * 0.75, 0, 7); ctx.stroke();
+    }
+    if (fx.lenses && dim > 0.01) {  // a bee eye's honeycomb: its lit lenses, turning with the front
+      const bee = frame.bee?.[i], { spots: cells, rings } = honeycomb(fx.lenses), ro = beeRoll[i] || 0;
+      const pitch = size * 0.85 / (rings + 0.5);
+      cells.forEach((q, k) => {
+        if (bee && !((bee[k + 1] ?? 1) > 0.01)) return;
+        const x = q[0] * Math.cos(ro) - q[1] * Math.sin(ro), y = q[0] * Math.sin(ro) + q[1] * Math.cos(ro);
+        ctx.fillStyle = rgb(c, Math.min(1, dim * 1.3));
+        ctx.beginPath(); ctx.arc(p[0] + x * pitch, p[1] - y * pitch, Math.max(0.8, pitch * 0.38), 0, 7); ctx.fill();
+      });
     }
   });
 }
