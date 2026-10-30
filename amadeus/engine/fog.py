@@ -8,7 +8,9 @@ How much one second of fog adds depends on the machine and the room. A machine's
 minute, from the fixture or estimated from its power) against the room's volume (the stage's
 `room_volume_m3`, else width × depth × ceiling): a big fogger in a small room fires a short, softer burst
 and then rests a long time; a small one in a big hall runs as long as it may (its `max_burst_s`), rests to
-reheat, and runs again. A hazer (made for continuous output) runs steadily at the level that holds the haze.
+reheat, and runs again. A hazer (made for continuous output) runs steadily at the level that holds the haze;
+when that level is below what the machine can make (`min_level`: most hazers make nothing at a few percent), it
+keeps the room hazy with short bursts on the beat at a level it can make, as often as the haze needs.
 The room clears by itself (`fog_clear_s`, its ventilation), and `safety.max_fog` caps the haze.
 """
 
@@ -37,6 +39,10 @@ MIN_ON_S = 0.5  # shorter bursts don't come out of a fogger
 MIN_LEVEL = 0.35  # … nor much below this output
 MIN_GAP_S = 3.0  # between two bursts at least
 BURST_ADD = 0.2  # a drop's burst: a visible blast that adds this much haze at most
+HAZE_MIN_LEVEL = 0.1  # below this output most hazers make nothing (a fixture's `fog.min_level` says better)
+PULSE_LEVEL = 0.3  # a hazer's burst when steady output would be too low: at least this, and its min_level
+PULSE_ADD = 0.1  # … sized to add about this much haze
+PULSE_MIN_S, PULSE_MAX_S = 2.0, 10.0  # … for this long (a hazer's pump and fan need a moment to push haze out)
 WATT_TO_M3_MIN = {"fog": 0.3, "haze": 0.2}  # estimate when the output isn't known: 1500 W fogger ≈ 450 m³/min
 
 
@@ -47,6 +53,7 @@ class Machine:
     haze: bool  # a hazer: continuous, proportional output
     max_burst_s: float  # longest it can fog before it has to reheat (foggers)
     rest_s: float  # how long it reheats after a full-length burst
+    min_level: float = HAZE_MIN_LEVEL  # the lowest output that still makes haze (hazers)
 
 
 def machine(element_id: str, defn: dict) -> Machine:
@@ -60,6 +67,7 @@ def machine(element_id: str, defn: dict) -> Machine:
         haze,
         float(fog.get("max_burst_s", 600 if haze else 25)),
         float(fog.get("rest_s", 0 if haze else 25)),
+        float(fog.get("min_level", HAZE_MIN_LEVEL)),
     )
 
 
@@ -112,6 +120,7 @@ def plan(
     start_at: list[float | None] = [None] * len(machines)  # a burst waiting for its beat
     level_of = [1.0] * len(machines)
     blast = [False] * len(machines)  # the current burst is a drop's: it runs its length
+    owed = [0.0] * len(machines)  # a pulsing hazer: the output it still owes the haze (level × seconds)
 
     def rest(m: Machine, length: float) -> float:
         return max(MIN_GAP_S, m.rest_s * length / m.max_burst_s)
@@ -131,7 +140,28 @@ def plan(
             if m.haze:  # steady: what holds the level, plus a share of what's missing
                 hold = want / (rate[j] * clear_s) if want else 0.0
                 v = min(max(hold + lack / (rate[j] * 20.0), 0.0), 1.0) if want else 0.0
-                out[j, k] = v if v >= 0.05 else 0.0
+                if v >= m.min_level or not want:
+                    out[j, k], owed[j], on_until[j], start_at[j] = v, 0.0, -1.0, None
+                    continue
+                # too little to make haze: the same output in bursts it can make, on the beat
+                level = min(max(PULSE_LEVEL, m.min_level), 1.0)
+                owed[j] += v * dt
+                if t < on_until[j]:
+                    if h >= max_fog or (owed[j] <= 0 and t - began[j] >= PULSE_MIN_S):
+                        on_until[j], ready_at[j] = t, t + MIN_GAP_S
+                    else:
+                        out[j, k] = level
+                        owed[j] -= level * dt
+                        continue
+                length = min(max(PULSE_ADD / (rate[j] * level), PULSE_MIN_S), PULSE_MAX_S)
+                if start_at[j] is not None and t >= start_at[j] - 1e-9:
+                    start_at[j] = None
+                    fire(j, t, level, length, False)
+                    ready_at[j] = on_until[j] + MIN_GAP_S
+                    out[j, k] = level
+                    owed[j] -= level * dt
+                elif start_at[j] is None and t >= ready_at[j] and owed[j] >= level * length and h < max_fog:
+                    start_at[j] = next_beat(t)
                 continue
             if t < on_until[j]:
                 # there: stop early (but not before a fogger can push fog out at all, unless at the cap)
