@@ -71,12 +71,37 @@ def test_quiet_at_the_edges():
     assert not out[int((PHRASES[-1][0] + 1) * fog.FOG_FPS) :].any()  # and the outro lets it clear
 
 
-def test_a_hazer_runs_steadily():
-    out, haze = run(fog.Machine("h", 60, True, 600, 0), 600)
+def test_a_hazer_runs_steadily_in_a_hall():
+    out, haze = run(fog.Machine("h", 60, True, 600, 0), 4000)
     on = out > 0
     assert on.sum() / fog.FOG_FPS > 60  # most of the time…
     assert len(bursts(out)) <= 3  # … in long stretches, not bursts
+    assert out[on].min() >= fog.HAZE_MIN_LEVEL  # and at a level it makes haze at
     assert haze.max() <= fog.DEFAULT_MAX_FOG + 0.05
+
+
+def test_a_big_hazer_in_a_small_room_keeps_it_hazy_with_bursts():
+    """Steady output would be a few percent, which a hazer doesn't make: bursts it can make, on the beat."""
+    hazer = fog.Machine("h", 258, True, 600, 0)  # a 1300 W hazer in a living room
+    duration = 600.0
+    beats = np.arange(0, duration, BEAT)
+    for level, lo, hi in (("light", 0.12, 0.45), ("medium", 0.3, 0.65), ("heavy", 0.45, 0.75)):
+        out, haze = fog.plan([(0, duration, level)], beats, duration, [hazer], 104)
+        b = bursts(out[0])
+        assert 2 <= len(b) <= 40, level  # bursts, not a flicker and not one long run
+        assert out[0][out[0] > 0].min() >= fog.PULSE_LEVEL  # always at an output that makes haze
+        for s, _ in b:
+            assert np.min(np.abs(beats - s)) <= 1 / fog.FOG_FPS + 1e-6  # on the beat
+        gaps = [b2[0] - b1[1] for b1, b2 in zip(b, b[1:])]
+        assert all(g >= fog.MIN_GAP_S - 1e-6 for g in gaps)
+        after = haze[int(90 * fog.FOG_FPS) : int((duration - 30) * fog.FOG_FPS)]
+        assert lo <= after.min() and after.max() <= hi, (level, after.min(), after.max())  # held about where asked
+
+
+def test_a_hazer_says_what_output_it_needs():
+    defn = {"physical": {"watts": 1290, "fog": {"type": "haze", "min_level": 0.2}}}
+    assert fog.machine("h", defn).min_level == 0.2
+    assert fog.machine("h", {"physical": {"fog": {"type": "haze"}}}).min_level == fog.HAZE_MIN_LEVEL
 
 
 def test_room_volume_from_the_stage():
