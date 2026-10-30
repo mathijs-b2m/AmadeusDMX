@@ -45,7 +45,7 @@ public static class Symbols
         ["puzzlepiece.extension"] = "", ["puzzlepiece.extension.fill"] = "",
         // the show
         ["bolt.fill"] = "", ["lightbulb.fill"] = "", ["lightbulb.max"] = "", ["light.strip.2"] = "",
-        ["light.panel"] = "", ["light.recessed"] = "", ["cloud.fog"] = "", ["moon.stars"] = "",
+        ["light.panel"] = "", ["light.recessed"] = "", ["cloud.fog"] = "", ["cloud.fog.fill"] = "", ["timer"] = "", ["repeat"] = "", ["moon.stars"] = "",
         ["moon.zzz"] = "", ["person.2"] = "", ["person.3"] = "", ["person.3.fill"] = "",
         ["person.3.sequence"] = "", ["figure.dance"] = "", ["figure.run"] = "", ["figure.walk.motion"] = "",
         ["film.stack"] = "", ["chart.bar"] = "", ["building.2"] = "", ["building.columns"] = "",

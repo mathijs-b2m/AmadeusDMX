@@ -25,6 +25,11 @@ struct NightCard: View {
                     }
                     Divider()
                 }
+                if (arc.hazers ?? 0) > 0 {
+                    Text("HAZE").font(.caption2.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 2)
+                    HazeRow(haze: arc.haze, send: send)
+                    Divider()
+                }
                 NightSettings(arc: arc, send: send)
             }
         }
@@ -42,6 +47,10 @@ struct NightCard: View {
                     HStack(spacing: 5) {
                         Text(arc.on ? arc.stageName : "Show Arc Off").font(.headline)
                         if arc.locked { Image(systemName: "pin.fill").font(.caption).foregroundStyle(.orange) }
+                        if arc.haze != nil {
+                            Image(systemName: "cloud.fog.fill").font(.caption).foregroundStyle(.orange)
+                                .help("You push the haze")
+                        }
                         if !arc.manual.isEmpty {
                             Image(systemName: "hand.raised.fill").font(.caption).foregroundStyle(.orange)
                                 .help("You hold \(arc.manual.count) knob\(arc.manual.count == 1 ? "" : "s")")
@@ -152,6 +161,69 @@ private struct KnobRow: View {
         }
         .font(.callout)
         .help(knob.id == "groups" ? "\(knob.help) (\(arc.playing) of \(arc.groups) playing)" : knob.help)
+    }
+}
+
+/// The haze push: the hazers at a level for a while (to fill the room), then the room kept that hazy with
+/// bursts at that level until given back (Auto).
+private struct HazeRow: View {
+    var haze: HazePush?
+    var send: ([String: Any]) -> Void
+    @AppStorage("hazePushLevel") private var level = 50.0
+    @AppStorage("hazePushSeconds") private var seconds = 30.0
+    @AppStorage("hazePushEvery") private var every = 30.0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "cloud.fog").frame(width: 18).foregroundStyle(.secondary)
+                Text("Output").frame(width: 110, alignment: .leading)
+                Slider(value: $level, in: 5...100, step: 5).controlSize(.small)
+                Text("\(Int(level)) %").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .frame(width: 40, alignment: .trailing)
+            }
+            .help("How hard the hazers run while you push: a level at which yours make haze")
+            HStack(spacing: 8) {
+                Image(systemName: "timer").frame(width: 18).foregroundStyle(.secondary)
+                Text("For").frame(width: 110, alignment: .leading)
+                Stepper(value: $seconds, in: 5...600, step: 5) {
+                    Text("\(Int(seconds)) s").font(.callout.monospacedDigit())
+                }
+                .controlSize(.small)
+            }
+            .help("How long the push runs: long enough to fill the room")
+            HStack(spacing: 8) {
+                Image(systemName: "repeat").frame(width: 18).foregroundStyle(.secondary)
+                Text("Then every").frame(width: 110, alignment: .leading)
+                Stepper(value: $every, in: 10...600, step: 5) {
+                    Text("\(Int(every)) s").font(.callout.monospacedDigit())
+                }
+                .controlSize(.small)
+                Spacer()
+                Button(haze == nil ? "Push" : "Push Again") {
+                    send(["haze": ["level": level / 100, "seconds": seconds, "every": every]])
+                }
+                .controlSize(.small)
+                .help("Run the hazers at this output this long, then keep the room that hazy")
+            }
+            .help("How often a short burst at this output tops the haze up: shorter when the room loses it fast")
+            HStack {
+                Text(status).font(.caption).foregroundStyle(haze == nil ? Color.secondary : Color.orange)
+                Spacer()
+                Button("Auto") { send(["haze": "auto"]) }
+                    .buttonStyle(.borderless).font(.caption)
+                    .disabled(haze == nil)
+                    .help(haze == nil ? "The show hazes by itself" : "Give the haze back to the show")
+            }
+        }
+        .font(.callout)
+    }
+
+    private var status: String {
+        guard let h = haze else { return "The show hazes by itself" }
+        let pct = "\(Int((h.level * 100).rounded())) %"
+        return h.mode == "push" ? "Pushing at \(pct): \(Int(h.left.rounded())) s left"
+            : "Holding the haze: a burst at \(pct) every \(Int((h.every ?? 0).rounded())) s"
     }
 }
 

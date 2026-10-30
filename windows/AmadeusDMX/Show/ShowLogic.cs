@@ -111,6 +111,14 @@ public static class Night
         "How hot the mix runs: the tracks' energy and the tempo against tonight's warm-up tempo"
         + (arc.BaseBpm is { } b ? $" ({Num.Round(b)} BPM)" : "") + ". The stages are detected from it.";
 
+    /// The haze push's line: what the hazers do now.
+    public static string HazeStatus(ArcStatus arc)
+    {
+        if (arc.Haze is not { } h) return "The show hazes by itself";
+        var pct = $"{Num.Round(h.Level * 100)} %";
+        return h.Mode == "push" ? $"Pushing at {pct}: {Num.Round(h.Left)} s left" : $"Holding the haze: a burst at {pct} every {Num.Round(h.Every ?? 0)} s";
+    }
+
     /// A night is between half an hour and twelve hours, a quarter of an hour per click.
     public const double Step = 900, MinLength = 1800, MaxLength = 12 * 3600;
     public static bool CanShorten(ArcStatus arc) => arc.Length > MinLength;
@@ -130,6 +138,11 @@ public static class ArcMessage
     public static Dictionary<string, object> Event(string key) => Make("event", key);
     public static Dictionary<string, object> Enabled(bool on) => Make("enabled", on);
     public static Dictionary<string, object> Reset() => Make("reset", true);
+    /// Push the hazers at `level` (0..1) for `seconds`, then keep the room that hazy with a burst every `every`
+    /// seconds; "auto" gives it back.
+    public static Dictionary<string, object> Haze(double level, double seconds, double every) =>
+        Make("haze", new Dictionary<string, double> { ["level"] = level, ["seconds"] = seconds, ["every"] = every });
+    public static Dictionary<string, object> HazeAuto() => Make("haze", "auto");
 
     /// As it goes on the wire.
     public static string Json(Dictionary<string, object> m) => JsonSerializer.Serialize(m, SetupAPI.JsonOptions);

@@ -105,6 +105,24 @@ public class ShowLogicTests
         Assert.Equal("""{"type":"arc","event":"wedding"}""", ArcMessage.Json(ArcMessage.Event("wedding")));
         Assert.Equal("""{"type":"arc","enabled":false}""", ArcMessage.Json(ArcMessage.Enabled(false)));
         Assert.Equal("""{"type":"arc","reset":true}""", ArcMessage.Json(ArcMessage.Reset()));
+        Assert.Equal("""{"type":"arc","haze":{"level":0.5,"seconds":60,"every":20}}""", ArcMessage.Json(ArcMessage.Haze(0.5, 60, 20)));
+        Assert.Equal("""{"type":"arc","haze":"auto"}""", ArcMessage.Json(ArcMessage.HazeAuto()));
+    }
+
+    [Fact]
+    public void TheHazePushAsTheEngineSendsIt()
+    {
+        var none = Arc(ArcJson);
+        Assert.Null(none.Hazers);
+        Assert.Null(none.Haze);
+        Assert.Equal("The show hazes by itself", Night.HazeStatus(none));
+        var push = Arc(ArcJson.Replace("\"hold\": 4}", "\"hold\": 4, \"hazers\": 1, \"haze\": {\"level\": 0.5, \"seconds\": 60, \"mode\": \"push\", \"left\": 32.4}}"));
+        Assert.Equal(1, push.Hazers);
+        Assert.Equal("Pushing at 50 %: 32 s left", Night.HazeStatus(push));
+        var hold = Arc(ArcJson.Replace("\"hold\": 4}", "\"hold\": 4, \"hazers\": 1, \"haze\": {\"level\": 0.5, \"seconds\": 60, \"every\": 20, \"mode\": \"hold\", \"left\": 0}}"));
+        Assert.Equal("Holding the haze: a burst at 50 % every 20 s", Night.HazeStatus(hold));
+        Assert.NotEqual(push, hold);
+        Assert.Equal(hold, Arc(ArcJson.Replace("\"hold\": 4}", "\"hold\": 4, \"hazers\": 1, \"haze\": {\"level\": 0.5, \"seconds\": 60, \"every\": 20, \"mode\": \"hold\", \"left\": 0}}")));
     }
 
     static Hello Track() => Hello.From(System.Text.Json.JsonDocument.Parse("""
