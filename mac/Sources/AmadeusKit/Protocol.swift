@@ -370,14 +370,29 @@ public struct ArcStatus: Decodable, Sendable, Equatable {
     public var movementLevel: Int?
     /// How many phrases a look is held (1: every phrase as the director planned it).
     public var hold: Int?
+    /// How many hazers the set has (the haze push is offered when it has any).
+    public var hazers: Int?
+    /// The operator's haze push (nil: the show hazes by itself).
+    public var haze: HazePush?
 
     enum CodingKeys: String, CodingKey {
         case on, length, elapsed, stage, stages, event, events, locked, heat, trend, bpm, baseBpm = "base_bpm"
-        case values, manual, groups, playing, movementLevel = "movement_level", hold
+        case values, manual, groups, playing, movementLevel = "movement_level", hold, hazers, haze
     }
 
     public var stageName: String { stages.first { $0.first == stage }?.last ?? stage }
     public var remaining: Double? { elapsed.map { length - $0 } }
+}
+
+/// The operator's haze push: the hazers at `level` for `seconds`, then the room kept that hazy with bursts.
+public struct HazePush: Decodable, Sendable, Equatable {
+    public var level: Double
+    public var seconds: Double
+    /// How often a hold burst tops the haze up (nil: as the room is said to clear).
+    public var every: Double?
+    /// "push" (for `left` seconds more) or "hold".
+    public var mode: String
+    public var left: Double
 }
 
 public struct Frame: Decodable, Sendable {

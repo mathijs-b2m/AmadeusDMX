@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from amadeus.engine import State
@@ -394,3 +395,64 @@ def test_a_countdown_needs_a_build_into_the_main_drop(monkeypatch):
     assert arclib.countdown_drop(None, plan) == 4
     plan[3].section = "groove"  # no tension before it: no countdown
     assert arclib.countdown_drop(None, plan) is None
+
+
+def haze_run(arc: ShowArc, seconds: float, engine=None, dt: float = 0.05) -> list[float]:
+    """The hazer's output frame by frame (the show's own output 0.2 under it)."""
+    out = []
+    for k in range(int(seconds / dt)):
+        states = {"haze": State(dimmer=0.2)}
+        arc.haze(states, engine, k * dt, dt)
+        out.append(states["haze"].dimmer)
+    return out
+
+
+def test_the_operator_pushes_haze_and_the_room_stays_hazy(tmp_path):
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.hazers = {"haze"}
+    assert arc.snapshot(0.0)["hazers"] == 1 and arc.snapshot(0.0)["haze"] is None
+    assert haze_run(arc, 2.0)[0] == 0.2  # no push: the show's own haze
+
+    arc.control({"haze": {"level": 0.5, "seconds": 60}}, now=0.0)
+    assert arc.snapshot(0.0)["haze"]["mode"] == "push"
+    beats = SimpleNamespace(beats=np.arange(0.0, 2000.0, 0.48))
+    out = haze_run(arc, 60 + 600, beats)
+    push = out[: int(60 / 0.05) - 1]
+    assert all(v == 0.5 for v in push)  # its level for its seconds
+    assert arc.snapshot(0.0)["haze"]["mode"] == "hold"
+    hold = out[int(60 / 0.05) :]
+    on = [i for i in range(1, len(hold)) if hold[i] and not hold[i - 1]]
+    lengths = [next((j for j in range(i, len(hold)) if not hold[j]), len(hold)) - i for i in on]
+    # held: 6 s bursts (a tenth of the push) every 30 s (the room clears in 300 s: 6 × 300 / 60)
+    assert 18 <= len(on) <= 21 and all(abs(n * 0.05 - 6.0) < 0.1 for n in lengths[:-1])
+    assert all(v in (0.0, 0.5) for v in hold)  # never the show's own level in between
+    assert abs(on[0] * 0.05 - 30) < 0.6  # the first one when the room has lost a burst's worth
+    for i in on:  # on the beat
+        t = 60 + i * 0.05
+        assert min(abs(beats.beats - t)) <= 0.051
+
+    arc.control({"haze": "auto"}, now=0.0)
+    assert arc.snapshot(0.0)["haze"] is None and haze_run(arc, 1.0)[0] == 0.2  # back to the show
+
+
+def test_the_operator_says_how_often_the_haze_is_topped_up(tmp_path):
+    """A small room that loses its haze fast: a burst as often as the operator asks."""
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.hazers = {"haze"}
+    arc.control({"haze": {"level": 0.6, "seconds": 30, "every": 15}}, now=0.0)
+    assert arc.snapshot(0.0)["haze"]["every"] == 15
+    hold = haze_run(arc, 30 + 300)[int(30 / 0.05) :]
+    on = [i for i in range(1, len(hold)) if hold[i] and not hold[i - 1]]
+    assert abs(on[0] * 0.05 - 15) < 0.1 and all(abs((b - a) * 0.05 - 15) < 0.1 for a, b in zip(on, on[1:]))
+    arc.control({"haze": {"level": 0.6, "seconds": 30, "every": 1}}, now=0.0)
+    assert arc.push["every"] == 10  # at least 10 s
+
+
+def test_no_hazers_no_push(tmp_path):
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.hazers = set()
+    arc.control({"haze": {"level": 2.0, "seconds": 1}}, now=0.0)
+    assert arc.push == {"level": 1.0, "seconds": 5}  # kept within bounds
+    states = {}
+    arc.haze(states, None, 0.0, 0.05)
+    assert states == {} and arc.snapshot(0.0)["hazers"] == 0

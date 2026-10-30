@@ -368,6 +368,7 @@ async def run(
                     arc.apply(states, engine, t, period)
                 else:
                     arc.observe(wall)
+                arc.haze(states, engine, t, period)  # the operator's haze push, with or without music
 
                 if sender:
                     unis: dict[int, bytearray] = {}

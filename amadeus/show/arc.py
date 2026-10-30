@@ -33,7 +33,8 @@ from pathlib import Path
 
 from amadeus import paths, system
 from amadeus.director.arc import song_arc
-from amadeus.engine.fog import machine
+from amadeus.engine.fog import DEFAULT_CLEAR_S, MIN_GAP_S, OUTDOOR_CLEAR_S, machine
+from amadeus.engine.state import State
 from amadeus.library import fixtures as fxlib
 from amadeus.rig.groups import head_groups
 
@@ -48,6 +49,11 @@ COUNTDOWNS_PER_NIGHT = 2
 COUNTDOWN_GAP = 0.2, 30 * 60.0  # at least a fifth of the night, and at least half an hour
 COUNTDOWN_STAGES = ("peak", "finale")
 COUNTDOWN_AFTER_S = 5 * 60.0  # the peak has run a few minutes: the floor is up before the wall shouts at it
+
+# The operator's haze push (a set with hazers): its level for its seconds, then the room held that hazy.
+HAZE_PUSH_S = 5.0, 600.0  # the operator's haze push: this long at least and at most
+HAZE_HOLD_BURST_S = 3.0, 10.0  # … then held with bursts at its level: a tenth of the push, between these
+HAZE_EVERY_S = 10.0, 600.0  # … this often (the operator's choice; else as fast as the room is said to clear)
 
 KNOBS = (
     "groups", "specials", "screen", "smoke",  # in play
@@ -343,6 +349,10 @@ class ShowArc:
         self._dirty = False
         self._levels: dict[str, int] = {}
         self._init_rig(rig)
+        st = rig.get("stage", {})
+        self.clear_s = float(st.get("fog_clear_s", OUTDOOR_CLEAR_S if st.get("outdoor") else DEFAULT_CLEAR_S))
+        self.push: dict | None = None  # the operator's haze: {level, seconds}, pushing for `left` s, then held
+        self.push_left = self.burst_left = self.burst_wait = 0.0
 
     # ------------------------------------------------------------ the rig: groups, specials, smoke
 
@@ -714,13 +724,69 @@ class ShowArc:
             if not self.fog_open[eid] or amount <= 0.0:
                 s.dimmer = 0.0
 
+    def haze(self, states: dict, engine, t: float, dt: float):
+        """The operator's haze push (with the hazers' own levels, whatever the arc does): the hazers at the push's
+        level for its seconds, then the room kept as hazy as the push made it, with bursts at that level (a level
+        the operator has seen make haze), on the beat, as often as the room loses it (fog.py's clearing). The
+        bursts don't depend on what the machine makes: the push and the hold scale with it alike."""
+        if self.push is None or not self.hazers:
+            return
+        level = self.push["level"]
+        on = False
+        if self.push_left > 0:
+            self.push_left -= dt
+            on = True
+        elif self.burst_left > 0:
+            self.burst_left -= dt
+            self.burst_wait -= dt
+            on = True
+        else:
+            burst, every = self._hold_bursts()
+            self.burst_wait -= dt
+            beat = engine is None or bool(((engine.beats > t - dt) & (engine.beats <= t)).any())
+            if self.burst_wait <= 0 and beat:  # due: the next beat starts the burst
+                self.burst_left, self.burst_wait = burst - dt, every
+                on = True
+        for eid in self.hazers:
+            s = states.get(eid)
+            if s is None:
+                s = states[eid] = State()
+            s.dimmer = level if on else 0.0
+
+    def _hold_bursts(self) -> tuple[float, float]:
+        """(a hold burst's length, the time from one to the next): as often as the operator says (`every`: they
+        see the haze go), else what the room loses meanwhile, the haze of `seconds` clearing in `clear_s`."""
+        seconds = self.push["seconds"]
+        burst = min(max(seconds / 10, HAZE_HOLD_BURST_S[0]), HAZE_HOLD_BURST_S[1])
+        every = self.push.get("every") or burst * self.clear_s / seconds
+        return burst, max(every, burst + MIN_GAP_S)
+
+    def haze_status(self) -> dict | None:
+        if self.push is None:
+            return None
+        mode = "push" if self.push_left > 0 else "hold"
+        every = round(self._hold_bursts()[1])  # (as it plays: said, or from the room)
+        return {**self.push, "every": every, "mode": mode, "left": round(max(self.push_left, 0.0), 1)}
+
     # ------------------------------------------------------------ the operator
 
     def control(self, msg: dict, now: float | None = None):
         """A message from the app: {"type": "arc", …} with any of
         knob: {name: value} (the operator takes it over), auto: name | "all" (back to the arc),
-        stage: key (force it), lock: bool, length_s: seconds, event: type, reset: true (a new night), enabled: bool."""
+        stage: key (force it), lock: bool, length_s: seconds, event: type, reset: true (a new night), enabled: bool,
+        haze: {level: 0..1, seconds, every} (push the hazers, then keep the room that hazy: a burst every `every` s)
+        | "auto" (back to the show)."""
         now = time.time() if now is None else now
+        haze = msg.get("haze")
+        if isinstance(haze, dict):
+            level = min(max(float(haze.get("level", 0.5)), 0.05), 1.0)
+            seconds = min(max(float(haze.get("seconds", 30)), HAZE_PUSH_S[0]), HAZE_PUSH_S[1])
+            self.push = {"level": round(level, 2), "seconds": round(seconds)}
+            if haze.get("every"):
+                self.push["every"] = round(min(max(float(haze["every"]), HAZE_EVERY_S[0]), HAZE_EVERY_S[1]))
+            self.push_left, self.burst_left, self.burst_wait = seconds, 0.0, self._hold_bursts()[1]
+        elif haze == "auto":
+            self.push = None
         for name, v in (msg.get("knob") or {}).items():
             if name in KNOBS:
                 self.manual[name] = min(max(float(v), 0.0), 1.0)
@@ -772,6 +838,8 @@ class ShowArc:
             "hold": self.hold(),
             "drop_look": self.plan_shape()[2],
             "ambient": self.plan_shape()[3],
+            "hazers": len(self.hazers),
+            "haze": self.haze_status(),
         }
 
     # ------------------------------------------------------------ remembered between engine starts

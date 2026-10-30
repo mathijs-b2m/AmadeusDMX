@@ -21,6 +21,16 @@ import Testing
     #expect(f.lite && f.fx.isEmpty)
 }
 
+@Test func theHazePushDecodes() throws {
+    let base = #"{"on": true, "length": 14400, "stage": "peak", "stages": [], "event": "club", "events": [], "locked": false, "heat": 0.5, "trend": 0, "values": {}, "manual": [], "groups": 2, "playing": 2"#
+    let none = try JSONDecoder().decode(ArcStatus.self, from: Data((base + "}").utf8))
+    #expect(none.hazers == nil && none.haze == nil)  // an engine without the haze push
+    let push = try JSONDecoder().decode(ArcStatus.self, from: Data((base + #", "hazers": 1, "haze": {"level": 0.5, "seconds": 60, "every": 20, "mode": "push", "left": 32.4}}"#).utf8))
+    #expect(push.hazers == 1 && push.haze == HazePush(level: 0.5, seconds: 60, every: 20, mode: "push", left: 32.4))
+    let auto = try JSONDecoder().decode(ArcStatus.self, from: Data((base + #", "hazers": 1, "haze": null}"#).utf8))
+    #expect(auto.hazers == 1 && auto.haze == nil)
+}
+
 @Test func outdoorStageRoundTrips() throws {
     let st = try JSONDecoder().decode(Stage.self, from: Data(#"{"width_m": 12, "outdoor": true}"#.utf8))
     #expect(st.outdoor)

@@ -77,14 +77,18 @@ operator `locked` it, the music's `heat` (0..1) and `trend`, the tempo (`bpm`, `
 tempo), every knob's value in `values` (0..1; in play: `groups`, `specials`, `screen`, `smoke`; character:
 `movement`, `changes`, `colour`; reaction: `response`, `drops`, `flashes`; level: `intensity`), the knobs the
 operator holds (`manual`), how many light `groups` the rig has and how many are `playing`, and the shape the
-plans are played in (`movement_level` 0 calm / 1 moderate / 2 as directed, `hold`: phrases a look is held).
+plans are played in (`movement_level` 0 calm / 1 moderate / 2 as directed, `hold`: phrases a look is held),
+how many `hazers` the set has, and the operator's haze push (`haze`: `{level, seconds, every?, mode, left}`,
+`mode` `push` for `left` seconds more, then `hold`; null when the show hazes by itself).
 The LED wall is drawn by the visualisers: they dim it by `values.screen`, below 0.5 show only calm colour, at 0
 nothing. Before the first track there is no `hello`, but lite status frames with `arc` still
 come (so the night can be set up before the music).
 
 **Client → engine.** Clients may send JSON on the same socket. `{"type": "arc", …}` with any of: `knob`
 (`{name: value}`: the operator takes the knob over), `auto` (a knob's name, or `"all"`: back to the arc),
-`stage` (force a stage), `lock` (bool), `length_s`, `event`, `reset` (`true`: a new night) and `enabled`.
+`stage` (force a stage), `lock` (bool), `length_s`, `event`, `reset` (`true`: a new night), `enabled` and
+`haze` (`{level: 0..1, seconds, every}`: the hazers at `level` for `seconds`, then a burst at that level every
+`every` seconds, on the beat, to keep the room hazy; `"auto"`: back to the show's own haze).
 The engine remembers it in `config/show-arc.json`; a night continues over an engine restart unless the
 music has been silent for two hours.
 

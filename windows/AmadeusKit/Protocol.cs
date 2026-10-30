@@ -550,6 +550,10 @@ public sealed record ArcStatus
     public int? MovementLevel { get; init; }
     /// How many phrases a look is held (1: every phrase as the director planned it).
     public int? Hold { get; init; }
+    /// How many hazers the set has (the haze push is offered when it has any).
+    public int? Hazers { get; init; }
+    /// The operator's haze push (null: the show hazes by itself).
+    public HazePush? Haze { get; init; }
 
     public string StageName => Stages.FirstOrDefault(s => s.Count > 0 && s[0] == Stage) is { Count: > 0 } s ? s[^1] : Stage;
     public double? Remaining => Elapsed is { } e ? Length - e : null;
@@ -566,6 +570,7 @@ public sealed record ArcStatus
             Values = J.Req(c, "values", J.DictOf(J.Double)), Manual = J.Req(c, "manual", J.ArrayOf(J.String)),
             Groups = J.Req(c, "groups", J.Int), Playing = J.Req(c, "playing", J.Int),
             MovementLevel = J.Val(c, "movement_level", J.Int), Hold = J.Val(c, "hold", J.Int),
+            Hazers = J.Val(c, "hazers", J.Int), Haze = J.Ref(c, "haze", HazePush.From),
         };
     }
 
@@ -576,9 +581,27 @@ public sealed record ArcStatus
         && Locked == o.Locked && Heat == o.Heat && Trend == o.Trend && Bpm == o.Bpm && BaseBpm == o.BaseBpm
         && Values.Count == o.Values.Count && Values.All(p => o.Values.TryGetValue(p.Key, out var v) && v == p.Value)
         && Manual.SequenceEqual(o.Manual) && Groups == o.Groups && Playing == o.Playing
-        && MovementLevel == o.MovementLevel && Hold == o.Hold;
+        && MovementLevel == o.MovementLevel && Hold == o.Hold && Hazers == o.Hazers && Equals(Haze, o.Haze);
 
     public override int GetHashCode() => HashCode.Combine(Stage, Heat, Elapsed, Manual.Count, Values.Count);
+}
+
+/// The operator's haze push: the hazers at `Level` for `Seconds`, then the room kept that hazy with bursts.
+public sealed record HazePush
+{
+    public double Level { get; init; }
+    public double Seconds { get; init; }
+    /// How often a hold burst tops the haze up (null: as the room is said to clear).
+    public double? Every { get; init; }
+    /// "push" (for `Left` seconds more) or "hold".
+    public string Mode { get; init; } = "";
+    public double Left { get; init; }
+
+    public static HazePush From(JsonElement c) => new()
+    {
+        Level = J.Req(c, "level", J.Double), Seconds = J.Req(c, "seconds", J.Double), Every = J.Val(c, "every", J.Double),
+        Mode = J.Req(c, "mode", J.String), Left = J.Req(c, "left", J.Double),
+    };
 }
 
 public sealed class Frame

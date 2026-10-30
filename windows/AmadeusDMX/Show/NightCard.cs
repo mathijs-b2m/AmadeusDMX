@@ -25,6 +25,7 @@ public sealed class NightCard(AppModel model)
     readonly TextBlock _title = UI.Text("", Font.Headline);
     readonly FontIcon _pin = UI.Icon("pin.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _hand = UI.Icon("hand.raised.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
+    readonly FontIcon _fog = UI.Icon("cloud.fog.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly TextBlock _clock = UI.Text("", Font.Caption).Secondary();
     readonly TextBlock _countdown = UI.Text("", Font.Title2).Bold();
     readonly FontIcon _chevron = UI.Icon("chevron.down").Secondary();
@@ -39,7 +40,7 @@ public sealed class NightCard(AppModel model)
         {
             Content = UI.HStack(10,
                 _moon,
-                UI.VStack(1, UI.HStack(5, _title, _pin, _hand).Leading(), _clock.Leading()),
+                UI.VStack(1, UI.HStack(5, _title, _pin, _fog, _hand).Leading(), _clock.Leading()),
                 UI.Spacer(8),
                 _countdown,
                 _chevron),
@@ -61,7 +62,7 @@ public sealed class NightCard(AppModel model)
     void Refresh()
     {
         if (Arc is not { } arc || _card is null) return;
-        var shape = $"{_open}|{arc.On}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
+        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
         if (shape != _shape)
         {
             _shape = shape;
@@ -79,6 +80,7 @@ public sealed class NightCard(AppModel model)
         _title.Text = Night.Title(arc);
         _pin.Visible(arc.Locked);
         _hand.Visible(arc.Manual.Count > 0).Tooltip(Night.HeldHelp(arc));
+        _fog.Visible(arc.Haze is not null).Tooltip("You push the haze");
         _clock.Text = Night.Clock(arc);
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
@@ -104,6 +106,12 @@ public sealed class NightCard(AppModel model)
                 _body.Children.Add(UI.Text(title.ToUpperInvariant(), Font.Caption2).Bold().Secondary().Margin(0, 2, 0, 0).Leading());
                 foreach (var k in knobs) _body.Children.Add(KnobRow(k));
             }
+            _body.Children.Add(UI.Divider());
+        }
+        if (arc.Hazers > 0)
+        {
+            _body.Children.Add(UI.Text("HAZE", Font.Caption2).Bold().Secondary().Margin(0, 2, 0, 0).Leading());
+            _body.Children.Add(HazeRow());
             _body.Children.Add(UI.Divider());
         }
         _body.Children.Add(NightSettings(arc));
@@ -161,6 +169,61 @@ public sealed class NightCard(AppModel model)
             row.Tooltip(Night.KnobHelp(knob, arc));
         });
         return row;
+    }
+
+    // MARK: the haze push: the hazers at a level for a while (to fill the room), then the room kept that hazy
+    // with bursts at that level until given back (Auto)
+
+    UIElement HazeRow()
+    {
+        var level = Defaults.Standard.Contains("hazePushLevel") ? Defaults.Standard.Double("hazePushLevel") : 50;
+        var seconds = Defaults.Standard.Contains("hazePushSeconds") ? Defaults.Standard.Integer("hazePushSeconds") : 30;
+        var every = Defaults.Standard.Contains("hazePushEvery") ? Defaults.Standard.Integer("hazePushEvery") : 30;
+        var pct = UI.Text($"{Num.Round(level)} %", Font.Caption).Secondary().Frame(width: 40);
+        pct.TextAlignment = TextAlignment.Right;
+        var slider = UI.Slider(level, 5, 100, v =>
+        {
+            level = v;
+            pct.Text = $"{Num.Round(v)} %";
+            Defaults.Standard.Set("hazePushLevel", v);
+        }, step: 5);
+        var output = UI.HStack(8,
+            UI.Icon("cloud.fog").Secondary().Frame(width: 18),
+            UI.Text("Output", Font.Callout).Frame(width: 110),
+            slider.Grow(),
+            pct).Tooltip("How hard the hazers run while you push: a level at which yours make haze");
+        var stepper = Form.Stepper(seconds, 5, 600, n => $"{n} s", n =>
+        {
+            seconds = n;
+            Defaults.Standard.Set("hazePushSeconds", n);
+        }, step: 5);
+        var time = UI.HStack(8,
+            UI.Icon("timer").Secondary().Frame(width: 18),
+            UI.Text("For", Font.Callout).Frame(width: 110),
+            stepper.Grow()).Tooltip("How long the push runs: long enough to fill the room");
+        var everyStepper = Form.Stepper(every, 10, 600, n => $"{n} s", n =>
+        {
+            every = n;
+            Defaults.Standard.Set("hazePushEvery", n);
+        }, step: 5);
+        var push = UI.Button("Push", () => Send(ArcMessage.Haze(level / 100, seconds, every))).Small()
+            .Tooltip("Run the hazers at this output this long, then keep the room that hazy");
+        var again = UI.HStack(8,
+            UI.Icon("repeat").Secondary().Frame(width: 18),
+            UI.Text("Then every", Font.Callout).Frame(width: 110),
+            everyStepper.Grow(),
+            push).Tooltip("How often a short burst at this output tops the haze up: shorter when the room loses it fast");
+        var status = UI.Text("", Font.Caption);
+        var auto = UI.Button("Auto", () => Send(ArcMessage.HazeAuto())).Borderless().Font(Font.Caption);
+        _updates.Add(a =>
+        {
+            status.Text = Night.HazeStatus(a);
+            status.Foreground(a.Haze is null ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Orange));
+            push.Content = a.Haze is null ? "Push" : "Push Again";
+            auto.IsEnabled = a.Haze is not null;
+            auto.Tooltip(a.Haze is null ? "The show hazes by itself" : "Give the haze back to the show");
+        });
+        return UI.VStack(6, output, time, again, UI.HStack(status, UI.Spacer(), auto));
     }
 
     // MARK: the stages, named for the event: the one the music is in lit; click one to force it
