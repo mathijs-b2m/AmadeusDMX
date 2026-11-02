@@ -111,6 +111,12 @@ public static class Night
         "How hot the mix runs: the tracks' energy and the tempo against tonight's warm-up tempo"
         + (arc.BaseBpm is { } b ? $" ({Num.Round(b)} BPM)" : "") + ". The stages are detected from it.";
 
+    /// The Lightshow row's line.
+    public static string LightshowStatus(bool on) =>
+        on ? "Every track a show piece, until you switch it off" : "Play the tracks as a show piece";
+
+    public const string LightshowHelp = "Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.";
+
     /// The haze push's line: what the hazers do now.
     public static string HazeStatus(ArcStatus arc)
     {
@@ -138,6 +144,8 @@ public static class ArcMessage
     public static Dictionary<string, object> Event(string key) => Make("event", key);
     public static Dictionary<string, object> Enabled(bool on) => Make("enabled", on);
     public static Dictionary<string, object> Reset() => Make("reset", true);
+    /// The Lightshow on or off: every track played as a show piece.
+    public static Dictionary<string, object> Lightshow(bool on) => Make("lightshow", on);
     /// Push the hazers at `level` (0..1) for `seconds`, then keep the room that hazy with a burst every `every`
     /// seconds; "auto" gives it back.
     public static Dictionary<string, object> Haze(double level, double seconds, double every) =>

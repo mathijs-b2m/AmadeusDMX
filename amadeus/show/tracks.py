@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from amadeus.director.lightshow import NAME as LIGHTSHOW
 from amadeus.director.style import SetGenre
 from amadeus.engine import Engine
 
@@ -29,9 +30,14 @@ class TrackShows:
         self.set_genre = SetGenre()  # the set's genre: tracks of a genre share a house style
         self.shape = (2, 1, True, False)  # the show arc's shape for the plans (show/arc.py, plan_shape)
         self.directed: dict[str, list] = {}  # file → the director's plan, before calming
+        self.lightshow = False  # the operator's Lightshow: every track played by the lightshow program
 
     def _style_genre(self, file: str):
         return lambda a: self.set_genre.genre_for(file, a.genre, a.genre_source)
+
+    def wanted(self) -> str:
+        """The director the tracks are planned by: the lightshow's while it is on, else the decision model."""
+        return LIGHTSHOW if self.lightshow else self.director
 
     def set_director(self, director: str):
         """Switch decision model: every known track gets a plan from the new one (cached plans are instant)."""
@@ -39,6 +45,18 @@ class TrackShows:
             return
         print(f"  ⇄ decision model: {self.director} → {director}")
         self.director = director
+        self._replan()
+
+    def set_lightshow(self, on: bool):
+        """The operator's Lightshow on or off: every known track is planned again (the old show keeps playing
+        until the new one is ready)."""
+        if on == self.lightshow:
+            return
+        print(f"  ⇄ lightshow {'on: every track a show piece' if on else 'off'}", flush=True)
+        self.lightshow = on
+        self._replan()
+
+    def _replan(self):
         with self.lock:  # busy tracks pick up the change themselves (their job notices and restarts)
             files = [f for f in self.shows if f not in self.pending]
             for f in files:
@@ -113,23 +131,25 @@ class TrackShows:
             if first:
                 self._step(file, analysis="running")
                 style = self._style_genre(file)
-                a, plan = get_plan(Path(file), "rules", False, rig=self.rig, style_genre=style)  # immediately usable
+                quick = LIGHTSHOW if self.lightshow else "rules"  # (the lightshow needs no model: at once)
+                a, plan = get_plan(Path(file), quick, False, rig=self.rig, style_genre=style)  # immediately usable
                 self._step(file, analysis="done")
-                self._install(file, a, plan, "rules")
+                self._install(file, a, plan, quick)
                 if self._separate(file):  # the lights run meanwhile; then the show gets the synth notes
-                    a, plan = get_plan(Path(file), "rules", False, rig=self.rig, style_genre=style)
-                    self._install(file, a, plan, "rules")
-            done = "rules" if first else None
-            while self.director != done:  # (re)build until the plan of the CURRENT model is installed
-                director = self.director
-                if director != "rules":
+                    quick = LIGHTSHOW if self.lightshow else "rules"
+                    a, plan = get_plan(Path(file), quick, False, rig=self.rig, style_genre=style)
+                    self._install(file, a, plan, quick)
+            done = quick if first else None
+            while self.wanted() != done:  # (re)build until the plan of the CURRENT model is installed
+                director = self.wanted()
+                if director not in ("rules", LIGHTSHOW):
                     self._step(file, ai="running", ai_done=0, ai_total=0, ai_model=director)
                 try:
                     a, plan = get_plan(
                         Path(file),
                         director,
                         False,
-                        cancel=lambda d=director: self.director != d,
+                        cancel=lambda d=director: self.wanted() != d,
                         rig=self.rig,
                         style_genre=self._style_genre(file),
                         progress=lambda k, n, f=file: self.status[f].update(ai_done=k, ai_total=n),
@@ -137,9 +157,9 @@ class TrackShows:
                 except Cancelled:
                     print(f"  ✗ {Path(file).name}: stopped {director} (decision model switched)")
                     continue
-                if director == self.director:
+                if director == self.wanted():
                     self._install(file, a, plan, director)
-                    if director != "rules":
+                    if director not in ("rules", LIGHTSHOW):
                         self._step(file, ai="done", ai_done=len(plan), ai_total=len(plan))
                 done = director
         except BaseException as e:  # noqa: BLE001 - a bad track must never stop the show

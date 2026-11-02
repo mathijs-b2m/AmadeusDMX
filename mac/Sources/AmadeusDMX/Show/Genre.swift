@@ -1,5 +1,6 @@
 // The track's genre (one word), and the program it gets: a chip for every track, and a banner that stands
-// out for a genre with a program of its own (cinematic: every hit played by its own fixtures).
+// out for a program of its own (cinematic: every hit played by its own fixtures; the lightshow, switched on by
+// hand: the same, as a show piece that builds up).
 import AmadeusKit
 import SwiftUI
 
@@ -49,17 +50,20 @@ struct GenreChip: View {
     }
 }
 
-/// A genre with a program of its own: said loudly.
+/// A program of its own: said loudly.
 struct ProgramBanner: View {
     let program: String
 
+    private var lightshow: Bool { program == "lightshow" }
+
     var body: some View {
-        if program == "cinematic" {
+        if program == "cinematic" || lightshow {
             HStack(spacing: 10) {
-                Image(systemName: "film.stack").font(.title2.weight(.semibold))
+                Image(systemName: lightshow ? "sparkles" : "film.stack").font(.title2.weight(.semibold))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("CINEMATIC PROGRAM").font(.callout.weight(.heavy)).tracking(1.5)
-                    Text("Every hit played by its own fixtures, exactly on time").font(.caption).opacity(0.85)
+                    Text(lightshow ? "LIGHTSHOW" : "CINEMATIC PROGRAM").font(.callout.weight(.heavy)).tracking(1.5)
+                    Text(lightshow ? "Every hit played, building up section by section"
+                         : "Every hit played by its own fixtures, exactly on time").font(.caption).opacity(0.85)
                 }
                 Spacer(minLength: 0)
             }
@@ -70,7 +74,9 @@ struct ProgramBanner: View {
                                startPoint: .leading, endPoint: .trailing),
                 in: .rect(cornerRadius: 12)
             )
-            .help("A film-score track: no beat grid. The hits are found where they are, sorted into voices, and every voice plays its own fixtures; the biggest hits play the whole rig.")
+            .help(lightshow
+                ? "You switched the Lightshow on: every hit is played by its own lights. One section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax."
+                : "A film-score track: no beat grid. The hits are found where they are, sorted into voices, and every voice plays its own fixtures; the biggest hits play the whole rig.")
         }
     }
 }

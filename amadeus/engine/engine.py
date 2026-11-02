@@ -22,6 +22,7 @@ from amadeus.engine import zones
 from amadeus.engine.cinematic import CinematicMixin
 from amadeus.engine.fog import FogMixin
 from amadeus.engine.lasers import LasersMixin
+from amadeus.engine.lightshow import LightshowMixin
 from amadeus.engine.looks import DROP_DARK_FROM, XFADE, LooksMixin
 from amadeus.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
 from amadeus.engine.rings import RingsMixin
@@ -36,8 +37,27 @@ from amadeus.rig import geometry
 PICKUP_LEAD = 0.65  # a section that leads in early: how far its look has come in by the downbeat (which lands it)
 
 
+def program_of(analysis: Analysis, plan: list[Decision]) -> str:
+    """The program a track plays, if one of its own: "lightshow" for a plan the lightshow director made (switched
+    on by hand), "cinematic" for a film score; "" for the show of looks."""
+    if getattr(analysis, "hits", None) is None:
+        return ""
+    if plan and plan[0].source.startswith("lightshow"):
+        return "lightshow"
+    return "cinematic" if getattr(analysis, "genre", "") == "cinematic" else ""
+
+
 class Engine(
-    TimingMixin, LooksMixin, MotionMixin, RingsMixin, LasersMixin, CinematicMixin, FogMixin, RollsMixin, ZoomMixin
+    TimingMixin,
+    LooksMixin,
+    MotionMixin,
+    RingsMixin,
+    LasersMixin,
+    LightshowMixin,
+    CinematicMixin,
+    FogMixin,
+    RollsMixin,
+    ZoomMixin,
 ):
     def __init__(
         self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False, fog_carry: bool = False
@@ -147,11 +167,10 @@ class Engine(
         self.reach_uv = [self._reach(j) for j in range(len(self.heads))]
         self._move_beats = (1, 1)
         self._move_travel = (0.9, 0.9)
-        # a program of its own for the genre (cinematic: every hit played by its own fixtures)
-        self.program = (
-            "cinematic" if getattr(analysis, "genre", "") == "cinematic" and analysis.hits is not None else ""
-        )
-        if self.program == "cinematic":
+        # a program of its own: for the genre (cinematic: every hit played by its own fixtures), or switched on by
+        # hand (lightshow: the cinematic program as a show piece, building up layer by layer)
+        self.program = program_of(analysis, plan)
+        if self.program:
             self._init_cinematic(rig)
         self.traj = self._cached_trajectories()
         self._share_motors()
@@ -190,7 +209,7 @@ class Engine(
 
     def render(self, t: float) -> tuple[int, dict[str, State]]:
         i, d = self.decision_at(t)
-        if self.program == "cinematic":
+        if self.program:
             return i, self._finish(self._cinematic_scene(t), t)
         states = self._scene(d, t)
         big = self.drop_strength is None or self.drop_strength >= DROP_DARK_FROM  # (small drops: no moving in black)

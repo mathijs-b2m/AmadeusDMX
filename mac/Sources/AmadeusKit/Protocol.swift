@@ -374,10 +374,12 @@ public struct ArcStatus: Decodable, Sendable, Equatable {
     public var hazers: Int?
     /// The operator's haze push (nil: the show hazes by itself).
     public var haze: HazePush?
+    /// The operator's Lightshow: every track played as a show piece (nil: an engine without it).
+    public var lightshow: Bool?
 
     enum CodingKeys: String, CodingKey {
         case on, length, elapsed, stage, stages, event, events, locked, heat, trend, bpm, baseBpm = "base_bpm"
-        case values, manual, groups, playing, movementLevel = "movement_level", hold, hazers, haze
+        case values, manual, groups, playing, movementLevel = "movement_level", hold, hazers, haze, lightshow
     }
 
     public var stageName: String { stages.first { $0.first == stage }?.last ?? stage }

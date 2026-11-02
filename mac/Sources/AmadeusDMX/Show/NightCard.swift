@@ -14,6 +14,10 @@ struct NightCard: View {
             header
             if open {
                 Divider()
+                if arc.lightshow != nil {
+                    LightshowRow(on: arc.lightshow ?? false, send: send)
+                    Divider()
+                }
                 if arc.on {
                     StageStrip(arc: arc, send: send)
                     HeatRow(arc: arc)
@@ -47,6 +51,10 @@ struct NightCard: View {
                     HStack(spacing: 5) {
                         Text(arc.on ? arc.stageName : "Show Arc Off").font(.headline)
                         if arc.locked { Image(systemName: "pin.fill").font(.caption).foregroundStyle(.orange) }
+                        if arc.lightshow == true {
+                            Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
+                                .help("Lightshow: every track played as a show piece")
+                        }
                         if arc.haze != nil {
                             Image(systemName: "cloud.fog.fill").font(.caption).foregroundStyle(.orange)
                                 .help("You push the haze")
@@ -161,6 +169,28 @@ private struct KnobRow: View {
         }
         .font(.callout)
         .help(knob.id == "groups" ? "\(knob.help) (\(arc.playing) of \(arc.groups) playing)" : knob.help)
+    }
+}
+
+/// The Lightshow: switched on by hand for a song that should be a light show of its own (a demo, the night's
+/// anthem). Every track is then played hit by hit, building up section by section to the climax.
+private struct LightshowRow: View {
+    var on: Bool
+    var send: ([String: Any]) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").frame(width: 18).foregroundStyle(on ? Color.orange : Color.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Lightshow").font(.callout.weight(.semibold))
+                Text(on ? "Every track a show piece, until you switch it off" : "Play the tracks as a show piece")
+                    .font(.caption).foregroundStyle(on ? Color.orange : Color.secondary)
+            }
+            Spacer()
+            Toggle("Lightshow", isOn: Binding(get: { on }, set: { send(["lightshow": $0]) }))
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+        .help("Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.")
     }
 }
 

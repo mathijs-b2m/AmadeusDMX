@@ -694,7 +694,7 @@ class MotionMixin:
 
     def _head_dirs_v(self, ts: np.ndarray, j: int) -> np.ndarray:
         """A head's target directions over time: per phrase, with the crossfade and the move-in-black before drops."""
-        if self.program == "cinematic":
+        if self.program:  # cinematic, lightshow
             return self._cinematic_head_dirs(ts, j)
         out = np.empty((len(ts), 3))
         idx = np.maximum(0, np.searchsorted(self.starts, ts, side="right") - 1)

@@ -79,7 +79,8 @@ tempo), every knob's value in `values` (0..1; in play: `groups`, `specials`, `sc
 operator holds (`manual`), how many light `groups` the rig has and how many are `playing`, and the shape the
 plans are played in (`movement_level` 0 calm / 1 moderate / 2 as directed, `hold`: phrases a look is held),
 how many `hazers` the set has, and the operator's haze push (`haze`: `{level, seconds, every?, mode, left}`,
-`mode` `push` for `left` seconds more, then `hold`; null when the show hazes by itself).
+`mode` `push` for `left` seconds more, then `hold`; null when the show hazes by itself), and whether the
+operator's `lightshow` is on (every track played by the lightshow program).
 The LED wall is drawn by the visualisers: they dim it by `values.screen`, below 0.5 show only calm colour, at 0
 nothing. Before the first track there is no `hello`, but lite status frames with `arc` still
 come (so the night can be set up before the music).
@@ -88,7 +89,9 @@ come (so the night can be set up before the music).
 (`{name: value}`: the operator takes the knob over), `auto` (a knob's name, or `"all"`: back to the arc),
 `stage` (force a stage), `lock` (bool), `length_s`, `event`, `reset` (`true`: a new night), `enabled` and
 `haze` (`{level: 0..1, seconds, every}`: the hazers at `level` for `seconds`, then a burst at that level every
-`every` seconds, on the beat, to keep the room hazy; `"auto"`: back to the show's own haze).
+`every` seconds, on the beat, to keep the room hazy; `"auto"`: back to the show's own haze) and `lightshow`
+(bool: every track played as a show piece, rebuilt in the background; the hello's `program` says `lightshow`
+once a track plays it).
 The engine remembers it in `config/show-arc.json`; a night continues over an engine restart unless the
 music has been silent for two hours.
 

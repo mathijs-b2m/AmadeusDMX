@@ -139,6 +139,8 @@ class CinematicMixin:
     """Mixed into the Engine; active when the analysis has hits and the genre's program is cinematic."""
 
     CINE_VERSION = VERSION
+    duck_depth = DUCK_DEPTH  # (the lightshow program makes less room: engine/lightshow.py)
+    own_attack_s = OWN_ATTACK_S
 
     # ---------------------------------------------------------------- the orchestra
 
@@ -552,7 +554,7 @@ class CinematicMixin:
         for e in self.rig["elements"]:
             eid = e["id"]
             power = self.cine_power.get(eid, 0.0)
-            duck = 1 - DUCK_DEPTH * power * room  # the powerful lights step down for the small ones' accents
+            duck = 1 - self.duck_depth * power * room  # the powerful lights step down for the small ones' accents
             dim, col = 0.0, cols[0]
             if eid in self.cine_floor and glow > 0:  # the lows glow on the floor
                 dim = glow * duck
@@ -568,7 +570,7 @@ class CinematicMixin:
                 for k in range(max(0, q - 4), q):  # the last few hits still on
                     t0, level, hold, fade, c, impact = items[k]
                     v = envelope(t, t0, level, hold, fade)
-                    if power and t - t0 > (IMPACT_KEEP_S if impact else OWN_ATTACK_S):
+                    if power and t - t0 > (IMPACT_KEEP_S if impact else self.own_attack_s):
                         v *= duck  # it steps down; its own hit (and an impact's flash) lands first
                     if v > dim:
                         dim, col = v, c

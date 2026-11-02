@@ -362,6 +362,7 @@ async def run(
                     states, i, t = {eid: State() for eid in ids}, 0, 0.0
                 wall = time.time()
                 shows.set_shape(arc.plan_shape())  # calmer heads, fewer look changes (rebuilt in the background)
+                shows.set_lightshow(arc.lightshow)  # the operator's show piece (every track rebuilt in the background)
                 if parts:
                     bpm = deck.bpm or a.bpm * deck.speed
                     arc.observe(wall, *((plan[i], bpm) if used != STANDIN else ()))  # a stand-in tells nothing

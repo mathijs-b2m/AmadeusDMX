@@ -74,10 +74,12 @@ function onHello(msg) {
   const g = $("genre");  // the genre; a program of its own (cinematic) stands out
   g.style.display = msg.genre ? "" : "none";
   const styled = msg.style && msg.style !== msg.genre ? ` · ${msg.style.toUpperCase()} STYLE` : "";
-  g.textContent = msg.program === "cinematic" ? "🎬 CINEMATIC PROGRAM" : (msg.genre || "").toUpperCase() + styled;
-  g.style.background = msg.program === "cinematic" ? "linear-gradient(90deg, #f2731a, #8c1a99)" : "";
-  g.style.color = msg.program === "cinematic" ? "#fff" : "";
-  g.title = msg.program === "cinematic" ? "Every hit played by its own fixtures, exactly on time" : `genre (${msg.genre_source || "audio"})`;
+  const banner = { cinematic: ["🎬 CINEMATIC PROGRAM", "Every hit played by its own fixtures, exactly on time"],
+    lightshow: ["✨ LIGHTSHOW", "Every hit played, building up section by section (switched on by hand)"] }[msg.program];
+  g.textContent = banner ? banner[0] : (msg.genre || "").toUpperCase() + styled;
+  g.style.background = banner ? "linear-gradient(90deg, #f2731a, #8c1a99)" : "";
+  g.style.color = banner ? "#fff" : "";
+  g.title = banner ? banner[1] : `genre (${msg.genre_source || "audio"})`;
   const tl = $("timeline");
   tl.querySelectorAll(".seg").forEach(e => e.remove());
   msg.plan.forEach((d, i) => {
