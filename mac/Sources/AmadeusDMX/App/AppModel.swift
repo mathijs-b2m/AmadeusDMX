@@ -184,6 +184,9 @@ final class AppModel {
     }
     var showZones = UserDefaults.standard.bool(forKey: "showZones")   // -showZones YES
     var playingFile: URL?
+    /// The track that plays is played as a Lightshow (a show piece that builds up; a live show switches it in the
+    /// night card).
+    var playingLightshow = false
     var setupReady = false
 
     @ObservationIgnored private var setupStartedAt: Date?
@@ -221,9 +224,10 @@ final class AppModel {
                   let code = UserDefaults.standard.string(forKey: "djCode") {
             DispatchQueue.main.async { self.startLive(dj: dj, code: code) }
         }
-        if let file = UserDefaults.standard.string(forKey: "play") {  // -play FILE [-playFrom SECONDS]: start with a track
+        if let file = UserDefaults.standard.string(forKey: "play") {  // -play FILE [-playFrom SECONDS] [-lightshow YES]
             let from = UserDefaults.standard.double(forKey: "playFrom")
-            DispatchQueue.main.async { self.play(URL(filePath: file), from: from) }
+            let lightshow = UserDefaults.standard.bool(forKey: "lightshow")
+            DispatchQueue.main.async { self.play(URL(filePath: file), from: from, lightshow: lightshow) }
         }
         feed.start()
         if let ws = workspace, ws.limiterLevel() < 1 { ws.setLimiterLevel(1) }
@@ -378,13 +382,16 @@ final class AppModel {
         engine.start(ws, args, environment: engineEnvironment, readyWhen: "Live mode", keepAwake: true)
     }
 
-    /// Play a track with the engine itself (no VirtualDJ): to try a set or a look.
-    func play(_ file: URL, from start: Double = 0) {
+    /// Play a track with the engine itself (no VirtualDJ): to try a set or a look. `lightshow`: as a Lightshow
+    /// (nil: as the track before).
+    func play(_ file: URL, from start: Double = 0, lightshow: Bool? = nil) {
         guard let ws = workspace, !selectedSet.isEmpty else { return }
         section = .show  // starting a show: watch it
         playingFile = file
+        if let lightshow { playingLightshow = lightshow }
         runningWithDMX = sendArtNet
         var args = ["play", file.path, "--set", selectedSet, "--rig", selectedRig]
+        if playingLightshow { args += ["--director", "lightshow"] }
         if sendArtNet { args.append("--artnet") }
         if start > 0 { args += ["--start", String(Int(start))] }
         if UserDefaults.standard.bool(forKey: "muted") { args.append("--mute") }   // -muted YES (testing)
@@ -392,6 +399,18 @@ final class AppModel {
     }
 
     func stopShow() { engine.stop() }
+
+    /// The Lightshow on or off for the track that plays: it starts again where it was.
+    func setPlayLightshow(_ on: Bool) {
+        guard let file = playingFile, engineRunning, on != playingLightshow else { return }
+        let at = feed.time
+        playingLightshow = on
+        engine.stop()
+        Task {
+            for _ in 0..<80 where engine.isRunning { try? await Task.sleep(for: .milliseconds(100)) }
+            play(file, from: at)
+        }
+    }
 
     /// Switch the mode. Turning the lights on or off needs a new engine: a running show asks first.
     func setMode(_ m: ShowMode) {

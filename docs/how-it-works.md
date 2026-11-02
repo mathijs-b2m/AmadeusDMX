@@ -123,10 +123,11 @@ Film scores and trailer music have no beat grid to light. The cinematic program 
 
 ### The lightshow
 
-For one song that should be a light show of its own (a demo, the night's anthem), switch **Lightshow** on in
-the night card (or play a track with `--director lightshow`). Every track is then rebuilt in the background
-(the show keeps playing meanwhile) and played like the cinematic program, hit by hit, with three things of its
-own:
+For one song that should be a light show of its own (a demo, the night's anthem), switch **Lightshow** on: in
+a live show in the night card (every track is then rebuilt in the background, the show keeps playing
+meanwhile); for a track on its own with **Start › Play a Track as Lightshow…** (⇧⌘O), or the Lightshow switch
+on the now-playing card while it plays (the track starts again where it was); from the command line with
+`--director lightshow`. It is played like the cinematic program, hit by hit, with three things of its own:
 
 - **a build-up**: one section of lights starts and plays every hit alone. Every phrase with the music for it
   brings one more section in, until the whole rig plays at the loudest part. A quiet part takes sections away

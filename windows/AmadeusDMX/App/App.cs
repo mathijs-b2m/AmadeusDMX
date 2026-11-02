@@ -92,6 +92,9 @@ public static class AppCommands
         show.Items.Add(Command("Play a Track…", () => PlayPanel.Choose(model, window), VirtualKey.O)
             .Follow(model, [nameof(AppModel.EngineRunning), nameof(AppModel.Workspace)],
                     i => i.IsEnabled = model.Workspace is not null && !model.EngineRunning));
+        show.Items.Add(Command("Play a Track as Lightshow…", () => PlayPanel.Choose(model, window, lightshow: true), VirtualKey.O, Ctrl | Shift)
+            .Follow(model, [nameof(AppModel.EngineRunning), nameof(AppModel.Workspace)],
+                    i => i.IsEnabled = model.Workspace is not null && !model.EngineRunning));
         show.Items.Add(new MenuFlyoutSeparator());
         show.Items.Add(Command("DMX Output", window.OpenDMX, VirtualKey.D, Ctrl | Shift)
             .Follow(model, [nameof(AppModel.Workspace)], i => i.IsEnabled = model.Workspace is not null));
@@ -135,12 +138,12 @@ public static class AppCommands
     }
 }
 
-/// The file picker for "Play a Track…".
+/// The file picker for "Play a Track…" (and "… as Lightshow").
 public static class PlayPanel
 {
     static readonly string[] Audio = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".aiff", ".aif", ".opus"];
 
-    public static async void Choose(AppModel model, Window window)
+    public static async void Choose(AppModel model, Window window, bool lightshow = false)
     {
         var picker = new FileOpenPicker(window.AppWindow.Id)
         {
@@ -148,6 +151,6 @@ public static class PlayPanel
             SuggestedStartLocation = PickerLocationId.MusicLibrary,
         };
         foreach (var t in Audio) picker.FileTypeFilter.Add(t);
-        if (await picker.PickSingleFileAsync() is { } file) model.Play(file.Path);
+        if (await picker.PickSingleFileAsync() is { } file) model.Play(file.Path, lightshow: lightshow);
     }
 }

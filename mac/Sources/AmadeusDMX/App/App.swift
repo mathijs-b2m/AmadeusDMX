@@ -101,6 +101,9 @@ struct AppCommands: Commands {
             Button("Play a Track…") { PlayPanel.choose(model) }
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(model.workspace == nil || model.engineRunning)
+            Button("Play a Track as Lightshow…") { PlayPanel.choose(model, lightshow: true) }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+                .disabled(model.workspace == nil || model.engineRunning)
             Divider()
             Button("DMX Output") { model.section = .dmx }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
@@ -125,14 +128,14 @@ struct AppCommands: Commands {
     }
 }
 
-/// Open panel for "Play a Track…".
+/// Open panel for "Play a Track…" (and "… as Lightshow").
 @MainActor
 enum PlayPanel {
-    static func choose(_ model: AppModel) {
+    static func choose(_ model: AppModel, lightshow: Bool = false) {
         let p = NSOpenPanel()
         p.allowedContentTypes = [.audio]
-        p.message = "Choose a track to play with the lights"
+        p.message = lightshow ? "Choose a track to play as a Lightshow" : "Choose a track to play with the lights"
         p.prompt = "Play"
-        if p.runModal() == .OK, let url = p.url { model.play(url) }
+        if p.runModal() == .OK, let url = p.url { model.play(url, lightshow: lightshow) }
     }
 }
