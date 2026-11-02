@@ -20,6 +20,7 @@ import numpy as np
 from amadeus.audio.model import Analysis
 from amadeus.director import Decision
 from amadeus.dmx import limiter
+from amadeus.engine.engine import program_of
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
 
@@ -94,11 +95,11 @@ def hello(
             "energy": energy_curve(a),
             "screen": bool(rig.get("screen")),
             "countdown": countdown,
-            # what kind of music, where that came from, and the program it gets (if any: e.g. cinematic)
+            # what kind of music, where that came from, and the program it gets (if any: cinematic, lightshow)
             "genre": getattr(a, "genre", ""),
             "genre_source": getattr(a, "genre_source", ""),
             "style": getattr(a, "style", ""),  # the genre whose house style the plan follows
-            "program": "cinematic" if getattr(a, "genre", "") == "cinematic" and a.hits is not None else "",
+            "program": program_of(a, plan),
             # the pictures on the heads' gobo wheels (base64 PNG, JPEG for glass): frames point into this list
             "gobos": real.gobo_pictures() if real is not None else [],
         }

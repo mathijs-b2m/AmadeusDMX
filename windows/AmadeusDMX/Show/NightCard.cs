@@ -26,6 +26,7 @@ public sealed class NightCard(AppModel model)
     readonly FontIcon _pin = UI.Icon("pin.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _hand = UI.Icon("hand.raised.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _fog = UI.Icon("cloud.fog.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
+    readonly FontIcon _sparkles = UI.Icon("sparkles", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly TextBlock _clock = UI.Text("", Font.Caption).Secondary();
     readonly TextBlock _countdown = UI.Text("", Font.Title2).Bold();
     readonly FontIcon _chevron = UI.Icon("chevron.down").Secondary();
@@ -40,7 +41,7 @@ public sealed class NightCard(AppModel model)
         {
             Content = UI.HStack(10,
                 _moon,
-                UI.VStack(1, UI.HStack(5, _title, _pin, _fog, _hand).Leading(), _clock.Leading()),
+                UI.VStack(1, UI.HStack(5, _title, _pin, _sparkles, _fog, _hand).Leading(), _clock.Leading()),
                 UI.Spacer(8),
                 _countdown,
                 _chevron),
@@ -62,7 +63,7 @@ public sealed class NightCard(AppModel model)
     void Refresh()
     {
         if (Arc is not { } arc || _card is null) return;
-        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
+        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
         if (shape != _shape)
         {
             _shape = shape;
@@ -81,6 +82,7 @@ public sealed class NightCard(AppModel model)
         _pin.Visible(arc.Locked);
         _hand.Visible(arc.Manual.Count > 0).Tooltip(Night.HeldHelp(arc));
         _fog.Visible(arc.Haze is not null).Tooltip("You push the haze");
+        _sparkles.Visible(arc.Lightshow == true).Tooltip("Lightshow: every track played as a show piece");
         _clock.Text = Night.Clock(arc);
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
@@ -96,6 +98,11 @@ public sealed class NightCard(AppModel model)
         _body.Visible(_open);
         if (!_open) return;
         _body.Children.Add(UI.Divider());
+        if (arc.Lightshow is not null)
+        {
+            _body.Children.Add(LightshowRow(arc));
+            _body.Children.Add(UI.Divider());
+        }
         if (arc.On)
         {
             _body.Children.Add(StageStrip(arc));
@@ -169,6 +176,29 @@ public sealed class NightCard(AppModel model)
             row.Tooltip(Night.KnobHelp(knob, arc));
         });
         return row;
+    }
+
+    // MARK: the Lightshow: switched on by hand for a song that should be a light show of its own (a demo, the
+    // night's anthem); every track is then played hit by hit, building up section by section to the climax
+
+    UIElement LightshowRow(ArcStatus arc)
+    {
+        var on = arc.Lightshow == true;
+        var icon = UI.Icon("sparkles").Frame(width: 18);
+        var status = UI.Text("", Font.Caption);
+        var toggle = UI.Toggle("", on, v => Send(ArcMessage.Lightshow(v)));
+        _updates.Add(a =>
+        {
+            var now = a.Lightshow == true;
+            toggle.SetOn(now);
+            status.Text = Night.LightshowStatus(now);
+            var tint = now ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush");
+            status.Foreground(tint);
+            icon.Foreground(tint);
+        });
+        var title = UI.Text("Lightshow", Font.Callout).Bold();
+        return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Leading()), UI.Spacer(), toggle)
+            .Tooltip(Night.LightshowHelp);
     }
 
     // MARK: the haze push: the hazers at a level for a while (to fill the room), then the room kept that hazy

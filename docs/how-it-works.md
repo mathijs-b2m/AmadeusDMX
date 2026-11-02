@@ -121,6 +121,31 @@ Film scores and trailer music have no beat grid to light. The cinematic program 
 - **the melody**: when everything plays together legato, there are few hits to play, so a melody layer takes over. The notes of the separated melody instrument are played over the melody section (each held, then let go as the next one comes): low notes in the centre, high notes out to the sides. The pad section holds a steady glow, and the moving heads drift with the melody's contour. Percussive passages don't get it;
 - between hits it's dark. Quiet passages play soft, the climax hard. The colours follow the arc: ice when calm, warm in the swells, fire at the climax. An answering section plays in the next colour of the palette.
 
+### The lightshow
+
+For one song that should be a light show of its own (a demo, the night's anthem), switch **Lightshow** on in
+the night card (or play a track with `--director lightshow`). Every track is then rebuilt in the background
+(the show keeps playing meanwhile) and played like the cinematic program, hit by hit, with three things of its
+own:
+
+- **a build-up**: one section of lights starts and plays every hit alone. Every phrase with the music for it
+  brings one more section in, until the whole rig plays at the loudest part. A quiet part takes sections away
+  again, and the next loud part brings them back at once. The colours warm up as it builds (cool, warm, fire),
+  the heads change pictures more often (at phrase starts, then every four bars, at the climax every two), and
+  the strobes and lasers are kept for the impacts until the build is well under way;
+- **a layered symphony**: every voice (booms, cymbals, stabs, ticks) has its own seat, a section that plays it
+  for the whole track. A voice whose section hasn't joined yet is played by one that has, and every section
+  that joins takes its own instrument over. Call and response and tutti on the strong hits work as in the
+  cinematic program, among the sections that play;
+- **intense**: hits land brighter, a hit whose section is still busy is played by another section instead of
+  being dropped, and the sections that play keep a low glow between the hits that grows with the build. The
+  glow changes in slow ramps and goes with the music's bars, so silences are still dark. The powerful lights
+  make less room for the small ones' accents, and never step down within their own hit.
+
+While it is on, the show arc leaves the frame as the program plays it: every group, the specials, full
+response. Only the intensity and flashes knobs you hold still apply. No fixture is hit more often than about
+three times a second, and the strobes stay within `max_flash_hz`. It stays on until you switch it off.
+
 ## Decision models
 
 Choose the decision model on the **setup page** (saved on selection, also in a running live show) or per run with `--director`.

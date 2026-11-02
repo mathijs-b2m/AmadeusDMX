@@ -21,6 +21,8 @@ from amadeus.director import (
 )
 from amadeus.director.cinematic import NAME as CINEMATIC
 from amadeus.director.cinematic import CinematicDirector
+from amadeus.director.lightshow import NAME as LIGHTSHOW
+from amadeus.director.lightshow import LightshowDirector
 from amadeus.director.style import style_for
 from amadeus.director.themes import theme_of
 from amadeus.rig.groups import has_smoke, head_groups, laser_list, signature
@@ -95,12 +97,18 @@ def get_plan(
     analysis giving one (a live set's genre, amadeus/director/style.py). The plan is cached per style."""
     director = normalize_director(director)
     a = analyze(wav, CACHE, tempo=tempo)
-    if a.genre == CINEMATIC:  # a program of its own: the hits are the show, the music decides the arc
+    if director == LIGHTSHOW:  # switched on by hand: the cinematic program as a show piece, for any track
+        if a.hits is None:
+            from amadeus.audio import hits
+
+            a.hits = hits.load_or_detect(a.path)
+    elif a.genre == CINEMATIC:  # a program of its own: the hits are the show, the music decides the arc
         director = CINEMATIC
+    programmed = director in (CINEMATIC, LIGHTSHOW)
     genre = style_genre(a) if callable(style_genre) else (style_genre or a.genre)
-    style = style_for(genre) if director != CINEMATIC else None
+    style = style_for(genre) if not programmed else None
     a.style = style.genre if style else ""
-    theme = theme_of(wav) if director != CINEMATIC else None
+    theme = theme_of(wav) if not programmed else None
     groups = head_groups(rig) if rig else []
     lasers = laser_list(rig) if rig else []
     screen = bool(rig and rig.get("screen"))
@@ -128,6 +136,8 @@ def get_plan(
     base = plan_path(wav, director, tempo).name.split(f".{_file_tag(director)}.")[0]
     if director == CINEMATIC:
         d = CinematicDirector()
+    elif director == LIGHTSHOW:
+        d = LightshowDirector()
     elif director == "openai":
         d = OpenAIDirector(
             CACHE / f"{base}.decisions-cache.json",

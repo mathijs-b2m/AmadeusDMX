@@ -31,6 +31,13 @@ import Testing
     #expect(auto.hazers == 1 && auto.haze == nil)
 }
 
+@Test func theLightshowSwitchDecodes() throws {
+    let base = #"{"on": true, "length": 14400, "stage": "peak", "stages": [], "event": "club", "events": [], "locked": false, "heat": 0.5, "trend": 0, "values": {}, "manual": [], "groups": 2, "playing": 2"#
+    #expect(try JSONDecoder().decode(ArcStatus.self, from: Data((base + "}").utf8)).lightshow == nil)  // an older engine
+    let on = try JSONDecoder().decode(ArcStatus.self, from: Data((base + #", "lightshow": true}"#).utf8))
+    #expect(on.lightshow == true)
+}
+
 @Test func outdoorStageRoundTrips() throws {
     let st = try JSONDecoder().decode(Stage.self, from: Data(#"{"width_m": 12, "outdoor": true}"#.utf8))
     #expect(st.outdoor)

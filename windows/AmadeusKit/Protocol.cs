@@ -554,6 +554,8 @@ public sealed record ArcStatus
     public int? Hazers { get; init; }
     /// The operator's haze push (null: the show hazes by itself).
     public HazePush? Haze { get; init; }
+    /// The operator's Lightshow: every track played as a show piece (null: an engine without it).
+    public bool? Lightshow { get; init; }
 
     public string StageName => Stages.FirstOrDefault(s => s.Count > 0 && s[0] == Stage) is { Count: > 0 } s ? s[^1] : Stage;
     public double? Remaining => Elapsed is { } e ? Length - e : null;
@@ -571,6 +573,7 @@ public sealed record ArcStatus
             Groups = J.Req(c, "groups", J.Int), Playing = J.Req(c, "playing", J.Int),
             MovementLevel = J.Val(c, "movement_level", J.Int), Hold = J.Val(c, "hold", J.Int),
             Hazers = J.Val(c, "hazers", J.Int), Haze = J.Ref(c, "haze", HazePush.From),
+            Lightshow = J.Val(c, "lightshow", J.Bool),
         };
     }
 
@@ -581,7 +584,8 @@ public sealed record ArcStatus
         && Locked == o.Locked && Heat == o.Heat && Trend == o.Trend && Bpm == o.Bpm && BaseBpm == o.BaseBpm
         && Values.Count == o.Values.Count && Values.All(p => o.Values.TryGetValue(p.Key, out var v) && v == p.Value)
         && Manual.SequenceEqual(o.Manual) && Groups == o.Groups && Playing == o.Playing
-        && MovementLevel == o.MovementLevel && Hold == o.Hold && Hazers == o.Hazers && Equals(Haze, o.Haze);
+        && MovementLevel == o.MovementLevel && Hold == o.Hold && Hazers == o.Hazers && Equals(Haze, o.Haze)
+        && Lightshow == o.Lightshow;
 
     public override int GetHashCode() => HashCode.Combine(Stage, Heat, Elapsed, Manual.Count, Values.Count);
 }

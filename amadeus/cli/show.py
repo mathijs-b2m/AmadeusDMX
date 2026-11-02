@@ -30,7 +30,8 @@ def add_commands(sub) -> dict:
         p.add_argument(
             "--director",
             default="auto",
-            help="auto | openai | rules | ollama (local decision model nimble) | ollama:<decision model>",
+            help="auto | openai | rules | ollama (local decision model nimble) | ollama:<decision model> | lightshow "
+            "(a show piece: every hit played, building up layer by layer)",
         )
         p.add_argument("--redo", action="store_true", help="re-run the director even if a plan is cached")
         if name == "play":

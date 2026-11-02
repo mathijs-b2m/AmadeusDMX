@@ -1,5 +1,6 @@
 // The track's genre (one word), and the program it gets: a chip for every track, and a banner that stands
-// out for a genre with a program of its own (cinematic: every hit played by its own fixtures).
+// out for a program of its own (cinematic: every hit played by its own fixtures; the lightshow, switched on by
+// hand: the same, as a show piece that builds up).
 // (Genre's symbols and words are in ShowLogic.cs.)
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Media;
@@ -18,14 +19,15 @@ public static class GenreChip
     }
 }
 
-/// A genre with a program of its own: said loudly.
+/// A program of its own: said loudly.
 public static class ProgramBanner
 {
     public static FrameworkElement? Build(string program)
     {
-        if (program != "cinematic") return null;
+        if (program != "cinematic" && program != "lightshow") return null;
+        var lightshow = program == "lightshow";
         var white = Tint.Brush(Tint.White);
-        var title = UI.Text("CINEMATIC PROGRAM", Font.Callout).Foreground(white);
+        var title = UI.Text(lightshow ? "LIGHTSHOW" : "CINEMATIC PROGRAM", Font.Callout).Foreground(white);
         title.FontWeight = FontWeights.Black;
         title.CharacterSpacing = 115;  // tracking 1.5 pt at 13 pt
         var gradient = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
@@ -37,11 +39,13 @@ public static class ProgramBanner
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(12, 9, 12, 9),
             Child = UI.HStack(10,
-                UI.Icon("film.stack", Theme.Size(Font.Title2)).Foreground(white),
+                UI.Icon(lightshow ? "sparkles" : "film.stack", Theme.Size(Font.Title2)).Foreground(white),
                 UI.VStack(1,
                     title.Leading(),
-                    UI.Text("Every hit played by its own fixtures, exactly on time", Font.Caption).Foreground(white).Opacity(0.85).Leading()),
+                    UI.Text(lightshow ? "Every hit played, building up section by section" : "Every hit played by its own fixtures, exactly on time", Font.Caption).Foreground(white).Opacity(0.85).Leading()),
                 UI.Spacer()),
-        }.Tooltip("A film-score track: no beat grid. The hits are found where they are, sorted into voices, and every voice plays its own fixtures; the biggest hits play the whole rig.");
+        }.Tooltip(lightshow
+            ? "You switched the Lightshow on: every hit is played by its own lights. One section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax."
+            : "A film-score track: no beat grid. The hits are found where they are, sorted into voices, and every voice plays its own fixtures; the biggest hits play the whole rig.");
     }
 }

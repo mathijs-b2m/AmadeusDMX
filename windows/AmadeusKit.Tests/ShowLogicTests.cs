@@ -107,6 +107,17 @@ public class ShowLogicTests
         Assert.Equal("""{"type":"arc","reset":true}""", ArcMessage.Json(ArcMessage.Reset()));
         Assert.Equal("""{"type":"arc","haze":{"level":0.5,"seconds":60,"every":20}}""", ArcMessage.Json(ArcMessage.Haze(0.5, 60, 20)));
         Assert.Equal("""{"type":"arc","haze":"auto"}""", ArcMessage.Json(ArcMessage.HazeAuto()));
+        Assert.Equal("""{"type":"arc","lightshow":true}""", ArcMessage.Json(ArcMessage.Lightshow(true)));
+    }
+
+    [Fact]
+    public void TheLightshowSwitchAsTheEngineSendsIt()
+    {
+        Assert.Null(Arc(ArcJson).Lightshow);  // an engine without it: no row
+        var on = Arc(ArcJson.Replace("\"hold\": 4}", "\"hold\": 4, \"lightshow\": true}"));
+        Assert.True(on.Lightshow);
+        Assert.NotEqual(Arc(ArcJson), on);
+        Assert.Equal("Every track a show piece, until you switch it off", Night.LightshowStatus(true));
     }
 
     [Fact]

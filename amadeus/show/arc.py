@@ -22,6 +22,11 @@ The knobs work on the mixed frame after the engines (`apply`), except colour var
 themselves (engine/looks.py), head movement and look changes, which reshape each track's plan (`shape_plan`,
 the track is rebuilt in the background: head paths are worked out ahead), and the LED wall, which the
 visualisers draw. The drop moment is never touched: it keeps its full response.
+
+The operator's **Lightshow** switch plays every track as a show piece (the lightshow program, engine/
+lightshow.py): the tracks are rebuilt with it in the background, and while it is on the arc leaves the frame
+as the program plays it (every group, the specials, full response); only the intensity and flashes knobs the
+operator holds still apply. It stays on until switched off (an engine restart keeps it for the night).
 """
 
 from __future__ import annotations
@@ -335,6 +340,7 @@ class ShowArc:
         self.stage_since = 0.0  # night time the stage began
         self.locked = False  # the operator holds the stage
         self.manual: dict[str, float] = {}
+        self.lightshow = False  # the operator's show piece: every track played by the lightshow program
         self.fast = self.slow = None  # heat, followed quickly and slowly
         self.bpm_fast = self.bpm_slow = None
         self.bpm_base: float | None = None  # the warm-up's tempo
@@ -565,6 +571,8 @@ class ShowArc:
         """What the plans are shaped to (show/tracks.py rebuilds a track's engine when it changes): the movement
         level, how many phrases a look is held, whether a drop still brings its own look (not for small drops),
         and the warm-up's ambient look (in the warm-up while the heads are calm)."""
+        if self.lightshow:  # the program plays the plan as its director made it
+            return 2, 1, True, False
         move = self.movement_level()
         return move, self.hold(), self._level("drops", (DROPS_OWN_LOOK,)) == 1, self.ambient()
 
@@ -609,6 +617,9 @@ class ShowArc:
         and smoke. `engine`: the dominant deck's (its bars and drops), `t` its position."""
         if not self.enabled:
             return
+        if self.lightshow:
+            self._as_programmed(states)
+            return
         self._respond(states, engine, t, dt)
         self._group_gains(engine, t, dt)
         sp = self.value("specials")  # in the box, out for the big moments only, or free (as directed)
@@ -630,6 +641,19 @@ class ShowArc:
                     g *= flashes
             s.dimmer *= g * level
             s.white *= g * level * flashes
+        self._smoke(states)
+
+    def _as_programmed(self, states: dict):
+        """The lightshow plays the frame as it is: every group and the specials; only the intensity and the
+        flashes the operator holds dim it."""
+        level, flashes = self.manual.get("intensity", 1.0), self.manual.get("flashes", 1.0)
+        self.special_gain = 1.0
+        for eid in self.lights:
+            s = states.get(eid)
+            if s is None:
+                continue
+            s.dimmer *= level
+            s.white *= level * (flashes if eid in self.strobes else 1.0)
         self._smoke(states)
 
     def _respond(self, states: dict, engine, t: float, dt: float):
@@ -775,7 +799,7 @@ class ShowArc:
         knob: {name: value} (the operator takes it over), auto: name | "all" (back to the arc),
         stage: key (force it), lock: bool, length_s: seconds, event: type, reset: true (a new night), enabled: bool,
         haze: {level: 0..1, seconds, every} (push the hazers, then keep the room that hazy: a burst every `every` s)
-        | "auto" (back to the show)."""
+        | "auto" (back to the show), lightshow: bool (every track played as a show piece)."""
         now = time.time() if now is None else now
         haze = msg.get("haze")
         if isinstance(haze, dict):
@@ -811,6 +835,9 @@ class ShowArc:
             self.fast = self.slow = self.bpm_fast = self.bpm_slow = self.bpm_base = None
         if "enabled" in msg:
             self.enabled = bool(msg["enabled"])
+        if "lightshow" in msg:
+            self.lightshow = bool(msg["lightshow"])
+            print(f"  ☾ show arc: lightshow {'on' if self.lightshow else 'off'}", flush=True)
         snap = any(k in msg for k in ("stage", "event", "reset", "enabled", "auto", "length_s"))
         self.values = self._glide(self._targets(self.heat(), now), 0.0, snap)
         self._dirty = True  # saved within a few seconds (a slider sends many of these)
@@ -840,6 +867,7 @@ class ShowArc:
             "ambient": self.plan_shape()[3],
             "hazers": len(self.hazers),
             "haze": self.haze_status(),
+            "lightshow": self.lightshow,
         }
 
     # ------------------------------------------------------------ remembered between engine starts
@@ -856,6 +884,7 @@ class ShowArc:
             "stage_since": self.stage_since,
             "locked": self.locked,
             "manual": self.manual,
+            "lightshow": self.lightshow,
             "revealed": sorted(getattr(self, "revealed", ())),
             "countdowns": self.countdowns,
             "heat": [self.fast, self.slow],
@@ -882,6 +911,7 @@ class ShowArc:
         if d.get("started") is None or now - float(d.get("seen") or 0) > NEW_NIGHT_AFTER_S:
             return  # the knobs and the length stay; the night itself starts again with the music
         self.started, self.seen = float(d["started"]), float(d["seen"])
+        self.lightshow = bool(d.get("lightshow", False))  # (on for this night only)
         self._revealed_saved = [int(k) for k in d.get("revealed") or []]
         self.countdowns = [float(c) for c in d.get("countdowns") or []]
         self.stage = STAGE_KEYS.index(d["stage"]) if d.get("stage") in STAGE_KEYS else 0
