@@ -102,7 +102,8 @@ DOWN_LOWEST_DEG = -88.0  # a tilt wave played down stays this side of straight d
 RIG_CLEAR_M = 0.5  # a beam passing this close by another head shines into it
 
 
-LOW_HEAD_M = 1.0  # heads below this (on the floor) aim up and over the crowd instead of down onto it
+LOW_HEAD_M = 1.0  # heads below this over what they stand on (the floor, the deck) aim up and over the crowd
+# instead of down onto it
 
 
 OPEN_SKY = {"el": 66, "az_amp": 60, "el_amp": 18}  # outdoors: the sky aim goes higher and wider (no ceiling)
@@ -163,7 +164,7 @@ class MotionMixin:
         self.move_travel[j] = (frac["pan"], frac["tilt"])
         out = {}
         for name, aim in AIMS.items():
-            if self.head_pos[j][2] < LOW_HEAD_M:
+            if geometry.over_ground(self.head_pos[j], self.stage) < LOW_HEAD_M:
                 aim = {**aim, **LOW_AIMS.get(name, {})}
             out[name] = (axes["pan"][0] / aim["az_amp"], axes["tilt"][0] / aim["el_amp"])
         return out
@@ -249,7 +250,8 @@ class MotionMixin:
         while beams may not point back (the back guard would bend them down into the floor next to it): it plays up."""
         mode = self.truss_aim[j] if getattr(self, "truss_aim", None) else None
         name = TRUSS_AIMS.get(mode, {}).get(name, name)
-        if name == "stage" and self.head_pos[j][2] < LOW_HEAD_M and self.stage.get("back_guard", True):
+        low = geometry.over_ground(self.head_pos[j], self.stage) < LOW_HEAD_M
+        if name == "stage" and low and self.stage.get("back_guard", True):
             return "sky"
         return name
 
@@ -260,7 +262,7 @@ class MotionMixin:
         aim = AIMS.get(name, AIMS["crowd"])
         if name == "sky" and self.stage.get("outdoor"):
             aim = {**aim, **OPEN_SKY}
-        if head_pos[2] < LOW_HEAD_M:
+        if geometry.over_ground(head_pos, self.stage) < LOW_HEAD_M:
             aim = {**aim, **LOW_AIMS.get(name, {})}
         top = geometry.ceiling_top_deg(head_pos, self.stage)
         if top is not None and aim["el"] + aim["el_amp"] > top and aim["el"] > 0:
@@ -333,7 +335,8 @@ class MotionMixin:
         """A pour's top (high, under the ceiling) and floor elevation for head j."""
         sky = self._fit_aim("sky", self.head_pos[j])
         top = sky["el"] + 0.5 * sky["el_amp"]
-        floor = POUR_LOW_FLOOR_DEG if self.head_pos[j][2] < LOW_HEAD_M else POUR_FLOOR_DEG
+        low = geometry.over_ground(self.head_pos[j], self.stage) < LOW_HEAD_M
+        floor = POUR_LOW_FLOOR_DEG if low else POUR_FLOOR_DEG
         if aim_name == "down":  # a truss that plays down: the fall ends straight under it
             floor = min(floor, DOWN_LOWEST_DEG + 3)
         return top, min(floor, top - 30.0)

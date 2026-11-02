@@ -205,6 +205,13 @@ def eye_safe(d: np.ndarray, head_z: float, st: dict) -> np.ndarray:
     return d
 
 
+def over_ground(pos, st: dict) -> float:
+    """How high a fixture is over what it stands on: the stage's deck behind its front edge, the hall floor in front."""
+    deck = float(st.get("deck_m", 0.0) or 0.0)
+    z = float(pos[2])
+    return z - deck if deck > 0 and float(pos[1]) <= 0.0 and z >= deck else z
+
+
 def ceiling_top_deg(head_pos, st: dict) -> float | None:
     """The highest elevation a head's beam may have under the ceiling guard (None: guard off, or outdoors)."""
     if not st.get("ceiling_guard", True) or st.get("outdoor"):
