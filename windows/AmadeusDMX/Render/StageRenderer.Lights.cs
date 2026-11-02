@@ -253,11 +253,12 @@ public sealed partial class StageRenderer
                 }
                 case FixtureKind.Strobe:
                 {
-                    // one blinding white flash from the face, flooding the room for a moment
+                    // a white flash from the face that lights the room for a moment: kept gentle on screen (a real
+                    // strobe would blind; ten of them flashing on the beat must not hurt the eyes of whoever watches)
                     var sd = fx.Dir?.ToFloat() ?? new Vector3(0, 1, 0.14f);
-                    Beam(p, Vector3.Normalize(sd), spreadDeg: 100, color: Vector3.One, intensity: dim * 0.9f, maxLen: 8);
-                    sprites.Add(new SpriteInstance(new(p, 0.35f * (1 + 1.5f * dim)), new(0.9f, 0.95f, 1, dim * 3), new(1, 0, 0, 0)));
-                    lightSum += new Vector3(dim * 8);   // the whole room lights up
+                    Beam(p, Vector3.Normalize(sd), spreadDeg: 100, color: Vector3.One, intensity: dim * 0.4f, maxLen: 8);
+                    sprites.Add(new SpriteInstance(new(p, 0.3f * (1 + 0.6f * dim)), new(0.9f, 0.95f, 1, dim * 1.2f), new(1, 0, 0, 0)));
+                    lightSum += new Vector3(dim * 2);   // the room lights up
                     break;
                 }
                 default:  // par, smoke, other
