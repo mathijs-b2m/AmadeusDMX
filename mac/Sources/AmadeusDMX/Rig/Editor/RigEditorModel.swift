@@ -60,7 +60,11 @@ final class RigEditorModel: StageEditing {
     @ObservationIgnored private var raise: (id: String, before: RigDocument)?
     var message: String?
     var busy = false
-    @ObservationIgnored var undoManager: UndoManager?
+    // The window's undo manager doesn't keep its targets alive: a step left behind for an editor that's gone
+    // (another rig or set picked, the page left) would crash on undo, so they go with the editor.
+    @ObservationIgnored var undoManager: UndoManager? {
+        didSet { if oldValue !== undoManager { oldValue?.removeAllActions(withTarget: self) } }
+    }
     @ObservationIgnored private var defs: [String: FixtureDefinition] = [:]
     @ObservationIgnored private let workspace: Workspace
     @ObservationIgnored private var drag: (sel: EditorSelection, grab: SIMD3<Double>, start: SIMD3<Double>, before: RigDocument)?
@@ -103,6 +107,8 @@ final class RigEditorModel: StageEditing {
         doc = d
         saved = d
     }
+
+    isolated deinit { undoManager?.removeAllActions(withTarget: self) }
 
     var isDirty: Bool { doc != saved }
     var rigName: String { doc.rig }
