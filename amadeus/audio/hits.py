@@ -11,6 +11,11 @@ their own surroundings. Every hit gets:
   drums of a kit; the show gives each voice its own fixtures.
 - **impacts**: the very biggest broadband hits (the whole rig plays them).
 
+A hit is found in the frame whose window the sound has just entered, so it is found early (a sharp kick
+~70 ms, a mix of real drums ~30 ms). `aligned` puts every hit on the analysis's own onset of it (the kick, the
+snare, the hats, the accents, the lead: exact to a few ms), or, with none close, moves it by the track's own
+typical offset.
+
 The low end gets its own detector (booms under dense music would drown in the total), and the sustained low
 end (drones, rumble) is kept as an envelope for the floor glow.
 """
@@ -165,6 +170,34 @@ def detect(path: Path) -> Hits:
     low = np.clip((low - np.percentile(low, 10)) / max(np.percentile(low, 99) - np.percentile(low, 10), 1), 0, 1)
     low = np.convolve(low, np.ones(9) / 9, mode="same")  # ~200 ms: a glow, not a flicker
     return Hits(frames / fps, strength, decay, voice, impact, pitch, low.astype(np.float32), fps)
+
+
+ALIGN_WINDOW_S = (-0.02, 0.12)  # the analysis's onset of a hit lies this far after it (it is found early)
+ALIGN_FALLBACK_S = 0.05  # a track with no onset close to any hit: hits move this much later
+
+
+def aligned(h: Hits, onsets: dict) -> Hits:
+    """`h` with every hit at its exact time: on the analysis's nearest onset just after it, or, with none in
+    reach, moved by the median of the others' offsets."""
+    if not len(h):
+        return h
+    ref = np.sort(np.concatenate([np.asarray(t, float) for t, _ in (onsets or {}).values()] or [np.zeros(0)]))
+    lo, hi = ALIGN_WINDOW_S
+    t = np.array(h.t, float)
+    snapped = np.full(len(t), np.nan)
+    if len(ref):
+        k = np.searchsorted(ref, t + lo)
+        ok = k < len(ref)
+        cand = ref[np.minimum(k, len(ref) - 1)]
+        ok &= cand <= t + hi
+        snapped[ok] = cand[ok]
+    found = ~np.isnan(snapped)
+    shift = float(np.median(snapped[found] - t[found])) if found.sum() >= 8 else ALIGN_FALLBACK_S
+    out = np.where(found, snapped, t + shift)
+    order = np.argsort(out, kind="stable")
+    keep = order[np.r_[True, np.diff(out[order]) >= MIN_GAP_S]]  # two hits on one onset are one
+    keep = np.sort(keep)
+    return Hits(out[keep], h.strength[keep], h.decay[keep], h.voice[keep], h.impact[keep], h.pitch[keep], h.low, h.fps)
 
 
 def load_or_detect(path: str | Path, cache_dir: Path = paths.CACHE) -> Hits:
