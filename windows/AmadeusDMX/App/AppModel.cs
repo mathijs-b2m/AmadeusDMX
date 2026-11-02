@@ -496,11 +496,18 @@ public sealed class AppModel : Observable
     public void StopShow() => Engine.Stop();
 
     /// The Lightshow on or off for the track that plays: it starts again where it was.
-    public async void SetPlayLightshow(bool on)
+    public void SetPlayLightshow(bool on)
     {
-        if (PlayingFile is not { } file || !EngineRunning || on == PlayingLightshow) return;
-        var at = Feed.Time;
+        if (PlayingFile is null || !EngineRunning || on == PlayingLightshow) return;
         PlayingLightshow = on;
+        JumpTo(Feed.Time);
+    }
+
+    /// The track that plays, started again at `at` seconds (the timeline's click to jump). The old engine has to
+    /// be gone first: it says so on this thread, so waiting for it here would leave Play to find it still running.
+    public async void JumpTo(double at)
+    {
+        if (PlayingFile is not { } file) return;
         Engine.Stop();
         for (var i = 0; i < 80 && Engine.IsRunning; i++) await Task.Delay(100);
         Play(file, at);

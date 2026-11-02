@@ -33,10 +33,8 @@ struct TimelineCard: View {
                         } else { hover = nil }
                     }
                     .onTapGesture { p in
-                        guard let file = model.playingFile else { return }
-                        let t = Double(p.x / geo.size.width) * hello.duration
-                        model.engine.stopAndWait()
-                        model.play(file, from: t)
+                        guard model.playingFile != nil else { return }
+                        model.jump(to: Double(p.x / geo.size.width) * hello.duration)
                     }
             }
             .frame(height: 54)
