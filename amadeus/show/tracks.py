@@ -140,6 +140,15 @@ class TrackShows:
                     a, plan = get_plan(Path(file), quick, False, rig=self.rig, style_genre=style)
                     self._install(file, a, plan, quick)
             done = quick if first else None
+            with self.lock:
+                showing = self.shows.get(file)
+            if not first and not self.lightshow and showing is not None and showing[3] == LIGHTSHOW:
+                # the Lightshow switched off: back to the rules' show at once (a model's plan can take minutes,
+                # or fail), then on to the model's
+                a, plan = get_plan(Path(file), "rules", False, rig=self.rig, style_genre=self._style_genre(file))
+                if not self.lightshow:
+                    self._install(file, a, plan, "rules")
+                    done = "rules"
             while self.wanted() != done:  # (re)build until the plan of the CURRENT model is installed
                 director = self.wanted()
                 if director not in ("rules", LIGHTSHOW):

@@ -127,25 +127,29 @@ For one song that should be a light show of its own (a demo, the night's anthem)
 a live show in the night card (every track is then rebuilt in the background, the show keeps playing
 meanwhile); for a track on its own with **Start › Play a Track as Lightshow…** (⇧⌘O), or the Lightshow switch
 on the now-playing card while it plays (the track starts again where it was); from the command line with
-`--director lightshow`. It is played like the cinematic program, hit by hit, with three things of its own:
+`--director lightshow`. It is the cinematic program, hit by hit, turned all the way up:
 
-- **a build-up**: one section of lights starts and plays every hit alone. Every phrase with the music for it
-  brings one more section in, until the whole rig plays at the loudest part. A quiet part takes sections away
-  again, and the next loud part brings them back at once. The colours warm up as it builds (cool, warm, fire),
-  the heads change pictures more often (at phrase starts, then every four bars, at the climax every two), and
-  the strobes and lasers are kept for the impacts until the build is well under way;
-- **a layered symphony**: every voice (booms, cymbals, stabs, ticks) has its own seat, a section that plays it
-  for the whole track. A voice whose section hasn't joined yet is played by one that has, and every section
-  that joins takes its own instrument over. Call and response and tutti on the strong hits work as in the
-  cinematic program, among the sections that play;
-- **intense**: hits land brighter, a hit whose section is still busy is played by another section instead of
-  being dropped, and the sections that play keep a low glow between the hits that grows with the build. The
-  glow changes in slow ramps and goes with the music's bars, so silences are still dark. The powerful lights
-  make less room for the small ones' accents, and never step down within their own hit.
+- **every light plays**: the rig is played in families, one per fixture model however many trusses it hangs
+  on (all the PARs, all the Auras…), each in a few blocks left to right for its chases. Every family plays an
+  instrument of the music (booms, cymbals, stabs, ticks); with more families than instruments, an instrument
+  gets several, and they play it together when the music is loud;
+- **a build-up**: one family starts with every hit, and every loud phrase brings a third of the rig in, so the
+  whole rig plays from the third loud phrase on. A quiet part takes families away, the next loud part brings
+  them back at once. The colours warm up as it builds (cool, warm, fire), and the heads change picture at the
+  phrases, then every two bars, with the whole rig in every bar;
+- **flashing**: hits are short and hard, at full level. Strong hits are played by every family at once, white,
+  with the strobes; once the whole rig plays, the strobes also hit every kick and snare. Snare rolls into the
+  drops flash on their hits, the impacts hit the whole rig, the strobes and the lasers. A busy family's hit is
+  played by another, and the families that play glow between the hits (dark in silences);
+- **heads in pictures that fit the room**: every picture is checked from where each head hangs, with the drift
+  around it. A head the ceiling or the back-wall guard would have to bend, or that would light the ceiling
+  nearby, takes a picture that works from its place (down onto the floor ahead), and a picture most heads
+  can't do is left out.
 
 While it is on, the show arc leaves the frame as the program plays it: every group, the specials, full
-response. Only the intensity and flashes knobs you hold still apply. No fixture is hit more often than about
-three times a second, and the strobes stay within `max_flash_hz`. It stays on until you switch it off.
+response. Only the intensity and flashes knobs you hold still apply. Every flash stays within the set's
+`max_flash_hz` (faster only with *allow fast strobe*, none with *strobe free*). Switching it off in a live show
+goes back to the rules' show at once, and to your decision model's plan when that is ready.
 
 ## Decision models
 

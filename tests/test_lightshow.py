@@ -48,12 +48,12 @@ def test_the_layers_build_up_one_by_one():
     n = 6
     got = D.layers(a, n)
     assert got[0] == 1  # one section starts alone
-    # one new section at a time (after a breakdown the ones that played before come back at once)
-    assert all(got[k] <= max(got[:k]) + 1 for k in range(1, len(got)))
+    # a third of the rig at a time (after a breakdown the ones that played before come back at once)
+    assert all(got[k] <= max(got[:k]) + 2 for k in range(1, len(got)))
     assert max(got) > 1
     r = D.ranks(a)
     for k, rank in zip(got, r):
-        assert k <= max(1, 1 + round(rank * (n - 1))) or rank >= D.CLIMAX  # a quiet part thins out
+        assert k <= max(1, 1 + round(rank / D.FULL_FROM * (n - 1)))  # a quiet part thins out
 
 
 def test_the_build_reaches_everything_at_a_long_climax():
@@ -74,12 +74,29 @@ def test_every_rig_plays_it(path):
     assert max(lit) > 0
 
 
-def test_every_voice_keeps_its_section_once_it_has_joined(show):
+def test_every_family_plays_an_instrument_and_keeps_it(show):
     _, _, e = show
-    for role, seat in e.ls_seats.items():
+    seated = sorted(s for fams in e.ls_seats.values() for s in fams)
+    assert seated == list(range(len(e.cine_sections)))  # every family has an instrument, one each
+    for role, fams in e.ls_seats.items():
         for sc in e.cine_score:
-            if seat in sc["active"]:
-                assert sc["parts"][role][0] == seat
+            joined = [s for s in fams if s in sc["active"]]
+            if joined:
+                assert [s for s, _ in sc["parts"][role]] == joined
+
+
+def test_a_family_is_every_fixture_of_a_model(show):
+    _, rig, e = show
+    models = {
+        f["fixture"]
+        for f in rig["fixtures"]
+        if any(
+            el["fixture"] == f["id"] and el["kind"] not in ("laser", "strobe", "smoke", "inert")
+            for el in rig["elements"]
+        )
+    }
+    assert len(e.cine_sections) == len(models)
+    assert all(len(s["units"]) <= 8 for s in e.cine_sections)
 
 
 def test_only_sections_that_have_joined_play(show):
@@ -117,9 +134,20 @@ def test_no_light_flickers(name):
     e = Engine(a, direct(a, LightshowDirector(), verbose=False), rig, real_output=False)
     ts = np.arange(0, a.duration, 1 / FPS)
     frames = [e.render(float(t))[1] for t in ts]
-    for eid in frames[0]:
+    for eid in frames[0]:  # it flashes on purpose, but no light chops along with the music
         x = np.array([f[eid].dimmer for f in frames])
-        assert fast_cycles(x) <= 2, eid
+        assert fast_cycles(x) <= 0.03 * a.duration, eid
+
+
+@pytest.mark.parametrize("name", ["showcase", "concert60"])
+def test_no_fixture_flashes_faster_than_the_set_allows(name):
+    a = rock()
+    rig = load_rig(f"tests/sets/{name}.json")
+    e = Engine(a, direct(a, LightshowDirector(), verbose=False), rig, real_output=False)
+    gap = 1 / rig["safety"]["max_flash_hz"] - 1e-6
+    for eid, (_, items) in e.cine_events.items():
+        played = sorted({round(float(t0), 6) for t0, *_ in items})
+        assert all(b - x >= gap for x, b in zip(played, played[1:])), eid
 
 
 def test_brighter_than_the_cinematic_program():
@@ -207,3 +235,23 @@ def test_track_shows_switch_to_the_lightshow(monkeypatch):
     shows.pending.clear()
     shows.set_lightshow(False)
     assert shows.wanted() == "rules" and len(built) == 2
+
+
+def test_switching_the_lightshow_off_goes_back_to_the_rules_at_once(monkeypatch):
+    from amadeus import pipeline
+    from amadeus.show import tracks
+
+    calls = []
+
+    def plan(file, director, redo, **kw):
+        calls.append(director)
+        if director == "openai":
+            raise RuntimeError("no key")  # the model fails: the rules' show must already play
+        return "a", [director]
+
+    monkeypatch.setattr(pipeline, "get_plan", plan)
+    shows = tracks.TrackShows(load_rig("tests/sets/small.json"), "openai", Path("."))
+    monkeypatch.setattr(shows, "_install", lambda f, a, p, d: shows.shows.__setitem__(f, (a, p, None, d)))
+    shows.shows[__file__] = ("a", ["lightshow"], None, "lightshow")
+    shows._build(__file__, first=False)
+    assert calls[0] == "rules" and shows.shows[__file__][3] == "rules"
