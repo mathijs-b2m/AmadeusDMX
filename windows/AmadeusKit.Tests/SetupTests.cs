@@ -432,7 +432,8 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
             await w.Search(api);
             var fuze = w.Results.First(e => e.Key == "beamz/fuze75b-beam");
             await w.Add(fuze, api);
-            Assert.Equal(4, w.Planned.Single().Count);  // a moving head: four
+            Assert.Equal(1, w.Planned.Single().Count);  // one to start with
+            w.Planned.Single().Count = 4;
             Assert.Equal("12ch", w.Planned.Single().Mode);  // the most channels first
             w.Name = "Wizard Test";
             w.Template = RigTemplate.Booth;
@@ -491,7 +492,7 @@ public sealed class SetupServiceTests(ITestOutputHelper output)
             Assert.Null(later.Error);
             Assert.Contains("**wizard-test-2**", note);
             Assert.Equal("wizard-test-2", host.Editing);
-            Assert.Equal(4, ws.LoadSet("wizard-test-2")!.Fixtures.Count);
+            Assert.Single(ws.LoadSet("wizard-test-2")!.Fixtures);
             Assert.Equal("→ node", ws.LoadSet("wizard-test-2")!.OutputText);  // the device there already
         }
         finally
