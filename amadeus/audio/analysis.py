@@ -252,7 +252,7 @@ def _finish(a: Analysis, path: Path) -> Analysis:
     a.genre, a.genre_source, a.genre_facts = call.genre, call.source, call.facts
     form.apply(a, call, song)
     if call.program == "cinematic":
-        a.hits = hits.load_or_detect(path)
+        a.hits = hits.aligned(hits.load_or_detect(path), a.onsets)
     return a
 
 

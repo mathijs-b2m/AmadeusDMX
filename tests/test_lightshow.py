@@ -255,3 +255,35 @@ def test_switching_the_lightshow_off_goes_back_to_the_rules_at_once(monkeypatch)
     shows.shows[__file__] = ("a", ["lightshow"], None, "lightshow")
     shows._build(__file__, first=False)
     assert calls[0] == "rules" and shows.shows[__file__][3] == "rules"
+
+
+def test_hits_land_on_the_analysis_onsets():
+    from amadeus.audio import hits
+
+    t = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
+    n = len(t)
+    h = hits.Hits(
+        t - 0.07,
+        np.ones(n),
+        np.full(n, 0.2),
+        np.zeros(n, int),
+        np.zeros(n, bool),
+        np.zeros(n),
+        np.zeros(10, np.float32),
+        46.875,
+    )  # fmt: skip  (found 70 ms early, as a sharp kick is)
+    onsets = {"kick": (t[:-1], np.ones(n - 1))}  # the last one has no onset of its own
+    got = hits.aligned(h, onsets).t
+    assert np.allclose(got[:-1], t[:-1])  # on the onset
+    assert abs(got[-1] - t[-1]) < 1e-6  # moved by the others' offset
+
+
+def test_strobe_free_keeps_the_strobes_dark(show):
+    a = rock()
+    rig = load_rig("tests/sets/showcase.json")
+    rig["safety"]["strobe_free"] = True
+    e = Engine(a, direct(a, LightshowDirector(), verbose=False), rig, real_output=False)
+    assert e.cine_strobes
+    for t in np.arange(0, a.duration, 0.05):
+        states = e.render(float(t))[1]
+        assert all(states[s].dimmer == 0 for s in e.cine_strobes)

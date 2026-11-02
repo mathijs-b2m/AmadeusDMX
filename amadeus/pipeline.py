@@ -101,7 +101,7 @@ def get_plan(
         if a.hits is None:
             from amadeus.audio import hits
 
-            a.hits = hits.load_or_detect(a.path)
+            a.hits = hits.aligned(hits.load_or_detect(a.path), a.onsets)
     elif a.genre == CINEMATIC:  # a program of its own: the hits are the show, the music decides the arc
         director = CINEMATIC
     programmed = director in (CINEMATIC, LIGHTSHOW)
