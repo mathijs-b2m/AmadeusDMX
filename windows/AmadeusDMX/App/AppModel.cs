@@ -253,6 +253,10 @@ public sealed class AppModel : Observable
     public bool ShowZones { get => _showZones; set => Set(ref _showZones, value); }
     string? _playingFile;
     public string? PlayingFile { get => _playingFile; private set { if (Set(ref _playingFile, value)) ShowChanged(); } }
+    bool _playingLightshow;
+    /// The track that plays is played as a Lightshow (a show piece that builds up; a live show switches it in the
+    /// night card).
+    public bool PlayingLightshow { get => _playingLightshow; private set => Set(ref _playingLightshow, value); }
     bool _setupReady;
     public bool SetupReady { get => _setupReady; private set => Set(ref _setupReady, value); }
 
@@ -288,10 +292,11 @@ public sealed class AppModel : Observable
             Later(() => StartLive());
         else if (d.String("startDJ") is { } dj && d.String("djCode") is { } code)  // -startDJ NAME -djCode 1234
             Later(() => StartLive(dj, code));
-        if (d.String("play") is { } file)  // -play FILE [-playFrom SECONDS]: start with a track
+        if (d.String("play") is { } file)  // -play FILE [-playFrom SECONDS] [-lightshow YES]: start with a track
         {
             var from = d.Double("playFrom");
-            Later(() => Play(file, from));
+            var lightshow = d.Bool("lightshow");
+            Later(() => Play(file, from, lightshow));
         }
         Feed.Start();
         Later(() => EditorSelfTest.RunIfRequested(this));  // -editorSelfTest SET (development; it saves into the set and rig SET)
@@ -470,15 +475,18 @@ public sealed class AppModel : Observable
         Engine.Start(ws, args, EngineEnvironment, readyWhen: "Live mode", keepAwake: true);
     }
 
-    /// Play a track with the engine itself (no VirtualDJ): to try a set or a look.
-    public void Play(string file, double from = 0)
+    /// Play a track with the engine itself (no VirtualDJ): to try a set or a look. `lightshow`: as a Lightshow
+    /// (null: as the track before).
+    public void Play(string file, double from = 0, bool? lightshow = null)
     {
         if (Workspace is not { } ws || SelectedSet.Length == 0) return;
         Section = Section.Show;  // starting a show: watch it
         PlayingFile = file;
+        if (lightshow is { } ls) PlayingLightshow = ls;
         WatchFirewall(null);
         _runningWithDMX = SendArtNet;
         var args = new List<string> { "play", file, "--set", SelectedSet, "--rig", SelectedRig };
+        if (PlayingLightshow) args.AddRange(["--director", "lightshow"]);
         if (SendArtNet) args.Add("--artnet");
         if (from > 0) args.AddRange(["--start", ((int)from).ToString(System.Globalization.CultureInfo.InvariantCulture)]);
         if (Defaults.Standard.Bool("muted")) args.Add("--mute");  // -muted YES (testing)
@@ -486,6 +494,17 @@ public sealed class AppModel : Observable
     }
 
     public void StopShow() => Engine.Stop();
+
+    /// The Lightshow on or off for the track that plays: it starts again where it was.
+    public async void SetPlayLightshow(bool on)
+    {
+        if (PlayingFile is not { } file || !EngineRunning || on == PlayingLightshow) return;
+        var at = Feed.Time;
+        PlayingLightshow = on;
+        Engine.Stop();
+        for (var i = 0; i < 80 && Engine.IsRunning; i++) await Task.Delay(100);
+        Play(file, at);
+    }
 
     /// Switch the mode. Turning the lights on or off needs a new engine: a running show asks first.
     public void SetMode(ShowMode m)

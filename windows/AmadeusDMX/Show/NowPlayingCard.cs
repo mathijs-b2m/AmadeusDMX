@@ -39,6 +39,7 @@ public sealed class NowPlayingCard(AppModel model)
                 GenreChip.Build(h.Genre, h.GenreSource, h.Style)),
             metrics.Leading(),
             d is null ? null : IntensityPips.Build(d.Intensity).Leading(),
+            state.Kind == ShowStateKind.Playing ? LightshowSwitch() : null,  // a track on its own (a live show: the night card)
         };
         if (feed.LaserGuard.Count > 0)
             rows.Add(UI.VStack(2, [.. NowPlaying.Guard(feed.LaserGuard).Select(g =>
@@ -46,6 +47,13 @@ public sealed class NowPlayingCard(AppModel model)
                         .Foreground(NowPlaying.GuardIsSevere(g.Note) ? Tint.Red : Tint.Orange).Leading())])
                 .Tooltip("The laser guard keeps laser beams out of the laser safety zones (rig editor)").Leading());
         return UI.VStack(8, [.. rows]);
+    }
+
+    UIElement LightshowSwitch()
+    {
+        var toggle = UI.Toggle("", model.PlayingLightshow, model.SetPlayLightshow);
+        return UI.HStack(8, UI.Label("sparkles", "Lightshow", Font.Callout), toggle).Leading()
+            .Tooltip("Play this track as a show piece: every hit played by its own lights, building up section by section to the climax. The track starts again where it is (a few seconds).");
     }
 
     string Idle(ShowState s) => s.Kind switch

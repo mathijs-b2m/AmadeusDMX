@@ -31,6 +31,13 @@ struct NowPlayingCard: View {
                         }
                     }
                     if let d { IntensityPips(level: d.intensity) }
+                    if state == .playing {  // a track on its own: the Lightshow here (a live show: the night card)
+                        Toggle(isOn: Binding(get: { model.playingLightshow }, set: { model.setPlayLightshow($0) })) {
+                            Label("Lightshow", systemImage: "sparkles")
+                        }
+                        .toggleStyle(.switch).controlSize(.small)
+                        .help("Play this track as a show piece: every hit played by its own lights, building up section by section to the climax. The track starts again where it is (a few seconds).")
+                    }
                     if !model.feed.laserGuard.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             ForEach(model.feed.laserGuard.sorted { $0.key < $1.key }, id: \.key) { id, note in

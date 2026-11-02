@@ -183,6 +183,7 @@ public sealed class EngineButton(AppModel model, MainWindow window)
             }
             flyout.Items.Add(UI.Item("Start with a DJ Laptop…", () => DJLinkSheet.Present(model, window), "laptopcomputer.and.arrow.down"));
             flyout.Items.Add(UI.Item("Play a Track…", () => PlayPanel.Choose(model, window), "music.note"));
+            flyout.Items.Add(UI.Item("Play a Track as Lightshow…", () => PlayPanel.Choose(model, window, lightshow: true), "sparkles"));
         };
         start.Flyout = flyout;
         return start.Bind(model, [nameof(AppModel.Workspace), nameof(AppModel.SelectedSet), nameof(AppModel.ShowState)], b =>

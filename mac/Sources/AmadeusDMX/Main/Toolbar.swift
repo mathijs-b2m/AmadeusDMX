@@ -169,6 +169,7 @@ struct EngineButton: View {
                 }
                 Button("Start with a DJ Laptop…", systemImage: "laptopcomputer.and.arrow.down") { showDJ = true }
                 Button("Play a Track…", systemImage: "music.note") { PlayPanel.choose(model) }
+                Button("Play a Track as Lightshow…", systemImage: "sparkles") { PlayPanel.choose(model, lightshow: true) }
             } label: {
                 Label("Start", systemImage: "play.fill")
             } primaryAction: {
