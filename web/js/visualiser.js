@@ -587,15 +587,16 @@ function draw() {
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 7); ctx.fill();
       }
     } else if (fx.kind === "strobe") {
-      // a strobe: one blinding white flash from its face, flooding the room for a moment
+      // a strobe: a white flash from its face that lights the room for a moment, kept gentle on screen (ten of
+      // them flashing on the beat must not hurt the eyes of whoever watches)
       const p = P(fx.pos); if (!p) return;
       const d = fx.dir || [0, 1, 0.14], end = beamEnd(fx.pos, d, st);
-      drawBeam(P, fx.pos, end.p, Math.min(end.t, 7), 100, [1, 1, 1], dim * 0.7);
-      const r = 0.5 * p[3] * (1 + 4 * dim), g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], r);
-      g.addColorStop(0, `rgba(255,255,255,${Math.min(1, dim * 1.4)})`); g.addColorStop(0.3, `rgba(220,235,255,${0.6 * dim})`);
+      drawBeam(P, fx.pos, end.p, Math.min(end.t, 7), 100, [1, 1, 1], dim * 0.3);
+      const r = 0.5 * p[3] * (1 + 1.5 * dim), g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], r);
+      g.addColorStop(0, `rgba(255,255,255,${Math.min(0.8, dim * 0.8)})`); g.addColorStop(0.3, `rgba(220,235,255,${0.25 * dim})`);
       g.addColorStop(1, "rgba(200,220,255,0)");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fill();
-      ctx.fillStyle = `rgba(255,255,255,${0.12 * dim})`; ctx.fillRect(0, 0, cv.width, cv.height);  // the room lights up
+      ctx.fillStyle = `rgba(255,255,255,${0.02 * dim})`; ctx.fillRect(0, 0, cv.width, cv.height);  // the room lights up
     } else {
       const d = fx.dir || [0, 0.18, 1], end = beamEnd(fx.pos, d, st);  // up-lighter, slightly towards the crowd
       // the cells of a bar share its light: many small beams, not many full-strength ones

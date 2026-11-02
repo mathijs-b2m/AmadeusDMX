@@ -219,12 +219,13 @@ extension StageRenderer {
                                               color: SIMD4(simd_mix(col, [1, 0.95, 0.85], SIMD3(repeating: 0.5)), dim * 0.9),
                                               extra: [0.3, 0, 0, 0]))
             case .strobe:
-                // one blinding white flash from the face, flooding the room for a moment
+                // a white flash from the face that lights the room for a moment: kept gentle on screen (a real strobe
+                // would blind; ten of them flashing on the beat must not hurt the eyes of whoever watches)
                 let sd = fx.dir.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } ?? SIMD3(0, 1, 0.14)
-                beam(p, simd_normalize(sd), spreadDeg: 100, color: [1, 1, 1], intensity: dim * 0.9, maxLen: 8)
-                sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.35 * (1 + 1.5 * dim)), color: SIMD4(0.9, 0.95, 1, dim * 3),
+                beam(p, simd_normalize(sd), spreadDeg: 100, color: [1, 1, 1], intensity: dim * 0.4, maxLen: 8)
+                sprites.append(SpriteInstance(centerSize: SIMD4(p, 0.3 * (1 + 0.6 * dim)), color: SIMD4(0.9, 0.95, 1, dim * 1.2),
                                               extra: [1, 0, 0, 0]))
-                lightSum += SIMD3(repeating: dim * 8)   // the whole room lights up
+                lightSum += SIMD3(repeating: dim * 2)   // the room lights up
             case .par, .smoke, .other:
                 // a bar's cells share its light: many small beams, not many full-strength ones
                 let cellK: Float = (fx.cells ?? 1) > 1 ? 1.6 / Float(fx.cells!) : 1
