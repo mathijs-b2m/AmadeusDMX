@@ -197,7 +197,8 @@ public sealed class NightCard(AppModel model)
             icon.Foreground(tint);
         });
         var title = UI.Text("Lightshow", Font.Callout).Bold();
-        return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Leading()), UI.Spacer(), toggle)
+        // the line wraps (it is longer while on), so the switch stays in the card
+        return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow(), toggle)
             .Tooltip(Night.LightshowHelp);
     }
 

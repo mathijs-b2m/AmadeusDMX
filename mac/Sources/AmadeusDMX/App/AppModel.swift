@@ -402,9 +402,15 @@ final class AppModel {
 
     /// The Lightshow on or off for the track that plays: it starts again where it was.
     func setPlayLightshow(_ on: Bool) {
-        guard let file = playingFile, engineRunning, on != playingLightshow else { return }
-        let at = feed.time
+        guard playingFile != nil, engineRunning, on != playingLightshow else { return }
         playingLightshow = on
+        jump(to: feed.time)
+    }
+
+    /// The track that plays, started again at `at` seconds (the timeline's click to jump). The old engine has to
+    /// be gone first: it says so on the main actor, so waiting for it there would leave play() to find it running.
+    func jump(to at: Double) {
+        guard let file = playingFile else { return }
         engine.stop()
         Task {
             for _ in 0..<80 where engine.isRunning { try? await Task.sleep(for: .milliseconds(100)) }

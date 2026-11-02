@@ -27,10 +27,8 @@ public sealed class TimelineCard(AppModel model, Hello hello)
         _canvas.PointerExited += (_, _) => { _hover = null; Header(); };
         _canvas.Tapped += (_, e) =>
         {
-            if (model.PlayingFile is not { } file) return;
-            var t = Timeline.Time(e.GetPosition(_canvas).X, _canvas.ActualWidth, hello.Duration);
-            model.Engine.StopAndWait();
-            model.Play(file, t);
+            if (model.PlayingFile is null) return;
+            model.JumpTo(Timeline.Time(e.GetPosition(_canvas).X, _canvas.ActualWidth, hello.Duration));
         };
         // the phrase playing is drawn brighter; only the playhead moves with the time (the drawing stays put)
         _canvas.Bind(model.Feed, nameof(LiveFeed.Phrase), _ => Draw());
