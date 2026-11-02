@@ -208,6 +208,17 @@ enum EditorSelfTest {
         } catch {
             check("save", false, error.localizedDescription)
         }
+        // 15. an editor that's gone (another rig picked, the page left) takes its undo steps with it: undo doesn't crash
+        let undo2 = UndoManager()
+        undo2.groupsByEvent = false
+        if let gone = RigEditorModel(workspace: ws, rig: name, set: name) {
+            gone.undoManager = undo2
+            undo2.beginUndoGrouping()
+            gone.unmount(["sharpy1"])
+            undo2.endUndoGrouping()
+        }
+        check("undo after the editor is gone", !undo2.canUndo)
+        if undo2.canUndo { undo2.undo() }
         finish(out)
     }
 
