@@ -35,22 +35,22 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             var fs = d.Fixtures.Where(f => ids.Contains(f.Id)).ToList();
             return string.Join("|", "multi", string.Join(",", ids.Order(StringComparer.Ordinal)),
                                fs.All(f => TrussOf(f) is { Vertical: false }), fs.All(f => TrussOf(f) is { Vertical: true }),
-                               fs.All(f => TrussOf(f)?.IsRing == true));
+                               fs.All(f => TrussOf(f)?.IsLoop == true));
         }
         switch (editor.Selection)
         {
             case { Kind: EditorSelectionKind.Truss, Id: var id }:
                 return d.Trusses.FirstOrDefault(t => t.Id == id) is { } t
-                    ? string.Join("|", "truss", id, t.Vertical, t.IsRing, t.Arc, t.DiameterM, d.Fixtures.Count(f => f.Truss == id)) : "none";
+                    ? string.Join("|", "truss", id, t.Vertical, t.IsRing, t.IsCarre, t.Arc, t.DiameterM, d.Fixtures.Count(f => f.Truss == id)) : "none";
             case { Kind: EditorSelectionKind.Fixture, Id: var id }:
                 return d.Fixtures.FirstOrDefault(f => f.Id == id) is { } f
-                    ? string.Join("|", "fixture", id, f.Truss, TrussOf(f)?.Vertical, TrussOf(f)?.IsRing, f.Waiting, f.Universe, f.Address, f.Mode) : "none";
+                    ? string.Join("|", "fixture", id, f.Truss, TrussOf(f)?.Vertical, TrussOf(f)?.IsLoop, f.Waiting, f.Universe, f.Address, f.Mode) : "none";
             case { Kind: EditorSelectionKind.Zone, Id: var id }:
                 return d.Zones.FirstOrDefault(z => z.Id == id) is { } z ? string.Join("|", "zone", id, z.Shape, z.Kind) : "none";
         }
         return string.Join("|", "overview", d.Set, editor.IsDirty, editor.Busy, d.Stage.Outdoor, d.HasScreen,
             string.Join(";", d.Fixtures.Select(f => $"{f.Id},{f.Key},{f.Waiting},{f.Truss},{f.Side},{f.Mount}")),
-            string.Join(";", d.Trusses.Select(t => $"{t.Id},{t.LengthM},{t.Vertical},{t.IsRing},{t.DiameterM},{t.Arc}")),
+            string.Join(";", d.Trusses.Select(t => $"{t.Id},{t.LengthM},{t.Vertical},{t.IsRing},{t.DiameterM},{t.Arc},{t.WidthM},{t.DepthM}")),
             string.Join(";", d.Zones.Select(z => $"{z.Id},{z.Name},{z.Kind},{z.Shape},{z.Enabled}")));
     }
 
@@ -141,8 +141,8 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
         foreach (var t in d.Trusses)
         {
             var id = t.Id;
-            trusses.Add(ListRow(t.Vertical ? "building.columns" : t.IsRing ? EditorUI.Symbol("circle") : "square.split.bottomrightquarter", null, t.Id,
-                $"{(t.IsRing ? TrussInspector.RingName(t) : $"{Format.Number(t.LengthM)} m")} · {fixtures.Count(f => f.Truss == t.Id)} fixtures",
+            trusses.Add(ListRow(t.Vertical ? "building.columns" : t.IsRing ? EditorUI.Symbol("circle") : t.IsCarre ? "square" : "square.split.bottomrightquarter", null, t.Id,
+                $"{(t.IsRing ? TrussInspector.RingName(t) : t.IsCarre ? TrussInspector.CarreName(t) : $"{Format.Number(t.LengthM)} m")} · {fixtures.Count(f => f.Truss == t.Id)} fixtures",
                 () => editor.Selection = EditorSelection.Truss(id)));
         }
         sections.Children.Add(EditorUI.Section("Trusses", trusses));
@@ -256,7 +256,7 @@ public sealed class MultiFixtureInspector(RigEditorModel editor, IRigEditorHost 
         }
         if (onBoxTruss)
         {
-            var onRing = fixtures.All(f => Of(f)?.IsRing == true);
+            var onRing = fixtures.All(f => Of(f)?.IsLoop == true);
             s.Children.Add(EditorUI.Section("Position on the Truss",
                 EditorUI.Segmented(editor, ["under", "front", "top", "back"], () => Shared("under"),
                     v => v switch { "under" => "Under", "front" => onRing ? "Outside" : "Front", "top" => "Top", _ => onRing ? "Inside" : "Back" },
@@ -333,6 +333,9 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
 {
     static string Metres(double v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " m";
 
+    /// "3 × 3 m".
+    public static string CarreName(Truss t) => $"{Format.Number(t.CarreWidth)} × {Format.Number(t.CarreDepth)} m";
+
     /// "Ø 4 m circle" / "Ø 6 m half circle".
     public static string RingName(Truss t)
     {
@@ -358,16 +361,19 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         var truss = T;
         var s = UI.VStack(18);
         s.Children.Add(EditorUI.Section(null,
-            UI.HStack(10, UI.Icon(truss.Vertical ? "building.columns" : truss.IsRing ? EditorUI.Symbol("circle")
+            UI.HStack(10, UI.Icon(truss.Vertical ? "building.columns" : truss.IsRing ? EditorUI.Symbol("circle") : truss.IsCarre ? "square"
                                   : truss.IsStand ? "lamp.floor" : "square.split.bottomrightquarter", 22)
                               .Foreground(Tint.Accent),
                       UI.VStack(2, UI.Text(truss.Id, Font.Headline),
                                 UI.Text(truss.Vertical ? "Tower, box truss 30 cm" : truss.IsRing ? $"Round truss, {RingName(truss)}"
+                                        : truss.IsCarre ? $"Carré {CarreName(truss)}, on four legs"
                                         : truss.Type == "tbar" ? "T-bar stand, on one tripod" : truss.IsStand ? "Light bridge, on two tripods"
                                         : "Box truss (quatro), 30 cm", Font.Caption).Secondary())),
             truss.IsStand && (truss.MaxKg is not null || truss.MaxHeightM is not null)
                 ? UI.Text(StandLimits(truss), Font.Caption).Secondary().Wrap() : null,
             truss.IsRing ? UI.Text("Heads on a ring play it as a circle: crowns of beams out of it, cones, twisters, waves running round.", Font.Caption)
+                .Secondary().Wrap() : null,
+            truss.IsCarre ? UI.Text("A square of truss standing on its own legs. Heads on it play it like a ring: crowns of beams out of it, cones, twisters, waves running round.", Font.Caption)
                 .Secondary().Wrap() : null));
 
         var size = new List<UIElement?>();
@@ -383,6 +389,15 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
             if (!Truss.RingArcs.Contains(truss.Arc)) arcs.Add(truss.Arc);
             size.Add(EditorUI.Segmented(editor, arcs, () => T.Arc, a => a == 360 ? "Full circle" : a == 180 ? "Half circle" : $"{(int)a}°",
                 a => editor.UpdateTruss(id, a >= 359.5 ? "Make Full Circle" : "Make Half Circle", t => t.ArcDeg = a)));
+        }
+        else if (truss.IsCarre)
+        {
+            size.Add(EditorUI.Stepper(editor, () => $"Width {Metres(T.CarreWidth)}",
+                () => editor.UpdateTruss(id, "Change Width", t => t.WidthM = Math.Max(1, t.CarreWidth - 0.5)),
+                () => editor.UpdateTruss(id, "Change Width", t => t.WidthM = Math.Min(20, t.CarreWidth + 0.5))));
+            size.Add(EditorUI.Stepper(editor, () => $"Depth {Metres(T.CarreDepth)}",
+                () => editor.UpdateTruss(id, "Change Depth", t => t.DepthM = Math.Max(1, t.CarreDepth - 0.5)),
+                () => editor.UpdateTruss(id, "Change Depth", t => t.DepthM = Math.Min(20, t.CarreDepth + 0.5))));
         }
         else
         {
@@ -473,7 +488,7 @@ public sealed class FixtureInspector(AppModel model, RigEditorModel editor, IRig
             mounting.Add(EditorUI.Segmented(editor, ["under", "front", "top", "back"], () => F.Side ?? (F.Mount == "stand" ? "top" : "under"),
                 v => v switch
                 {
-                    "under" => "Under 0°", "front" => box.IsRing ? "Outside 90°" : "Front 90°", "top" => "Top 180°", _ => box.IsRing ? "Inside 270°" : "Back 270°",
+                    "under" => "Under 0°", "front" => box.IsLoop ? "Outside 90°" : "Front 90°", "top" => "Top 180°", _ => box.IsLoop ? "Inside 270°" : "Back 270°",
                 }, v => editor.SetSide(id, v)));
         }
         else if (truss is { Vertical: true })

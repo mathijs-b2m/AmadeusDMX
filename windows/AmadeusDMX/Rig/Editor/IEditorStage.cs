@@ -299,7 +299,8 @@ public sealed class PlaceholderStage : IEditorStage
             else
             {
                 foreach (var (a, b) in t.Pieces()) AddLine(a, b, color, Math.Max(3, 0.3 * _scale));
-                if (on && !t.IsRing)
+                foreach (var leg in t.CarreCorners) AddSquare(new Vec3(leg.X, leg.Y, 0), 0.3, color);  // a carré's legs
+                if (on && !t.IsLoop)
                     foreach (var end in new[] { t.Point(-t.LengthM / 2), t.Point(t.LengthM / 2) }) AddSquare(end, 0.26, HandleColor);
             }
         }

@@ -105,6 +105,12 @@ public sealed class RigStep(AppModel model, WizardModel w)
                     Bar(w * 0.1, h * 0.2, w * 0.8); Bar(w * 0.14, h * 0.1, w * 0.72); Bar(w * 0.22, floor - 22, w * 0.56);
                     Tower(6, h * 0.18); Tower(w - 10, h * 0.18);
                     break;
+                case RigTemplate.Carre:  // seen from the front, a little from above: the back side higher up, between the front legs
+                    Tower(w * 0.32, h * 0.12); Tower(w * 0.68 - 4, h * 0.12);
+                    Bar(w * 0.32, h * 0.12, w * 0.36);
+                    Tower(w * 0.16, h * 0.3); Tower(w * 0.84 - 4, h * 0.3);
+                    Bar(w * 0.16, h * 0.3, w * 0.68);
+                    break;
                 default:  // seen a little from below: a flat ellipse, the half circle a wider arc behind it
                 {
                     double cx = w / 2, cy = h * 0.2, r = w * 0.36;

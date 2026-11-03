@@ -370,6 +370,9 @@ public class MapperAndSettingsTests
         Assert.True(UpdateVersions.IsPrerelease("0.4.0-beta.1"));
         Assert.False(UpdateVersions.IsPrerelease("0.4.0"));
         Assert.Equal("Concert Stage", RigTemplate.Stage.Title());
+        Assert.Equal("carre", RigTemplate.Carre.RawValue());  // the engine's name for it
+        Assert.Equal("Carré", RigTemplate.Carre.Title());
+        Assert.Equal((8.0, 3.0, 12.0), RigTemplate.Carre.Size());
         Assert.True(RigTemplates.IsDefaultName("club2"));
         Assert.False(RigTemplates.IsDefaultName("paradiso"));
     }
