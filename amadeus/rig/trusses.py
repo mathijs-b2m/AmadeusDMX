@@ -12,6 +12,13 @@ A round truss (`"shape": "circle"`) hangs flat: a full circle, or an arc of `arc
 `u` from the arc's middle, to the right seen from the audience); a fixture on it is turned with the arc, so
 its front (and the truss's "front" face) faces out of the circle and the "back" face into it.
 
+A carré (`"shape": "carre"`) is a rectangle of box truss standing on its own four legs (a tower at each corner,
+down to the floor), as at a trade-fair stand or round a DJ booth on the dance floor: `width_m` across (before
+`rot_deg` turns it), `depth_m` up and down the stage, `x_m`/`y_m` its centre and `z_m` the frame's height. Like a
+full round truss it is a closed loop: along it is measured round the frame from the middle of its front side
+(towards +x first, `length_m` is the frame's perimeter), its "front" face faces out of the carré and "back" into
+it, and its heads play crowns, cones and twisters (`is_loop`). Fixtures clamp to the frame, not to the legs.
+
 A light stand (`"type": "bridge"` or `"tbar"`) is the cheaper kind: a ~40 mm tube instead of a 30 cm box truss,
 standing on tripods. A light bridge has a stand under each end of its bar, a T-bar one under its middle; `z_m` is
 the bar's height (the stands go down to the floor). Fixtures clamp to the tube like to a box truss's sides, only
@@ -43,6 +50,10 @@ DEFAULT_DIAMETER_M = 4.0
 ARCS_DEG = (360.0, 180.0)  # a full circle or a half circle (any arc works)
 STANDS = ("bridge", "tbar")  # light stands: a bridge on two tripods, a T-bar on one
 STAND_INSET_M = 0.05  # a light bridge's stands: this far in from the bar's ends
+CARRE_SIZES_M = ((3.0, 3.0), (4.0, 3.0), (4.0, 4.0), (6.0, 4.0))  # carrés as they are hired (any size works)
+DEFAULT_CARRE_M = (3.0, 3.0)
+CARRE_HEIGHT_M = 3.0  # the usual leg: a 3 m tower
+CORNER_CLEAR_M = 0.25  # a fixture on a carré stays this far from a corner (the corner block and the leg)
 AIMS = ("audience", "down")  # where a truss's heads play (`aim`); none: automatic
 OVER_CROWD_M = 1.0  # a truss this far in front of the stage edge hangs over the crowd: automatic is down
 
@@ -56,9 +67,98 @@ def is_full_ring(t: dict) -> bool:
     return is_ring(t) and ring_arc(t) >= 359.5
 
 
+def is_carre(t: dict) -> bool:
+    """A carré: a rectangle of truss on four legs."""
+    return t.get("shape") == "carre" and not t.get("vertical")
+
+
+def is_loop(t: dict) -> bool:
+    """A truss whose heads play round it: a round truss (or an arc) or a carré."""
+    return is_ring(t) or is_carre(t)
+
+
+def is_closed(t: dict) -> bool:
+    """A loop without ends: a full circle or a carré (round it, past one end is the other)."""
+    return is_full_ring(t) or is_carre(t)
+
+
+def carre_size(t: dict) -> tuple[float, float]:
+    """A carré's width (across, before it is turned) and depth (m)."""
+    return float(t.get("width_m", DEFAULT_CARRE_M[0])), float(t.get("depth_m", DEFAULT_CARRE_M[1]))
+
+
+def loop_radius(t: dict) -> float:
+    """How big a loop is, as a circle's radius (a carré: half its mean side)."""
+    if is_carre(t):
+        w, d = carre_size(t)
+        return (w + d) / 4
+    return ring_radius(t)
+
+
+def carre_corners(t: dict) -> list[tuple[float, float]]:
+    """A carré's corners (x, y), where its legs stand: front +x, back +x, back -x, front -x (round it, the way
+    along it goes)."""
+    w, d = carre_size(t)
+    r = math.radians(t.get("rot_deg", 0.0))
+    c, s = math.cos(r), math.sin(r)
+    return [(t["x_m"] + c * lx - s * ly, t["y_m"] + s * lx + c * ly)
+            for lx, ly in ((w / 2, d / 2), (w / 2, -d / 2), (-w / 2, -d / 2), (-w / 2, d / 2))]  # fmt: skip
+
+
+def _carre_local(t: dict, u: float) -> tuple[float, float, float]:
+    """(x, y, the frame's direction in degrees) `u` metres round an unturned carré from its front middle."""
+    w, d = carre_size(t)
+    s = (u + w / 2) % (2 * (w + d))  # from the front -x corner
+    if s < w:
+        return -w / 2 + s, d / 2, 0.0  # the front, towards +x
+    if s < w + d:
+        return w / 2, d / 2 - (s - w), -90.0  # the +x side, upstage
+    if s < 2 * w + d:
+        return w / 2 - (s - w - d), -d / 2, 180.0  # the back, towards -x
+    return -w / 2, -d / 2 + (s - 2 * w - d), 90.0  # the -x side, downstage
+
+
+def carre_clear(t: dict, u: float) -> float:
+    """`u` moved off a carré's corner (CORNER_CLEAR_M), staying on the side it was on."""
+    w, d = carre_size(t)
+    L = 2 * (w + d)
+    s = (u + w / 2) % L
+    for c in (0.0, w, w + d, 2 * w + d, L):
+        if abs(s - c) < CORNER_CLEAR_M:
+            s = c + CORNER_CLEAR_M if s >= c else c - CORNER_CLEAR_M
+            break
+    return (s - w / 2 + L / 2) % L - L / 2
+
+
+def carre_spread(t: dict, k: int) -> list[float]:
+    """`k` places round a carré, mirrored: front and back alike, the two sides alike (shared by their lengths),
+    each side's evenly along it; an odd one out goes to the front."""
+    w, d = carre_size(t)
+    pairs, odd = divmod(k, 2)
+    fb = round(pairs * w / (w + d)) if pairs else 0
+    counts = (fb + odd, pairs - fb, fb, pairs - fb)  # front, +x side, back, -x side
+    out, start = [], -w / 2
+    for n, side in zip(counts, (w, d, w, d)):
+        out += [start + side * (i + 0.5) / n for i in range(n)]
+        start += side
+    L = 2 * (w + d)
+    return [round((u + L / 2) % L - L / 2, 3) for u in out]
+
+
+def carre(
+    tid: str, width: float, depth: float, x: float, y: float, z: float = CARRE_HEIGHT_M, rot: float = 0.0
+) -> dict:
+    """A carré: a `width` × `depth` frame at `z` on four legs."""
+    t = {"id": tid, "type": "quatro", "shape": "carre", "width_m": round(width, 2), "depth_m": round(depth, 2),
+         "x_m": round(x, 2), "y_m": round(y, 2), "z_m": round(z, 2)}  # fmt: skip
+    if rot:
+        t["rot_deg"] = round(rot, 1)
+    return normalise(t)
+
+
 def is_stand(t: dict) -> bool:
     """A light stand: a bridge or a T-bar (a tube on tripods), not a box truss."""
-    return t.get("type") in STANDS and not t.get("vertical") and not is_ring(t)
+    return t.get("type") in STANDS and not t.get("vertical") and not is_loop(t)
 
 
 def stand_feet(t: dict) -> list[tuple[float, float]]:
@@ -118,9 +218,11 @@ def ring(tid: str, diameter: float, x: float, y: float, z: float, arc: float = 3
 
 
 def normalise(t: dict) -> dict:
-    """A round truss's `length_m` follows its diameter and arc (they are what is edited)."""
+    """A round truss's `length_m` follows its diameter and arc, a carré's its sides (they are what is edited)."""
     if is_ring(t):
         t["length_m"] = round(math.radians(ring_arc(t)) * ring_radius(t), 3)
+    if is_carre(t):
+        t["length_m"] = round(2 * sum(carre_size(t)), 3)
     if is_stand(t):  # a stand goes as high (and as low) as it does
         z = max(t["z_m"], t.get("min_height_m") or 0.0)
         t["z_m"] = min(z, t.get("max_height_m") or z)
@@ -152,8 +254,32 @@ def point(t: dict, u: float) -> tuple[float, float, float]:
     if is_ring(t):
         a, R = ring_angle(t, u), ring_radius(t)
         return t["x_m"] + R * math.cos(a), t["y_m"] + R * math.sin(a), t["z_m"]
+    if is_carre(t):
+        lx, ly, _ = _carre_local(t, u)
+        r = math.radians(t.get("rot_deg", 0.0))
+        return t["x_m"] + math.cos(r) * lx - math.sin(r) * ly, t["y_m"] + math.sin(r) * lx + math.cos(r) * ly, t["z_m"]
     r = math.radians(t.get("rot_deg", 0.0))
     return t["x_m"] + math.cos(r) * u, t["y_m"] + math.sin(r) * u, t["z_m"]
+
+
+def direction(t: dict, u: float) -> float:
+    """The way a horizontal truss runs at `u` (degrees, counter-clockwise from +x seen from above): its face
+    towards the audience (on a loop: out of it) is to the left of it."""
+    if is_ring(t):
+        return math.degrees(ring_angle(t, u)) - 90.0
+    if is_carre(t):
+        return t.get("rot_deg", 0.0) + _carre_local(t, u)[2]
+    return t.get("rot_deg", 0.0)
+
+
+def outline(t: dict) -> list[tuple[float, float]]:
+    """A horizontal truss seen from above as a line (x, y): its ends, round an arc, or round a carré's corners."""
+    L = normalise(t)["length_m"]
+    if is_carre(t):
+        c = carre_corners(t)
+        return [point(t, 0.0)[:2], *c, point(t, 0.0)[:2]]
+    n = 48 if is_ring(t) else 1
+    return [point(t, -L / 2 + L * k / n)[:2] for k in range(n + 1)]
 
 
 def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> dict:
@@ -187,15 +313,17 @@ def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> 
         if not f["rot_deg"]:
             f.pop("rot_deg")
         return f
-    if is_ring(t):
+    if is_loop(t):
         L = normalise(t)["length_m"]
-        if is_full_ring(t):  # round the circle: past one end is the other
+        if is_closed(t):  # round the loop: past one end is the other
             u = (u + L / 2) % L - L / 2
+        if is_carre(t):
+            u = carre_clear(t, u)
     u = max(-L / 2, min(L / 2, u))
     side = side if side in SIDES else ("top" if f.get("mount") == "stand" else "under")
     x, y, z = point(t, u)
-    # the truss's direction here (on a ring: the tangent, so "front" faces out of the circle)
-    rot = math.degrees(ring_angle(t, u)) - 90.0 if is_ring(t) else t.get("rot_deg", 0.0)
+    # the truss's direction here (on a loop: round it, so "front" faces out of it)
+    rot = direction(t, u)
     r = math.radians(rot)
     nx, ny = -math.sin(r), math.cos(r)  # the face towards the audience (on a ring: out of the circle)
     drop, out = (TUBE_DROP, TUBE_OUT) if is_stand(t) else (HANG_DROP, SIDE_OUT)
@@ -214,7 +342,7 @@ def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> 
         x=round(x / width, 4),
         y_m=round(y, 3),
         z_m=round(z, 3),
-        rot_deg=round((rot + 180.0) % 360.0 - 180.0 if is_ring(t) else rot, 1),
+        rot_deg=round((rot + 180.0) % 360.0 - 180.0 if is_loop(t) else rot, 1),
     )
     roll = {"front": 90, "back": 270}.get(side)
     if roll:

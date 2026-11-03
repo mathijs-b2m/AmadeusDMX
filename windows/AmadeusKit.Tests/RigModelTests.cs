@@ -274,4 +274,40 @@ public class RigModelTests
         t.Normalise();
         Assert.Equal(9, t.ZM);  // no max: it isn't held down
     }
+
+    // A carré (a rectangle of truss on four legs) goes round the same way as amadeus/rig/trusses.py has it
+    // (mac/Tests/AmadeusKitTests/CarreTests.swift).
+    [Fact]
+    public void ACarreDecodesAndGoesRoundFromItsFrontMiddle()
+    {
+        var json = """{"id": "c", "type": "quatro", "shape": "carre", "width_m": 4, "depth_m": 3, "x_m": 4, "y_m": -1, "z_m": 3}""";
+        var t = Truss.From(J.ParseElement(Encoding.UTF8.GetBytes(json)));
+        Assert.True(t.IsCarre && t.IsLoop && t.IsClosed && !t.IsRing && !t.IsStand);
+        Assert.Equal(14, t.LengthM);
+        Assert.Equal([new Vec2(6, 0.5), new Vec2(6, -2.5), new Vec2(2, -2.5), new Vec2(2, 0.5)], t.CarreCorners);
+        Assert.Equal(new Vec3(4, 0.5, 3), t.Point(0));  // the middle of the front side
+        Assert.Equal(new Vec3(6, -1, 3), t.Point(3.5));  // the +x side, going upstage
+        Assert.Equal(-90, t.DirectionDeg(3.5));
+        Assert.Equal(new Vec3(2, -2.5, 3), t.Point(-5));  // the -x side, coming back
+        Assert.Equal(90, t.DirectionDeg(-4));
+        Assert.Equal(2.25, t.CarreClear(2.0));  // off the corner, on its own side
+        Assert.Equal(1.75, t.CarreClear(1.9));
+        Assert.Equal(-6.5, t.Wrapped(7.5));  // no ends
+        var (u, dist) = t.Project(new Vec2(6.3, -1.2));
+        Assert.Equal(3.7, u, 9);
+        Assert.Equal(0.3, dist, 9);
+        Assert.Equal(4, t.Pieces().Count);
+        var o = t.ToJSON().Object!;  // its size survives a save
+        Assert.Equal(4, o["width_m"].Number);
+        Assert.Equal(3, o["depth_m"].Number);
+        Assert.Equal(t, Truss.From(t.ToJSON()));
+    }
+
+    [Fact]
+    public void ATurnedCarreTurnsItsFrame()
+    {
+        var t = Truss.Carre("c", width: 4, depth: 2, xM: 0, yM: 0, zM: 3, rotDeg: 90);
+        Assert.True((t.CarreCorners[0] - new Vec2(-1, 2)).Length < 1e-9);
+        Assert.Equal(90, t.DirectionDeg(0));
+    }
 }

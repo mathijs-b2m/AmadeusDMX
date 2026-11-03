@@ -26,9 +26,14 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// "circle": a round truss, hung flat (amadeus/rig/trusses.py): a full circle or an arc of `arcDeg` of
     /// `diameterM`, centred on xM/yM, the middle of the arc facing the audience (turned by rotDeg); lengthM is the
     /// length round the arc and follows the two.
+    /// "carre": a rectangle of truss on four legs (a tower at each corner, to the floor), `widthM` across and
+    /// `depthM` up and down the stage before rotDeg turns it, centred on xM/yM, the frame at zM; a closed loop like a
+    /// full circle, lengthM its perimeter, measured round it from the middle of its front side.
     public var shape: String?
     public var diameterM: Double?
     public var arcDeg: Double?
+    public var widthM: Double?
+    public var depthM: Double?
     /// Where the heads on it play: "audience" or "down"; nil: automatic (down when it hangs over the crowd).
     public var aim: String?
     /// A light stand's (type "bridge" or "tbar") limits as the maker gives them: what it takes, how high it goes.
@@ -39,10 +44,15 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// The usual round truss sizes (any other works too) and arcs.
     public static let ringDiameters: [Double] = [2, 3, 4, 5, 6, 8]
     public static let ringArcs: [Double] = [360, 180]
+    /// Carrés as they are hired (any other size works too), their usual 3 m legs, and how far fixtures keep from a
+    /// corner (the corner block and the leg).
+    public static let carreSizes: [(Double, Double)] = [(3, 3), (4, 3), (4, 4), (6, 4)]
+    public static let carreHeightM = 3.0
+    public static let cornerClearM = 0.25
 
     enum CodingKeys: String, CodingKey {
         case id, type, lengthM = "length_m", xM = "x_m", yM = "y_m", zM = "z_m", rotDeg = "rot_deg", vertical
-        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m"
+        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", widthM = "width_m", depthM = "depth_m", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m"
     }
 
     /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
@@ -82,6 +92,8 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         shape = try c.decodeIfPresent(String.self, forKey: .shape)
         diameterM = try c.decodeIfPresent(Double.self, forKey: .diameterM)
         arcDeg = try c.decodeIfPresent(Double.self, forKey: .arcDeg)
+        widthM = try c.decodeIfPresent(Double.self, forKey: .widthM)
+        depthM = try c.decodeIfPresent(Double.self, forKey: .depthM)
         aim = try c.decodeIfPresent(String.self, forKey: .aim)
         maxKg = try c.decodeIfPresent(Double.self, forKey: .maxKg)
         maxHeightM = try c.decodeIfPresent(Double.self, forKey: .maxHeightM)
@@ -98,6 +110,15 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         return t
     }
 
+    /// A carré: a `width` × `depth` frame at `zM` on four legs.
+    public static func carre(id: String, width: Double, depth: Double, xM: Double, yM: Double,
+                             zM: Double = carreHeightM, rotDeg: Double = 0) -> Truss {
+        var t = Truss(id: id, lengthM: 1, xM: xM, yM: yM, zM: zM, rotDeg: rotDeg)
+        t.shape = "carre"; t.widthM = width; t.depthM = depth
+        t.normalise()
+        return t
+    }
+
     /// A truss this far in front of the stage edge hangs over the crowd (amadeus/rig/trusses.py OVER_CROWD_M).
     public static let overCrowdM = 1.0
 
@@ -109,7 +130,21 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
 
     public var isRing: Bool { shape == "circle" && !vertical }
     /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.
-    public var isStand: Bool { (type == "bridge" || type == "tbar") && !vertical && !isRing }
+    public var isStand: Bool { (type == "bridge" || type == "tbar") && !vertical && !isLoop }
+    /// A carré: a rectangle of truss on four legs.
+    public var isCarre: Bool { shape == "carre" && !vertical }
+    /// A truss whose heads play round it: a round truss (or an arc) or a carré.
+    public var isLoop: Bool { isRing || isCarre }
+    /// A loop without ends: a full circle or a carré (round it, past one end is the other).
+    public var isClosed: Bool { isFullRing || isCarre }
+    public var carreWidth: Double { widthM ?? 3 }
+    public var carreDepth: Double { depthM ?? 3 }
+    /// A carré's corners, where its legs stand: front +x, back +x, back -x, front -x (the way round it goes).
+    public var carreCorners: [SIMD2<Double>] {
+        guard isCarre else { return [] }
+        let w = carreWidth / 2, d = carreDepth / 2, r = rotDeg * .pi / 180
+        return [(w, d), (w, -d), (-w, -d), (-w, d)].map { SIMD2(xM + cos(r) * $0.0 - sin(r) * $0.1, yM + sin(r) * $0.0 + cos(r) * $0.1) }
+    }
     /// Where a light stand's tripods stand: under both ends of a bridge, under the middle of a T-bar.
     public var standFeet: [SIMD2<Double>] {
         guard isStand else { return [] }
@@ -124,6 +159,7 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// A round truss's length follows its diameter and arc (they are what is edited).
     public mutating func normalise() {
         if isRing { lengthM = (arc * .pi / 180 * radius * 1000).rounded() / 1000 }
+        if isCarre { lengthM = 2 * (carreWidth + carreDepth) }
         if isStand {  // a stand goes as high (and as low) as it does
             let z = max(zM, minHeightM ?? 0)
             zM = min(z, maxHeightM ?? z)
@@ -133,8 +169,41 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.
     public func ringAngle(_ u: Double) -> Double { (rotDeg + 90) * .pi / 180 - u / radius }
 
-    /// Which way the truss runs at `u` (degrees; on a ring the tangent, so its "front" faces out of the circle).
-    public func directionDeg(_ u: Double) -> Double { isRing ? ringAngle(u) * 180 / .pi - 90 : rotDeg }
+    /// Which way the truss runs at `u` (degrees; on a loop round it, so its "front" faces out of it).
+    public func directionDeg(_ u: Double) -> Double {
+        isRing ? ringAngle(u) * 180 / .pi - 90 : isCarre ? rotDeg + carreLocal(u).dir : rotDeg
+    }
+
+    /// Where `u` is round an unturned carré from its front middle, and which way the frame runs there (degrees).
+    func carreLocal(_ u: Double) -> (x: Double, y: Double, dir: Double) {
+        let w = carreWidth, d = carreDepth
+        var s = (u + w / 2).truncatingRemainder(dividingBy: 2 * (w + d))  // from the front -x corner
+        if s < 0 { s += 2 * (w + d) }
+        if s < w { return (-w / 2 + s, d / 2, 0) }  // the front, towards +x
+        if s < w + d { return (w / 2, d / 2 - (s - w), -90) }  // the +x side, upstage
+        if s < 2 * w + d { return (w / 2 - (s - w - d), -d / 2, 180) }  // the back, towards -x
+        return (-w / 2, -d / 2 + (s - 2 * w - d), 90)  // the -x side, downstage
+    }
+
+    /// `u` round a closed loop kept in -length/2..length/2 (past one end is the other).
+    public func wrapped(_ u: Double) -> Double {
+        var v = (u + lengthM / 2).truncatingRemainder(dividingBy: lengthM)
+        if v < 0 { v += lengthM }
+        return v - lengthM / 2
+    }
+
+    /// `u` moved off a carré's corner (cornerClearM), staying on the side it was on.
+    public func carreClear(_ u: Double) -> Double {
+        guard isCarre else { return u }
+        let w = carreWidth, d = carreDepth, L = 2 * (w + d)
+        var s = (u + w / 2).truncatingRemainder(dividingBy: L)
+        if s < 0 { s += L }
+        for c in [0, w, w + d, 2 * w + d, L] where abs(s - c) < Self.cornerClearM {
+            s = s >= c ? c + Self.cornerClearM : c - Self.cornerClearM
+            break
+        }
+        return wrapped(s - w / 2)
+    }
 
     /// Unit vector along the truss (horizontal trusses).
     public var axis: SIMD2<Double> { SIMD2(cos(rotDeg * .pi / 180), sin(rotDeg * .pi / 180)) }
@@ -146,12 +215,20 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
             let a = ringAngle(u)
             return SIMD3(xM + radius * cos(a), yM + radius * sin(a), zM)
         }
+        if isCarre {
+            let l = carreLocal(u)
+            return SIMD3(xM + axis.x * l.x - axis.y * l.y, yM + axis.y * l.x + axis.x * l.y, zM)
+        }
         return SIMD3(xM + axis.x * u, yM + axis.y * u, zM)
     }
 
-    /// A horizontal truss as straight pieces (one for a straight truss, short chords round a ring), for drawing and
-    /// picking.
+    /// A horizontal truss as straight pieces (one for a straight truss, short chords round a ring, a carré's four
+    /// sides), for drawing and picking.
     public func pieces(_ step: Double = 0.4) -> [(SIMD3<Double>, SIMD3<Double>)] {
+        if isCarre {
+            let c = carreCorners.map { SIMD3($0.x, $0.y, zM) }
+            return (0..<4).map { (c[($0 + 3) % 4], c[$0]) }  // front, +x side, back, -x side
+        }
         guard isRing else { return [(point(-lengthM / 2), point(lengthM / 2))] }
         let n = max(8, Int((lengthM / step).rounded(.up)))
         return (0..<n).map { k in
@@ -162,6 +239,18 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// Where a point (seen from above) lands on the truss, and how far it is from it.
     public func project(_ p: SIMD2<Double>) -> (u: Double, distance: Double) {
         if vertical { return (0, simd_length(p - SIMD2(xM, yM))) }
+        if isCarre {  // the nearest of its sides
+            let w = carreWidth, d = carreDepth
+            let starts = [-w / 2, w / 2, w / 2 + d, 3 * w / 2 + d]  // where each side starts round it
+            var best = (u: 0.0, distance: Double.infinity)
+            for (k, (a, b)) in pieces().enumerated() {
+                let a2 = SIMD2(a.x, a.y), ab = SIMD2(b.x, b.y) - a2, len = simd_length(ab)
+                let along = max(0, min(len, simd_dot(p - a2, ab / len)))
+                let dist = simd_length(p - (a2 + ab / len * along))
+                if dist < best.distance { best = (wrapped(starts[k] + along), dist) }
+            }
+            return best
+        }
         if isRing {  // round the circle from the arc's middle, kept on the arc
             let d = p - SIMD2(xM, yM)
             var u = ((rotDeg + 90) * .pi / 180 - atan2(d.y, d.x)) * radius

@@ -113,10 +113,10 @@ struct EditorInspector: View {
             ForEach(editor.doc.trusses) { t in
                 Button { editor.selection = .truss(t.id) } label: {
                     HStack {
-                        Image(systemName: t.vertical ? "building.columns" : t.isRing ? "circle" : "square.split.bottomrightquarter")
+                        Image(systemName: t.vertical ? "building.columns" : t.isRing ? "circle" : t.isCarre ? "square" : "square.split.bottomrightquarter")
                         Text(t.id)
                         Spacer()
-                        Text("\(t.isRing ? ringName(t) : "\(t.lengthM.formatted()) m") · \(fixtures.filter { $0.truss == t.id }.count) fixtures")
+                        Text("\(t.isRing ? ringName(t) : t.isCarre ? carreName(t) : "\(t.lengthM.formatted()) m") · \(fixtures.filter { $0.truss == t.id }.count) fixtures")
                             .foregroundStyle(.secondary).font(.caption)
                     }
                 }
@@ -228,7 +228,7 @@ private struct MultiFixtureInspector: View {
             Text("Drag one of them in the stage and the others come along: onto a truss they hang in a row.")
         }
         if onBoxTruss {
-            let onRing = fixtures.allSatisfy { f in f.truss.flatMap { t in editor.doc.trusses.first { $0.id == t } }?.isRing ?? false }
+            let onRing = fixtures.allSatisfy { f in f.truss.flatMap { t in editor.doc.trusses.first { $0.id == t } }?.isLoop ?? false }
             SwiftUI.Section("Position on the Truss") {
                 Picker("Side", selection: Binding(get: { Set(fixtures.compactMap(\.side)).count == 1 ? fixtures.first?.side ?? "under" : "" },
                                                   set: { editor.setSide(ids, $0) })) {
@@ -320,6 +320,9 @@ func standLimits(_ t: Truss) -> String {
     return s.prefix(1).uppercased() + s.dropFirst() + "."
 }
 
+/// "3 × 3 m".
+func carreName(_ t: Truss) -> String { "\(t.carreWidth.formatted()) × \(t.carreDepth.formatted()) m" }
+
 /// "Ø 4 m circle" / "Ø 6 m half circle".
 func ringName(_ t: Truss) -> String {
     let d = (t.diameterM ?? 4).formatted()
@@ -334,12 +337,13 @@ struct TrussInspector: View {
         let id = truss.id
         SwiftUI.Section {
             HStack {
-                Image(systemName: truss.vertical ? "building.columns" : truss.isRing ? "circle"
+                Image(systemName: truss.vertical ? "building.columns" : truss.isRing ? "circle" : truss.isCarre ? "square"
                       : truss.isStand ? "lamp.floor" : "square.split.bottomrightquarter")
                     .font(.title2).foregroundStyle(.tint)
                 VStack(alignment: .leading) {
                     Text(truss.id).font(.headline)
                     Text(truss.vertical ? "Tower, box truss 30 cm" : truss.isRing ? "Round truss, \(ringName(truss))"
+                         : truss.isCarre ? "Carré \(carreName(truss)), on four legs"
                          : truss.type == "tbar" ? "T-bar stand, on one tripod" : truss.isStand ? "Light bridge, on two tripods"
                          : "Box truss (quatro), 30 cm").font(.caption).foregroundStyle(.secondary)
                 }
@@ -349,6 +353,10 @@ struct TrussInspector: View {
             }
             if truss.isRing {
                 Text("Heads on a ring play it as a circle: crowns of beams out of it, cones, twisters, waves running round.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if truss.isCarre {
+                Text("A square of truss standing on its own legs. Heads on it play it like a ring: crowns of beams out of it, cones, twisters, waves running round.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -373,6 +381,17 @@ struct TrussInspector: View {
                     if !Truss.ringArcs.contains(truss.arc) { Text("\(Int(truss.arc))°").tag(truss.arc) }
                 }
                 .pickerStyle(.segmented)
+            } else if truss.isCarre {
+                Stepper(value: Binding(get: { truss.carreWidth }, set: { v in
+                    editor.updateTruss(truss.id, "Change Width") { $0.widthM = v }
+                }), in: 1...20, step: 0.5) {
+                    LabeledContent("Width", value: metres(truss.carreWidth))
+                }
+                Stepper(value: Binding(get: { truss.carreDepth }, set: { v in
+                    editor.updateTruss(truss.id, "Change Depth") { $0.depthM = v }
+                }), in: 1...20, step: 0.5) {
+                    LabeledContent("Depth", value: metres(truss.carreDepth))
+                }
             } else {
             Stepper(value: binding(\.lengthM), in: 0.5...20, step: 0.5) {
                 LabeledContent("Length", value: metres(truss.lengthM))
@@ -471,8 +490,8 @@ struct FixtureInspector: View {
             if let t = truss, !t.vertical {
                 Picker("Position", selection: Binding(get: { fixture.side ?? (fixture.mount == "stand" ? "top" : "under") },
                                                       set: { editor.setSide(fixture.id, $0) })) {
-                    Text("Under 0°").tag("under"); Text(t.isRing ? "Outside 90°" : "Front 90°").tag("front"); Text("Top 180°").tag("top")
-                    Text(t.isRing ? "Inside 270°" : "Back 270°").tag("back")
+                    Text("Under 0°").tag("under"); Text(t.isLoop ? "Outside 90°" : "Front 90°").tag("front"); Text("Top 180°").tag("top")
+                    Text(t.isLoop ? "Inside 270°" : "Back 270°").tag("back")
                 }
                 .pickerStyle(.segmented)
             } else if let t = truss, t.vertical {

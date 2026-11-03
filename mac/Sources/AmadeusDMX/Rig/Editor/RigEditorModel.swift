@@ -244,6 +244,16 @@ final class RigEditorModel: StageEditing {
         selection = .truss(t.id)
     }
 
+    /// A carré (a rectangle of truss on its own four legs) round the DJ booth: its front side just in front of the
+    /// stage edge, its frame as high as its legs go.
+    func addCarre(width: Double, depth: Double) {
+        let W = doc.width, n = doc.trusses.filter(\.isCarre).count
+        let t = Truss.carre(id: newTrussID("carre"), width: width, depth: depth, xM: W / 2,
+                            yM: 1 - depth / 2 + Double(n) * (depth + 1), zM: min(Truss.carreHeightM, doc.stage.ceilingM - 0.5))
+        change("Add Carré") { $0.trusses.append(t) }
+        selection = .truss(t.id)
+    }
+
     func updateTruss(_ id: String, _ name: String = "Change Truss", _ body: (inout Truss) -> Void) {
         change(name) { d in
             guard let i = d.trusses.firstIndex(where: { $0.id == id }) else { return }
@@ -270,14 +280,11 @@ final class RigEditorModel: StageEditing {
     /// Clamp a fixture to a truss (amadeus/rig/trusses.py place: the same rules).
     static func place(_ f: inout PlacedFixture, on t: Truss, at u: Double, width: Double) {
         var u = u
-        if t.isFullRing {  // round the circle: past one end is the other
-            u = (u + t.lengthM / 2).truncatingRemainder(dividingBy: t.lengthM)
-            if u < 0 { u += t.lengthM }
-            u -= t.lengthM / 2
-        }
+        if t.isClosed { u = t.wrapped(u) }  // round the loop: past one end is the other
+        if t.isCarre { u = t.carreClear(u) }  // not on a corner
         u = t.vertical ? max(0.2, min(t.lengthM, u)) : max(-t.lengthM / 2, min(t.lengthM / 2, u))
         if f.truss != t.id && !t.vertical { f.rotDeg = t.rotDeg }  // clamped on: square to the truss
-        if t.isRing {  // on a ring: always turned with the arc, its front out of the circle
+        if t.isLoop {  // on a ring or a carré: always turned with it, its front out of it
             var r = (t.directionDeg(u) + 180).truncatingRemainder(dividingBy: 360)
             if r < 0 { r += 360 }
             f.rotDeg = ((r - 180) * 10).rounded() / 10
@@ -313,7 +320,7 @@ final class RigEditorModel: StageEditing {
         } else {
             // the box truss's four sides: under it, on top, on the front (audience) or the back face
             let side = f.side.flatMap { sides.contains($0) ? $0 : nil } ?? (f.mount == "stand" ? "top" : "under")
-            // n: towards the audience (on a ring: out of the circle)
+            // n: towards the audience (on a loop: out of it)
             let p = t.point(u), r = t.directionDeg(u) * .pi / 180, n = SIMD2(-sin(r), cos(r))
             var q = SIMD2(p.x, p.y), z = p.z
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
@@ -1189,7 +1196,7 @@ final class RigEditorModel: StageEditing {
                 if Self.rayToSegment(o, d, top, top + [0, 0, 0.01]).0 < 0.35 { raise = (id, doc); return true }
                 return false
             }
-            if t.isRing { return false }  // a ring has no ends to stretch: its size is in the inspector
+            if t.isLoop { return false }  // a ring or a carré has no ends to stretch: its size is in the inspector
             let (a, b) = Self.ends(t)
             for (end, other) in [(a, b), (b, a)] {
                 let p = SIMD3(end.x, end.y, t.zM)

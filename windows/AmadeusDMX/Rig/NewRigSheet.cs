@@ -1,6 +1,6 @@
 using AmadeusKit;
 // A new rig (a venue): start from the structure that's there (an empty room, two stands, a truss over the
-// booth, a club, a concert stage, a round truss), size it, and then mount your set on it: automatically or by hand.
+// booth, a club, a concert stage, a round truss, a carré), size it, and then mount your set on it: automatically or by hand.
 // The port of mac/Sources/AmadeusDMX/Rig/NewRigSheet.swift: the sheets are ContentDialogs.
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -61,6 +61,12 @@ public static class RigSketch
             case RigTemplate.Stage:
                 Bar(w * 0.1, h * 0.2, w * 0.8); Bar(w * 0.14, h * 0.1, w * 0.72); Bar(w * 0.22, floor - 22, w * 0.56);
                 Tower(6, h * 0.18); Tower(w - 10, h * 0.18);
+                break;
+            case RigTemplate.Carre:  // seen from the front, a little from above: the back side higher up, between the front legs
+                Tower(w * 0.32, h * 0.12); Tower(w * 0.68 - 4, h * 0.12);
+                Bar(w * 0.32, h * 0.12, w * 0.36);
+                Tower(w * 0.16, h * 0.3); Tower(w * 0.84 - 4, h * 0.3);
+                Bar(w * 0.16, h * 0.3, w * 0.68);
                 break;
             case RigTemplate.Ring:  // seen a little from below: a flat ellipse, the half circle a wider arc behind it
             {
@@ -181,7 +187,7 @@ public sealed class NewRigSheet(AppModel model)
             UI.Row("Name", name.MinWidth(260)),
             SizeRow("Stage width", _width, 2, 30, 0.5, v => _width = v),
             _template == RigTemplate.Floor ? null
-                : SizeRow(_template is RigTemplate.Stands or RigTemplate.Bridge ? "Stand height" : "Truss height", _height, 2, 12, 0.5, v => _height = v),
+                : SizeRow(_template is RigTemplate.Stands or RigTemplate.Bridge ? "Stand height" : _template == RigTemplate.Carre ? "Leg height" : "Truss height", _height, 2, 12, 0.5, v => _height = v),
             SizeRow("Room depth", _depth, 4, 40, 1, v => _depth = v),
             UI.Row("LED wall behind the DJ", UI.Toggle("", _screen, v => _screen = v))));
     }

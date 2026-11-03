@@ -31,9 +31,14 @@ public sealed record Truss
     /// "circle": a round truss, hung flat (amadeus/rig/trusses.py): a full circle or an arc of `ArcDeg` of
     /// `DiameterM`, centred on XM/YM, the middle of the arc facing the audience (turned by RotDeg); LengthM is the
     /// length round the arc and follows the two.
+    /// "carre": a rectangle of truss on four legs (a tower at each corner, to the floor), `WidthM` across and
+    /// `DepthM` up and down the stage before RotDeg turns it, centred on XM/YM, the frame at ZM; a closed loop like a
+    /// full circle, LengthM its perimeter, measured round it from the middle of its front side.
     public string? Shape { get; set; }
     public double? DiameterM { get; set; }
     public double? ArcDeg { get; set; }
+    public double? WidthM { get; set; }
+    public double? DepthM { get; set; }
     /// Where the heads on it play: "audience" or "down"; nil: automatic (down when it hangs over the crowd).
     public string? Aim { get; set; }
     /// A light stand's (type "bridge" or "tbar") limits as the maker gives them: what it takes, how high it goes.
@@ -44,6 +49,11 @@ public sealed record Truss
     /// The usual round truss sizes (any other works too) and arcs.
     public static readonly double[] RingDiameters = [2, 3, 4, 5, 6, 8];
     public static readonly double[] RingArcs = [360, 180];
+    /// Carrés as they are hired (any other size works too), their usual 3 m legs, and how far fixtures keep from a
+    /// corner (the corner block and the leg).
+    public static readonly (double W, double D)[] CarreSizes = [(3, 3), (4, 3), (4, 4), (6, 4)];
+    public const double CarreHeightM = 3.0;
+    public const double CornerClearM = 0.25;
 
     /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
     public sealed record StandPreset(string Type, double LengthM, double? MinHeightM, double MaxHeightM, double MaxKg)
@@ -84,6 +94,8 @@ public sealed record Truss
             Shape = J.Ref(c, "shape", J.String),
             DiameterM = J.Val(c, "diameter_m", J.Double),
             ArcDeg = J.Val(c, "arc_deg", J.Double),
+            WidthM = J.Val(c, "width_m", J.Double),
+            DepthM = J.Val(c, "depth_m", J.Double),
             Aim = J.Ref(c, "aim", J.String),
             MaxKg = J.Val(c, "max_kg", J.Double),
             MaxHeightM = J.Val(c, "max_height_m", J.Double),
@@ -105,6 +117,8 @@ public sealed record Truss
         if (Shape is not null) o["shape"] = Shape;
         if (DiameterM is { } d) o["diameter_m"] = d;
         if (ArcDeg is { } a) o["arc_deg"] = a;
+        if (WidthM is { } w) o["width_m"] = w;
+        if (DepthM is { } dp) o["depth_m"] = dp;
         if (Aim is not null) o["aim"] = Aim;
         if (MaxKg is { } kg) o["max_kg"] = kg;
         if (MaxHeightM is { } top) o["max_height_m"] = top;
@@ -120,6 +134,15 @@ public sealed record Truss
         return t;
     }
 
+    /// A carré: a `width` × `depth` frame at `zM` on four legs.
+    public static Truss Carre(string id, double width, double depth, double xM, double yM, double zM = CarreHeightM,
+                              double rotDeg = 0)
+    {
+        var t = new Truss(id, 1, xM, yM, zM, rotDeg) { Shape = "carre", WidthM = width, DepthM = depth };
+        t.Normalise();
+        return t;
+    }
+
     /// A truss this far in front of the stage edge hangs over the crowd (amadeus/rig/trusses.py OVER_CROWD_M).
     public const double OverCrowdM = 1.0;
 
@@ -128,7 +151,27 @@ public sealed record Truss
 
     public bool IsRing => Shape == "circle" && !Vertical;
     /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.
-    public bool IsStand => Type is "bridge" or "tbar" && !Vertical && !IsRing;
+    public bool IsStand => Type is "bridge" or "tbar" && !Vertical && !IsLoop;
+    /// A carré: a rectangle of truss on four legs.
+    public bool IsCarre => Shape == "carre" && !Vertical;
+    /// A truss whose heads play round it: a round truss (or an arc) or a carré.
+    public bool IsLoop => IsRing || IsCarre;
+    /// A loop without ends: a full circle or a carré (round it, past one end is the other).
+    public bool IsClosed => IsFullRing || IsCarre;
+    public double CarreWidth => WidthM ?? 3;
+    public double CarreDepth => DepthM ?? 3;
+    /// A carré's corners, where its legs stand: front +x, back +x, back -x, front -x (the way round it goes).
+    public IReadOnlyList<Vec2> CarreCorners
+    {
+        get
+        {
+            if (!IsCarre) return [];
+            double w = CarreWidth / 2, d = CarreDepth / 2, r = RotDeg * Math.PI / 180;
+            (double X, double Y)[] local = [(w, d), (w, -d), (-w, -d), (-w, d)];
+            return local.Select(c => new Vec2(XM + Math.Cos(r) * c.X - Math.Sin(r) * c.Y,
+                                              YM + Math.Sin(r) * c.X + Math.Cos(r) * c.Y)).ToList();
+        }
+    }
     /// Where a light stand's tripods stand: under both ends of a bridge, under the middle of a T-bar.
     public IReadOnlyList<Vec2> StandFeet
     {
@@ -148,6 +191,7 @@ public sealed record Truss
     public void Normalise()
     {
         if (IsRing) LengthM = RigDocument.Round(Arc * Math.PI / 180 * Radius, 1000);
+        if (IsCarre) LengthM = 2 * (CarreWidth + CarreDepth);
         if (IsStand)  // a stand goes as high (and as low) as it does
         {
             var z = Math.Max(ZM, MinHeightM ?? 0);
@@ -158,8 +202,45 @@ public sealed record Truss
     /// The angle (radians, counter-clockwise from +x) of the point `u` along a round truss from its arc's middle.
     public double RingAngle(double u) => (RotDeg + 90) * Math.PI / 180 - u / Radius;
 
-    /// Which way the truss runs at `u` (degrees; on a ring the tangent, so its "front" faces out of the circle).
-    public double DirectionDeg(double u) => IsRing ? RingAngle(u) * 180 / Math.PI - 90 : RotDeg;
+    /// Which way the truss runs at `u` (degrees; on a loop round it, so its "front" faces out of it).
+    public double DirectionDeg(double u) =>
+        IsRing ? RingAngle(u) * 180 / Math.PI - 90 : IsCarre ? RotDeg + CarreLocal(u).Dir : RotDeg;
+
+    /// Where `u` is round an unturned carré from its front middle, and which way the frame runs there (degrees).
+    internal (double X, double Y, double Dir) CarreLocal(double u)
+    {
+        double w = CarreWidth, d = CarreDepth;
+        var s = (u + w / 2) % (2 * (w + d));  // from the front -x corner
+        if (s < 0) s += 2 * (w + d);
+        if (s < w) return (-w / 2 + s, d / 2, 0);  // the front, towards +x
+        if (s < w + d) return (w / 2, d / 2 - (s - w), -90);  // the +x side, upstage
+        if (s < 2 * w + d) return (w / 2 - (s - w - d), -d / 2, 180);  // the back, towards -x
+        return (-w / 2, -d / 2 + (s - 2 * w - d), 90);  // the -x side, downstage
+    }
+
+    /// `u` round a closed loop kept in -length/2..length/2 (past one end is the other).
+    public double Wrapped(double u)
+    {
+        var v = (u + LengthM / 2) % LengthM;
+        if (v < 0) v += LengthM;
+        return v - LengthM / 2;
+    }
+
+    /// `u` moved off a carré's corner (CornerClearM), staying on the side it was on.
+    public double CarreClear(double u)
+    {
+        if (!IsCarre) return u;
+        double w = CarreWidth, d = CarreDepth, L = 2 * (w + d);
+        var s = (u + w / 2) % L;
+        if (s < 0) s += L;
+        foreach (var c in new[] { 0, w, w + d, 2 * w + d, L })
+        {
+            if (Math.Abs(s - c) >= CornerClearM) continue;
+            s = s >= c ? c + CornerClearM : c - CornerClearM;
+            break;
+        }
+        return Wrapped(s - w / 2);
+    }
 
     /// Unit vector along the truss (horizontal trusses).
     public Vec2 Axis => new(Math.Cos(RotDeg * Math.PI / 180), Math.Sin(RotDeg * Math.PI / 180));
@@ -173,13 +254,23 @@ public sealed record Truss
             var a = RingAngle(u);
             return new(XM + Radius * Math.Cos(a), YM + Radius * Math.Sin(a), ZM);
         }
+        if (IsCarre)
+        {
+            var l = CarreLocal(u);
+            return new(XM + Axis.X * l.X - Axis.Y * l.Y, YM + Axis.Y * l.X + Axis.X * l.Y, ZM);
+        }
         return new(XM + Axis.X * u, YM + Axis.Y * u, ZM);
     }
 
-    /// A horizontal truss as straight pieces (one for a straight truss, short chords round a ring), for drawing and
-    /// picking.
+    /// A horizontal truss as straight pieces (one for a straight truss, short chords round a ring, a carré's four
+    /// sides), for drawing and picking.
     public IReadOnlyList<(Vec3 A, Vec3 B)> Pieces(double step = 0.4)
     {
+        if (IsCarre)
+        {
+            var c = CarreCorners.Select(p => new Vec3(p.X, p.Y, ZM)).ToList();
+            return Enumerable.Range(0, 4).Select(k => (c[(k + 3) % 4], c[k])).ToList();  // front, +x side, back, -x side
+        }
         if (!IsRing) return [(Point(-LengthM / 2), Point(LengthM / 2))];
         var n = Math.Max(8, (int)Math.Ceiling(LengthM / step));
         return Enumerable.Range(0, n)
@@ -190,6 +281,24 @@ public sealed record Truss
     public (double U, double Distance) Project(Vec2 p)
     {
         if (Vertical) return (0, (p - new Vec2(XM, YM)).Length);
+        if (IsCarre)  // the nearest of its sides
+        {
+            double w = CarreWidth, d = CarreDepth;
+            double[] starts = [-w / 2, w / 2, w / 2 + d, 3 * w / 2 + d];  // where each side starts round it
+            (double U, double Distance) best = (0, double.PositiveInfinity);
+            var sides = Pieces();
+            for (var k = 0; k < sides.Count; k++)
+            {
+                var (a, b) = sides[k];
+                Vec2 a2 = a.XY, ab = b.XY - a2;
+                var len = ab.Length;
+                var dir = ab * (1 / len);
+                var along = Math.Max(0, Math.Min(len, Vec2.Dot(p - a2, dir)));
+                var dist = (p - (a2 + dir * along)).Length;
+                if (dist < best.Distance) best = (Wrapped(starts[k] + along), dist);
+            }
+            return best;
+        }
         if (IsRing)  // round the circle from the arc's middle, kept on the arc
         {
             var d = p - new Vec2(XM, YM);

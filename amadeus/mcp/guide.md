@@ -27,7 +27,8 @@ of the stage, the back is negative. `z` is height.
 
 A truss: `{"id", "type": "quatro", "length_m", "x_m" (its centre), "y_m", "z_m", "rot_deg"}`; a tower adds
 `"vertical": true` (then `length_m` is its height and `z_m` its middle); a round truss `"shape": "circle"`,
-`diameter_m`, `arc_deg`. A light stand is the cheap kind: `"type": "bridge"` (a bar on a tripod at each end) or
+`diameter_m`, `arc_deg`; a carré (a rectangle of truss on four legs, standing on the floor) `"shape": "carre"`,
+`width_m`, `depth_m`, `z_m` the frame's height (round it like round a full circle, from its front middle). A light stand is the cheap kind: `"type": "bridge"` (a bar on a tripod at each end) or
 `"tbar"` (a T-bar on one tripod), `z_m` the bar's height, with `max_kg`, `min_height_m` and `max_height_m` from
 the maker when known. A truss may say where its heads play: `"aim": "audience"` or `"down"`.
 

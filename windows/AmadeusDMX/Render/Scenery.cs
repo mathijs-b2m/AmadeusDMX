@@ -164,7 +164,7 @@ public sealed class Scenery
                     LightStand(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
                 else
                     TrussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
-                if (sel && !t.IsRing)  // the end handles: drag one to stretch or turn the truss
+                if (sel && !t.IsLoop)  // the end handles: drag one to stretch or turn the truss
                 {
                     var r = (float)t.RotDeg * MathF.PI / 180;
                     var ax = V(MathF.Cos(r), MathF.Sin(r), 0);
@@ -309,6 +309,17 @@ public sealed class Scenery
     /// A horizontal quatro truss from the set: four chords along it and lacing, turned with it.
     void TrussBeam(Truss t, Vector3 color, float emissive)
     {
+        if (t.IsCarre)  // its four sides, end plates at the corners, and a tower under each corner down to the floor
+        {
+            foreach (var (a, b) in t.Pieces())
+            {
+                var side = new Truss(t.Id, (b - a).Length, (a.X + b.X) / 2, (a.Y + b.Y) / 2, t.ZM,
+                    Math.Atan2(b.Y - a.Y, b.X - a.X) * 180 / Math.PI) { Type = t.Type };
+                StraightBeam(side, color, emissive, [-1, 1]);
+            }
+            foreach (var c in t.CarreCorners) TrussTower((float)c.X, (float)c.Y, (float)t.ZM - 0.05f, color: color, emissive: emissive);
+            return;
+        }
         if (t.IsRing)  // round: short straight pieces round the arc, end plates only where an arc ends
         {
             var pieces = t.Pieces(0.3);

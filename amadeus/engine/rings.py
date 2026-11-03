@@ -14,7 +14,10 @@ circle's shape (any director's plan, nothing extra to choose):
 - wave → the movement **runs round the ring** (one lap in WAVE_BEATS, a full circle loops), in the crown;
 - the tilt wave rolls round the ring too; sync and mirror stay as they are (a ring can do parallel beams).
 
-Pars on a full ring chase round it (looks.py) instead of to and fro.
+A carré (a rectangle of truss on four legs) plays the same way, as the closed loop it is: its heads face out of
+it, round its centre, and the cone and twister keep to its size (`T.loop_radius`).
+
+Pars on a full ring (or a carré) chase round it (looks.py) instead of to and fro.
 """
 
 from __future__ import annotations
@@ -41,7 +44,7 @@ class RingsMixin:
     def _init_rings(self, rig: dict, fixtures: dict):
         """Per head: its ring, or None (`centre`, `radius`, `angle` (radians round the centre, from +x),
         `frac` (0..1 round the ring from the front middle), `full`)."""
-        rings = {t["id"]: T.normalise(dict(t)) for t in rig.get("trusses", []) if T.is_ring(t)}
+        rings = {t["id"]: T.normalise(dict(t)) for t in rig.get("trusses", []) if T.is_loop(t)}
         self.rings: list[dict | None] = []
         for j, e in enumerate(self.heads):
             t = rings.get(fixtures[e["fixture"]].get("truss"))
@@ -52,6 +55,8 @@ class RingsMixin:
             a = math.atan2(p[1] - t["y_m"], p[0] - t["x_m"])
             if T.is_full_ring(t):  # round from the front middle, to the right seen from the audience
                 frac = ((math.radians(t.get("rot_deg", 0.0) + 90.0) - a) / (2 * math.pi)) % 1.0
+            elif T.is_carre(t):  # round its frame from the front middle, the same way
+                frac = (float(fixtures[e["fixture"]].get("truss_pos_m", 0.0)) / t["length_m"]) % 1.0
             else:  # along the arc, end to end
                 u = float(fixtures[e["fixture"]].get("truss_pos_m", 0.0))
                 frac = min(max(u / max(t["length_m"], 1e-6) + 0.5, 0.0), 1.0)
@@ -59,10 +64,10 @@ class RingsMixin:
                 {
                     "truss": t["id"],
                     "centre": np.array([t["x_m"], t["y_m"], p[2]]),
-                    "radius": T.ring_radius(t),
+                    "radius": T.loop_radius(t),
                     "angle": a,
                     "frac": frac,
-                    "full": T.is_full_ring(t),
+                    "full": T.is_closed(t),
                     "aim": T.light_aim(t),
                 }
             )
@@ -86,7 +91,7 @@ class RingsMixin:
         self.pars = sorted(self.pars, key=key)
         self.order = {f["id"]: i for i, f in enumerate(self.pars)}
         ids = {t["id"] if t else None for t in on.values()}
-        self.par_loop = len(ids) == 1 and None not in ids and T.is_full_ring(next(iter(on.values())))
+        self.par_loop = len(ids) == 1 and None not in ids and T.is_closed(next(iter(on.values())))
 
     def _ring_wave_pos(self, ring: dict, pos: np.ndarray) -> np.ndarray:
         return pos - ring["frac"] * RING_WAVE_BEATS

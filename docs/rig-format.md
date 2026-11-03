@@ -110,6 +110,22 @@ and the formations take its shape: `fan` is a crown of beams out of the circle, 
 `sync` and `mirror` stay as they are. Pars on a full ring chase round it. Auto-mount spreads fixtures evenly round a
 full circle; strobes and blinders stay on a straight truss when there is one.
 
+**Carré.** A truss with `"shape": "carre"` is a rectangle of box truss standing on its own four legs (a tower in
+each corner, down to the floor), as round a DJ booth on the dance floor or at a trade-fair stand: `width_m` across
+the stage and `depth_m` up and down it (before `rot_deg` turns it), `x_m`/`y_m` its centre and `z_m` the frame's
+height. The editor offers 3 × 3, 4 × 3, 4 × 4 and 6 × 4 m with 3 m legs (any other size works). Its `length_m` is
+the frame's perimeter. Like a full round truss it has no ends: a fixture's `truss_pos_m` is measured round the
+frame from the middle of its front side, towards stage right first; its `front` face is the outside, `back` the
+inside, and fixtures keep 25 cm clear of the corners. Fixtures clamp to the frame (put a tower next to it for
+fixtures on a leg).
+
+```json
+{"id": "carre", "type": "quatro", "shape": "carre", "width_m": 3, "depth_m": 3, "x_m": 4, "y_m": -0.5, "z_m": 3}
+```
+
+Moving heads on a carré play it like a ring (below): a group of their own, crowns of beams out of it, cones and
+twisters, waves running round it. Auto-mount spreads fixtures mirrored along its sides.
+
 **Where a truss's heads play.** A horizontal truss can say where the moving heads on it aim: `"aim": "audience"`
 (out towards the crowd, never back at the stage: a director's aim at the stage becomes the crowd, and a ring's crown
 stays in front of it) or `"aim": "down"` (onto the crowd under it: the director's crowd and stage aims become

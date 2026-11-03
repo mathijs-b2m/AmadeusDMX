@@ -108,7 +108,7 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
         else:  # a row along the front edge of the stage and one at the back, mirrored
             m.row(on_floor[0::2], y=-0.5, z=0.3, mount="floor", span=0.85)
             m.row(on_floor[1::2], y=back_y, z=0.3, mount="floor", span=0.7)
-    straight = [t for t in horiz if not T.is_full_ring(t)]  # a circle has no ends for the blinders
+    straight = [t for t in horiz if not T.is_closed(t)]  # a circle (or a carré) has no ends for the blinders
     front = [((straight or horiz)[0], "front")] if horiz else []
     m.row(m.trusses(by_role["strobe"], front, "strobe", share=0.4), y=-0.3, z=0.25, mount="floor", span=0.3)
     m.row(m.ends(by_role["blinder"], front[0][0] if front else None), y=-0.2, z=0.9, mount="stand", span=0.76)
@@ -271,12 +271,15 @@ def _new_id(trusses: list[dict], base: str) -> str:
     return f"{base}{n}"
 
 
-def mirrored(fixtures: list[dict], spots: list[float]) -> list[tuple[dict, float]]:
+def mirrored(fixtures: list[dict], spots: list[float], loop: float | None = None) -> list[tuple[dict, float]]:
     """Fixtures onto spots so that every model is mirrored around the middle: the biggest group takes the
-    outermost pairs, the next group the pairs inside those, an odd one out goes to the middle."""
+    outermost pairs, the next group the pairs inside those, an odd one out goes to the middle. Round a closed
+    loop `loop` m long (a full ring, a carré), the spot half way round is its own mirror too."""
     spots = sorted(spots)
+    back = [u for u in spots if loop and abs(u + loop / 2) < 1e-3]
+    spots = [u for u in spots if u not in back]
     pairs = [(spots[i], spots[-1 - i]) for i in range(len(spots) // 2)]
-    middle = [spots[len(spots) // 2]] if len(spots) % 2 else []
+    middle = ([spots[len(spots) // 2]] if len(spots) % 2 else []) + back
     groups: dict[str, list[dict]] = defaultdict(list)
     for f in fixtures:
         groups[f["fixture"]].append(f)
@@ -314,7 +317,7 @@ class _Mounter:
     def _free(self, t: dict, side: str, n: int, kind: str, share: float, width: float = 0.3) -> list[float]:
         """Up to `n` positions on a truss side, spread evenly and symmetric, clear of what hangs there. On a light
         stand's bar, fixtures `width` wide (their housing) go side by side, a hand apart."""
-        if T.is_full_ring(t):  # round a circle: evenly all the way round, no ends to keep clear
+        if T.is_closed(t):  # round a circle or a carré: evenly all the way round, no ends to keep clear
             return self._round(t, side, n, kind)
         span = t["length_m"] * share
         step, least = SPACING[kind], MIN_SPACING[kind]
@@ -343,6 +346,8 @@ class _Mounter:
         k = min(n, int(L / SPACING[kind]))
         if k <= 0:
             return []
+        if not busy and T.is_carre(t):  # mirrored, along the sides, clear of the corners
+            return T.carre_spread(t, k)
         if not busy:  # one in the middle of the front (u = 0), the rest evenly round
             return [(L * i / k + L / 2) % L - L / 2 for i in range(k)]
         step = L / int(L / SPACING[kind])
@@ -352,6 +357,8 @@ class _Mounter:
             return min(d, L - d)
 
         slots = [-L / 2 + step * i for i in range(int(L / SPACING[kind]))]
+        if T.is_carre(t):  # not on a corner
+            slots = [s for s in slots if abs(T.carre_clear(t, s) - s) < 1e-6]
         slots = [s for s in slots if all(gap(s, b) >= MIN_SPACING[kind] for b in busy)]
         if len(slots) <= n:
             return slots
@@ -367,14 +374,14 @@ class _Mounter:
         for i, (t, side) in enumerate(sides):
             want = len(left) if i == len(sides) - 1 else round(len(fixtures) * t["length_m"] / total)
             spots = self._free(t, side, min(want, len(left)), kind, share, width)
-            for f, u in mirrored(left[: len(spots)], spots):
+            for f, u in mirrored(left[: len(spots)], spots, t["length_m"] if T.is_closed(t) else None):
                 self._put(f, t, u, side)
             left = left[len(spots) :]
         for t, side in sides:  # overflow: squeeze more onto trusses that still have room
             if not left:
                 break
             spots = self._free(t, side, len(left), kind, share, width)
-            for f, u in mirrored(left[: len(spots)], spots):
+            for f, u in mirrored(left[: len(spots)], spots, t["length_m"] if T.is_closed(t) else None):
                 self._put(f, t, u, side)
             left = left[len(spots) :]
         return left

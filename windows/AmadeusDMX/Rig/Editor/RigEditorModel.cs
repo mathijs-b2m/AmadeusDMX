@@ -362,6 +362,18 @@ public sealed class RigEditorModel : Observable, IStageEditing
         Selection = EditorSelection.Truss(t.Id);
     }
 
+    /// A carré (a rectangle of truss on its own four legs) round the DJ booth: its front side just in front of the
+    /// stage edge, its frame as high as its legs go.
+    public void AddCarre(double width, double depth)
+    {
+        var W = Doc.Width;
+        var n = Doc.Trusses.Count(x => x.IsCarre);
+        var t = Truss.Carre(NewTrussID("carre"), width, depth, W / 2, 1 - depth / 2 + n * (depth + 1),
+                            Math.Min(Truss.CarreHeightM, Doc.Stage.CeilingM - 0.5));
+        Change("Add Carré", d => d.Trusses.Add(t));
+        Selection = EditorSelection.Truss(t.Id);
+    }
+
     public void UpdateTruss(string id, Action<Truss> body) => UpdateTruss(id, "Change Truss", body);
 
     public void UpdateTruss(string id, string name, Action<Truss> body) => Change(name, d =>
@@ -386,15 +398,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// Clamp a fixture to a truss (amadeus/rig/trusses.py place: the same rules).
     public static void Place(PlacedFixture f, Truss t, double u, double width)
     {
-        if (t.IsFullRing)  // round the circle: past one end is the other
-        {
-            u = (u + t.LengthM / 2) % t.LengthM;
-            if (u < 0) u += t.LengthM;
-            u -= t.LengthM / 2;
-        }
+        if (t.IsClosed) u = t.Wrapped(u);  // round the loop: past one end is the other
+        if (t.IsCarre) u = t.CarreClear(u);  // not on a corner
         u = t.Vertical ? Math.Max(0.2, Math.Min(t.LengthM, u)) : Math.Max(-t.LengthM / 2, Math.Min(t.LengthM / 2, u));
         if (f.Truss != t.Id && !t.Vertical) f.RotDeg = t.RotDeg;  // clamped on: square to the truss
-        if (t.IsRing)  // on a ring: always turned with the arc, its front out of the circle
+        if (t.IsLoop)  // on a ring or a carré: always turned with it, its front out of it
         {
             var r = (t.DirectionDeg(u) + 180) % 360;
             if (r < 0) r += 360;
@@ -437,7 +445,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             // the box truss's four sides: under it, on top, on the front (audience) or the back face
             var side = f.Side is { } s1 && Sides.Contains(s1) ? s1 : f.Mount == "stand" ? "top" : "under";
-            // n: towards the audience (on a ring: out of the circle)
+            // n: towards the audience (on a loop: out of it)
             var p = t.Point(u);
             var r = t.DirectionDeg(u) * Math.PI / 180;
             var n = new Vec2(-Math.Sin(r), Math.Cos(r));
@@ -1484,7 +1492,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                     if (RayToSegment(o, d, top, top + new Vec3(0, 0, 0.01)).Dist < 0.35) { _raise = (id, Doc.Clone()); return true; }
                     return false;
                 }
-                if (t.IsRing) return false;  // a ring has no ends to stretch: its size is in the inspector
+                if (t.IsLoop) return false;  // a ring or a carré has no ends to stretch: its size is in the inspector
                 var (a, b) = Ends(t);
                 foreach (var (end, other) in new[] { (a, b), (b, a) })
                 {
