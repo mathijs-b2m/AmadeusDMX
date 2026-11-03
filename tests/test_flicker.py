@@ -1,4 +1,5 @@
-"""Lights never flicker: the kick leads, fast triggers play the kick, nothing strobes with the music, a kick
+"""Lights never flicker: the kick leads, fast triggers play the kick, nothing strobes with the music (but the
+heads' own strobe, a look of its own), a kick
 break holds and builds and the kick's return hits, and moving heads never freeze in quiet parts."""
 
 from dataclasses import replace
@@ -51,7 +52,8 @@ def test_no_light_flickers(track, path):
     e = Engine(track, plan, rig)
     ids = [x["id"] for x in rig["elements"] if x["kind"] in ("head", "par")]
     ts = np.arange(0.05, track.duration - 0.1, 1 / FPS)
-    tr = np.array([[max(st[i].dimmer, st[i].white) for i in ids] for st in (e.render(float(t))[1] for t in ts)])
+    level = lambda s: s.strobe or max(s.dimmer, s.white)  # noqa: E731  (a head's strobe is meant: its level)
+    tr = np.array([[level(st[i]) for i in ids] for st in (e.render(float(t))[1] for t in ts)])
     assert sum(fast_cycles(c) for c in tr.T) == 0
 
 
@@ -110,3 +112,33 @@ def test_still_heads_drift_and_upward_aims_fit_under_a_low_ceiling(track):
         out = e._head_dir_v(d, ts, 0)
         travel = np.degrees(np.arccos(np.clip(out @ out.T, -1, 1))).max()
         assert travel > 5, f"{movement}/{aim} frozen"
+
+
+@pytest.mark.parametrize("fast", [False, True])
+def test_heads_strobe_on_the_grid_within_the_flash_limit(track, fast):
+    rig = load_rig(SETS[0])
+    rig["safety"]["allow_fast_strobe"] = fast
+    plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
+    drop = next(d for d in plan if d.section == "drop")
+    plan = [replace(d, head_light="strobe", grouping="unison", layer_split="none") if d is drop else d for d in plan]
+    e = Engine(track, plan, rig)
+    head = e.heads[0]["id"]
+    ts = np.arange(drop.start + 1.0, drop.end - 1.0, 1 / 400)
+    on = np.array([e.head_strobe(drop, float(t)) for t in ts]) > 0
+    starts = ts[1:][on[1:] & ~on[:-1]]
+    gaps = np.diff(starts)
+    limit = L.FAST_STROBE_HZ if fast else rig["safety"]["max_flash_hz"]
+    assert len(starts) > 4 and gaps.min() >= 1 / limit - 0.01  # never faster than the set allows
+    beat = 60 / 128
+    assert np.allclose(gaps, gaps[0], atol=0.01) and gaps[0] <= beat + 0.01  # a steady strobe, at least every beat
+    st = e.render(float(starts[2]) + 0.01)[1][head]
+    assert st.strobe > 0 and st.dimmer > 0.5 * st.strobe  # a flash, at the head's level
+
+
+def test_strobe_free_heads_pulse_instead(track):
+    rig = load_rig(SETS[0])
+    rig["safety"]["strobe_free"] = True
+    plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
+    plan = [replace(d, head_light="strobe") for d in plan]
+    e = Engine(track, plan, rig)
+    assert all(st.strobe == 0 for t in np.arange(1, track.duration - 1, 0.5) for st in e.render(float(t))[1].values())

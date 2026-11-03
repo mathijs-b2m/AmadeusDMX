@@ -394,7 +394,7 @@ public sealed partial class Hello
     public IReadOnlyList<FixtureInfo> Fixtures { get; init; } = [];
     public Stage Stage { get; init; } = new();
     public IReadOnlyList<Decision> Plan { get; init; } = [];
-    public double MaxFlashHz { get; init; } = 3;
+    public double MaxFlashHz { get; init; } = 4;
     public IReadOnlyList<double> Energy { get; init; } = [];
     public bool Screen { get; init; }
     /// The phrase of the drop the LED wall counts into (3-2-1 DROP!): a rare moment, once or twice a night.
@@ -419,7 +419,7 @@ public sealed partial class Hello
         Fixtures = J.Ref(c, "fixtures", J.ArrayOf(FixtureInfo.From)) ?? [],
         Stage = J.Ref(c, "stage", Stage.From) ?? new Stage(),
         Plan = J.Ref(c, "plan", J.ArrayOf(Decision.From)) ?? [],
-        MaxFlashHz = J.Val(c, "max_flash_hz", J.Double) ?? 3,
+        MaxFlashHz = J.Val(c, "max_flash_hz", J.Double) ?? 4,
         Energy = J.Ref(c, "energy", J.ArrayOf(J.Double)) ?? [],
         Screen = J.Val(c, "screen", J.Bool) ?? false,
         Countdown = J.Try(() => J.Val(c, "countdown", J.Int)),
@@ -556,9 +556,15 @@ public sealed record ArcStatus
     public HazePush? Haze { get; init; }
     /// The operator's Lightshow: every track played as a show piece (null: an engine without it).
     public bool? Lightshow { get; init; }
+    /// The DJ's named show: a fixed style for the set ("": none; null: an engine without named shows).
+    public string? Named { get; init; }
+    /// The named shows the engine offers, per genre.
+    public IReadOnlyList<NamedShow>? NamedShows { get; init; }
 
     public string StageName => Stages.FirstOrDefault(s => s.Count > 0 && s[0] == Stage) is { Count: > 0 } s ? s[^1] : Stage;
     public double? Remaining => Elapsed is { } e ? Length - e : null;
+    /// The named show that plays, if any.
+    public NamedShow? NamedShow => NamedShows?.FirstOrDefault(s => s.Key == Named);
 
     public static ArcStatus From(JsonElement c)
     {
@@ -574,6 +580,7 @@ public sealed record ArcStatus
             MovementLevel = J.Val(c, "movement_level", J.Int), Hold = J.Val(c, "hold", J.Int),
             Hazers = J.Val(c, "hazers", J.Int), Haze = J.Ref(c, "haze", HazePush.From),
             Lightshow = J.Val(c, "lightshow", J.Bool),
+            Named = J.Ref(c, "named", J.String), NamedShows = J.Ref(c, "named_shows", J.ArrayOf(AmadeusKit.NamedShow.From)),
         };
     }
 
@@ -585,9 +592,23 @@ public sealed record ArcStatus
         && Values.Count == o.Values.Count && Values.All(p => o.Values.TryGetValue(p.Key, out var v) && v == p.Value)
         && Manual.SequenceEqual(o.Manual) && Groups == o.Groups && Playing == o.Playing
         && MovementLevel == o.MovementLevel && Hold == o.Hold && Hazers == o.Hazers && Equals(Haze, o.Haze)
-        && Lightshow == o.Lightshow;
+        && Lightshow == o.Lightshow && Named == o.Named
+        && (NamedShows is null ? o.NamedShows is null : o.NamedShows is not null && NamedShows.SequenceEqual(o.NamedShows));
 
     public override int GetHashCode() => HashCode.Combine(Stage, Heat, Elapsed, Manual.Count, Values.Count);
+}
+
+/// A named show (amadeus/director/style.py, NAMED): a style of its own within a genre, for a DJ's whole set.
+public sealed record NamedShow
+{
+    public string Key { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Genre { get; init; } = "";
+
+    public static NamedShow From(JsonElement c) => new()
+    {
+        Key = J.Req(c, "key", J.String), Title = J.Req(c, "title", J.String), Genre = J.Req(c, "genre", J.String),
+    };
 }
 
 /// The operator's haze push: the hazers at `Level` for `Seconds`, then the room kept that hazy with bursts.

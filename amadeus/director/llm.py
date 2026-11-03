@@ -32,7 +32,7 @@ MODEL = "gpt-6-luna"
 HOLD_CONFIDENCE = 0.35  # mean look confidence below this, in an unchanged section → keep the previous look
 
 
-PROMPT_VERSION = 26
+PROMPT_VERSION = 27
 
 
 class OpenAIDirector:
@@ -147,6 +147,9 @@ class OpenAIDirector:
             guarded = True
         if self.style and self.style.own_look(d, history):  # the genre's own look (disco: the mirror ball)
             guarded = True
+        # The heads' strobe is for energy: a drop, a peak, the top of a build; elsewhere they play the kick.
+        if d.head_light == "strobe" and (d.section not in ("drop", "buildup", "groove", "chorus") or d.intensity < 2):
+            d.head_light, guarded = "beat", True
         if d.movement == "follow_lead":  # retired option (old cached answers)
             d.movement, guarded = "sweep", True
 
@@ -220,6 +223,8 @@ class OpenAIDirector:
             for n in [*LAYER_NAMES, "palette"]:
                 setattr(d, n, getattr(last, n))
             d.source = "openai+hold"
+        if self.style and self.style.enforce(d, sum(1 for h in history if h.section == d.section)):
+            guarded = True  # a named show's own layers, whatever the model chose
         arc = song_arc(a)[i]
         if laser_star(d, arc, self.lasers, next_best):
             guarded = True

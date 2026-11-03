@@ -7,7 +7,7 @@ The analysis finds the roll, its hits and its steps (amadeus/audio/rolls.py: qua
 thirty-seconds, or a fill's own rhythm). The flashes land on those hits, never a free-running strobe, and stay
 within the set's flash limit:
 
-- `safety.max_flash_hz` (3 Hz): the whole rig flashes together at most this often, so a fast roll is played
+- `safety.max_flash_hz` (4 Hz): the whole rig flashes together at most this often, so a fast roll is played
   on the hits of the finest beat subdivision that fits (at 128 BPM: the quarter notes) and builds with lights
   and brightness.
 - `safety.allow_fast_strobe`: every hit flashes. Each light flashes at most FAST_FLASH_HZ, so on the fastest
@@ -80,7 +80,7 @@ class RollsMixin:
                 self.pause_before[near[0]] = float(start)
         self.strobe_free = bool(safety.get("strobe_free", False))
         self.fast_strobe = bool(safety.get("allow_fast_strobe", False)) and not self.strobe_free
-        self.roll_hz = float(safety.get("max_flash_hz", 3.0))
+        self.roll_hz = float(safety.get("max_flash_hz", 4.0))
         # who flashes first: the strobes (made for it), then the rest spread over the stage, left to right
         strobes = [e["id"] for e in rig["elements"] if e["kind"] == "strobe"]
         lights = [e["id"] for e in sorted(self.pars + self.heads, key=self._x_of)]

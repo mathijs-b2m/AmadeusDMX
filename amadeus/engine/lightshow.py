@@ -88,7 +88,7 @@ class LightshowMixin(CinematicMixin):
             self.ls_ranks = ranks(self.a)
             self.duck_depth, self.own_attack_s = DUCK_DEPTH, OWN_ATTACK_S
             safety = rig["safety"]
-            hz = 0.0 if safety.get("strobe_free") else float(safety.get("max_flash_hz", 3.0))
+            hz = 0.0 if safety.get("strobe_free") else float(safety.get("max_flash_hz", 4.0))
             if safety.get("allow_fast_strobe") and not safety.get("strobe_free"):
                 hz = max(hz, FAST_HZ)
             self.ls_hz = hz

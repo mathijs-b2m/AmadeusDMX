@@ -146,7 +146,7 @@ def test_the_roll_flashes_on_its_hits_within_the_flash_limit(rolled):
     rig_on = _ons(ts, tr.max(axis=1))
     assert np.all(np.diff(rig_on) >= 1 / max_hz - 2 / FPS)  # nor the rig as a whole
     beats = a.beats[first : first + 31]
-    assert all(np.min(np.abs(beats - t)) < 0.012 for t in rig_on)  # on the beats (quarters fit 3 Hz at 128)
+    assert all(np.min(np.abs(beats - t)) < 0.012 for t in rig_on)  # on the beats (quarters fit 4 Hz at 128)
 
 
 def test_more_lights_flash_brighter_as_the_roll_speeds_up(rolled):

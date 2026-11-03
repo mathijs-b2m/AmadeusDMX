@@ -44,7 +44,7 @@ visualiser and the Mac app both read it.
 {"type": "hello", "track": "Deck 1: track.mp3", "duration": 412.0, "bpm": 128.0, "director": "openai",
  "fixtures": [{"id": "sharpy1", "kind": "head", "pos": [2.1, -1.5, 4.0], "fixture": "sharpy1", "...": "..."}],
  "stage": {"width_m": 12, "...": "..."}, "trusses": [], "zones": [], "plan": [{"section": "drop", "...": "..."}],
- "energy": [0.12, "..."], "max_flash_hz": 3.0, "screen": true,
+ "energy": [0.12, "..."], "max_flash_hz": 4.0, "screen": true,
  "gobos": [{"key": "qlc/ClayPaky/gobo00006", "img": "iVBORw0…", "style": "rings"}]}
 ```
 

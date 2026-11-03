@@ -31,8 +31,11 @@ class TrackShows:
         self.shape = (2, 1, True, False)  # the show arc's shape for the plans (show/arc.py, plan_shape)
         self.directed: dict[str, list] = {}  # file → the director's plan, before calming
         self.lightshow = False  # the operator's Lightshow: every track played by the lightshow program
+        self.named = ""  # the DJ's named show (director/style.py, NAMED): every track lit in it
 
     def _style_genre(self, file: str):
+        if self.named:
+            return self.named
         return lambda a: self.set_genre.genre_for(file, a.genre, a.genre_source)
 
     def wanted(self) -> str:
@@ -55,6 +58,24 @@ class TrackShows:
         print(f"  ⇄ lightshow {'on: every track a show piece' if on else 'off'}", flush=True)
         self.lightshow = on
         self._replan()
+
+    def set_named(self, key: str):
+        """The DJ's named show (a key of style.NAMED, "": none): every known track is planned again in it (the
+        old show keeps playing until the new one is ready)."""
+        if key == self.named:
+            return
+        print(f"  ⇄ named show: {key or 'off'}", flush=True)
+        self.named = key
+        self._replan()
+
+    def _in_style(self, a) -> bool:
+        """Is this analysis' plan lit in the named show as it is now (or in no named show, when none is on)?"""
+        from amadeus.director.style import NAMED
+
+        if self.lightshow or getattr(a, "genre", "") == "cinematic":  # a program of its own: no style at all
+            return True
+        style = getattr(a, "style", "")
+        return style == self.named if self.named else style not in NAMED
 
     def _replan(self):
         with self.lock:  # busy tracks pick up the change themselves (their job notices and restarts)
@@ -142,14 +163,17 @@ class TrackShows:
             done = quick if first else None
             with self.lock:
                 showing = self.shows.get(file)
-            if not first and not self.lightshow and showing is not None and showing[3] == LIGHTSHOW:
-                # the Lightshow switched off: back to the rules' show at once (a model's plan can take minutes,
-                # or fail), then on to the model's
+            a = showing[0] if showing is not None else None
+            restyled = a is not None and not self._in_style(a)
+            if not first and not self.lightshow and showing is not None and (showing[3] == LIGHTSHOW or restyled):
+                # the Lightshow switched off, or a named show on or off: the rules' show at once (a model's plan can
+                # take minutes, or fail), then on to the model's
                 a, plan = get_plan(Path(file), "rules", False, rig=self.rig, style_genre=self._style_genre(file))
                 if not self.lightshow:
                     self._install(file, a, plan, "rules")
                     done = "rules"
-            while self.wanted() != done:  # (re)build until the plan of the CURRENT model is installed
+            # (re)build until the plan of the CURRENT model, in the current named show, is installed
+            while self.wanted() != done or (a is not None and not self._in_style(a)):
                 director = self.wanted()
                 if director not in ("rules", LIGHTSHOW):
                     self._step(file, ai="running", ai_done=0, ai_total=0, ai_model=director)
@@ -158,13 +182,13 @@ class TrackShows:
                         Path(file),
                         director,
                         False,
-                        cancel=lambda d=director: self.wanted() != d,
+                        cancel=lambda d=director, n=self.named: self.wanted() != d or self.named != n,
                         rig=self.rig,
                         style_genre=self._style_genre(file),
                         progress=lambda k, n, f=file: self.status[f].update(ai_done=k, ai_total=n),
                     )
                 except Cancelled:
-                    print(f"  ✗ {Path(file).name}: stopped {director} (decision model switched)")
+                    print(f"  ✗ {Path(file).name}: stopped {director} (decision model or named show switched)")
                     continue
                 if director == self.wanted():
                     self._install(file, a, plan, director)

@@ -16,6 +16,9 @@ struct NightCard: View {
                 Divider()
                 if arc.lightshow != nil {
                     LightshowRow(on: arc.lightshow ?? false, send: send)
+                    if let shows = arc.namedShows, !shows.isEmpty {
+                        NamedShowRow(arc: arc, shows: shows, send: send)
+                    }
                     Divider()
                 }
                 if arc.on {
@@ -54,6 +57,10 @@ struct NightCard: View {
                         if arc.lightshow == true {
                             Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
                                 .help("Lightshow: every track played as a show piece")
+                        }
+                        if let show = arc.namedShow {
+                            Image(systemName: "star.circle.fill").font(.caption).foregroundStyle(.orange)
+                                .help("Named show: \(show.title)")
                         }
                         if arc.haze != nil {
                             Image(systemName: "cloud.fog.fill").font(.caption).foregroundStyle(.orange)
@@ -191,6 +198,59 @@ private struct LightshowRow: View {
                 .labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
         .help("Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.")
+    }
+}
+
+/// The DJ's named show: a fixed style for their whole set (Prydz Tomorrow …), per genre; None: the house style of
+/// each track's genre. The tracks are planned again in the background when it changes.
+private struct NamedShowRow: View {
+    var arc: ArcStatus
+    var shows: [NamedShow]
+    var send: ([String: Any]) -> Void
+
+    private var genres: [String] {
+        var out: [String] = []
+        for show in shows where !out.contains(show.genre) { out.append(show.genre) }
+        return out
+    }
+
+    private func of(_ genre: String) -> [NamedShow] { shows.filter { $0.genre == genre } }
+
+    private var playing: Bool { arc.namedShow != nil && arc.lightshow != true }
+
+    private var caption: String {
+        guard let show = arc.namedShow else { return "Each track in its genre's style" }
+        return arc.lightshow == true ? "Waits while the Lightshow plays" : "Every track in \(show.title), until you pick None"
+    }
+
+    private var selection: Binding<String> {
+        Binding(get: { arc.named ?? "" }, set: { send(["named": $0]) })
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "star.circle").frame(width: 18)
+                .foregroundStyle(playing ? Color.orange : Color.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Named Show").font(.callout.weight(.semibold))
+                Text(caption).font(.caption).foregroundStyle(playing ? Color.orange : Color.secondary)
+            }
+            Spacer()
+            Picker("Named Show", selection: selection) {
+                Text("None").tag("")
+                ForEach(genres, id: \.self) { genre in
+                    SwiftUI.Section {
+                        ForEach(of(genre)) { show in
+                            Text(show.title).tag(show.key)
+                        }
+                    } header: {
+                        Text(genre.capitalized)
+                    }
+                }
+            }
+            .labelsHidden().pickerStyle(.menu).controlSize(.small).fixedSize()
+        }
+        .help("A show with a style of its own, for a DJ who wants one look all set long: its colours, how the heads light and move. Every track is lit in it, whatever its genre. Takes a few seconds per track to prepare; the show keeps playing meanwhile.")
     }
 }
 

@@ -423,7 +423,7 @@
   "safety" : {
     "allow_fast_strobe" : false,
     "master" : 1,
-    "max_flash_hz" : 3
+    "max_flash_hz" : 4
   },
   "screen" : {
     "width_m" : 6.6

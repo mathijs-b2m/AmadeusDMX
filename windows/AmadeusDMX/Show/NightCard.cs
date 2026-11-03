@@ -27,6 +27,7 @@ public sealed class NightCard(AppModel model)
     readonly FontIcon _hand = UI.Icon("hand.raised.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _fog = UI.Icon("cloud.fog.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _sparkles = UI.Icon("sparkles", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
+    readonly FontIcon _star = UI.Icon("star.circle.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly TextBlock _clock = UI.Text("", Font.Caption).Secondary();
     readonly TextBlock _countdown = UI.Text("", Font.Title2).Bold();
     readonly FontIcon _chevron = UI.Icon("chevron.down").Secondary();
@@ -41,7 +42,7 @@ public sealed class NightCard(AppModel model)
         {
             Content = UI.HStack(10,
                 _moon,
-                UI.VStack(1, UI.HStack(5, _title, _pin, _sparkles, _fog, _hand).Leading(), _clock.Leading()),
+                UI.VStack(1, UI.HStack(5, _title, _pin, _sparkles, _star, _fog, _hand).Leading(), _clock.Leading()),
                 UI.Spacer(8),
                 _countdown,
                 _chevron),
@@ -63,7 +64,7 @@ public sealed class NightCard(AppModel model)
     void Refresh()
     {
         if (Arc is not { } arc || _card is null) return;
-        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
+        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{string.Join(",", (arc.NamedShows ?? []).Select(n => $"{n.Key}={n.Title}={n.Genre}"))}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
         if (shape != _shape)
         {
             _shape = shape;
@@ -83,6 +84,7 @@ public sealed class NightCard(AppModel model)
         _hand.Visible(arc.Manual.Count > 0).Tooltip(Night.HeldHelp(arc));
         _fog.Visible(arc.Haze is not null).Tooltip("You push the haze");
         _sparkles.Visible(arc.Lightshow == true).Tooltip("Lightshow: every track played as a show piece");
+        _star.Visible(arc.NamedShow is not null).Tooltip(arc.NamedShow is { } named ? $"Named show: {named.Title}" : "");
         _clock.Text = Night.Clock(arc);
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
@@ -101,6 +103,7 @@ public sealed class NightCard(AppModel model)
         if (arc.Lightshow is not null)
         {
             _body.Children.Add(LightshowRow(arc));
+            if (arc.NamedShows is { Count: > 0 } shows) _body.Children.Add(NamedShowRow(shows));
             _body.Children.Add(UI.Divider());
         }
         if (arc.On)
@@ -200,6 +203,40 @@ public sealed class NightCard(AppModel model)
         // the line wraps (it is longer while on), so the switch stays in the card
         return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow(), toggle)
             .Tooltip(Night.LightshowHelp);
+    }
+
+    // MARK: the DJ's named show: a fixed style for their whole set (Prydz Tomorrow …), per genre; None: the house
+    // style of each track's genre. The tracks are planned again in the background when it changes.
+
+    UIElement NamedShowRow(IReadOnlyList<NamedShow> shows)
+    {
+        var icon = UI.Icon("star.circle").Frame(width: 18);
+        var status = UI.Text("", Font.Caption);
+        var label = UI.Text("None", Font.Caption);
+        var picker = UI.MenuButton(label, () =>
+        {
+            var named = Arc?.Named ?? "";
+            var menu = UI.Menu(UI.Choice("None", "named", named == "", () => Send(ArcMessage.Named(""))));
+            foreach (var genre in Night.NamedShowGenres(shows))
+            {
+                menu.Items.Add(UI.Separator());
+                menu.Items.Add(UI.Note(Formatting.Capitalized(genre)));
+                foreach (var show in shows.Where(s => s.Genre == genre))
+                    menu.Items.Add(UI.Choice(show.Title, "named", named == show.Key, () => Send(ArcMessage.Named(show.Key))));
+            }
+            return menu;
+        }).Small();
+        _updates.Add(a =>
+        {
+            label.Text = a.NamedShow?.Title ?? "None";
+            status.Text = Night.NamedShowStatus(a);
+            var tint = Night.NamedShowPlaying(a) ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush");
+            status.Foreground(tint);
+            icon.Foreground(tint);
+        });
+        var title = UI.Text("Named Show", Font.Callout).Bold();
+        return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow(), picker)
+            .Tooltip(Night.NamedShowHelp);
     }
 
     // MARK: the haze push: the hazers at a level for a while (to fill the room), then the room kept that hazy

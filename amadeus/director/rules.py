@@ -43,6 +43,7 @@ RULE_LOOKS = {
         ("off", "pulse", "kick", "random", "tilt_wave", "wave", "crowd", "white", "impact"),
         ("full", "color_pop", "kick", "steady", "tilt_wave", "mirror", "sky", "accent", "impact"),
         ("off", "pulse", "kick", "steady", "pour", "sync", "crowd", "white", "impact"),
+        ("off", "pulse", "kick", "strobe", "swing", "mirror", "crowd", "white", "impact"),
     ],
     "breakdown": [
         ("dim", "none", "accents", "breathe", "circle", "wave", "sky", "base", "steady"),
@@ -332,6 +333,8 @@ class RuleDirector:
         apply_lasers(d, self.lasers, n_before)
         apply_screen(d, self.screen, n_before)
         apply_fog(d, self.fog, last, i == len(a.phrases) - 1)
+        if self.style:
+            self.style.enforce(d, n_before)  # a named show's own layers, after the groups
         arc = song_arc(a)[i]
         laser_star(d, arc, self.lasers)
         apply_arc(d, arc, self.lasers, self.groups)

@@ -66,7 +66,7 @@ def write_rig(items: list[dict], show, artnet: dict | None = None) -> dict:
     """The fixtures (and the node) into the show's set; the rig keeps its trusses and stage."""
     rig = show.load()
     rig["artnet"] = artnet or rig.get("artnet", {"ip": "192.168.1.50", "port": 6454, "fps": 40})
-    rig.setdefault("safety", {"max_flash_hz": 3.0, "master": 1.0})
+    rig.setdefault("safety", {"max_flash_hz": 4.0, "master": 1.0})
     from amadeus.rig.store import PLACEMENT_KEYS
 
     for it in items:  # the gear only: where they hang is up to the rig (auto-mount or the rig editor)

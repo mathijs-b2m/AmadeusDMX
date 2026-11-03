@@ -178,6 +178,8 @@ def apply_arc(d: Decision, arc: dict, lasers, groups, next_best=None) -> bool:
         d.movement, changed = "nod", True
     if calm and d.head_light == "random":
         d.head_light, changed = "breathe", True
+    if d.head_light == "strobe" and (calm or role in ("gentle_drop", "early")):  # a strobe is for real energy
+        d.head_light, changed = ("steady" if calm else "beat"), True
     if role in ("main_drop", "main_chorus") and d.intensity < 3:
         d.intensity, changed = 3, True
     return changed

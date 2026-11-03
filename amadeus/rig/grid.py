@@ -57,7 +57,7 @@ def grid_rig(
         "description": f"{count}× {defn['manufacturer']} {defn['model']} on {rows} trusses "
         f"({width:g} m wide, {height:g}–{height + rise * (rows - 1):g} m high); visualiser only",
         "artnet": {"ip": "127.0.0.1", "port": 6454, "fps": 40},
-        "safety": {"max_flash_hz": 3, "master": 1.0, "allow_fast_strobe": False},
+        "safety": {"max_flash_hz": 4, "master": 1.0, "allow_fast_strobe": False},
         "fixtures": fixtures,
         "stage": {
             "width_m": round(stage_w, 2),
@@ -161,7 +161,7 @@ def concert_rig(
         f"{n['top']} overhead, {n['back']} at the back, {n['front']} on the front edge, "
         f"{per_tower} per side tower; visualiser only",
         "artnet": {"ip": "127.0.0.1", "port": 6454, "fps": 40},
-        "safety": {"max_flash_hz": 3, "master": 1.0, "allow_fast_strobe": False},
+        "safety": {"max_flash_hz": 4, "master": 1.0, "allow_fast_strobe": False},
         "fixtures": fixtures,
         "stage": {
             "width_m": round(stage_w, 2),

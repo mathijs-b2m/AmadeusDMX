@@ -32,7 +32,7 @@ every fixture hangs.
   "description": "My gear",
   "artnet": {"ip": "2.0.0.10", "port": 6454, "fps": 40},
   "output": {"type": "sacn"},
-  "safety": {"max_flash_hz": 3, "master": 1.0, "allow_fast_strobe": false},
+  "safety": {"max_flash_hz": 4, "master": 1.0, "allow_fast_strobe": false},
   "director": "openai",
   "fixtures": [
     {"id": "fuze1", "fixture": "beamz/fuze75b-beam", "mode": "12ch", "universe": 1, "address": 1,

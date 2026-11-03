@@ -57,6 +57,13 @@ ACCENT_SECTIONS = ("groove", "drop", "buildup", "verse", "chorus")
 BLOCK_BARS = 4  # in energetic parts the group's kick pattern and the accent roles change this often
 MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 
+# The heads' strobe (head light "strobe"): white flashes on the beat grid, as fine as the section asks (notes per
+# beat) and the set's flash limit allows (max_flash_hz; allow_fast_strobe: up to FAST_STROBE_HZ; strobe_free: the
+# heads pulse on the kick instead). Every head with a dimmer strobes this way, in time with the music.
+HEAD_STROBE_DIV = {"drop": 4, "groove": 2, "chorus": 2, "buildup": 2}  # elsewhere: on the beat
+HEAD_STROBE_ON_S = 0.05  # a flash: two DMX frames
+FAST_STROBE_HZ = 10.0
+
 
 def kick_turn(pattern: str, k: int, n: int, hit: int) -> bool:
     """Does element k (of n, left to right) play kick number `hit` in this pattern?"""
@@ -159,7 +166,7 @@ class LooksMixin:
         beat, phase, period = self.beat_info(t)
         i = d.phrase  # this look's own phrase (during a crossfade the previous look is rendered too)
         nxt = self.plan[i + 1] if i + 1 < len(self.plan) else None
-        max_hz = float(self.rig["safety"].get("max_flash_hz", 3.0))
+        max_hz = float(self.rig["safety"].get("max_flash_hz", 4.0))
         dim = 0.0
         if self.rig["safety"].get("strobe_free"):
             pass  # strobe-free: the strobes stay dark
@@ -176,6 +183,26 @@ class LooksMixin:
             dim = _decay(self.flash_t, self.flash_s, t, 0.06)
         for e in strobes:
             out[e["id"]] = State(dimmer=dim, r=1.0, g=1.0, b=1.0)
+
+    def _head_strobe_hz(self) -> float:
+        """How often a head may flash (0: strobe-free)."""
+        safety = self.rig["safety"]
+        if safety.get("strobe_free"):
+            return 0.0
+        return FAST_STROBE_HZ if safety.get("allow_fast_strobe") else float(safety.get("max_flash_hz", 4.0))
+
+    def head_strobe(self, d: Decision, t: float) -> float | None:
+        """The heads' strobe at t: 1 while a flash is on, 0 between (None: strobe-free). Flashes on the beat grid,
+        1/16 notes in a drop, 1/8 in a groove or a build, else on the beat, halved until the flash limit is kept."""
+        hz = self._head_strobe_hz()
+        if hz <= 0:
+            return None
+        beat, phase, period = self.beat_info(t)
+        div = float(HEAD_STROBE_DIV.get(d.section, 1))
+        while div > 0.25 and div / max(period, 1e-3) > hz + 1e-6:
+            div /= 2
+        since = ((beat + phase) * div % 1.0) / div * period
+        return 1.0 if since < HEAD_STROBE_ON_S else 0.0
 
     def _layer(self, d: Decision, j: int) -> str | None:
         """Layering: 'base' (holds a soft glow) or 'accent' (plays the hits); None when not layered."""
@@ -575,8 +602,12 @@ class LooksMixin:
             col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + step) % len(cols)]}[hc]
             hl = d.head_light
             mine = env if kick_turn(head_pattern, rank[f["id"]], nh, hit) else 0.0  # this head's kick
+            gate = None  # strobing: the flash, applied last (the beam's level is worked out first)
             if role["movement"] == "pour" and hl != "off":  # the pour plays its own light: lit falling, dark rising
                 dim = self.pour_light(d, t, j, role)
+            elif hl == "strobe":  # white flashes on the beat grid; strobe-free: a pulse on the kick
+                gate = self.head_strobe(d, t)
+                dim, col = (1.0, (1.0, 1.0, 1.0)) if gate is not None else (0.25 + 0.75 * mine, col)
             elif hl == "flick":  # on around the beat, when the head arrives and turns; dark while travelling
                 dim = 1.0 if (phase < 0.22 or phase > 0.85) else 0.0
             elif hl == "beat":  # on with the kick, held, let go: on/off (the phrase's pattern splits the group)
@@ -615,8 +646,11 @@ class LooksMixin:
                     col = base
             if rise:
                 dim *= 0.4 + 0.6 * progress
-            st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
-            if d.dynamics == "impact" and d.head_light != "off" and voice != "tac":  # (the flash: the boom's)
+            strobe = 0.0
+            if gate is not None and layer != "base" and not voice:
+                strobe, dim = dim, dim * gate
+            st = State(dimmer=dim, r=col[0], g=col[1], b=col[2], strobe=strobe)
+            if d.dynamics == "impact" and d.head_light != "off" and voice != "tac" and not strobe:  # (the boom's)
                 st.white = flash * (dim if role["movement"] == "pour" else 1.0)  # (a pour waits dark at the floor)
             st.fx = d.beam_fx
             featured = self._featured(d, j) if grouping in ("split", "solo") else None
@@ -637,6 +671,7 @@ class LooksMixin:
         master = INTENSITY_MASTER[max(0, min(3, level))] * self.rig["safety"]["master"]
         for st in out.values():
             st.dimmer *= master
+            st.strobe *= master
         return out
 
     def _star_lights(self) -> list[str]:

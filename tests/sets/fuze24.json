@@ -341,7 +341,7 @@
   "safety" : {
     "allow_fast_strobe" : false,
     "master" : 1,
-    "max_flash_hz" : 3
+    "max_flash_hz" : 4
   },
   "screen" : {
     "_note" : "LED wall behind the DJ (visualiser only for now)",

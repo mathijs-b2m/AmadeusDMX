@@ -117,6 +117,19 @@ public static class Night
 
     public const string LightshowHelp = "Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.";
 
+    /// The named show plays: one is picked and the Lightshow isn't on (it waits for it).
+    public static bool NamedShowPlaying(ArcStatus arc) => arc.NamedShow is not null && arc.Lightshow != true;
+
+    /// The Named Show row's line.
+    public static string NamedShowStatus(ArcStatus arc) =>
+        arc.NamedShow is not { } show ? "Each track in its genre's style"
+        : arc.Lightshow == true ? "Waits while the Lightshow plays" : $"Every track in {show.Title}, until you pick None";
+
+    /// The named shows' genres, in the engine's order (the menu's sections).
+    public static IReadOnlyList<string> NamedShowGenres(IReadOnlyList<NamedShow> shows) => shows.Select(s => s.Genre).Distinct().ToList();
+
+    public const string NamedShowHelp = "A show with a style of its own, for a DJ who wants one look all set long: its colours, how the heads light and move. Every track is lit in it, whatever its genre. Takes a few seconds per track to prepare; the show keeps playing meanwhile.";
+
     /// The haze push's line: what the hazers do now.
     public static string HazeStatus(ArcStatus arc)
     {
@@ -146,6 +159,8 @@ public static class ArcMessage
     public static Dictionary<string, object> Reset() => Make("reset", true);
     /// The Lightshow on or off: every track played as a show piece.
     public static Dictionary<string, object> Lightshow(bool on) => Make("lightshow", on);
+    /// The DJ's named show by its key ("": none, each track in its genre's style).
+    public static Dictionary<string, object> Named(string key) => Make("named", key);
     /// Push the hazers at `level` (0..1) for `seconds`, then keep the room that hazy with a burst every `every`
     /// seconds; "auto" gives it back.
     public static Dictionary<string, object> Haze(double level, double seconds, double every) =>

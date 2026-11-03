@@ -347,7 +347,7 @@ class CinematicMixin:
                 events.setdefault(eid, []).append((t, lv, hold, fade, colour, False))
 
         motif = {r: [-1e9, -1, 0] for r in ROLES}  # per voice: last hit, motif number, step in the motif
-        max_hz = float(self.rig["safety"].get("max_flash_hz", 3.0))
+        max_hz = float(self.rig["safety"].get("max_flash_hz", 4.0))
         last_flash = -1e9
         self.cine_played = []  # (time, level) of every hit the show played: how busy it is
         everything = [i for s in self.cine_sections for u in s["units"] for i in u]

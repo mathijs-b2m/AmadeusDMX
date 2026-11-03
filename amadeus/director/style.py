@@ -20,6 +20,11 @@ set's genre, and a new genre takes over after two tracks in a row. A track whose
 choice, the Decisions API from its artist and title, its tag) is lit in its own style: a Coldplay song in a
 techno set is still pop. A genre with a program of its own (cinematic) plays that program and leaves the
 set's genre alone.
+
+A **named show** is a style sheet of its own within a genre ("Prydz Tomorrow", a techno show): the DJ picks it for
+their set, and every track is lit in it, whatever its genre, until it is switched off. Besides its colours and
+leans it says what it always does (`always`, per section): the colours of the pars and heads, how the heads light
+and move. Those are not leans but the show, in every phrase, for both directors.
 """
 
 from __future__ import annotations
@@ -43,6 +48,21 @@ class Style:
     beat: str = ""  # a trigger that IS the genre (reggaeton: boom-tac): not a lean, the beat of its body
     looks: dict[str, dict] = field(default_factory=dict)  # per section: the genre's own look there (disco's
     # mirror ball in the break), every layer it names
+    title: str = ""  # a named show: its name (and `of`: the genre it belongs to)
+    of: str = ""
+    always: dict[str, dict] = field(default_factory=dict)  # a named show: per section ("*": all), per layer,
+    # what it always plays (a tuple: taken in turn per phrase of the section)
+
+    def enforce(self, d, k: int) -> bool:
+        """A named show's own layers for decision `d` (k: the phrases of its section so far), after everything else
+        the director decided (the groups too). True if changed."""
+        changed = False
+        for layer, values in {**self.always.get("*", {}), **self.always.get(d.section, {})}.items():
+            v = values[k % len(values)] if isinstance(values, tuple) else values
+            if getattr(d, layer) != v:
+                setattr(d, layer, v)
+                changed = True
+        return changed
 
     def keep_beat(self, d) -> bool:
         """The genre's own beat where the music plays a beat: in the body of the track (grooves, verses,
@@ -98,7 +118,7 @@ BEAT_TRIGGERS = ("kick", "backbeat", "hats", "eighths", "sixteenths", "synth")
 KIT_ALSO = ("bars",)  # a band: where its drums play, the kit plays them, also where a calm look would only count bars
 
 
-def _style(genre, text, palettes, avoid=None, prefer=None, beat="", looks=None) -> Style:
+def _style(genre, text, palettes, avoid=None, prefer=None, beat="", looks=None, **named) -> Style:
     return Style(
         genre,
         text,
@@ -107,6 +127,7 @@ def _style(genre, text, palettes, avoid=None, prefer=None, beat="", looks=None) 
         {k: tuple(v) for k, v in (prefer or {}).items()},
         beat,
         dict(looks or {}),
+        **named,
     )
 
 
@@ -117,7 +138,7 @@ MIRROR_BALL = {"beam_fx": "gobo_rotate", "gobo_style": "dots", "movement": "circ
 
 
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
-_CALM_AVOID = {"head_light": {"flick", "beat", "random"},
+_CALM_AVOID = {"head_light": {"flick", "beat", "random", "strobe"},
                "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave", "pour"},
                "par_accent": {"chase"}, "beam_fx": {"prism_spin", "gobo_spin", "gobo_shake"}}  # fmt: skip
 _CALM_PREFER = {"head_light": ("breathe", "steady"), "movement": ("sweep", "still", "circle"),
@@ -223,7 +244,7 @@ STYLES: dict[str, Style] = {
             "rnb",
             "R&B and soul: smooth and warm. Gold and warm colours, soft fades, slow sweeping movement; nothing harsh.",
             ["gold", "warm", "cool"],
-            {"head_light": {"flick"}, "par_accent": {"sparkle"}, "movement": {"ballyhoo"}},
+            {"head_light": {"flick", "strobe"}, "par_accent": {"sparkle"}, "movement": {"ballyhoo"}},
             {"head_light": ("breathe", "steady"), "par_accent": ("pulse", "color_pop"), "movement": ("sweep", "swing")},
         ),  # fmt: skip
         _style(
@@ -308,7 +329,7 @@ STYLES: dict[str, Style] = {
                 "par_base": {"off"},
                 "par_accent": {"none", "melody"},
                 "movement": {"nod", "bounce", "ballyhoo", "step_on_beat"},
-                "head_light": {"flick", "random", "beat"},
+                "head_light": {"flick", "random", "beat", "strobe"},
                 "beam_fx": {"gobo_shake", "gobo_spin", "frost"},
                 "gobo_style": {"shapes", "curves"},
             },
@@ -362,9 +383,78 @@ STYLES: dict[str, Style] = {
 }
 
 
+# The heads steal the show: every head plays the light (no glowing base layer), all groups at once.
+_HEADS_LEAD = {"layer_split": "none", "grouping": ("unison", "per_group")}
+
+# Named shows: a fixed style for a DJ's whole set, picked in the night card. Their key is the style's "genre" (the
+# plan cache tells them apart by it); `of` is the genre they belong to, `title` what the app shows.
+NAMED: dict[str, Style] = {
+    s.genre: s
+    for s in [
+        _style(
+            "prydz-tomorrow",
+            "Prydz Tomorrow: red and white. The pars wash the stage in deep red, the beam heads are open white and "
+            "steal the show: swinging, sweeping, and strobing hard on the drops and the peaks. Now and then, in "
+            "the breaks, the red gives way to a dark blue or green, then back.",
+            ["prydz", "prydz_blue", "prydz_green"],
+            title="Prydz Tomorrow",
+            of="techno",
+            always={
+                "*": {
+                    "palette": "prydz",
+                    "head_color": "white",
+                    "beam_fx": "open",
+                    "par_base": "full",
+                    "par_accent": "none",
+                },
+                "groove": {
+                    "head_light": ("strobe", "beat", "strobe", "flick"),
+                    "movement": ("swing", "sweep"),
+                    "formation": ("mirror", "wave", "fan"),
+                    "par_accent": "pulse",
+                    **_HEADS_LEAD,
+                },
+                "drop": {
+                    "head_light": "strobe",
+                    "movement": ("swing", "ballyhoo", "swing", "sweep"),
+                    "formation": ("mirror", "fan", "cross"),
+                    "aim": "crowd",
+                    "par_accent": "pulse",
+                    "dynamics": "impact",
+                    **_HEADS_LEAD,
+                },
+                "buildup": {"head_light": ("pulse", "strobe"), "movement": ("sweep", "nod"), **_HEADS_LEAD},
+                "chorus": {"head_light": ("strobe", "beat"), "movement": ("swing", "sweep"), **_HEADS_LEAD},
+                "breakdown": {
+                    "palette": ("prydz", "prydz_blue", "prydz", "prydz_green"),
+                    "head_light": "steady",
+                    "movement": ("sweep", "still"),
+                    "par_base": "dim",
+                },
+                "bridge": {
+                    "palette": ("prydz_blue", "prydz_green"),
+                    "head_light": "steady",
+                    "movement": "sweep",
+                    "par_base": "dim",
+                },
+                "intro": {"head_light": "steady", "movement": "sweep", "par_base": "dim"},
+                "outro": {"head_light": "steady", "movement": "sweep", "par_base": "dim"},
+            },
+        ),  # fmt: skip
+    ]
+}
+
+
 def style_for(genre: str | None) -> Style | None:
-    """The style sheet of a genre (None: no genre, or a genre with a program of its own)."""
-    return STYLES.get(genre or "")
+    """The style sheet of a genre or a named show (None: no genre, or a genre with a program of its own)."""
+    return STYLES.get(genre or "") or NAMED.get(genre or "")
+
+
+def named_shows() -> list[dict]:
+    """The named shows, for the apps: [{key, title, genre}], per genre in the order of the genres."""
+    order = list(STYLES)
+    shows = sorted(NAMED.values(), key=lambda s: (order.index(s.of) if s.of in order else len(order), s.title))
+    return [{"key": s.genre, "title": s.title, "genre": s.of} for s in shows]
 
 
 def check() -> list[str]:
@@ -375,7 +465,18 @@ def check() -> list[str]:
     options = {name: {v for v, _ in opts} for name, opts, _ in LAYERS}
     known = {f.name for f in Decision.__dataclass_fields__.values()}
     out = []
-    for s in STYLES.values():
+    for s in [*STYLES.values(), *NAMED.values()]:
+        if s.title and s.of not in STYLES:
+            out.append(f"{s.genre}: genre {s.of}")
+        for section, layers in s.always.items():
+            for layer, v in layers.items():
+                values = v if isinstance(v, tuple) else (v,)
+                if layer not in known:
+                    out.append(f"{s.genre}: always {layer}")
+                elif layer == "palette":
+                    out += [f"{s.genre}: palette {p}" for p in values if p not in PALETTES]
+                elif layer in options:
+                    out += [f"{s.genre}: {section} {layer}={x}" for x in values if x not in options[layer]]
         out += [f"{s.genre}: palette {p}" for p in s.palettes if p not in PALETTES]
         for table in (s.avoid, s.prefer):
             for layer, values in table.items():
@@ -425,4 +526,4 @@ class SetGenre:
             return out
 
 
-__all__ = ["DEFAULT_PALETTES", "STYLES", "SetGenre", "Style", "check", "style_for"]
+__all__ = ["DEFAULT_PALETTES", "NAMED", "STYLES", "SetGenre", "Style", "check", "named_shows", "style_for"]
