@@ -108,6 +108,8 @@ public class ShowLogicTests
         Assert.Equal("""{"type":"arc","haze":{"level":0.5,"seconds":60,"every":20}}""", ArcMessage.Json(ArcMessage.Haze(0.5, 60, 20)));
         Assert.Equal("""{"type":"arc","haze":"auto"}""", ArcMessage.Json(ArcMessage.HazeAuto()));
         Assert.Equal("""{"type":"arc","lightshow":true}""", ArcMessage.Json(ArcMessage.Lightshow(true)));
+        Assert.Equal("""{"type":"arc","named":"prydz"}""", ArcMessage.Json(ArcMessage.Named("prydz")));
+        Assert.Equal("""{"type":"arc","named":""}""", ArcMessage.Json(ArcMessage.Named("")));
     }
 
     [Fact]
@@ -118,6 +120,36 @@ public class ShowLogicTests
         Assert.True(on.Lightshow);
         Assert.NotEqual(Arc(ArcJson), on);
         Assert.Equal("Every track a show piece, until you switch it off", Night.LightshowStatus(true));
+    }
+
+    [Fact]
+    public void TheNamedShowsAsTheEngineSendsThem()
+    {
+        var old = Arc(ArcJson);  // an engine without named shows: no row
+        Assert.Null(old.Named);
+        Assert.Null(old.NamedShows);
+        Assert.Null(old.NamedShow);
+        const string shows = "\"named_shows\": [{\"key\": \"prydz\", \"title\": \"Prydz Tomorrow\", \"genre\": \"techno\"}, "
+            + "{\"key\": \"disco\", \"title\": \"Studio 54\", \"genre\": \"disco\"}, {\"key\": \"warehouse\", \"title\": \"Warehouse\", \"genre\": \"techno\"}]";
+        var none = Arc(ArcJson.Replace("\"hold\": 4}", $"\"hold\": 4, \"lightshow\": false, \"named\": \"\", {shows}}}"));
+        Assert.Equal("", none.Named);
+        Assert.Equal(3, none.NamedShows!.Count);
+        Assert.Equal(new NamedShow { Key = "prydz", Title = "Prydz Tomorrow", Genre = "techno" }, none.NamedShows[0]);
+        Assert.Null(none.NamedShow);
+        Assert.False(Night.NamedShowPlaying(none));
+        Assert.Equal("Each track in its genre's style", Night.NamedShowStatus(none));
+        Assert.Equal(["techno", "disco"], Night.NamedShowGenres(none.NamedShows));
+
+        var picked = Arc(ArcJson.Replace("\"hold\": 4}", $"\"hold\": 4, \"lightshow\": false, \"named\": \"prydz\", {shows}}}"));
+        Assert.Equal("Prydz Tomorrow", picked.NamedShow?.Title);
+        Assert.True(Night.NamedShowPlaying(picked));
+        Assert.Equal("Every track in Prydz Tomorrow, until you pick None", Night.NamedShowStatus(picked));
+        Assert.NotEqual(none, picked);
+        Assert.Equal(picked, Arc(ArcJson.Replace("\"hold\": 4}", $"\"hold\": 4, \"lightshow\": false, \"named\": \"prydz\", {shows}}}")));
+
+        var waits = Arc(ArcJson.Replace("\"hold\": 4}", $"\"hold\": 4, \"lightshow\": true, \"named\": \"prydz\", {shows}}}"));
+        Assert.False(Night.NamedShowPlaying(waits));
+        Assert.Equal("Waits while the Lightshow plays", Night.NamedShowStatus(waits));
     }
 
     [Fact]

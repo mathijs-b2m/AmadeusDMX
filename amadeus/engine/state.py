@@ -23,6 +23,8 @@ class State:
     spin: float = 0.0  # lasers: rotation -1..1 (0 = still)
     lcolor: str = ""  # lasers: colour mode (base/accent/white/cycle: one colour; multi/rainbow: per beam)
     phase: float = -1.0  # lasers: ripple position across the fan 0..1 (-1: all beams lit)
+    strobe: float = 0.0  # moving heads: strobing, a flash this bright (0: not strobing; the show arc holds the
+    # beam steady at this level where its flashes knob is down, and never smooths a strobe)
     dmx_pan: float | None = None  # pan/tilt sent as DMX (the target, slightly ahead); pan/tilt above is the
     dmx_tilt: float | None = None  # predicted real position, used by the visualiser
 
@@ -31,7 +33,7 @@ class State:
         src = o if k >= 0.5 else self  # discrete: switch halfway
         out.fx, out.gobo, out.fx_speed, out.fx_reverse = src.fx, src.gobo, src.fx_speed, src.fx_reverse
         out.size, out.spin, out.lcolor, out.phase = src.size, src.spin, src.lcolor, src.phase
-        out.dmx_pan, out.dmx_tilt = src.dmx_pan, src.dmx_tilt
+        out.dmx_pan, out.dmx_tilt, out.strobe = src.dmx_pan, src.dmx_tilt, src.strobe
         out.zoom = self.zoom * (1 - k) + o.zoom * k
         return out
 

@@ -19,7 +19,7 @@ def load_rig(source) -> dict:
 
 def load_rig_dict(rig: dict) -> dict:
     rig = json.loads(json.dumps(rig))  # private copy
-    rig.setdefault("safety", {"max_flash_hz": 3.0, "master": 1.0})
+    rig.setdefault("safety", {"max_flash_hz": 4.0, "master": 1.0})
     rig.setdefault("artnet", {"ip": "127.0.0.1", "port": 6454, "fps": 40})
     for f in rig["fixtures"]:
         f.setdefault("mode", fxlib.default_mode(fxlib.get(f["fixture"])))

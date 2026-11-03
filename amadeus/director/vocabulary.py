@@ -61,6 +61,19 @@ PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 
         "Warm white, amber and deep blue. A concert stage: rock, live bands.",
         [(1.0, 0.85, 0.65), (1.0, 0.55, 0.1), (0.1, 0.2, 0.9), (1.0, 1.0, 1.0)],
     ),
+    # a named show's own (director/style.py, NAMED): Prydz Tomorrow's red and white, now and then dark blue or green
+    "prydz": (
+        "Deep red and white: red washes, white beams.",
+        [(1.0, 0.0, 0.0), (0.75, 0.0, 0.02), (1.0, 1.0, 1.0), (1.0, 0.05, 0.05)],
+    ),
+    "prydz_blue": (
+        "Dark blue with red and white: a cold moment in a red show.",
+        [(0.0, 0.06, 0.55), (1.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.0, 0.1, 0.8)],
+    ),
+    "prydz_green": (
+        "Deep green with red and white: a rare moment in a red show.",
+        [(0.0, 0.55, 0.12), (1.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.0, 0.7, 0.2)],
+    ),
 }
 DEFAULT_PALETTES = ["warm", "cool", "neon", "fire", "ice"]  # without a style
 
@@ -127,6 +140,12 @@ HEAD_LIGHT = [
     ),
     ("beat", "Beams on with the kick, held, then off: a punchy on/off rhythm, the group split into parts."),
     ("alternate", "Heads take turns per kick (left, right, left...): call and response."),
+    (
+        "strobe",
+        "The heads STROBE: sharp white flashes locked to the beat grid (1/16 notes in a drop, 1/8 in a groove or "
+        "build), while they keep moving. Pure energy: for drops, peaks and the top of a build, with swing, "
+        "sweep or ballyhoo; never in calm parts, and not for long stretches.",
+    ),
     (
         "random",
         "Every head lights on its own random kicks: a restless rig, each head its own rhythm. Great while "

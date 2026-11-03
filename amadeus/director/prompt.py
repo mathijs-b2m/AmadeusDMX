@@ -169,7 +169,13 @@ def build_prompt(
         f"Set position: {fmt_time(p.start)} of {fmt_time(a.duration)} ({p.start / a.duration:.0%}).",
         f"Track: {Path(str(a.path)).stem} (the title can be a hint for the mood or the show).",
     ]
-    if style:
+    if style and style.title:  # a named show: the DJ's fixed style for the whole set
+        parts.append(
+            f"STYLE: the DJ plays this set as the named show '{style.title}': {style.text} Its colours, the heads' "
+            f"light and their paths are the show's own; choose the rest (formation, aim, energy, groups) so it "
+            f"plays THIS phrase of the music."
+        )
+    elif style:
         parts.append(
             f"STYLE: this part of the set is {style.genre}. Its house style, as a LEAN, not a rule: {style.text} "
             f"Keep its colours, so the set looks like one show. For movement and light, let the music of THIS "

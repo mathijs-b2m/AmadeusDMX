@@ -53,7 +53,7 @@
   "safety": {
     "allow_fast_strobe": true,
     "master": 0.5,
-    "max_flash_hz": 3
+    "max_flash_hz": 4
   },
   "stage": {
     "ceiling_m": 2.6,

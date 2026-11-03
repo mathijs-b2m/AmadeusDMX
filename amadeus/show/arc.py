@@ -38,6 +38,7 @@ from pathlib import Path
 
 from amadeus import paths, system
 from amadeus.director.arc import song_arc
+from amadeus.director.style import NAMED, named_shows
 from amadeus.engine.fog import DEFAULT_CLEAR_S, MIN_GAP_S, OUTDOOR_CLEAR_S, machine
 from amadeus.engine.state import State
 from amadeus.library import fixtures as fxlib
@@ -217,6 +218,7 @@ SPECIALS_MOMENTS, SPECIALS_FREE = 0.25, 0.75  # specials knob: in the box below,
 REVEAL_WAIT_PHRASES = 4  # a group new tonight waits for a drop to be revealed, but at most this many phrases
 GLIDE_S = 8.0  # the knobs follow a stage the music brings this quickly (1/e)
 DROP_FLASH = 0.6  # flashes turned down: a big drop still flashes at least this much
+HEAD_STROBE_FROM = 0.35  # the flashes knob from here: strobing heads strobe; below it they hold a steady beam
 BIG_DROP = 0.5  # drops at least this big keep their full response and flash (the moment the lights hit)
 DROPS_OWN_LOOK = 0.25  # drops at least this big bring their own look, also when looks are held
 
@@ -341,6 +343,7 @@ class ShowArc:
         self.locked = False  # the operator holds the stage
         self.manual: dict[str, float] = {}
         self.lightshow = False  # the operator's show piece: every track played by the lightshow program
+        self.named = ""  # the DJ's named show (director/style.py, NAMED): every track lit in it ("": none)
         self.fast = self.slow = None  # heat, followed quickly and slowly
         self.bpm_fast = self.bpm_slow = None
         self.bpm_base: float | None = None  # the warm-up's tempo
@@ -635,6 +638,8 @@ class ShowArc:
             if s is None:
                 continue
             g = self.gain[self.member_of[eid]] if eid in self.member_of else 1.0
+            if s.strobe > 0 and flashes < HEAD_STROBE_FROM:  # a strobing head: its flashes held as a steady beam
+                s.dimmer = s.strobe
             if eid in self.specials:
                 g = self.special_gain if self.special_gain > 0.02 else 0.0  # (a laser off is off)
                 if eid in self.strobes:
@@ -665,7 +670,8 @@ class ShowArc:
         k = 1 - math.exp(-dt / tau) if dt else 1.0
         for eid in self.lights:
             s = states.get(eid)
-            if s is None or eid in self.specials:
+            if s is None or eid in self.specials or s.strobe > 0:  # (a strobe stays crisp, or holds steady)
+                self.smooth.pop(eid, None)
                 continue
             fields = ("dimmer", "white") if eid in self.heads else ("dimmer", "white", "r", "g", "b")
             raw = [getattr(s, f) for f in fields]
@@ -799,7 +805,8 @@ class ShowArc:
         knob: {name: value} (the operator takes it over), auto: name | "all" (back to the arc),
         stage: key (force it), lock: bool, length_s: seconds, event: type, reset: true (a new night), enabled: bool,
         haze: {level: 0..1, seconds, every} (push the hazers, then keep the room that hazy: a burst every `every` s)
-        | "auto" (back to the show), lightshow: bool (every track played as a show piece)."""
+        | "auto" (back to the show), lightshow: bool (every track played as a show piece), named: a named show's key
+        | "" (the DJ's fixed style for the set, or none)."""
         now = time.time() if now is None else now
         haze = msg.get("haze")
         if isinstance(haze, dict):
@@ -838,6 +845,9 @@ class ShowArc:
         if "lightshow" in msg:
             self.lightshow = bool(msg["lightshow"])
             print(f"  ☾ show arc: lightshow {'on' if self.lightshow else 'off'}", flush=True)
+        if "named" in msg and (msg["named"] or "") in (*NAMED, ""):
+            self.named = msg["named"] or ""
+            print(f"  ☾ show arc: named show {NAMED[self.named].title if self.named else 'off'}", flush=True)
         snap = any(k in msg for k in ("stage", "event", "reset", "enabled", "auto", "length_s"))
         self.values = self._glide(self._targets(self.heat(), now), 0.0, snap)
         self._dirty = True  # saved within a few seconds (a slider sends many of these)
@@ -868,6 +878,8 @@ class ShowArc:
             "hazers": len(self.hazers),
             "haze": self.haze_status(),
             "lightshow": self.lightshow,
+            "named": self.named,
+            "named_shows": named_shows(),
         }
 
     # ------------------------------------------------------------ remembered between engine starts
@@ -885,6 +897,7 @@ class ShowArc:
             "locked": self.locked,
             "manual": self.manual,
             "lightshow": self.lightshow,
+            "named": self.named,
             "revealed": sorted(getattr(self, "revealed", ())),
             "countdowns": self.countdowns,
             "heat": [self.fast, self.slow],
@@ -912,6 +925,7 @@ class ShowArc:
             return  # the knobs and the length stay; the night itself starts again with the music
         self.started, self.seen = float(d["started"]), float(d["seen"])
         self.lightshow = bool(d.get("lightshow", False))  # (on for this night only)
+        self.named = d.get("named") if d.get("named") in NAMED else ""  # (the DJ's set: this night only)
         self._revealed_saved = [int(k) for k in d.get("revealed") or []]
         self.countdowns = [float(c) for c in d.get("countdowns") or []]
         self.stage = STAGE_KEYS.index(d["stage"]) if d.get("stage") in STAGE_KEYS else 0

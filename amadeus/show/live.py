@@ -231,7 +231,7 @@ async def run(
     sender = open_output(rig, None if artnet_ip == "rig" else artnet_ip) if artnet_ip else None
     shows = TrackShows(rig, director, cache, real_output=drives_real_lights(sender, rig))
     follower = DirectorFollower(show, shows) if follow_set else None
-    standins = StandIns(rig, shows.real_output, lambda: shows.set_genre.current or "")
+    standins = StandIns(rig, shows.real_output, lambda: shows.named or shows.set_genre.current or "")
     handover: dict[int, tuple] = {}  # per deck: (when its own show took over, the stand-in it fades out of)
     on_standin: set[int] = set()  # decks playing their stand-in groove
     universes = sorted({f["universe"] for f in rig["fixtures"]})
@@ -363,6 +363,7 @@ async def run(
                 wall = time.time()
                 shows.set_shape(arc.plan_shape())  # calmer heads, fewer look changes (rebuilt in the background)
                 shows.set_lightshow(arc.lightshow)  # the operator's show piece (every track rebuilt in the background)
+                shows.set_named(arc.named)  # the DJ's named show (every track rebuilt in its style, in the background)
                 if parts:
                     bpm = deck.bpm or a.bpm * deck.speed
                     arc.observe(wall, *((plan[i], bpm) if used != STANDIN else ()))  # a stand-in tells nothing

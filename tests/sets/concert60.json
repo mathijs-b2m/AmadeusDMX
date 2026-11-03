@@ -6,7 +6,7 @@
     "fps": 40
   },
   "safety": {
-    "max_flash_hz": 3,
+    "max_flash_hz": 4,
     "master": 1,
     "allow_fast_strobe": false
   },

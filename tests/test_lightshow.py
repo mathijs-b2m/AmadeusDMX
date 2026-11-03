@@ -111,12 +111,13 @@ def test_only_sections_that_have_joined_play(show):
             assert eid in playing
 
 
-def test_no_fixture_is_hit_faster_than_about_three_times_a_second(show):
-    a, _, e = show
+def test_no_fixture_is_hit_faster_than_the_flash_limit(show):
+    a, rig, e = show
     impacts = set(a.hits.t[a.hits.impact].round(6))
+    gap = min(C.RETRIGGER_S, 1 / rig["safety"]["max_flash_hz"])  # (the Lightshow hits as often as the set allows)
     for _, items in e.cine_events.values():
         played = [t0 for t0, *_ in items if round(t0, 6) not in impacts]
-        assert all(b - x >= C.RETRIGGER_S - 1e-6 for x, b in zip(played, played[1:]))
+        assert all(b - x >= gap - 1e-6 for x, b in zip(played, played[1:]))
 
 
 def test_strobes_stay_within_max_flash_hz(show):
@@ -134,9 +135,10 @@ def test_no_light_flickers(name):
     e = Engine(a, direct(a, LightshowDirector(), verbose=False), rig, real_output=False)
     ts = np.arange(0, a.duration, 1 / FPS)
     frames = [e.render(float(t))[1] for t in ts]
-    for eid in frames[0]:  # it flashes on purpose, but no light chops along with the music
+    fastest = 1 / rig["safety"]["max_flash_hz"] - 0.01  # it flashes on purpose, as often as the set allows …
+    for eid in frames[0]:  # … but no light chops along with the music
         x = np.array([f[eid].dimmer for f in frames])
-        assert fast_cycles(x) <= 0.03 * a.duration, eid
+        assert fast_cycles(x, fastest_s=fastest) <= 0.03 * a.duration, eid
 
 
 @pytest.mark.parametrize("name", ["showcase", "concert60"])

@@ -245,7 +245,7 @@ def build(draft: Draft, choices: dict[int, Choice], name: str) -> tuple[dict, di
     set_doc = {
         "description": f"Imported: {len(fixtures)} fixtures",
         "artnet": {"ip": "127.0.0.1", "port": 6454, "fps": 40},
-        "safety": {"max_flash_hz": 3, "master": 1.0, "allow_fast_strobe": False},
+        "safety": {"max_flash_hz": 4, "master": 1.0, "allow_fast_strobe": False},
         "director": "openai",
         "fixtures": fixtures,
     }

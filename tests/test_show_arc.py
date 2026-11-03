@@ -456,3 +456,32 @@ def test_no_hazers_no_push(tmp_path):
     states = {}
     arc.haze(states, None, 0.0, 0.05)
     assert states == {} and arc.snapshot(0.0)["hazers"] == 0
+
+
+def test_the_dj_picks_a_named_show_for_the_night(tmp_path):
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    snap = arc.snapshot(0.0)
+    assert snap["named"] == "" and any(s["key"] == "prydz-tomorrow" for s in snap["named_shows"])
+    arc.control({"named": "prydz-tomorrow"}, now=0.0)
+    arc.control({"named": "no-such-show"}, now=0.0)  # (an unknown one is ignored)
+    assert arc.snapshot(0.0)["named"] == "prydz-tomorrow"
+    arc.observe(1.0, SimpleNamespace(section="groove", intensity=2), 128.0)
+    arc.save(1.0)
+    assert ShowArc(load_rig(RIG), tmp_path / "arc.json", now=2.0).named == "prydz-tomorrow"  # an engine restart
+    arc.control({"named": ""}, now=3.0)
+    assert arc.named == ""
+
+
+def test_a_strobing_head_is_never_smoothed_and_holds_steady_without_flashes(tmp_path):
+    rig = load_rig(RIG)
+    arc = ShowArc(rig, tmp_path / "arc.json", now=0.0)
+    head = next(e["id"] for e in rig["elements"] if e["kind"] == "head")
+    arc.control({"knob": {"response": 0.0, "flashes": 1.0, "intensity": 1.0, "groups": 1.0}}, now=0.0)
+    for on in (1, 0, 1, 0):
+        states = {head: State(dimmer=float(on), strobe=1.0)}
+        arc.apply(states, None, 0.0, 0.025)
+        assert states[head].dimmer == pytest.approx(float(on) * arc.gain[arc.member_of[head]], abs=1e-6)
+    arc.control({"knob": {"flashes": 0.0}}, now=0.0)
+    states = {head: State(dimmer=0.0, strobe=1.0)}
+    arc.apply(states, None, 0.0, 0.025)
+    assert states[head].dimmer > 0  # flashes down: a steady beam instead of the strobe

@@ -70,3 +70,28 @@ def test_the_set_keeps_its_genre_until_a_new_one_lasts():
     assert s.genre_for("h.mp3", "pop", source="ai") == "pop"  # so does a genre known from artist and title
     assert s.genre_for("i.mp3", "cinematic") == "cinematic"  # a program of its own…
     assert s.genre_for("j.mp3", "pop", "audio") == "pop"  # …and leaves the set alone: pop twice, the set is pop
+
+
+def test_prydz_tomorrow_red_pars_white_heads_strobing_drops():
+    from amadeus.director.style import NAMED, named_shows
+
+    style = NAMED["prydz-tomorrow"]
+    assert style_for("prydz-tomorrow") is style and style.of == "techno"
+    assert {"key": "prydz-tomorrow", "title": "Prydz Tomorrow", "genre": "techno"} in named_shows()
+    a = synthetic_analysis()
+    plan = direct(a, RuleDirector(style=style), verbose=False)
+    assert all(d.head_color == "white" and d.beam_fx == "open" for d in plan)  # open white beams all night
+    body = [d for d in plan if d.section in ("groove", "drop", "buildup")]
+    assert body and all(d.palette == "prydz" for d in body)  # red washes, the blue and green only in the breaks
+    assert all(d.par_base == "full" for d in body)
+    drops = [d for d in plan if d.section == "drop"]
+    assert drops and sum(d.head_light == "strobe" for d in drops) >= len(drops) // 2  # (the arc tames an early one)
+    assert all(d.movement in ("swing", "ballyhoo", "sweep", "step_on_beat") for d in drops)
+
+
+def test_a_named_show_is_the_whole_set_and_not_a_lean():
+    from amadeus.director.style import NAMED
+
+    a = synthetic_analysis()
+    prompt = build_prompt(a, 0, [], style=NAMED["prydz-tomorrow"])
+    assert "named show 'Prydz Tomorrow'" in prompt and "LEAN" not in prompt

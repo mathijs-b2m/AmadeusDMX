@@ -255,7 +255,7 @@ public struct Hello: Decodable, Sendable {
         fixtures = try c.decodeIfPresent([FixtureInfo].self, forKey: .fixtures) ?? []
         stage = try c.decodeIfPresent(Stage.self, forKey: .stage) ?? Stage()
         plan = try c.decodeIfPresent([Decision].self, forKey: .plan) ?? []
-        maxFlashHz = try c.decodeIfPresent(Double.self, forKey: .maxFlashHz) ?? 3
+        maxFlashHz = try c.decodeIfPresent(Double.self, forKey: .maxFlashHz) ?? 4
         energy = try c.decodeIfPresent([Double].self, forKey: .energy) ?? []
         screen = try c.decodeIfPresent(Bool.self, forKey: .screen) ?? false
         countdown = try? c.decodeIfPresent(Int.self, forKey: .countdown)
@@ -376,14 +376,29 @@ public struct ArcStatus: Decodable, Sendable, Equatable {
     public var haze: HazePush?
     /// The operator's Lightshow: every track played as a show piece (nil: an engine without it).
     public var lightshow: Bool?
+    /// The DJ's named show: a fixed style for the set ("": none; nil: an engine without named shows).
+    public var named: String?
+    /// The named shows the engine offers, per genre.
+    public var namedShows: [NamedShow]?
 
     enum CodingKeys: String, CodingKey {
         case on, length, elapsed, stage, stages, event, events, locked, heat, trend, bpm, baseBpm = "base_bpm"
         case values, manual, groups, playing, movementLevel = "movement_level", hold, hazers, haze, lightshow
+        case named, namedShows = "named_shows"
     }
 
     public var stageName: String { stages.first { $0.first == stage }?.last ?? stage }
+    /// The named show that plays, if any.
+    public var namedShow: NamedShow? { namedShows?.first { $0.key == named } }
     public var remaining: Double? { elapsed.map { length - $0 } }
+}
+
+/// A named show (amadeus/director/style.py, NAMED): a style of its own within a genre, for a DJ's whole set.
+public struct NamedShow: Decodable, Sendable, Equatable, Identifiable {
+    public var key: String
+    public var title: String
+    public var genre: String
+    public var id: String { key }
 }
 
 /// The operator's haze push: the hazers at `level` for `seconds`, then the room kept that hazy with bursts.

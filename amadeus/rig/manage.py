@@ -39,7 +39,7 @@ def new_set(name: str, copy_of: str | None = None, generated: dict | None = None
     store.sets.save(name, {
         "description": "",
         "artnet": current.get("artnet", {"ip": "127.0.0.1", "port": 6454, "fps": 40}),
-        "safety": current.get("safety", {"max_flash_hz": 3, "master": 1.0}),
+        "safety": current.get("safety", {"max_flash_hz": 4, "master": 1.0}),
         "director": current.get("director", "rules"),
         "fixtures": [],
     })  # fmt: skip
