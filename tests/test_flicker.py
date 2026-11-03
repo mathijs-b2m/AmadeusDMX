@@ -151,6 +151,7 @@ def test_head_strobe_lights_the_frame_nearest_the_beat(track):
     late = np.array(late)
     assert np.abs(late).max() <= frame / 2 + 1e-6 and abs(late.mean()) < 0.003  # on the beat, not a frame after
 
+
 def test_strobe_free_heads_pulse_instead(track):
     rig = load_rig(SETS[0])
     rig["safety"]["strobe_free"] = True
