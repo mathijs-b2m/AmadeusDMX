@@ -134,7 +134,7 @@ struct Scenery {
                 } else {
                     trussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
                 }
-                if sel && !t.isRing {  // the end handles: drag one to stretch or turn the truss
+                if sel && !t.isLoop {  // the end handles: drag one to stretch or turn the truss
                     let r = Float(t.rotDeg) * .pi / 180, ax = SIMD3<Float>(cos(r), sin(r), 0)
                     for e: Float in [-1, 1] {
                         let p = SIMD3<Float>(Float(t.xM), Float(t.yM), Float(t.zM)) + ax * (Float(t.lengthM) / 2 * e)
@@ -262,6 +262,18 @@ struct Scenery {
 
     /// A horizontal quatro truss from the set: four chords along it and lacing, turned with it.
     private mutating func trussBeam(_ t: Truss, color: SIMD3<Float>, emissive: Float) {
+        if t.isCarre {  // its four sides, end plates at the corners, and a tower under each corner down to the floor
+            for (a, b) in t.pieces() {
+                var side = Truss(id: t.id, lengthM: simd_length(b - a), xM: (a.x + b.x) / 2, yM: (a.y + b.y) / 2,
+                                 zM: t.zM, rotDeg: atan2(b.y - a.y, b.x - a.x) * 180 / .pi)
+                side.type = t.type
+                straightBeam(side, color: color, emissive: emissive, ends: [-1, 1])
+            }
+            for c in t.carreCorners {
+                trussTower(Float(c.x), Float(c.y), Float(t.zM) - 0.05, color: color, emissive: emissive)
+            }
+            return
+        }
         if t.isRing {  // round: short straight pieces round the arc, end plates only where an arc ends
             let pieces = t.pieces(0.3)
             for (k, (a, b)) in pieces.enumerated() {

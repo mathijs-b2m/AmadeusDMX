@@ -6,7 +6,7 @@ one, each group its own formation, one group featured, ...); the engine uses eac
 group for formations, waves, chases and focus points.
 
 Groups come from the rig ("group" on a fixture), else from the trusses and positions:
-- a ring: the heads on one round truss, in order round it (`amadeus/engine/rings.py` plays them as a circle);
+- a ring: the heads on one round truss (or a carré), in order round it (`amadeus/engine/rings.py` plays them as a circle);
 - a column: 3+ heads at the same spot across the stage, stacked in height (a truss tower);
 - a row: heads with the same mount at about the same depth and height.
 Each group gets a class the director talks about: overhead, ring, back, front, towers (or "all").
@@ -46,7 +46,7 @@ def head_groups(rig: dict) -> list[dict]:
         return []
     named: dict[str, list] = {}
     rest = []
-    rings = {t["id"]: t for t in rig.get("trusses", []) if T.is_ring(t)}
+    rings = {t["id"]: t for t in rig.get("trusses", []) if T.is_loop(t)}
     for h in heads:
         if h[2].get("group"):
             named.setdefault(h[2]["group"], []).append(h)

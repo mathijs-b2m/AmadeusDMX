@@ -124,6 +124,14 @@ def _clock(t: dict, u: float) -> str:
     return f"{whole}{':30' if h % 1 else ''} o'clock"
 
 
+def _carre_side(t: dict, u: float) -> str:
+    """Which side of a carré, in crew words."""
+    nx, ny = -math.sin(math.radians(T.direction(t, u))), math.cos(math.radians(T.direction(t, u)))
+    return {"the audience": "front side", "upstage": "back side", "stage right": "SR side", "stage left": "SL side"}.get(
+        toward(nx, ny), f"side towards {toward(nx, ny)}"
+    )
+
+
 def _where(f: dict, t: dict | None, W: float) -> tuple[float, str]:
     """(sort key, where it goes in words)."""
     if t is None:
@@ -141,6 +149,9 @@ def _where(f: dict, t: dict | None, W: float) -> tuple[float, str]:
             return t["length_m"] + 1, "on top of the tower"
         face = toward(*T.tower_normal(t, side))
         return u, f"{u:.2f} m up from the base, on the face towards {face}"
+    if T.is_carre(t):  # round its frame from the front middle, like a ring
+        d = u % t["length_m"]
+        return d, f"{d:.2f} m round from the front middle, going SR first ({_carre_side(t, u)}), {SIDE_TEXT.get(side, side)}"
     if T.is_full_ring(t):  # round from its front middle, one way round
         d = u % t["length_m"]
         return d, f"{d:.2f} m round from the front middle, going SR first ({_clock(t, u)}), {SIDE_TEXT.get(side, side)}"
@@ -191,8 +202,8 @@ def layout(merged: dict) -> dict:
         fx = sorted(by[tid], key=lambda r: r["_key"])
         for n, r in enumerate(fx, 1):
             r["label"] = f"{tid} {n}"
-        kind = "tower" if t.get("vertical") else "ring" if T.is_ring(t) else "truss"
-        ends = _ends(t)[:2] if kind == "truss" or (kind == "ring" and not T.is_full_ring(t)) else None
+        kind = "tower" if t.get("vertical") else "ring" if T.is_loop(t) else "truss"
+        ends = _ends(t)[:2] if kind == "truss" or (kind == "ring" and not T.is_closed(t)) else None
         structures.append({"id": tid, "kind": kind, "truss": t, "fixtures": fx, "ends": ends,
                            "watts": sum(r["watts"] for r in fx), "kg": sum(r["kg"] for r in fx),
                            "kg_unknown": sum(1 for r in fx if not r["kg"])})  # fmt: skip
@@ -223,7 +234,9 @@ def _plan_svg(merged: dict, lay: dict) -> str:
     W = lay["width_m"]
     pts: list[tuple[float, float]] = [(0.0, 0.0), (W, 0.0)]
     for t in merged.get("trusses", []):
-        if T.is_ring(t):
+        if T.is_carre(t):
+            pts += T.carre_corners(t)
+        elif T.is_ring(t):
             R = T.ring_radius(t)
             pts += [(t["x_m"] - R, t["y_m"] - R), (t["x_m"] + R, t["y_m"] + R)]
         elif t.get("vertical"):
@@ -247,15 +260,18 @@ def _plan_svg(merged: dict, lay: dict) -> str:
     out.append(f'<text x="{b[0] - 4}" y="{a[1] + 16}" class="sl" text-anchor="end">STAGE LEFT ▸</text>')
     out.append(f'<text x="{a[0] + 4}" y="{a[1] + 16}" class="sl">◂ STAGE RIGHT</text>')
     for k, t in enumerate(merged.get("trusses", [])):
-        if T.is_ring(t):
+        if T.is_loop(t):
             L = t["length_m"]
-            n = 48
-            line = " ".join("{:.1f},{:.1f}".format(*P(*T.point(t, -L / 2 + L * k / n)[:2])) for k in range(n + 1))
+            line = " ".join("{:.1f},{:.1f}".format(*P(x, y)) for x, y in T.outline(t))
             out.append(f'<polyline points="{line}" class="truss"/>')
+            for x, y in T.carre_corners(t) if T.is_carre(t) else []:  # its legs
+                cx, cy = P(x, y)
+                out.append(f'<rect x="{cx - 0.15 * s}" y="{cy - 0.15 * s}" width="{0.3 * s}" height="{0.3 * s}" '
+                           'class="tower"/>')  # fmt: skip
             # by its upstage-most point (a full circle) or its stage-right end (an arc): not at the centre, which
             # rings often share
             lx, ly = P(
-                *T.point(t, L / 2 if T.is_full_ring(t) else max(-L / 2, L / 2, key=lambda u: T.point(t, u)[0]))[:2]
+                *T.point(t, L / 2 if T.is_closed(t) else max(-L / 2, L / 2, key=lambda u: T.point(t, u)[0]))[:2]
             )
             ly -= 14
         elif t.get("vertical"):
@@ -297,20 +313,23 @@ def _strip_svg(st: dict) -> str:
     """One truss or tower drawn on its own: the fixtures at their distance from the reference end."""
     t, fx = st["truss"], st["fixtures"]
     if st["kind"] == "ring":
-        R = T.ring_radius(t)
+        if T.is_carre(t):  # as far out as its corners
+            R = max(math.hypot(x - t["x_m"], y - t["y_m"]) for x, y in T.carre_corners(t))
+        else:
+            R = T.ring_radius(t)
         s = 120 / max(R, 0.5)
         out = [f'<svg viewBox="{-R * s - 40} {-R * s - 40} {2 * R * s + 80} {2 * R * s + 80}" class="ring">']
-        L = t["length_m"]
-        arc = [T.point(t, -L / 2 + L * k / 48) for k in range(49)]
-        line = " ".join(f"{-(x - t['x_m']) * s:.1f},{(y - t['y_m']) * s:.1f}" for x, y, _ in arc)
+        line = " ".join(f"{-(x - t['x_m']) * s:.1f},{(y - t['y_m']) * s:.1f}" for x, y in T.outline(t))
         out.append(f'<polyline points="{line}" class="truss"/>')
+        for x, y in T.carre_corners(t) if T.is_carre(t) else []:  # its legs
+            cx, cy = -(x - t["x_m"]) * s, (y - t["y_m"]) * s
+            out.append(f'<rect x="{cx - 8:.1f}" y="{cy - 8:.1f}" width="16" height="16" class="tower"/>')
         out.append(f'<text x="0" y="{R * s + 30}" class="aud">AUDIENCE</text>')
         for r in fx:
             x, y, _ = T.point(t, r["pos"])
-            out_r = 1 + (
-                22 / (R * s) if r["side"] == "top" else 0
-            )  # on top: drawn just outside, apart from what hangs under
-            cx, cy = -(x - t["x_m"]) * s * out_r, (y - t["y_m"]) * s * out_r
+            nx, ny = -math.sin(math.radians(T.direction(t, r["pos"]))), math.cos(math.radians(T.direction(t, r["pos"])))
+            out_m = 22 / s if r["side"] == "top" else 0  # on top: drawn just outside, apart from what hangs under
+            cx, cy = -(x + nx * out_m - t["x_m"]) * s, (y + ny * out_m - t["y_m"]) * s
             out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="10" fill="{ROLE_COLOR.get(r["role"], "#555")}"/>'
                        f'<text x="{cx:.1f}" y="{cy + 3.5:.1f}" class="fn">{_e(_num(r))}</text>')  # fmt: skip
         return "".join(out) + "</svg>"
@@ -458,6 +477,9 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
         t = st["truss"]
         if st["kind"] == "tower":
             what = f"tower {t['length_m']:.1f} m high, at {t['x_m']:.2f} m from the SL edge"
+        elif T.is_carre(t):
+            w, d = T.carre_size(t)
+            what = f"carré {w:.1f} × {d:.1f} m on four legs, the frame at {t['z_m']:.1f} m"
         elif st["kind"] == "ring":
             what = (
                 f"round truss Ø {T.ring_radius(t) * 2:.1f} m"
@@ -477,7 +499,9 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
                      "stand on it, outlined dots are on its front or back face.</p>")  # fmt: skip
         elif st["kind"] == "ring":
             start = (
-                "its front middle (6 o'clock), going stage right first" if T.is_full_ring(t) else f"its {st['ends'][0]}"
+                "the middle of its front side, going stage right first" if T.is_carre(t)
+                else "its front middle (6 o'clock), going stage right first" if T.is_full_ring(t)
+                else f"its {st['ends'][0]}"
             )
             p.append("<p class='note'>Seen from above, the audience at the bottom. Measured round the truss from "
                      f"{start}.</p>")  # fmt: skip

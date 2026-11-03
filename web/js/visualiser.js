@@ -63,6 +63,7 @@ function onHello(msg) {
   const ps = msg.fixtures.map(f => f.pos);
   const trussBack = (msg.trusses || []).map(t => t.vertical ? t.y_m          // the back wall clears the trusses too
     : t.shape === "circle" ? t.y_m - (t.diameter_m || 4) / 2                  // (a ring: its whole circle, to be safe)
+    : t.shape === "carre" ? t.y_m - Math.hypot(t.width_m || 3, t.depth_m || 3) / 2  // (a carré: round its corners)
     : t.y_m - Math.abs(Math.sin((t.rot_deg || 0) * Math.PI / 180)) * (t.length_m || 2) / 2);
   show.ext = {top: Math.max(2, ...ps.map(p => p[2])), back: Math.min(-1, ...ps.map(p => p[1]), ...trussBack) - 1.5};
   $("waiting").style.display = "none";
@@ -351,6 +352,19 @@ function drawTruss(P, t, line) {
     const z0 = 0, z1 = (t.z_m || 0) + L / 2;
     for (const [dx, dy] of [[-h, -h], [h, -h], [h, h], [-h, h]]) line([t.x_m + dx, t.y_m + dy, z0], [t.x_m + dx, t.y_m + dy, z1], col);
     for (let z = 0.25; z < z1; z += 0.5) line([t.x_m - h, t.y_m - h, z], [t.x_m + h, t.y_m - h, z + 0.25], "#2a2e3a");
+    return;
+  }
+  if (t.shape === "carre") {  // a carré: four straight trusses round it, a tower under each corner (to the floor)
+    const w = (t.width_m || 3) / 2, d = (t.depth_m || 3) / 2, c = Math.cos(r), s = Math.sin(r);
+    const at = (lx, ly) => [t.x_m + c * lx - s * ly, t.y_m + s * lx + c * ly];
+    for (const [lx, ly, len, rot] of [[0, d, 2 * w, 0], [0, -d, 2 * w, 0], [w, 0, 2 * d, 90], [-w, 0, 2 * d, 90]]) {
+      const [x, y] = at(lx, ly);
+      drawTruss(P, {x_m: x, y_m: y, z_m: t.z_m, length_m: len, rot_deg: (t.rot_deg || 0) + rot}, line);
+    }
+    for (const [lx, ly] of [[w, d], [w, -d], [-w, -d], [-w, d]]) {
+      const [x, y] = at(lx, ly), H = t.z_m + h;
+      drawTruss(P, {x_m: x, y_m: y, z_m: H / 2, length_m: H, rot_deg: t.rot_deg || 0, vertical: true}, line);
+    }
     return;
   }
   if (t.shape === "circle") {  // a round truss: the chords follow the arc (amadeus/rig/trusses.py), its middle

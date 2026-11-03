@@ -1,10 +1,10 @@
 // A new rig (a venue): start from the structure that's there (an empty room, two stands, a truss over the
-// booth, a club, a concert stage, a round truss), size it, and then mount your set on it: automatically or by hand.
+// booth, a club, a concert stage, a round truss, a carré), size it, and then mount your set on it: automatically or by hand.
 import AmadeusKit
 import SwiftUI
 
 enum RigTemplate: String, CaseIterable, Identifiable {
-    case floor, stands, bridge, booth, club, stage, ring   // amadeus/rig/templates.py
+    case floor, stands, bridge, booth, club, stage, ring, carre   // amadeus/rig/templates.py
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -15,6 +15,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .club: "Club"
         case .stage: "Concert Stage"
         case .ring: "Round Truss"
+        case .carre: "Carré"
         }
     }
     var detail: String {
@@ -26,6 +27,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .club: "Two trusses over the booth, front and back."
         case .stage: "Two overhead trusses, a low one at the back, a tower each side."
         case .ring: "A circle over the booth, a half circle behind it: heads play crowns, cones and twisters."
+        case .carre: "A square of truss on its own four legs round the booth: heads play it like a ring."
         }
     }
     /// width, truss height, room depth (m)
@@ -38,6 +40,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .club: (10, 4.5, 15)
         case .stage: (16, 7, 25)
         case .ring: (10, 4.5, 15)
+        case .carre: (8, 3, 12)
         }
     }
 }
@@ -77,6 +80,11 @@ struct RigSketch: View {
             case .stage:
                 bar(w * 0.1, h * 0.2, w * 0.8); bar(w * 0.14, h * 0.1, w * 0.72); bar(w * 0.22, floor - 22, w * 0.56)
                 tower(6, h * 0.18); tower(w - 10, h * 0.18)
+            case .carre:  // seen from the front, a little from above: the back side higher up, between the front legs
+                tower(w * 0.32, h * 0.12); tower(w * 0.68 - 4, h * 0.12)
+                bar(w * 0.32, h * 0.12, w * 0.36)
+                tower(w * 0.16, h * 0.3); tower(w * 0.84 - 4, h * 0.3)
+                bar(w * 0.16, h * 0.3, w * 0.68)
             case .ring:  // seen a little from below: a flat ellipse, the half circle a wider arc behind it
                 var back = Path()
                 back.addArc(center: CGPoint(x: w / 2, y: h * 0.2), radius: w * 0.36, startAngle: .degrees(195),
@@ -130,7 +138,7 @@ struct NewRigSheet: View {
             Form {
                 TextField("Name", text: $name)
                 SizeRow(title: "Stage width", value: $width, range: 2...30, step: 0.5)
-                if template != .floor { SizeRow(title: template == .stands || template == .bridge ? "Stand height" : "Truss height", value: $height, range: 2...12, step: 0.5) }
+                if template != .floor { SizeRow(title: template == .stands || template == .bridge ? "Stand height" : template == .carre ? "Leg height" : "Truss height", value: $height, range: 2...12, step: 0.5) }
                 SizeRow(title: "Room depth", value: $depth, range: 4...40, step: 1)
                 Toggle("LED wall behind the DJ", isOn: $screen)
             }

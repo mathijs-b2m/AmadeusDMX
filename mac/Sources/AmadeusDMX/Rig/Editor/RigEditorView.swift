@@ -177,6 +177,12 @@ struct RigEditorView: View {
                             Button("Ø \(Int(d)) m half circle") { editor.addRing(diameter: d, arc: 180) }
                         }
                     }
+                    SwiftUI.Section("Carré (on four legs)") {
+                        ForEach(Truss.carreSizes.indices, id: \.self) { k in
+                            let (w, d) = Truss.carreSizes[k]
+                            Button("\(Int(w)) × \(Int(d)) m carré") { editor.addCarre(width: w, depth: d) }
+                        }
+                    }
                     SwiftUI.Section("Tower") {
                         ForEach([2.0, 3.0, 4.0], id: \.self) { l in
                             Button("\(Int(l)) m tower") { editor.addTruss(length: l, vertical: true) }
