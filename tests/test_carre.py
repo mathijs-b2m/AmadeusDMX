@@ -114,4 +114,4 @@ def test_the_hang_sheet_draws_its_legs_and_names_its_sides():
     assert any("front side" in r["where"] for r in st["fixtures"])
     assert any("back side" in r["where"] for r in st["fixtures"])
     page = hangsheet.html(rig)
-    assert "carré 6.0 × 4.0 m on four legs" in page and page.count("class=\"tower\"") >= 8  # its legs, twice
+    assert "carré 6.0 × 4.0 m on four legs" in page and page.count('class="tower"') >= 8  # its legs, twice

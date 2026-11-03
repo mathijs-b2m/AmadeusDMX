@@ -127,9 +127,12 @@ def _clock(t: dict, u: float) -> str:
 def _carre_side(t: dict, u: float) -> str:
     """Which side of a carré, in crew words."""
     nx, ny = -math.sin(math.radians(T.direction(t, u))), math.cos(math.radians(T.direction(t, u)))
-    return {"the audience": "front side", "upstage": "back side", "stage right": "SR side", "stage left": "SL side"}.get(
-        toward(nx, ny), f"side towards {toward(nx, ny)}"
-    )
+    return {
+        "the audience": "front side",
+        "upstage": "back side",
+        "stage right": "SR side",
+        "stage left": "SL side",
+    }.get(toward(nx, ny), f"side towards {toward(nx, ny)}")
 
 
 def _where(f: dict, t: dict | None, W: float) -> tuple[float, str]:
@@ -151,7 +154,10 @@ def _where(f: dict, t: dict | None, W: float) -> tuple[float, str]:
         return u, f"{u:.2f} m up from the base, on the face towards {face}"
     if T.is_carre(t):  # round its frame from the front middle, like a ring
         d = u % t["length_m"]
-        return d, f"{d:.2f} m round from the front middle, going SR first ({_carre_side(t, u)}), {SIDE_TEXT.get(side, side)}"
+        return (
+            d,
+            f"{d:.2f} m round from the front middle, going SR first ({_carre_side(t, u)}), {SIDE_TEXT.get(side, side)}",
+        )
     if T.is_full_ring(t):  # round from its front middle, one way round
         d = u % t["length_m"]
         return d, f"{d:.2f} m round from the front middle, going SR first ({_clock(t, u)}), {SIDE_TEXT.get(side, side)}"
@@ -270,9 +276,7 @@ def _plan_svg(merged: dict, lay: dict) -> str:
                            'class="tower"/>')  # fmt: skip
             # by its upstage-most point (a full circle) or its stage-right end (an arc): not at the centre, which
             # rings often share
-            lx, ly = P(
-                *T.point(t, L / 2 if T.is_closed(t) else max(-L / 2, L / 2, key=lambda u: T.point(t, u)[0]))[:2]
-            )
+            lx, ly = P(*T.point(t, L / 2 if T.is_closed(t) else max(-L / 2, L / 2, key=lambda u: T.point(t, u)[0]))[:2])
             ly -= 14
         elif t.get("vertical"):
             cx, cy = P(t["x_m"], t["y_m"])
@@ -499,8 +503,10 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
                      "stand on it, outlined dots are on its front or back face.</p>")  # fmt: skip
         elif st["kind"] == "ring":
             start = (
-                "the middle of its front side, going stage right first" if T.is_carre(t)
-                else "its front middle (6 o'clock), going stage right first" if T.is_full_ring(t)
+                "the middle of its front side, going stage right first"
+                if T.is_carre(t)
+                else "its front middle (6 o'clock), going stage right first"
+                if T.is_full_ring(t)
                 else f"its {st['ends'][0]}"
             )
             p.append("<p class='note'>Seen from above, the audience at the bottom. Measured round the truss from "

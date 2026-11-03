@@ -145,7 +145,9 @@ def carre_spread(t: dict, k: int) -> list[float]:
     return [round((u + L / 2) % L - L / 2, 3) for u in out]
 
 
-def carre(tid: str, width: float, depth: float, x: float, y: float, z: float = CARRE_HEIGHT_M, rot: float = 0.0) -> dict:
+def carre(
+    tid: str, width: float, depth: float, x: float, y: float, z: float = CARRE_HEIGHT_M, rot: float = 0.0
+) -> dict:
     """A carré: a `width` × `depth` frame at `z` on four legs."""
     t = {"id": tid, "type": "quatro", "shape": "carre", "width_m": round(width, 2), "depth_m": round(depth, 2),
          "x_m": round(x, 2), "y_m": round(y, 2), "z_m": round(z, 2)}  # fmt: skip
