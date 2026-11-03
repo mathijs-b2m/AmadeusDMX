@@ -201,7 +201,10 @@ class LooksMixin:
         div = float(HEAD_STROBE_DIV.get(d.section, 1))
         while div > 0.25 and div / max(period, 1e-3) > hz + 1e-6:
             div /= 2
-        since = ((beat + phase) * div % 1.0) / div * period
+        # the flash opens half a frame before the grid line: the frame nearest the beat is the first one lit (from
+        # the line on, the first lit frame came up to a whole frame after the beat, the strobe sounded late)
+        half = 0.5 / float(self.rig["artnet"].get("fps", 40))
+        since = ((beat + phase + half / period) * div % 1.0) / div * period
         return 1.0 if since < HEAD_STROBE_ON_S else 0.0
 
     def _layer(self, d: Decision, j: int) -> str | None:

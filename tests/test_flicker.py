@@ -135,6 +135,22 @@ def test_heads_strobe_on_the_grid_within_the_flash_limit(track, fast):
     assert st.strobe > 0 and st.dimmer > 0.5 * st.strobe  # a flash, at the head's level
 
 
+def test_head_strobe_lights_the_frame_nearest_the_beat(track):
+    rig = load_rig(SETS[0])
+    rig["safety"]["allow_fast_strobe"] = True
+    plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
+    drop = next(d for d in plan if d.section == "drop")
+    e = Engine(track, plan, rig)
+    frame = 1 / rig["artnet"].get("fps", 40)
+    late = []
+    for b in [x for x in e.beats if drop.start + 1 < x < drop.end - 1][:16]:
+        for phase in np.linspace(0, frame, 9, endpoint=False):  # the show's frames fall anywhere around the beat
+            ts = b - 2 * frame + phase + frame * np.arange(5)
+            lit = [t for t in ts if e.head_strobe(drop, float(t))]
+            late.append(lit[0] - b)
+    late = np.array(late)
+    assert np.abs(late).max() <= frame / 2 + 1e-6 and abs(late.mean()) < 0.003  # on the beat, not a frame after
+
 def test_strobe_free_heads_pulse_instead(track):
     rig = load_rig(SETS[0])
     rig["safety"]["strobe_free"] = True
