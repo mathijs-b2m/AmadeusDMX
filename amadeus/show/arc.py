@@ -152,7 +152,8 @@ PULL = 1.0  # a stage in its own part of the night (the warm-up early, the final
 # The event types: the stages' names, where in the night a stage may come (share from, to) and where it is
 # pulled to, which stages have special effects, which are calm (intensity as the stage begins, as it ends;
 # the others run at full), and the character of the knobs (smoke and flashes scaled,
-# colour variety and responsiveness lifted). The tempo counts for less where the genres change tempo a lot.
+# colour variety and responsiveness lifted, any knob lifted by `lift`). The tempo counts for less where the genres
+# change tempo a lot. `heat` lifts the music's heat: a crowd that is up from the start (a festival) peaks sooner.
 _ANYWHERE = (0.04, 9.0)
 EVENTS = {
     "club": {
@@ -167,6 +168,21 @@ EVENTS = {
         "colour": 0.0,
         "response": 0.0,
         "bpm": 0.3,
+    },
+    "festival": {  # a main stage: much harder and more varied than a club night (each song still in its own style)
+        "title": "Festival",
+        "names": ("Gates Open", "Heating Up", "Main Stage", "Breather", "Headliner", "Closing"),
+        "allowed": {"warmup": (0, 0.15), "finale": (0.7, 9), "outro": (0.94, 9)},
+        "pull": {"warmup": (0, 0.05), "finale": (0.8, 9), "outro": (0.97, 9)},
+        "specials": {"warmup": 0.25, "build": 0.5, "peak": 1.0, "deep": 0.5, "finale": 1.0, "outro": 0.5},
+        "calm": {},
+        "smoke": 1.0,
+        "flashes": 1.0,
+        "colour": 0.25,
+        "response": 0.15,
+        "lift": {"groups": 0.25, "movement": 0.25, "changes": 0.3, "screen": 0.2, "drops": 0.15, "flashes": 0.15},
+        "heat": 0.06,
+        "bpm": 0.2,
     },
     "wedding": {
         "title": "Wedding",
@@ -454,8 +470,9 @@ class ShowArc:
         rel = 0.0
         if self.bpm_fast and self.bpm_base:
             rel = min(max((fold_tempo(self.bpm_fast, self.bpm_base) - 1.0) * 12.0, -0.5), 1.0)  # +8%: hot
-        w = EVENTS[self.event]["bpm"]
-        return min(max((1 - w) * self.fast + w * (0.5 + 0.5 * rel), 0.0), 1.0)
+        ev = EVENTS[self.event]
+        w = ev["bpm"]
+        return min(max((1 - w) * self.fast + w * (0.5 + 0.5 * rel) + ev.get("heat", 0.0), 0.0), 1.0)
 
     def trend(self) -> float:
         return 0.0 if self.fast is None or self.slow is None else self.fast - self.slow
@@ -528,6 +545,8 @@ class ShowArc:
         out["smoke"] *= ev["smoke"]
         out["flashes"] *= ev["flashes"]
         out["colour"] += ev["colour"]
+        for k, v in ev.get("lift", {}).items():
+            out[k] += v
         lift = min(max(LIFT * (heat - MOODS[key][0]), -LIFT_MAX), LIFT_MAX)
         if calm is not None:  # (a stage at full intensity stays at full)
             out["intensity"] += lift
