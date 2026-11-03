@@ -294,7 +294,7 @@ def test_a_stage_you_pick_applies_at_once_and_small_drops_reveal_nothing(tmp_pat
     assert arc.playing_groups < n  # a warm-up's small drop at 40 s is no moment for the surprises
 
 
-@pytest.mark.parametrize("event", ["club", "latin", "wedding", "party"])
+@pytest.mark.parametrize("event", ["club", "festival", "latin", "wedding", "party"])
 def test_intensity_is_full_but_in_calm_stages(tmp_path, event):
     """A night runs at full intensity (a quiet stage plays fewer lights); only the calm stages (a wedding's
     dinner) are dimmed, whatever the music does."""
@@ -309,6 +309,45 @@ def test_intensity_is_full_but_in_calm_stages(tmp_path, event):
                 assert target < 1.0 or heat > 0.5  # (hot music lifts a calm stage, up to full)
             else:
                 assert target == 1.0, (stage, heat)
+
+
+def test_a_festival_plays_harder_than_a_club(tmp_path):
+    """A festival: in every stage at least as much as a club night on every knob, and clearly more all together (at
+    the peak: the specials free, full response, busier colours); its warm-up is short and never the empty floor's
+    ambient look."""
+    from amadeus.show.arc import EVENTS, KNOBS
+
+    club, fest = (ShowArc(load_rig(RIG), tmp_path / f"{e}.json", now=0.0) for e in ("club", "festival"))
+    fest.control({"event": "festival"}, now=0.0)
+    for stage in STAGE_KEYS:
+        for arc in (club, fest):
+            arc.control({"stage": stage, "lock": True}, now=1.0)
+        c, f = club._targets(0.6, now=1.0), fest._targets(0.6, now=1.0)
+        assert all(f[k] >= c[k] for k in KNOBS), stage
+        assert sum(f[k] - c[k] for k in KNOBS) > 0.8, stage
+        assert fest.movement_level() >= 1 and not fest.ambient(), stage
+    assert EVENTS["festival"]["allowed"]["warmup"][1] < EVENTS["club"]["allowed"]["warmup"][1]
+
+
+def test_a_festival_keeps_each_song_in_its_style(tmp_path):
+    """Festival's variety (a new look every phrase, busy colours) varies the looks within the song's own style:
+    every phrase keeps to the genre's palettes, and the engine's colour swaps stay in the phrase's palette."""
+    from amadeus.director.plan import direct
+    from amadeus.director.rules import RuleDirector
+    from amadeus.director.style import STYLES
+    from amadeus.engine.looks import COLOUR_BUSY
+    from amadeus.show.arc import shape_plan
+    from tests.synthetic import synthetic_analysis
+
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.control({"event": "festival", "stage": "peak", "lock": True}, now=0.0)
+    assert arc.plan_shape()[:2] == (2, 1) and arc.colour_variety() >= COLOUR_BUSY
+    a = synthetic_analysis()
+    for genre in ("techno", "rock", "house"):
+        style = STYLES[genre]
+        plan = shape_plan(direct(a, RuleDirector(style=style), verbose=False), arc.plan_shape())
+        assert {d.palette for d in plan} <= set(style.palettes), genre
+        assert len({d.look() for d in plan}) > 1  # (and the looks still change with the music)
 
 
 def test_calm_heads_keep_their_brightness():
