@@ -43,7 +43,9 @@ struct Scenery {
         let heads = fixtures.filter { $0.kind == .head }.count
         big = W >= 6 || heads >= 8
         top = max(2, Float(fixtures.map(\.pos.z).max() ?? 2))
-        if screen {  // the LED wall stands behind the DJ: the room's back wall is behind it
+        // a scaffold wall behind the stage: the LED wall hangs on its front, the stage stops at it
+        let scaffoldWall = Truss.screenWall(trusses)
+        if screen && scaffoldWall == nil {  // the LED wall stands behind the DJ: the room's back wall is behind it
             let wallY = big ? min(-4.5, room.back + 1.5) - 2.2 : -2.0
             room.back = min(room.back, wallY - 0.8)
         }
@@ -64,12 +66,19 @@ struct Scenery {
         var boothY: Float, boothZ: Float
         let raised = Float(max(0, stage.deckM))
         if big || raised > 0 {
-            let deckBack = min(-3, back + 1.0)
+            let wallFront = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) }
+            let deckBack = wallFront ?? min(-3, back + 1.0)
             let deckTop: Float = raised > 0 ? raised : 0.15, front: Float = raised > 0 ? 0 : -0.2
-            box(-0.5, W + 0.5, deckBack, front, 0, deckTop, [0.055, 0.058, 0.07])
+            if stage.deckScaffold && raised > 0 {  // a plate on open tube
+                box(-0.5, W + 0.5, deckBack, front, deckTop - 0.1, deckTop, [0.055, 0.058, 0.07])
+                scaffoldDeck(-0.5, W + 0.5, deckBack, front, deckTop - 0.1)
+            } else {
+                box(-0.5, W + 0.5, deckBack, front, 0, deckTop, [0.055, 0.058, 0.07])
+            }
             deck = (-0.5, W + 0.5, deckBack, front, deckTop)
             if big {
-                let ry = max(deckBack + 0.5, -4.5), rd: Float = 2.2, rw = min(5, W * 0.3)
+                // (against a scaffold: the riser and the DJ stay in front of the LED wall)
+                let ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5), rd = min(2.2, ry - deckBack), rw = min(5, W * 0.3)
                 box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8, [0.07, 0.074, 0.09])
                 boothY = ry - 0.4; boothZ = deckTop + 0.8
             } else {
@@ -101,12 +110,13 @@ struct Scenery {
         // the LED wall behind the DJ
         if screen {
             let sw = big ? min(10, W * 0.55) : 2.6, sh = sw * 9 / 16
-            let sy = big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0
+            let sy = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) + 0.37 }
+                ?? (big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0)
             let sz: Float = (big ? 1.4 : 1.15) + raised  // over the stage, as high as it stands
             wall = WallPlacement(center: [cx, sy, sz + sh / 2], width: sw, height: sh)
             let screenAt = vertices.count
             box(cx - sw / 2 - 0.12, cx + sw / 2 + 0.12, sy - 0.35, sy - 0.02, sz - 0.12, sz + sh + 0.12, [0.03, 0.03, 0.035])
-            if big {  // legs
+            if big && scaffoldWall == nil {  // legs
                 box(cx - sw / 2 - 0.1, cx - sw / 2 + 0.1, sy - 0.3, sy - 0.1, 0, sz, [0.06, 0.06, 0.07])
                 box(cx + sw / 2 - 0.1, cx + sw / 2 + 0.1, sy - 0.3, sy - 0.1, 0, sz, [0.06, 0.06, 0.07])
             }
@@ -131,6 +141,8 @@ struct Scenery {
             } else {
                 if t.isStand {
                     lightStand(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
+                } else if t.isScaffold {
+                    scaffold(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
                 } else {
                     trussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6 : hov ? 0.3 : 0)
                 }
@@ -231,6 +243,62 @@ struct Scenery {
         quad(P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1), P(-1, -1, -1), color, normal: -ay, emissive: emissive)
         quad(P(1, 1, -1), P(1, 1, 1), P(1, -1, 1), P(1, -1, -1), color, normal: ax, emissive: emissive)
         quad(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, 1), P(-1, 1, -1), color, normal: -ax, emissive: emissive)
+    }
+
+    /// A scaffold wall: two frames of standards and ledgers, transoms between them, every other bay braced, base plates.
+    private mutating func scaffold(_ t: Truss, color: SIMD3<Float>, emissive: Float) {
+        let rot = Float(t.rotDeg), r = rot * .pi / 180, L = Float(t.lengthM), H = Float(t.zM), D = Float(t.scaffoldDepth)
+        let ax = SIMD3<Float>(cos(r), sin(r), 0), ay = SIMD3<Float>(-sin(r), cos(r), 0)
+        let c = SIMD3<Float>(Float(t.xM), Float(t.yM), 0), bays = t.scaffoldBays, lifts = t.scaffoldLifts
+        let tube: Float = 0.05, bay = L / Float(bays), lift = H / Float(lifts)
+        func at(_ u: Float, _ v: Float, _ z: Float) -> SIMD3<Float> { c + ax * u + ay * v + SIMD3(0, 0, z) }
+        for v in [D / 2, -D / 2] {
+            for k in 0...bays {
+                let u = -L / 2 + bay * Float(k)
+                rotatedBox(at(u, v, H / 2 + 0.15), [tube, tube, H + 0.3], rot, color, emissive: emissive)
+                rotatedBox(at(u, v, 0.015), [0.2, 0.2, 0.03], rot, color * 0.7, emissive: emissive)
+            }
+            for k in 1...lifts { rotatedBox(at(0, v, lift * Float(k)), [L, tube, tube], rot, color, emissive: emissive) }
+            for k in stride(from: 0, to: bays, by: 2) {  // a brace up each braced bay, zigzag from lift to lift
+                let u = -L / 2 + bay * Float(k)
+                for j in 0..<lifts {
+                    let z = lift * Float(j), up = j % 2 == 0
+                    strut(at(up ? u : u + bay, v, z), at(up ? u + bay : u, v, z + lift), color * 0.85, emissive: emissive)
+                }
+            }
+        }
+        for k in 0...bays {  // transoms between the frames
+            let u = -L / 2 + bay * Float(k)
+            for j in 1...lifts { rotatedBox(at(u, 0, lift * Float(j)), [tube * 0.8, D, tube * 0.8], rot, color * 0.9, emissive: emissive) }
+        }
+    }
+
+    /// Open tube under a raised stage's plate: standards about 2 m apart, a ledger round each row, braces.
+    private mutating func scaffoldDeck(_ x0: Float, _ x1: Float, _ y0: Float, _ y1: Float, _ top: Float) {
+        let c: SIMD3<Float> = [0.16, 0.17, 0.2], t: Float = 0.025
+        let nx = max(1, Int(((x1 - x0) / 2.5).rounded())), ny = max(1, Int(((y1 - y0) / 2.5).rounded()))
+        let dx = (x1 - x0) / Float(nx), dy = (y1 - y0) / Float(ny)
+        for i in 0...nx {
+            for j in 0...ny {
+                let x = x0 + dx * Float(i), y = y0 + dy * Float(j)
+                box(x - t, x + t, y - t, y + t, 0, top, c)
+            }
+        }
+        for z in [top * 0.5, top - 0.05] {
+            for j in 0...ny { let y = y0 + dy * Float(j); box(x0, x1, y - t, y + t, z - t, z + t, c) }
+            for i in 0...nx { let x = x0 + dx * Float(i); box(x - t, x + t, y0, y1, z - t, z + t, c) }
+        }
+        for i in 0..<nx where i % 2 == 0 {  // the bays along the front and the back, braced
+            let x = x0 + dx * Float(i)
+            for y in [y0, y1] { strut([x, y, 0], [x + dx, y, top - 0.05], c * 0.85) }
+        }
+    }
+
+    /// A thin tube from `a` to `b` in any direction (a brace).
+    private mutating func strut(_ a: SIMD3<Float>, _ b: SIMD3<Float>, _ color: SIMD3<Float>, emissive: Float = 0) {
+        var m = MeshBuilder()
+        m.cylinder((a + b) / 2, simd_normalize(b - a), radius: 0.016, length: simd_length(b - a), color, emissive: emissive, segments: 5)
+        vertices += m.v
     }
 
     /// A light stand: its bar (a 40 mm tube) and a tripod under each end of a bridge, under the middle of a T-bar,

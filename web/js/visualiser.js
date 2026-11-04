@@ -271,8 +271,12 @@ function drawScenery(P, st) {
   }
   if (wall) {
     const sw = big ? Math.min(10, st.width_m * 0.55) : 2.6, sh = sw * 9 / 16;
-    const sy = big ? Math.min(-4.5, (show.ext?.back ?? -6) + 1.5) - 2.2 : -2.0;
-    const sz = big ? 1.4 : 1.15;
+    // a scaffold wall carries it on its front (the widest facing the audience: Truss.screenWall)
+    const carrier = (show.trusses || []).filter(t => t.type === "scaffold" && !t.vertical && Math.abs(t.rot_deg || 0) < 1)
+      .sort((a, b) => b.length_m - a.length_m)[0];
+    const sy = carrier ? carrier.y_m + (carrier.depth_m ?? 1) / 2 + 0.37
+      : big ? Math.min(-4.5, (show.ext?.back ?? -6) + 1.5) - 2.2 : -2.0;
+    const sz = (big ? 1.4 : 1.15) + (carrier ? st.deck_m || 0 : 0);
     // the picture's left edge goes on the corner that appears on the left (seen from the audience; else mirrored)
     let lx = cx - sw / 2, rx = cx + sw / 2;
     const a = P([lx, sy, sz]), b = P([rx, sy, sz]);
@@ -380,6 +384,21 @@ function drawTruss(P, t, line) {
     return;
   }
   const ax = [Math.cos(r), Math.sin(r)], nx = [-Math.sin(r), Math.cos(r)];
+  if (t.type === "scaffold") {  // a wall of tube: two frames of standards and ledgers, every other bay braced
+    const H = t.z_m, D = t.depth_m ?? 1, bays = Math.max(1, Math.round(L / (t.bay_m || 2.5))), lifts = Math.max(1, Math.round(H / (t.lift_m || 1)));
+    const at = (u, v, z) => [t.x_m + ax[0] * u + nx[0] * v, t.y_m + ax[1] * u + nx[1] * v, z];
+    for (const v of [D / 2, -D / 2]) {
+      for (let k = 0; k <= bays; k++) { const u = -L / 2 + L * k / bays; line(at(u, v, 0), at(u, v, H + 0.3), col); }
+      for (let j = 1; j <= lifts; j++) line(at(-L / 2, v, H * j / lifts), at(L / 2, v, H * j / lifts), col);
+      for (let k = 0; k < bays; k += 2) {
+        const u = -L / 2 + L * k / bays, u1 = u + L / bays;
+        for (let j = 0; j < lifts; j++) line(at(j % 2 ? u1 : u, v, H * j / lifts), at(j % 2 ? u : u1, v, H * (j + 1) / lifts), "#2a2e3a");
+      }
+    }
+    for (let k = 0; k <= bays; k++) { const u = -L / 2 + L * k / bays;
+      for (let j = 1; j <= lifts; j++) line(at(u, -D / 2, H * j / lifts), at(u, D / 2, H * j / lifts), "#2a2e3a"); }
+    return;
+  }
   if (t.type === "bridge" || t.type === "tbar") {  // a light stand: the bar, a tripod under each end (a T-bar: the middle)
     const z = t.z_m, on = u => [t.x_m + ax[0] * u, t.y_m + ax[1] * u, z];
     line(on(-L / 2), on(L / 2), col);

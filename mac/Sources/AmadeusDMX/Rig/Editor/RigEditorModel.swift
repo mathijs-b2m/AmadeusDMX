@@ -254,6 +254,17 @@ final class RigEditorModel: StageEditing {
         selection = .truss(t.id)
     }
 
+    /// A scaffold wall at the back of the stage: as many as there are, each a little further back. The LED wall hangs
+    /// on it.
+    func addScaffold(width: Double, height: Double) {
+        let W = doc.width, n = doc.trusses.filter(\.isScaffold).count
+        let back = min(10, max(6.5, W * 0.45)) + 0.5 + Double(n) * 2
+        let h = doc.stage.outdoor ? height : min(height, doc.stage.ceilingM - 0.3)
+        let t = Truss.scaffold(id: newTrussID("wall"), width: width, height: h, xM: W / 2, yM: -back)
+        change("Add Scaffold") { $0.trusses.append(t) }
+        selection = .truss(t.id)
+    }
+
     func updateTruss(_ id: String, _ name: String = "Change Truss", _ body: (inout Truss) -> Void) {
         change(name) { d in
             guard let i = d.trusses.firstIndex(where: { $0.id == id }) else { return }
@@ -279,6 +290,13 @@ final class RigEditorModel: StageEditing {
 
     /// Clamp a fixture to a truss (amadeus/rig/trusses.py place: the same rules).
     static func place(_ f: inout PlacedFixture, on t: Truss, at u: Double, width: Double) {
+        if t.isScaffold {  // onto the ledger it is on (new here: the top one)
+            let lift = min(t.scaffoldLifts, max(1, f.trussLift ?? t.scaffoldLifts))
+            place(&f, on: t.ledger(lift), at: u, width: width)
+            f.trussLift = lift
+            return
+        }
+        f.trussLift = nil
         var u = u
         if t.isClosed { u = t.wrapped(u) }  // round the loop: past one end is the other
         if t.isCarre { u = t.carreClear(u) }  // not on a corner
@@ -324,7 +342,7 @@ final class RigEditorModel: StageEditing {
             let p = t.point(u), r = t.directionDeg(u) * .pi / 180, n = SIMD2(-sin(r), cos(r))
             var q = SIMD2(p.x, p.y), z = p.z
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
-            let drop = t.isStand ? tubeDrop : hangDrop, out = t.isStand ? tubeOut : sideOut
+            let drop = t.isTube ? tubeDrop : hangDrop, out = t.isTube ? tubeOut : sideOut
             switch side {
             case "top": z += drop
             case "front": q += n * out
@@ -337,6 +355,17 @@ final class RigEditorModel: StageEditing {
             f.x = q.x / width
             f.yM = q.y
             f.zM = z
+        }
+    }
+
+    /// Every selected fixture on a scaffold: onto this ledger.
+    func setLift(_ ids: Set<String>, _ lift: Int) {
+        change("Move to Lift \(lift)") { d in
+            for i in d.fixtures.indices where ids.contains(d.fixtures[i].id) {
+                guard let t = d.trusses.first(where: { $0.id == d.fixtures[i].truss }), t.isScaffold else { continue }
+                d.fixtures[i].trussLift = lift
+                Self.place(&d.fixtures[i], on: t, at: d.fixtures[i].trussPos ?? 0, width: d.width)
+            }
         }
     }
 
@@ -426,9 +455,10 @@ final class RigEditorModel: StageEditing {
         let span = step * (n - 1)
         // keep the whole row on the truss
         let lo = t.vertical ? 0.3 : -t.lengthM / 2, hi = t.vertical ? t.lengthM - 0.3 : t.lengthM / 2
-        let mine = Set(ids)
+        let mine = Set(ids), lift = d.fixtures.first { $0.id == ids.first }?.trussLift
         let busy = d.fixtures.filter { f in
             !mine.contains(f.id) && f.truss == t.id && (t.vertical || (f.side ?? "under") == (side ?? "under"))
+                && (!t.isScaffold || f.trussLift == lift)
         }.compactMap { f in f.trussPos.map { ($0, t.vertical ? 0.45 : width(f)) } }
         func fits(_ start: Double) -> Bool {   // housings at least `gap` apart
             start >= lo - 1e-6 && start + span <= hi + 1e-6
@@ -757,6 +787,7 @@ final class RigEditorModel: StageEditing {
                 f.aim = p["aim"]?.array.flatMap { a in a.count == 2 ? SIMD2(a[0].number ?? 0, a[1].number ?? 0) : nil }
                 f.truss = p["truss"]?.string
                 f.trussPos = p["truss_pos_m"]?.number
+                f.trussLift = p["truss_lift"]?.number.map { Int($0) }
                 f.side = p["truss_side"]?.string
                 f.mountRoll = p["mount_roll_deg"]?.number
                 d.fixtures[i] = f
@@ -1130,19 +1161,58 @@ final class RigEditorModel: StageEditing {
     }
 
     /// The truss a ray passes closest to (within `radius`), and where along it.
-    private func truss(near o: SIMD3<Double>, _ d: SIMD3<Double>, radius: Double) -> (Truss, Double)? {
-        var best: (Truss, Double, Double)?
+    private func truss(near o: SIMD3<Double>, _ d: SIMD3<Double>, radius: Double) -> (Truss, Double, Double)? {
+        var best: (Truss, Double, Double, Double)?
         for t in doc.trusses {
             let pieces = t.vertical ? [(SIMD3(t.xM, t.yM, 0), SIMD3(t.xM, t.yM, t.zM + t.lengthM / 2))] : t.pieces()
             for (a, b) in pieces {
                 let (dist, along) = Self.rayToSegment(o, d, a, b)
-                guard dist < radius, best == nil || dist < best!.2 else { continue }
+                guard dist < radius, best == nil || dist < best!.2 else { continue }  // (the hit's height: on a scaffold, its ledger)
                 let hit = o + d * along
                 let u = t.vertical ? hit.z - (t.zM - t.lengthM / 2) : t.project(SIMD2(hit.x, hit.y)).u
-                best = (t, u, dist)
+                best = (t, u, dist, hit.z)
             }
         }
-        return best.map { ($0.0, $0.1) }
+        return best.map { ($0.0, $0.1, $0.3) }
+    }
+
+    /// Where a ray goes through the front of a scaffold, within its reach: which one, how far along, which ledger, and
+    /// how far along the ray.
+    private func wall(_ o: SIMD3<Double>, _ d: SIMD3<Double>) -> (t: Truss, u: Double, lift: Int, ray: Double)? {
+        var best: (t: Truss, u: Double, lift: Int, ray: Double)?
+        for t in doc.trusses where t.isScaffold {
+            let n = SIMD3(t.normal.x, t.normal.y, 0), den = simd_dot(d, n)
+            guard abs(den) > 1e-4 else { continue }
+            let front = SIMD3(t.xM, t.yM, 0) + n * (t.scaffoldDepth / 2), ray = simd_dot(front - o, n) / den
+            let hit = o + d * ray, u = simd_dot(SIMD2(hit.x - t.xM, hit.y - t.yM), t.axis)
+            guard ray > 0, abs(u) <= t.lengthM / 2 + 0.5, hit.z >= 0, hit.z <= t.zM + 0.8, ray < best?.ray ?? .infinity else { continue }
+            best = (t, u, t.nearestLift(hit.z), ray)
+        }
+        return best
+    }
+
+    /// A fixture dragged over a scaffold's front: up and down its ledgers with the pointer. One that is on it follows
+    /// the pointer over all of it; one coming from elsewhere only once the pointer is past the wall (on its way
+    /// across the stage it stays in the stage).
+    private func dragOnWall(_ id: String, _ g: (sel: EditorSelection, grab: SIMD3<Double>, start: SIMD3<Double>, before: RigDocument),
+                            _ o: SIMD3<Double>, _ d: SIMD3<Double>) -> Bool {
+        guard let i = doc.fixtures.firstIndex(where: { $0.id == id }), let w = wall(o, d) else { return false }
+        var f = doc.fixtures[i]
+        let plane = abs(d.z) > 1e-4 ? (g.grab.z - o.z) / d.z : Double.infinity
+        guard f.truss == w.t.id || plane <= 0 || plane >= w.ray - 0.9 else { return false }
+        let u = snap ? (w.u / Self.grid).rounded() * Self.grid : w.u
+        if f.truss != w.t.id { f.side = nil; if f.mount == "floor" { f.mount = "hang" } }
+        f.trussLift = w.lift
+        f.waiting = false
+        Self.place(&f, on: w.t, at: u, width: doc.width)
+        doc.fixtures[i] = f
+        if !group.isEmpty {  // the others come along, in a row on the same ledger
+            let ids = rowOrder([id] + group, from: g.before)
+            for k in doc.fixtures.indices where ids.contains(doc.fixtures[k].id) { doc.fixtures[k].trussLift = w.lift }
+            Self.arrange(&doc, ids, on: w.t, at: groupCentre(ids, lead: id, leadU: u), side: f.side, width: housingWidth)
+        }
+        refresh()
+        return true
     }
 
     // MARK: - building trusses
@@ -1351,6 +1421,7 @@ final class RigEditorModel: StageEditing {
         if dragBuild(s(origin), s(dir), free: free) { return }
         guard let g = drag else { return }
         let o = s(origin), d = s(dir)
+        if case .fixture(let id) = g.sel, !free, dragOnWall(id, g, o, d) { return }
         // move in the horizontal plane at the height where it was grabbed
         guard abs(d.z) > 1e-4 else { return }
         let t = (g.grab.z - o.z) / d.z
@@ -1378,7 +1449,7 @@ final class RigEditorModel: StageEditing {
             f.waiting = false
             let p2 = SIMD2(target.x, target.y)
             // snap onto the nearest truss within reach (towers by their footprint)
-            let near = doc.trusses.map { ($0, $0.project(p2)) }.filter { $0.1.distance < 0.9 }.min { $0.1.distance < $1.1.distance }
+            let near = doc.trusses.filter { !$0.isScaffold }.map { ($0, $0.project(p2)) }.filter { $0.1.distance < 0.9 }.min { $0.1.distance < $1.1.distance }
             if let (tr, pr) = near, snap || !free {
                 var u = tr.vertical ? (f.truss == tr.id ? (f.trussPos ?? 1) : min(tr.lengthM - 0.3, 1.0)) : pr.u
                 if snapOn && !tr.vertical { u = (u / grid).rounded() * grid }
@@ -1497,8 +1568,11 @@ final class RigEditorModel: StageEditing {
         defer { dropEnded() }
         guard let ids = Self.ids(from: payload)?.filter({ id in doc.fixtures.contains { $0.id == id } }), !ids.isEmpty else { return false }
         let o = s(origin), d = s(dir)
-        if let (t, u) = truss(near: o, d, radius: 0.8) {
+        if let (t, u, z) = truss(near: o, d, radius: 0.8) {
             change(ids.count == 1 ? "Mount Fixture" : "Mount \(ids.count) Fixtures") { doc in
+                if t.isScaffold {  // onto the ledger it was dropped on
+                    for k in doc.fixtures.indices where ids.contains(doc.fixtures[k].id) { doc.fixtures[k].trussLift = t.nearestLift(z) }
+                }
                 Self.arrange(&doc, ids, on: t, at: u, side: nil, width: housingWidth)
                 Self.lineUpWaiting(&doc)
             }
