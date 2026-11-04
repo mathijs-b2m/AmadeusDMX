@@ -39,7 +39,7 @@ FIRST = "showcase"  # what a fresh checkout starts with
 RIG_KEYS = ("stage", "trusses", "zones", "screen")
 # a fixture's fields that say where it is on a rig (everything else is the gear: model, patch, calibration)
 PLACEMENT_KEYS = (
-    "x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_side", "mount_roll_deg",
+    "x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_lift", "truss_side", "mount_roll_deg",
     "reverse", "width", "group",
 )  # fmt: skip
 UNPLACED = "_unplaced"  # a fixture not mounted on this rig yet: the waiting spot it was given

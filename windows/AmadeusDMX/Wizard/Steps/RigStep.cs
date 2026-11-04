@@ -105,6 +105,12 @@ public sealed class RigStep(AppModel model, WizardModel w)
                     Bar(w * 0.1, h * 0.2, w * 0.8); Bar(w * 0.14, h * 0.1, w * 0.72); Bar(w * 0.22, floor - 22, w * 0.56);
                     Tower(6, h * 0.18); Tower(w - 10, h * 0.18);
                     break;
+                case RigTemplate.Festival:  // the wall of tube, the LED wall on it, the deck in front
+                    for (var k = 0; k <= 6; k++) Tower(w * 0.08 + (w * 0.84 - 4) * k / 6, h * 0.08);
+                    for (var k = 0; k <= 5; k++) Bar(w * 0.08, h * 0.08 + (floor - 16 - h * 0.08) * k / 5, w * 0.84);
+                    Rect(w * 0.3, h * 0.3, w * 0.4, h * 0.34, line, 0);
+                    Rect(w * 0.12, floor - 16, w * 0.76, 4, truss, 0);
+                    break;
                 case RigTemplate.Carre:  // seen from the front, a little from above: the back side higher up, between the front legs
                     Tower(w * 0.32, h * 0.12); Tower(w * 0.68 - 4, h * 0.12);
                     Bar(w * 0.32, h * 0.12, w * 0.36);

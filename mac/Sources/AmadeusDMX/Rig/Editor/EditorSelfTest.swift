@@ -27,6 +27,11 @@ enum EditorSelfTest {
         func fx(_ id: String) -> PlacedFixture { e.doc.fixtures.first { $0.id == id }! }
         func tr(_ id: String) -> Truss { e.doc.trusses.first { $0.id == id }! }
         let W = e.doc.width
+        if let wall = e.doc.trusses.first(where: \.isScaffold) {  // a set on a scaffold: only what is its own
+            scaffold(e, wall, check)
+            finish(out)
+            return
+        }
 
         // 1. pick a truss between its fixtures
         let front = tr("front")
@@ -220,6 +225,36 @@ enum EditorSelfTest {
         check("undo after the editor is gone", !undo2.canUndo)
         if undo2.canUndo { undo2.undo() }
         finish(out)
+    }
+
+    /// Fixtures up and down a scaffold's ledgers, looking at it from the audience. Needs a fixture "h1" not on it yet.
+    private static func scaffold(_ e: RigEditorModel, _ wall: Truss, _ check: (String, Bool, String) -> Void) {
+        let eye = SIMD3<Float>(Float(wall.xM), 25, 3)
+        func toward(_ u: Double, _ z: Double) -> SIMD3<Float> {
+            simd_normalize(SIMD3(Float(wall.xM + u), Float(wall.yM + wall.scaffoldDepth / 2), Float(z)) - eye)
+        }
+        func h1() -> PlacedFixture { e.doc.fixtures.first { $0.id == "h1" }! }
+        func w() -> Truss { e.doc.trusses.first { $0.id == wall.id }! }
+        check("dropped on a ledger", e.drop(RigEditorModel.payloadPrefix + "h1", origin: eye, dir: toward(-6, 6)) && h1().truss == wall.id
+              && h1().trussLift == 6, "truss \(h1().truss ?? "-") lift \(h1().trussLift ?? 0)")
+        check("hangs under that ledger", abs(h1().zM - (6 - RigEditorModel.tubeDrop)) < 0.01 && h1().mount == "hang", "z \(h1().zM)")
+        let at = h1().position(width: e.doc.width)
+        check("picked on the wall", e.pick(origin: eye, dir: simd_normalize(SIMD3<Float>(at) - eye), extend: false) && e.selection == .fixture("h1"), "")
+        e.drag(origin: eye, dir: toward(-3, 3.1), free: false)
+        check("dragged down the wall and along it", h1().trussLift == 3 && abs((h1().trussPos ?? 0) + 3) < 0.13,
+              "lift \(h1().trussLift ?? 0) pos \(h1().trussPos ?? .nan)")
+        e.drag(origin: eye, dir: toward(-3, 99), free: false)
+        check("above the wall: off it, or the top", h1().truss == nil || h1().trussLift == w().scaffoldLifts, "truss \(h1().truss ?? "-")")
+        e.drag(origin: eye, dir: toward(-3, 4), free: false)
+        e.endDrag()
+        check("back on a lower ledger", h1().truss == wall.id && h1().trussLift == 4, "lift \(h1().trussLift ?? 0)")
+        e.updateTruss(wall.id) { $0.yM -= 1 }
+        check("follows the scaffold", abs(h1().yM - (w().yM + w().scaffoldDepth / 2)) < 0.01, "y \(h1().yM)")
+        e.updateTruss(wall.id) { $0.zM = 2 * wall.zM }
+        check("a taller scaffold: the same ledger, higher", h1().trussLift == 4 && abs(h1().zM - (w().liftHeight(4) - RigEditorModel.tubeDrop)) < 0.01,
+              "lifts \(w().scaffoldLifts) z \(h1().zM)")
+        e.updateTruss(wall.id) { $0.zM = 3 }
+        check("a lower scaffold: the highest there is", h1().trussLift == w().scaffoldLifts, "lift \(h1().trussLift ?? 0)")
     }
 
     private static func finish(_ out: [String]) {

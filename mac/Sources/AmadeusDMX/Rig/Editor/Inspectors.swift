@@ -96,6 +96,11 @@ struct EditorInspector: View {
             ValueSlider(title: "Stage height", value: Binding(get: { editor.doc.stage.deckM }, set: { editor.setStageHeight($0) }),
                         range: 0...3, step: 0.1)
                 .help("How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage")
+            if editor.doc.stage.deckM > 0 {
+                Toggle("Stage on scaffold", isOn: Binding(get: { editor.doc.stage.deckScaffold },
+                                                          set: { v in editor.updateStage("Change Stage") { $0.deckScaffold = v } }))
+                    .help("Open tube under the stage instead of a solid front")
+            }
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
             if !editor.doc.stage.outdoor {
                 Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
@@ -113,10 +118,10 @@ struct EditorInspector: View {
             ForEach(editor.doc.trusses) { t in
                 Button { editor.selection = .truss(t.id) } label: {
                     HStack {
-                        Image(systemName: t.vertical ? "building.columns" : t.isRing ? "circle" : t.isCarre ? "square" : "square.split.bottomrightquarter")
+                        Image(systemName: t.vertical ? "building.columns" : t.isRing ? "circle" : t.isCarre ? "square" : t.isScaffold ? "squareshape.split.3x3" : "square.split.bottomrightquarter")
                         Text(t.id)
                         Spacer()
-                        Text("\(t.isRing ? ringName(t) : t.isCarre ? carreName(t) : "\(t.lengthM.formatted()) m") · \(fixtures.filter { $0.truss == t.id }.count) fixtures")
+                        Text("\(t.isRing ? ringName(t) : t.isCarre ? carreName(t) : t.isScaffold ? scaffoldName(t) : "\(t.lengthM.formatted()) m") · \(fixtures.filter { $0.truss == t.id }.count) fixtures")
                             .foregroundStyle(.secondary).font(.caption)
                     }
                 }
@@ -320,6 +325,9 @@ func standLimits(_ t: Truss) -> String {
     return s.prefix(1).uppercased() + s.dropFirst() + "."
 }
 
+/// "16 × 9 m".
+func scaffoldName(_ t: Truss) -> String { "\(t.lengthM.formatted()) × \(t.zM.formatted()) m" }
+
 /// "3 × 3 m".
 func carreName(_ t: Truss) -> String { "\(t.carreWidth.formatted()) × \(t.carreDepth.formatted()) m" }
 
@@ -337,13 +345,14 @@ struct TrussInspector: View {
         let id = truss.id
         SwiftUI.Section {
             HStack {
-                Image(systemName: truss.vertical ? "building.columns" : truss.isRing ? "circle" : truss.isCarre ? "square"
+                Image(systemName: truss.vertical ? "building.columns" : truss.isRing ? "circle" : truss.isCarre ? "square" : truss.isScaffold ? "squareshape.split.3x3"
                       : truss.isStand ? "lamp.floor" : "square.split.bottomrightquarter")
                     .font(.title2).foregroundStyle(.tint)
                 VStack(alignment: .leading) {
                     Text(truss.id).font(.headline)
                     Text(truss.vertical ? "Tower, box truss 30 cm" : truss.isRing ? "Round truss, \(ringName(truss))"
                          : truss.isCarre ? "Carré \(carreName(truss)), on four legs"
+                         : truss.isScaffold ? "Scaffold \(scaffoldName(truss)), \(truss.scaffoldBays) bays, \(truss.scaffoldLifts) lifts"
                          : truss.type == "tbar" ? "T-bar stand, on one tripod" : truss.isStand ? "Light bridge, on two tripods"
                          : "Box truss (quatro), 30 cm").font(.caption).foregroundStyle(.secondary)
                 }
@@ -353,6 +362,10 @@ struct TrussInspector: View {
             }
             if truss.isRing {
                 Text("Heads on a ring play it as a circle: crowns of beams out of it, cones, twisters, waves running round.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if truss.isScaffold {
+                Text("A wall of tube, standing on the floor. Drag fixtures up and down it: they clamp to its ledgers, and the LED wall hangs on its front.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if truss.isCarre {
@@ -392,6 +405,28 @@ struct TrussInspector: View {
                 }), in: 1...20, step: 0.5) {
                     LabeledContent("Depth", value: metres(truss.carreDepth))
                 }
+            } else if truss.isScaffold {
+                Stepper(value: binding(\.lengthM), in: 2...60, step: 0.5) {
+                    LabeledContent("Width", value: metres(truss.lengthM))
+                }
+                Stepper(value: binding(\.zM), in: 2...30, step: 0.5) {
+                    LabeledContent("Height", value: metres(truss.zM))
+                }
+                Stepper(value: Binding(get: { truss.scaffoldDepth }, set: { v in
+                    editor.updateTruss(truss.id, "Change Depth") { $0.depthM = v }
+                }), in: 0.5...3, step: 0.25) {
+                    LabeledContent("Depth", value: metres(truss.scaffoldDepth))
+                }
+                Stepper(value: Binding(get: { truss.bayM ?? 2.5 }, set: { v in
+                    editor.updateTruss(truss.id, "Change Bays") { $0.bayM = v }
+                }), in: 1...4, step: 0.25) {
+                    LabeledContent("Bay", value: metres(truss.bayM ?? 2.5))
+                }
+                Stepper(value: Binding(get: { truss.liftM ?? 1 }, set: { v in
+                    editor.updateTruss(truss.id, "Change Lifts") { $0.liftM = v }
+                }), in: 0.5...3, step: 0.25) {
+                    LabeledContent("Lift", value: metres(truss.liftM ?? 1))
+                }
             } else {
             Stepper(value: binding(\.lengthM), in: 0.5...20, step: 0.5) {
                 LabeledContent("Length", value: metres(truss.lengthM))
@@ -400,9 +435,11 @@ struct TrussInspector: View {
             ValueSlider(title: "Across (x)", value: binding(\.xM), range: -6...(editor.doc.width + 6), step: 0.25)
             ValueSlider(title: "Depth (y)", value: binding(\.yM), range: -14...4, step: 0.25)
             if !truss.vertical {
+                if !truss.isScaffold {
                 ValueSlider(title: "Height", value: binding(\.zM), range: truss.isStand
                             ? (truss.minHeightM ?? 1)...max((truss.minHeightM ?? 1) + 0.1, truss.maxHeightM ?? 4)
                             : 0.5...max(2, editor.doc.stage.ceilingM), step: truss.isStand ? 0.05 : 0.1)
+                }
                 ValueSlider(title: "Rotation", value: binding(\.rotDeg), range: -180...180, step: 15, unit: "°")
             }
         }
@@ -411,7 +448,7 @@ struct TrussInspector: View {
                 Picker("Aim", selection: Binding(get: { truss.aim ?? "" }, set: { v in
                     editor.updateTruss(truss.id, "Change Aim") { $0.aim = v.isEmpty ? nil : v }
                 })) {
-                    Text(truss.yM >= Truss.overCrowdM ? "Automatic (down)" : "Automatic").tag("")
+                    Text(truss.isScaffold ? "Automatic (audience)" : truss.yM >= Truss.overCrowdM ? "Automatic (down)" : "Automatic").tag("")
                     Text("Towards the audience").tag("audience")
                     Text("Down").tag("down")
                 }
@@ -515,6 +552,12 @@ struct FixtureInspector: View {
                 if truss == nil { Text("Floor").tag("floor") }
             }
             .pickerStyle(.segmented)
+            }
+            if let t = truss, t.isScaffold {
+                let lift = min(t.scaffoldLifts, max(1, fixture.trussLift ?? t.scaffoldLifts))
+                Stepper(value: Binding(get: { lift }, set: { editor.setLift(editor.selectedFixtures, $0) }), in: 1...t.scaffoldLifts) {
+                    LabeledContent("Lift", value: "\(lift) of \(t.scaffoldLifts), \(metres(t.liftHeight(lift)))")
+                }
             }
             if let t = truss {
                 ValueSlider(title: t.vertical ? "Height on tower" : "Along the truss",

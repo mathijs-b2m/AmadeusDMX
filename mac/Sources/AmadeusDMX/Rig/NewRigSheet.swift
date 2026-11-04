@@ -1,10 +1,10 @@
 // A new rig (a venue): start from the structure that's there (an empty room, two stands, a truss over the
-// booth, a club, a concert stage, a round truss, a carré), size it, and then mount your set on it: automatically or by hand.
+// booth, a club, a concert stage, a round truss, a carré, a festival stage), size it, and then mount your set on it: automatically or by hand.
 import AmadeusKit
 import SwiftUI
 
 enum RigTemplate: String, CaseIterable, Identifiable {
-    case floor, stands, bridge, booth, club, stage, ring, carre   // amadeus/rig/templates.py
+    case floor, stands, bridge, booth, club, stage, festival, ring, carre   // amadeus/rig/templates.py
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -14,6 +14,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .booth: "Truss over the Booth"
         case .club: "Club"
         case .stage: "Concert Stage"
+        case .festival: "Festival Stage"
         case .ring: "Round Truss"
         case .carre: "Carré"
         }
@@ -26,6 +27,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .booth: "One truss over the DJ."
         case .club: "Two trusses over the booth, front and back."
         case .stage: "Two overhead trusses, a low one at the back, a tower each side."
+        case .festival: "A scaffold wall behind a raised stage, the LED wall hanging on it: fixtures clamp anywhere on it."
         case .ring: "A circle over the booth, a half circle behind it: heads play crowns, cones and twisters."
         case .carre: "A square of truss on its own four legs round the booth: heads play it like a ring."
         }
@@ -39,6 +41,7 @@ enum RigTemplate: String, CaseIterable, Identifiable {
         case .booth: (6, 3.5, 12)
         case .club: (10, 4.5, 15)
         case .stage: (16, 7, 25)
+        case .festival: (16, 9, 30)
         case .ring: (10, 4.5, 15)
         case .carre: (8, 3, 12)
         }
@@ -80,6 +83,11 @@ struct RigSketch: View {
             case .stage:
                 bar(w * 0.1, h * 0.2, w * 0.8); bar(w * 0.14, h * 0.1, w * 0.72); bar(w * 0.22, floor - 22, w * 0.56)
                 tower(6, h * 0.18); tower(w - 10, h * 0.18)
+            case .festival:  // the wall of tube, the LED wall on it, the deck in front
+                for k in 0...6 { tower(w * 0.08 + (w * 0.84 - 4) * CGFloat(k) / 6, h * 0.08) }
+                for k in 0...5 { bar(w * 0.08, h * 0.08 + (floor - 16 - h * 0.08) * CGFloat(k) / 5, w * 0.84) }
+                ctx.fill(Path(CGRect(x: w * 0.3, y: h * 0.3, width: w * 0.4, height: h * 0.34)), with: line)
+                ctx.fill(Path(CGRect(x: w * 0.12, y: floor - 16, width: w * 0.76, height: 4)), with: truss)
             case .carre:  // seen from the front, a little from above: the back side higher up, between the front legs
                 tower(w * 0.32, h * 0.12); tower(w * 0.68 - 4, h * 0.12)
                 bar(w * 0.32, h * 0.12, w * 0.36)
@@ -165,7 +173,7 @@ struct NewRigSheet: View {
         let wasDefault = RigTemplate.allCases.contains { $0.rawValue == name } || name.isEmpty
         template = t
         (width, height, depth) = t.size
-        screen = t == .club || t == .stage
+        screen = t == .club || t == .stage || t == .festival
         if wasDefault { name = unique(t.rawValue) }
     }
 

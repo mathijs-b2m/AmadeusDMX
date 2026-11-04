@@ -110,6 +110,21 @@ and the formations take its shape: `fan` is a crown of beams out of the circle, 
 `sync` and `mirror` stay as they are. Pars on a full ring chase round it. Auto-mount spreads fixtures evenly round a
 full circle; strobes and blinders stay on a straight truss when there is one.
 
+**Scaffold.** A truss with `"type": "scaffold"` is the wall of tube a festival stage is built against, standing on
+the floor: standards about `bay_m` apart (default 2.5), ledgers about `lift_m` above each other (default 1), braced,
+in two frames `depth_m` apart (default 1). It moves, turns and stretches like a straight truss: `length_m` is its
+width, `x_m`/`y_m` its centre and `z_m` its top; the standards and ledgers share its size evenly.
+
+```json
+{"id": "wall", "type": "scaffold", "length_m": 16, "x_m": 8, "y_m": -7.5, "z_m": 9, "depth_m": 1, "bay_m": 2.5, "lift_m": 1}
+```
+
+Fixtures clamp to the ledgers of its front frame: `truss_pos_m` along it from its centre, `truss_lift` which ledger
+(1 is the lowest; without one the top), `truss_side` as on any truss. 3 or more heads on a ledger are a row of their
+own; fewer, stacked up the sides, are columns. Heads on a scaffold play out to the audience unless it has an `aim`.
+The rig's LED wall hangs on the front of the widest scaffold that faces the audience (auto-mount keeps clear of it).
+`stage.deck_scaffold: true` draws a raised stage on open tube; the `festival` template has all of this.
+
 **Carré.** A truss with `"shape": "carre"` is a rectangle of box truss standing on its own four legs (a tower in
 each corner, down to the floor), as round a DJ booth on the dance floor or at a trade-fair stand: `width_m` across
 the stage and `depth_m` up and down it (before `rot_deg` turns it), `x_m`/`y_m` its centre and `z_m` the frame's

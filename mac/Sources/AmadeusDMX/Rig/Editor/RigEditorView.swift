@@ -183,6 +183,12 @@ struct RigEditorView: View {
                             Button("\(Int(w)) × \(Int(d)) m carré") { editor.addCarre(width: w, depth: d) }
                         }
                     }
+                    SwiftUI.Section("Scaffold (a wall of tube)") {
+                        ForEach(Truss.scaffoldSizes.indices, id: \.self) { k in
+                            let (w, h) = Truss.scaffoldSizes[k]
+                            Button("\(Int(w)) × \(Int(h)) m scaffold") { editor.addScaffold(width: w, height: h) }
+                        }
+                    }
                     SwiftUI.Section("Tower") {
                         ForEach([2.0, 3.0, 4.0], id: \.self) { l in
                             Button("\(Int(l)) m tower") { editor.addTruss(length: l, vertical: true) }

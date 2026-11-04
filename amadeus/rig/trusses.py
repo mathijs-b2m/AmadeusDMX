@@ -25,6 +25,13 @@ the bar's height (the stands go down to the floor). Fixtures clamp to the tube l
 closer. It may say what it takes (`max_kg`) and how high it goes (`min_height_m`, `max_height_m`), as the maker
 gives them.
 
+A scaffold (`"type": "scaffold"`) is the wall of tube a festival stage is built against: standards every `bay_m`,
+ledgers every `lift_m`, braced, two frames `depth_m` apart, standing on the floor. It is a straight truss in every
+way that moves it: `length_m` across, `x_m`/`y_m` its centre, `rot_deg`; `z_m` is its top. Fixtures clamp to the
+ledgers of its front frame: `truss_pos_m` along it like on any truss, `truss_lift` which ledger (1 is the lowest, the
+top one is `lifts`), `truss_side` as on a light stand's tube. Its heads play out to the audience (`light_aim`), and
+an LED wall hangs on the front of the widest one that faces the audience (`screen_rect`).
+
 A truss's `aim` says where the heads on it play: `"audience"` (out towards the crowd, never back at the stage), or
 `"down"` (onto the crowd under it). Without one it is automatic: a truss hanging over the crowd (its centre at least
 OVER_CROWD_M in front of the stage edge) plays down, any other plays wherever the director aims.
@@ -54,6 +61,10 @@ CARRE_SIZES_M = ((3.0, 3.0), (4.0, 3.0), (4.0, 4.0), (6.0, 4.0))  # carrés as t
 DEFAULT_CARRE_M = (3.0, 3.0)
 CARRE_HEIGHT_M = 3.0  # the usual leg: a 3 m tower
 CORNER_CLEAR_M = 0.25  # a fixture on a carré stays this far from a corner (the corner block and the leg)
+SCAFFOLD_SIZES_M = ((8.0, 5.0), (12.0, 7.0), (16.0, 9.0), (20.0, 11.0))  # width × height to start from (any works)
+BAY_M = 2.5  # a scaffold's standards: about this far apart
+LIFT_M = 1.0  # its ledgers: about this far above each other
+SCAFFOLD_DEPTH_M = 1.0  # its two frames: this far apart
 AIMS = ("audience", "down")  # where a truss's heads play (`aim`); none: automatic
 OVER_CROWD_M = 1.0  # a truss this far in front of the stage edge hangs over the crowd: automatic is down
 
@@ -191,6 +202,92 @@ def stand(
     return t
 
 
+def is_scaffold(t: dict) -> bool:
+    """A scaffold wall: tube, bays across and lifts up, standing on the floor."""
+    return t.get("type") == "scaffold" and not t.get("vertical") and not is_loop(t)
+
+
+def is_tube(t: dict) -> bool:
+    """A bar fixtures clamp close to: a light stand's tube, or a ledger of a scaffold."""
+    return is_stand(t) or t.get("type") == "ledger"
+
+
+def _whole(v: float) -> int:
+    """To the nearest whole number, a half up: as the apps round, so a wall has the same bays and lifts in them all."""
+    return math.floor(v + 0.5)
+
+
+def scaffold_depth(t: dict) -> float:
+    return float(t.get("depth_m", SCAFFOLD_DEPTH_M))
+
+
+def scaffold_bays(t: dict) -> int:
+    """How many bays across (the standards share its length evenly)."""
+    return max(1, _whole(t["length_m"] / float(t.get("bay_m", BAY_M))))
+
+
+def scaffold_lifts(t: dict) -> int:
+    """How many lifts up: its ledgers share its height evenly, the top one at `z_m`."""
+    return max(1, _whole(t["z_m"] / float(t.get("lift_m", LIFT_M))))
+
+
+def lift_height(t: dict, lift: int) -> float:
+    return t["z_m"] * lift / scaffold_lifts(t)
+
+
+def nearest_lift(t: dict, z: float) -> int:
+    """The ledger nearest height `z`."""
+    n = scaffold_lifts(t)
+    return min(n, max(1, _whole(z / t["z_m"] * n)))
+
+
+def ledger(t: dict, lift: int) -> dict:
+    """Ledger `lift` of a scaffold's front frame, as a straight bar of its own (a fixture placed on it lands on the
+    scaffold, at that lift)."""
+    lift = min(scaffold_lifts(t), max(1, lift))
+    r, out = math.radians(t.get("rot_deg", 0.0)), scaffold_depth(t) / 2
+    return {"id": f"{t['id']}/{lift}", "type": "ledger", "scaffold": t["id"], "lift": lift, "length_m": t["length_m"],
+            "x_m": t["x_m"] - math.sin(r) * out, "y_m": t["y_m"] + math.cos(r) * out,
+            "z_m": round(lift_height(t, lift), 3), "rot_deg": t.get("rot_deg", 0.0)}  # fmt: skip
+
+
+def scaffold(
+    tid: str,
+    width: float,
+    height: float,
+    x: float,
+    y: float,
+    depth: float = SCAFFOLD_DEPTH_M,
+    bay: float = BAY_M,
+    lift: float = LIFT_M,
+    rot: float = 0.0,
+) -> dict:
+    """A scaffold wall `width` across and `height` high, its centre at `x`, `y`."""
+    t = {"id": tid, "type": "scaffold", "length_m": round(width, 2), "x_m": round(x, 2), "y_m": round(y, 2),
+         "z_m": round(height, 2), "depth_m": round(depth, 2), "bay_m": round(bay, 2),
+         "lift_m": round(lift, 2)}  # fmt: skip
+    if rot:
+        t["rot_deg"] = round(rot, 1)
+    return t
+
+
+def screen_wall(trusses: list[dict]) -> dict | None:
+    """The scaffold an LED wall hangs on: the widest one that faces the audience."""
+    walls = [t for t in trusses if is_scaffold(t) and abs(t.get("rot_deg", 0.0)) < 1.0]
+    return max(walls, key=lambda t: t["length_m"], default=None)
+
+
+def screen_rect(rig: dict, big: bool = True) -> tuple[float, float, float] | None:
+    """The LED wall on the rig's scaffold, as the apps draw it, centred on the stage: (half its width, its bottom,
+    its top) in metres, or None when it has no scaffold to hang on. `big`: a big rig's wall (Scenery)."""
+    if not rig.get("screen") or not screen_wall(rig.get("trusses", [])):
+        return None
+    st = rig.get("stage", {})
+    sw = min(10.0, float(st.get("width_m", 6.0)) * 0.55) if big else 2.6
+    bottom = (1.4 if big else 1.15) + float(st.get("deck_m", 0.0) or 0.0)
+    return sw / 2, bottom, bottom + sw * 9 / 16
+
+
 def ring_arc(t: dict) -> float:
     return float(min(360.0, max(10.0, t.get("arc_deg", 360.0))))
 
@@ -203,6 +300,8 @@ def light_aim(t: dict) -> str | None:
     """Where the heads on this truss play: "audience", "down", or None (the director's aim as it is)."""
     if t.get("aim") in AIMS:
         return t["aim"]
+    if is_scaffold(t):  # a wall: nothing to play behind it
+        return "audience"
     if not t.get("vertical") and float(t.get("y_m", 0.0)) >= OVER_CROWD_M:
         return "down"
     return None
@@ -284,8 +383,13 @@ def outline(t: dict) -> list[tuple[float, float]]:
 
 def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> dict:
     """Clamp fixture `f` to truss `t` at `u` (on `side` for a box truss) and set its position fields."""
+    if is_scaffold(t):  # onto the ledger it is on (new here: the top one)
+        return place(f, ledger(t, f.get("truss_lift") or scaffold_lifts(t)), u, width, side)
     L = t["length_m"]
-    f["truss"] = t["id"]
+    f["truss"] = t.get("scaffold", t["id"])
+    f.pop("truss_lift", None)
+    if t.get("scaffold"):
+        f["truss_lift"] = t["lift"]
     if t.get("vertical"):
         side = side if side in TOWER_SIDES else (f.get("truss_side") if f.get("truss_side") in TOWER_SIDES else "front")
         base = t["z_m"] - L / 2
@@ -326,7 +430,7 @@ def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> 
     rot = direction(t, u)
     r = math.radians(rot)
     nx, ny = -math.sin(r), math.cos(r)  # the face towards the audience (on a ring: out of the circle)
-    drop, out = (TUBE_DROP, TUBE_OUT) if is_stand(t) else (HANG_DROP, SIDE_OUT)
+    drop, out = (TUBE_DROP, TUBE_OUT) if is_tube(t) else (HANG_DROP, SIDE_OUT)
     if side == "top":
         z += drop
     elif side == "front":

@@ -3,7 +3,7 @@
 // its rules are tested.
 namespace AmadeusKit;
 
-public enum RigTemplate { Floor, Stands, Bridge, Booth, Club, Stage, Ring, Carre }
+public enum RigTemplate { Floor, Stands, Bridge, Booth, Club, Stage, Festival, Ring, Carre }
 
 public static class RigTemplates
 {
@@ -20,6 +20,7 @@ public static class RigTemplates
         RigTemplate.Booth => "Truss over the Booth",
         RigTemplate.Club => "Club",
         RigTemplate.Stage => "Concert Stage",
+        RigTemplate.Festival => "Festival Stage",
         RigTemplate.Carre => "Carré",
         _ => "Round Truss",
     };
@@ -32,6 +33,7 @@ public static class RigTemplates
         RigTemplate.Booth => "One truss over the DJ.",
         RigTemplate.Club => "Two trusses over the booth, front and back.",
         RigTemplate.Stage => "Two overhead trusses, a low one at the back, a tower each side.",
+        RigTemplate.Festival => "A scaffold wall behind a raised stage, the LED wall hanging on it: fixtures clamp anywhere on it.",
         RigTemplate.Carre => "A square of truss on its own four legs round the booth: heads play it like a ring.",
         _ => "A circle over the booth, a half circle behind it: heads play crowns, cones and twisters.",
     };
@@ -45,6 +47,7 @@ public static class RigTemplates
         RigTemplate.Booth => (6, 3.5, 12),
         RigTemplate.Club => (10, 4.5, 15),
         RigTemplate.Stage => (16, 7, 25),
+        RigTemplate.Festival => (16, 9, 30),
         RigTemplate.Carre => (8, 3, 12),
         _ => (10, 4.5, 15),
     };

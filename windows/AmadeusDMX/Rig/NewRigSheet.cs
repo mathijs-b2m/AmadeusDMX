@@ -1,6 +1,6 @@
 using AmadeusKit;
 // A new rig (a venue): start from the structure that's there (an empty room, two stands, a truss over the
-// booth, a club, a concert stage, a round truss, a carré), size it, and then mount your set on it: automatically or by hand.
+// booth, a club, a concert stage, a round truss, a carré, a festival stage), size it, and then mount your set on it: automatically or by hand.
 // The port of mac/Sources/AmadeusDMX/Rig/NewRigSheet.swift: the sheets are ContentDialogs.
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -61,6 +61,12 @@ public static class RigSketch
             case RigTemplate.Stage:
                 Bar(w * 0.1, h * 0.2, w * 0.8); Bar(w * 0.14, h * 0.1, w * 0.72); Bar(w * 0.22, floor - 22, w * 0.56);
                 Tower(6, h * 0.18); Tower(w - 10, h * 0.18);
+                break;
+            case RigTemplate.Festival:  // the wall of tube, the LED wall on it, the deck in front
+                for (var k = 0; k <= 6; k++) Tower(w * 0.08 + (w * 0.84 - 4) * k / 6, h * 0.08);
+                for (var k = 0; k <= 5; k++) Bar(w * 0.08, h * 0.08 + (floor - 16 - h * 0.08) * k / 5, w * 0.84);
+                Rect(w * 0.3, h * 0.3, w * 0.4, h * 0.34, line, 0);
+                Rect(w * 0.12, floor - 16, w * 0.76, 4, truss, 0);
                 break;
             case RigTemplate.Carre:  // seen from the front, a little from above: the back side higher up, between the front legs
                 Tower(w * 0.32, h * 0.12); Tower(w * 0.68 - 4, h * 0.12);
@@ -159,7 +165,7 @@ public sealed class NewRigSheet(AppModel model)
         var wasDefault = RigTemplates.All.Any(x => x.RawValue() == _name) || _name.Length == 0;
         _template = t;
         (_width, _height, _depth) = t.Size();
-        _screen = t is RigTemplate.Club or RigTemplate.Stage;
+        _screen = t is RigTemplate.Club or RigTemplate.Stage or RigTemplate.Festival;
         if (wasDefault) _name = Unique(t.RawValue());
         foreach (var (ct, card) in _cards)
             card.BorderBrush = ct == t ? new SolidColorBrush(Tint.Accent) : new SolidColorBrush(Microsoft.UI.Colors.Transparent);

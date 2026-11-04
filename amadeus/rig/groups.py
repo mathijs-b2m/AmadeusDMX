@@ -8,6 +8,8 @@ group for formations, waves, chases and focus points.
 Groups come from the rig ("group" on a fixture), else from the trusses and positions:
 - a ring: the heads on one round truss (or a carré), in order round it (`amadeus/engine/rings.py` plays them
   as a circle);
+- a lift of a scaffold: 3+ heads on one ledger, left to right (fewer: the rules below, so heads stacked up the sides of
+  a scaffold are its columns);
 - a column: 3+ heads at the same spot across the stage, stacked in height (a truss tower);
 - a row: heads with the same mount at about the same depth and height.
 Each group gets a class the director talks about: overhead, ring, back, front, towers (or "all").
@@ -48,11 +50,19 @@ def head_groups(rig: dict) -> list[dict]:
     named: dict[str, list] = {}
     rest = []
     rings = {t["id"]: t for t in rig.get("trusses", []) if T.is_loop(t)}
+    walls = {t["id"] for t in rig.get("trusses", []) if T.is_scaffold(t)}
+    lifts: dict[tuple, int] = {}
+    for h in heads:
+        if h[2].get("truss") in walls and not h[2].get("group"):
+            key = (h[2]["truss"], h[2].get("truss_lift"))
+            lifts[key] = lifts.get(key, 0) + 1
     for h in heads:
         if h[2].get("group"):
             named.setdefault(h[2]["group"], []).append(h)
         elif h[2].get("truss") in rings:
             named.setdefault(f"ring:{h[2]['truss']}", []).append(h)
+        elif lifts.get((h[2].get("truss"), h[2].get("truss_lift")), 0) >= 3:
+            named.setdefault(f"row:{h[2]['truss']}:{h[2].get('truss_lift')}", []).append(h)
         else:
             rest.append(h)
 

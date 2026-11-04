@@ -101,7 +101,7 @@ final class WizardModel {
 
     private func applyTemplate() {
         (width, height, depth) = template.size
-        ledWall = template == .club || template == .stage
+        ledWall = template == .club || template == .stage || template == .festival
         if RigTemplate.allCases.contains(where: { rigName.hasPrefix($0.rawValue) }) || rigName.isEmpty { rigName = template.rawValue }
     }
 

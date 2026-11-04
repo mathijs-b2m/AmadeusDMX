@@ -30,12 +30,14 @@ A truss: `{"id", "type": "quatro", "length_m", "x_m" (its centre), "y_m", "z_m",
 `diameter_m`, `arc_deg`; a carré (a rectangle of truss on four legs, standing on the floor) `"shape": "carre"`,
 `width_m`, `depth_m`, `z_m` the frame's height (round it like round a full circle, from its front middle). A light stand is the cheap kind: `"type": "bridge"` (a bar on a tripod at each end) or
 `"tbar"` (a T-bar on one tripod), `z_m` the bar's height, with `max_kg`, `min_height_m` and `max_height_m` from
-the maker when known. A truss may say where its heads play: `"aim": "audience"` or `"down"`.
+the maker when known. A scaffold wall (the
+tube wall of a festival stage, standing on the floor) is a straight truss with `"type": "scaffold"`: `length_m` its
+width, `z_m` its top, `depth_m`, and about `bay_m` between its standards and `lift_m` between its ledgers. A truss may say where its heads play: `"aim": "audience"` or `"down"`.
 
 A fixture's placement: `x`, `y_m`, `z_m`, `mount` (`hang`, `stand`, `floor`), `rot_deg` (counter-clockwise seen
 from above), and on a truss `truss` (its id), `truss_pos_m` (from the truss's centre along it; from the base on
 a tower), `truss_side` (`under`, `top`, `front`, `back`; a tower also `left`, `right`) and `mount_roll_deg`
-(90 on the front face, 270 on the back). Fixtures without motors can have `aim`: `[azimuth°, elevation°]`.
+(90 on the front face, 270 on the back); on a scaffold also `truss_lift`, which ledger (1 is the lowest). Fixtures without motors can have `aim`: `[azimuth°, elevation°]`.
 When you put a fixture on a truss, set `truss`, `truss_pos_m`, `truss_side` and `mount`; the engine works out
 the rest when it loads the rig. If in doubt, let `automount` place it and adjust from there.
 

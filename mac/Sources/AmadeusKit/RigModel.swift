@@ -30,6 +30,10 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// `depthM` up and down the stage before rotDeg turns it, centred on xM/yM, the frame at zM; a closed loop like a
     /// full circle, lengthM its perimeter, measured round it from the middle of its front side.
     public var shape: String?
+    /// A scaffold (type "scaffold"): a wall of tube standing on the floor (amadeus/rig/trusses.py), straight like a
+    /// truss, zM its top, about `bayM` between its standards, `liftM` between its ledgers, `depthM` between its frames.
+    public var bayM: Double?
+    public var liftM: Double?
     public var diameterM: Double?
     public var arcDeg: Double?
     public var widthM: Double?
@@ -49,10 +53,12 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     public static let carreSizes: [(Double, Double)] = [(3, 3), (4, 3), (4, 4), (6, 4)]
     public static let carreHeightM = 3.0
     public static let cornerClearM = 0.25
+    /// Scaffold walls to start from, width × height (any other size works too).
+    public static let scaffoldSizes: [(Double, Double)] = [(8, 5), (12, 7), (16, 9), (20, 11)]
 
     enum CodingKeys: String, CodingKey {
         case id, type, lengthM = "length_m", xM = "x_m", yM = "y_m", zM = "z_m", rotDeg = "rot_deg", vertical
-        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", widthM = "width_m", depthM = "depth_m", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m"
+        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", widthM = "width_m", depthM = "depth_m", bayM = "bay_m", liftM = "lift_m", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m"
     }
 
     /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
@@ -94,6 +100,8 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         arcDeg = try c.decodeIfPresent(Double.self, forKey: .arcDeg)
         widthM = try c.decodeIfPresent(Double.self, forKey: .widthM)
         depthM = try c.decodeIfPresent(Double.self, forKey: .depthM)
+        bayM = try c.decodeIfPresent(Double.self, forKey: .bayM)
+        liftM = try c.decodeIfPresent(Double.self, forKey: .liftM)
         aim = try c.decodeIfPresent(String.self, forKey: .aim)
         maxKg = try c.decodeIfPresent(Double.self, forKey: .maxKg)
         maxHeightM = try c.decodeIfPresent(Double.self, forKey: .maxHeightM)
@@ -119,18 +127,48 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         return t
     }
 
+    /// A scaffold wall `width` across and `height` high.
+    public static func scaffold(id: String, width: Double, height: Double, xM: Double, yM: Double) -> Truss {
+        var t = Truss(id: id, lengthM: width, xM: xM, yM: yM, zM: height)
+        t.type = "scaffold"; t.depthM = 1; t.bayM = 2.5; t.liftM = 1
+        return t
+    }
+
     /// A truss this far in front of the stage edge hangs over the crowd (amadeus/rig/trusses.py OVER_CROWD_M).
     public static let overCrowdM = 1.0
 
     /// Where the heads on it play, automatic resolved: "audience", "down", or nil (wherever the director aims).
     public var lightAim: String? {
         if let aim, aim == "audience" || aim == "down" { return aim }
+        if isScaffold { return "audience" }  // a wall: nothing to play behind it
         return !vertical && yM >= Self.overCrowdM ? "down" : nil
     }
 
     public var isRing: Bool { shape == "circle" && !vertical }
     /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.
     public var isStand: Bool { (type == "bridge" || type == "tbar") && !vertical && !isLoop }
+    /// A scaffold wall: tube, bays across and lifts up, standing on the floor.
+    public var isScaffold: Bool { type == "scaffold" && !vertical && !isLoop }
+    /// A bar fixtures clamp close to: a light stand's tube, or a ledger of a scaffold.
+    public var isTube: Bool { isStand || type == "ledger" }
+    public var scaffoldDepth: Double { depthM ?? 1 }
+    /// How many bays across and lifts up: the standards and ledgers share its size evenly, the top ledger at zM.
+    public var scaffoldBays: Int { max(1, Int((lengthM / (bayM ?? 2.5)).rounded())) }
+    public var scaffoldLifts: Int { max(1, Int((zM / (liftM ?? 1)).rounded())) }
+    public func liftHeight(_ lift: Int) -> Double { zM * Double(lift) / Double(scaffoldLifts) }
+    /// The ledger nearest height `z`.
+    public func nearestLift(_ z: Double) -> Int { min(scaffoldLifts, max(1, Int((z / zM * Double(scaffoldLifts)).rounded()))) }
+    /// Ledger `lift` of a scaffold's front frame, as a straight bar (under the scaffold's own id).
+    public func ledger(_ lift: Int) -> Truss {
+        let k = min(scaffoldLifts, max(1, lift)), n = normal * (scaffoldDepth / 2)
+        var t = Truss(id: id, lengthM: lengthM, xM: xM + n.x, yM: yM + n.y, zM: liftHeight(k), rotDeg: rotDeg)
+        t.type = "ledger"
+        return t
+    }
+    /// The scaffold an LED wall hangs on: the widest one that faces the audience.
+    public static func screenWall(_ trusses: [Truss]) -> Truss? {
+        trusses.filter { $0.isScaffold && abs($0.rotDeg) < 1 }.max { $0.lengthM < $1.lengthM }
+    }
     /// A carré: a rectangle of truss on four legs.
     public var isCarre: Bool { shape == "carre" && !vertical }
     /// A truss whose heads play round it: a round truss (or an arc) or a carré.
@@ -207,6 +245,8 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
 
     /// Unit vector along the truss (horizontal trusses).
     public var axis: SIMD2<Double> { SIMD2(cos(rotDeg * .pi / 180), sin(rotDeg * .pi / 180)) }
+    /// Unit vector out of its front (towards the audience when it isn't turned).
+    public var normal: SIMD2<Double> { SIMD2(-axis.y, axis.x) }
 
     /// A point on the truss: `u` metres from its centre along it (or above its base, for a tower).
     public func point(_ u: Double) -> SIMD3<Double> {
@@ -225,6 +265,9 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// A horizontal truss as straight pieces (one for a straight truss, short chords round a ring, a carré's four
     /// sides), for drawing and picking.
     public func pieces(_ step: Double = 0.4) -> [(SIMD3<Double>, SIMD3<Double>)] {
+        if isScaffold {  // the ledgers of its front frame
+            return (1...scaffoldLifts).map { k in let l = ledger(k); return (l.point(-lengthM / 2), l.point(lengthM / 2)) }
+        }
         if isCarre {
             let c = carreCorners.map { SIMD3($0.x, $0.y, zM) }
             return (0..<4).map { (c[($0 + 3) % 4], c[$0]) }  // front, +x side, back, -x side
@@ -377,6 +420,7 @@ public struct PlacedFixture: Identifiable, Equatable, Sendable {
     public var aim: SIMD2<Double>?  // azimuth, elevation (fixtures without motors)
     public var truss: String?
     public var trussPos: Double?
+    public var trussLift: Int?      // on a scaffold: which ledger (1 is the lowest)
     public var side: String?        // under | top | front | back (on a truss)
     public var mountRoll: Double?   // 90: on the front face, 270: on the back face (rolled about the truss)
     /// Not mounted on this rig yet: it waits on the floor at the front (the engine's waiting spot).
@@ -415,7 +459,7 @@ public struct RigDocument: Equatable {
     /// What belongs to the rig rather than the set, and a fixture's fields that say where it is
     /// (amadeus/rig/store.py: RIG_KEYS, PLACEMENT_KEYS).
     public static let rigKeys = ["stage", "trusses", "zones", "screen"]
-    public static let placementKeys = ["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_side",
+    public static let placementKeys = ["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_lift", "truss_side",
                                        "mount_roll_deg", "reverse", "width", "group"]
     public static let unplacedKey = "_unplaced"
 
@@ -464,6 +508,7 @@ public struct RigDocument: Equatable {
                                   yM: o["y_m"]?.number ?? d.0, zM: o["z_m"]?.number ?? d.1, rotDeg: o["rot_deg"]?.number ?? 0,
                                   aim: aim, truss: o["truss"]?.string, trussPos: o["truss_pos_m"]?.number,
                                   side: o["truss_side"]?.string, mountRoll: o["mount_roll_deg"]?.number)
+            f.trussLift = o["truss_lift"]?.number.map { Int($0) }
             f.waiting = o[Self.unplacedKey] != nil
             // a waiting spot the engine gave at the hall floor's height (store.py): on a raised stage, on its deck
             if f.waiting, f.mount == "floor", f.zM < deck, Stage.onStage(x: f.x, yM: f.yM) { f.zM += deck }
@@ -482,11 +527,11 @@ public struct RigDocument: Equatable {
         for (k, from) in [(i, fj), (j, fi)] {
             fixtures[k].mount = from.mount; fixtures[k].x = from.x; fixtures[k].yM = from.yM; fixtures[k].zM = from.zM
             fixtures[k].rotDeg = from.rotDeg; fixtures[k].aim = from.aim; fixtures[k].truss = from.truss
-            fixtures[k].trussPos = from.trussPos; fixtures[k].side = from.side; fixtures[k].mountRoll = from.mountRoll
+            fixtures[k].trussPos = from.trussPos; fixtures[k].trussLift = from.trussLift; fixtures[k].side = from.side; fixtures[k].mountRoll = from.mountRoll
             fixtures[k].waiting = from.waiting
         }
         // the placement fields the editor doesn't model (reverse, width, group) trade places too
-        let other = Set(Self.placementKeys).subtracting(["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m",
+        let other = Set(Self.placementKeys).subtracting(["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_lift",
                                                          "truss_side", "mount_roll_deg"])
         let ra = rawFixture(a), rb = rawFixture(b)
         updateRaw(a) { o in for k in other { o[k] = rb[k] } }
@@ -563,6 +608,7 @@ public struct RigDocument: Equatable {
             o["aim"] = f.aim.map { .array([.number(r($0.x, 10)), .number(r($0.y, 10))]) }
             o["truss"] = f.truss.map(JSONValue.string)
             o["truss_pos_m"] = f.trussPos.map { .number(r($0, 1000)) }
+            o["truss_lift"] = f.truss == nil ? nil : f.trussLift.map { .number(Double($0)) }
             o["truss_side"] = f.truss == nil ? nil : f.side.map(JSONValue.string)
             o["mount_roll_deg"] = (f.mountRoll ?? 0) == 0 ? nil : .number(f.mountRoll!)
             return .object(o)

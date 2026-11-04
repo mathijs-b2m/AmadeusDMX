@@ -28,6 +28,7 @@ DEFAULT_STAGE = {
     # "room_width_m": the hall's width, its side walls the same distance either side of the stage; when it isn't
     # given, ROOM_SIDE_M either side
     "deck_m": 0.0,  # the stage's height above the hall floor (heights count from the hall floor)
+    "deck_scaffold": False,  # the deck stands on scaffold (open tube under it), not on a solid front (drawing only)
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …
     "audience_min_up_deg": 35.0,  # … or this far up (heads below 2.5 m); 10° for higher heads

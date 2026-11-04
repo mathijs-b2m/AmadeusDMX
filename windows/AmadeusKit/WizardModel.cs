@@ -155,7 +155,7 @@ public sealed class WizardModel : Observable
     void ApplyTemplate()
     {
         (Width, Height, Depth) = Template.Size();
-        LedWall = Template is RigTemplate.Club or RigTemplate.Stage;
+        LedWall = Template is RigTemplate.Club or RigTemplate.Stage or RigTemplate.Festival;
         if (RigTemplates.IsDefaultName(RigName)) RigName = Template.RawValue();
     }
 

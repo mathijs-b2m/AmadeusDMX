@@ -41,16 +41,16 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
         {
             case { Kind: EditorSelectionKind.Truss, Id: var id }:
                 return d.Trusses.FirstOrDefault(t => t.Id == id) is { } t
-                    ? string.Join("|", "truss", id, t.Vertical, t.IsRing, t.IsCarre, t.Arc, t.DiameterM, d.Fixtures.Count(f => f.Truss == id)) : "none";
+                    ? string.Join("|", "truss", id, t.Vertical, t.IsRing, t.IsCarre, t.IsScaffold, t.Arc, t.DiameterM, d.Fixtures.Count(f => f.Truss == id)) : "none";
             case { Kind: EditorSelectionKind.Fixture, Id: var id }:
                 return d.Fixtures.FirstOrDefault(f => f.Id == id) is { } f
-                    ? string.Join("|", "fixture", id, f.Truss, TrussOf(f)?.Vertical, TrussOf(f)?.IsLoop, f.Waiting, f.Universe, f.Address, f.Mode) : "none";
+                    ? string.Join("|", "fixture", id, f.Truss, TrussOf(f)?.Vertical, TrussOf(f)?.IsLoop, TrussOf(f)?.IsScaffold, f.Waiting, f.Universe, f.Address, f.Mode) : "none";
             case { Kind: EditorSelectionKind.Zone, Id: var id }:
                 return d.Zones.FirstOrDefault(z => z.Id == id) is { } z ? string.Join("|", "zone", id, z.Shape, z.Kind) : "none";
         }
         return string.Join("|", "overview", d.Set, editor.IsDirty, editor.Busy, d.Stage.Outdoor, d.HasScreen,
             string.Join(";", d.Fixtures.Select(f => $"{f.Id},{f.Key},{f.Waiting},{f.Truss},{f.Side},{f.Mount}")),
-            string.Join(";", d.Trusses.Select(t => $"{t.Id},{t.LengthM},{t.Vertical},{t.IsRing},{t.DiameterM},{t.Arc},{t.WidthM},{t.DepthM}")),
+            string.Join(";", d.Trusses.Select(t => $"{t.Id},{t.LengthM},{t.ZM},{t.Vertical},{t.IsRing},{t.DiameterM},{t.Arc},{t.WidthM},{t.DepthM}")),
             string.Join(";", d.Zones.Select(z => $"{z.Id},{z.Name},{z.Kind},{z.Shape},{z.Enabled}")));
     }
 
@@ -128,6 +128,9 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
                 .Tooltip("The hall's width, wall to wall: beams end on its side walls and the haze fills it. The stage stands in its middle"),
             EditorUI.NumberField(editor, "Stage height", () => editor.Doc.Stage.DeckM, editor.SetDeck, 0, 3, 0.1,
                 help: "How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage"),
+            EditorUI.Toggle(editor, "Stage on scaffold", () => editor.Doc.Stage.DeckScaffold, v => editor.UpdateStage(s => s.DeckScaffold = v),
+                    "Open tube under the stage instead of a solid front")
+                .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.DeckM > 0 ? Visibility.Visible : Visibility.Collapsed),
             EditorUI.Toggle(editor, "LED wall behind the DJ", () => editor.Doc.HasScreen, editor.SetScreen),
             d.Stage.Outdoor ? null
                 : EditorUI.Toggle(editor, "Beams stay off the ceiling", () => editor.Doc.Stage.CeilingGuard, v => editor.UpdateStage(s => s.CeilingGuard = v),
@@ -141,8 +144,8 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
         foreach (var t in d.Trusses)
         {
             var id = t.Id;
-            trusses.Add(ListRow(t.Vertical ? "building.columns" : t.IsRing ? EditorUI.Symbol("circle") : t.IsCarre ? "square" : "square.split.bottomrightquarter", null, t.Id,
-                $"{(t.IsRing ? TrussInspector.RingName(t) : t.IsCarre ? TrussInspector.CarreName(t) : $"{Format.Number(t.LengthM)} m")} · {fixtures.Count(f => f.Truss == t.Id)} fixtures",
+            trusses.Add(ListRow(t.Vertical ? "building.columns" : t.IsRing ? EditorUI.Symbol("circle") : t.IsCarre ? "square" : t.IsScaffold ? "squareshape.split.3x3" : "square.split.bottomrightquarter", null, t.Id,
+                $"{(t.IsRing ? TrussInspector.RingName(t) : t.IsCarre ? TrussInspector.CarreName(t) : t.IsScaffold ? TrussInspector.ScaffoldName(t) : $"{Format.Number(t.LengthM)} m")} · {fixtures.Count(f => f.Truss == t.Id)} fixtures",
                 () => editor.Selection = EditorSelection.Truss(id)));
         }
         sections.Children.Add(EditorUI.Section("Trusses", trusses));
@@ -331,7 +334,10 @@ public static class HeadGroupSection
 
 public sealed class TrussInspector(RigEditorModel editor, string id)
 {
-    static string Metres(double v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " m";
+    internal static string Metres(double v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " m";
+
+    /// "16 × 9 m".
+    public static string ScaffoldName(Truss t) => $"{Format.Number(t.LengthM)} × {Format.Number(t.ZM)} m";
 
     /// "3 × 3 m".
     public static string CarreName(Truss t) => $"{Format.Number(t.CarreWidth)} × {Format.Number(t.CarreDepth)} m";
@@ -360,18 +366,23 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
     {
         var truss = T;
         var s = UI.VStack(18);
+        static string Kind(Truss t) => t.Vertical ? "Tower, box truss 30 cm" : t.IsRing ? $"Round truss, {RingName(t)}"
+            : t.IsCarre ? $"Carré {CarreName(t)}, on four legs"
+            : t.IsScaffold ? $"Scaffold {ScaffoldName(t)}, {t.ScaffoldBays} bays, {t.ScaffoldLifts} lifts"
+            : t.Type == "tbar" ? "T-bar stand, on one tripod" : t.IsStand ? "Light bridge, on two tripods"
+            : "Box truss (quatro), 30 cm";
         s.Children.Add(EditorUI.Section(null,
             UI.HStack(10, UI.Icon(truss.Vertical ? "building.columns" : truss.IsRing ? EditorUI.Symbol("circle") : truss.IsCarre ? "square"
+                                  : truss.IsScaffold ? "squareshape.split.3x3"
                                   : truss.IsStand ? "lamp.floor" : "square.split.bottomrightquarter", 22)
                               .Foreground(Tint.Accent),
                       UI.VStack(2, UI.Text(truss.Id, Font.Headline),
-                                UI.Text(truss.Vertical ? "Tower, box truss 30 cm" : truss.IsRing ? $"Round truss, {RingName(truss)}"
-                                        : truss.IsCarre ? $"Carré {CarreName(truss)}, on four legs"
-                                        : truss.Type == "tbar" ? "T-bar stand, on one tripod" : truss.IsStand ? "Light bridge, on two tripods"
-                                        : "Box truss (quatro), 30 cm", Font.Caption).Secondary())),
+                                UI.Text(Kind(truss), Font.Caption).Secondary().Bind(editor, nameof(RigEditorModel.Version), k => k.Text = Kind(T)))),
             truss.IsStand && (truss.MaxKg is not null || truss.MaxHeightM is not null)
                 ? UI.Text(StandLimits(truss), Font.Caption).Secondary().Wrap() : null,
             truss.IsRing ? UI.Text("Heads on a ring play it as a circle: crowns of beams out of it, cones, twisters, waves running round.", Font.Caption)
+                .Secondary().Wrap() : null,
+            truss.IsScaffold ? UI.Text("A wall of tube, standing on the floor. Drag fixtures up and down it: they clamp to its ledgers, and the LED wall hangs on its front.", Font.Caption)
                 .Secondary().Wrap() : null,
             truss.IsCarre ? UI.Text("A square of truss standing on its own legs. Heads on it play it like a ring: crowns of beams out of it, cones, twisters, waves running round.", Font.Caption)
                 .Secondary().Wrap() : null));
@@ -399,6 +410,24 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
                 () => editor.UpdateTruss(id, "Change Depth", t => t.DepthM = Math.Max(1, t.CarreDepth - 0.5)),
                 () => editor.UpdateTruss(id, "Change Depth", t => t.DepthM = Math.Min(20, t.CarreDepth + 0.5))));
         }
+        else if (truss.IsScaffold)
+        {
+            size.Add(EditorUI.Stepper(editor, () => $"Width {Metres(T.LengthM)}",
+                () => editor.UpdateTruss(id, t => t.LengthM = Math.Max(2, t.LengthM - 0.5)),
+                () => editor.UpdateTruss(id, t => t.LengthM = Math.Min(60, t.LengthM + 0.5))));
+            size.Add(EditorUI.Stepper(editor, () => $"Height {Metres(T.ZM)}",
+                () => editor.UpdateTruss(id, t => t.ZM = Math.Max(2, t.ZM - 0.5)),
+                () => editor.UpdateTruss(id, t => t.ZM = Math.Min(30, t.ZM + 0.5))));
+            size.Add(EditorUI.Stepper(editor, () => $"Depth {Metres(T.ScaffoldDepth)}",
+                () => editor.UpdateTruss(id, "Change Depth", t => t.DepthM = Math.Max(0.5, t.ScaffoldDepth - 0.25)),
+                () => editor.UpdateTruss(id, "Change Depth", t => t.DepthM = Math.Min(3, t.ScaffoldDepth + 0.25))));
+            size.Add(EditorUI.Stepper(editor, () => $"Bay {Metres(T.BayM ?? 2.5)}",
+                () => editor.UpdateTruss(id, "Change Bays", t => t.BayM = Math.Max(1, (t.BayM ?? 2.5) - 0.25)),
+                () => editor.UpdateTruss(id, "Change Bays", t => t.BayM = Math.Min(4, (t.BayM ?? 2.5) + 0.25))));
+            size.Add(EditorUI.Stepper(editor, () => $"Lift {Metres(T.LiftM ?? 1)}",
+                () => editor.UpdateTruss(id, "Change Lifts", t => t.LiftM = Math.Max(0.5, (t.LiftM ?? 1) - 0.25)),
+                () => editor.UpdateTruss(id, "Change Lifts", t => t.LiftM = Math.Min(3, (t.LiftM ?? 1) + 0.25))));
+        }
         else
         {
             size.Add(EditorUI.Stepper(editor, () => $"Length {Metres(T.LengthM)}",
@@ -409,11 +438,12 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         size.Add(EditorUI.ValueSlider(editor, "Depth (y)", () => T.YM, v => editor.UpdateTruss(id, t => t.YM = v), -14, 4, 0.25));
         if (!truss.Vertical)
         {
-            size.Add(truss.IsStand
-                ? EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
-                                       () => T.MinHeightM ?? 1, () => Math.Max((T.MinHeightM ?? 1) + 0.1, T.MaxHeightM ?? 4), 0.05)
-                : EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
-                                       () => 0.5, () => Math.Max(2, editor.Doc.Stage.CeilingM), 0.1));
+            if (!truss.IsScaffold)
+                size.Add(truss.IsStand
+                    ? EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
+                                           () => T.MinHeightM ?? 1, () => Math.Max((T.MinHeightM ?? 1) + 0.1, T.MaxHeightM ?? 4), 0.05)
+                    : EditorUI.ValueSlider(editor, "Height", () => T.ZM, v => editor.UpdateTruss(id, t => t.ZM = v),
+                                           () => 0.5, () => Math.Max(2, editor.Doc.Stage.CeilingM), 0.1));
             size.Add(EditorUI.ValueSlider(editor, "Rotation", () => T.RotDeg, v => editor.UpdateTruss(id, t => t.RotDeg = v), -180, 180, 15, "°"));
         }
         s.Children.Add(EditorUI.Section("Size and Place", size));
@@ -421,9 +451,10 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         if (!truss.Vertical)
         {
             var aims = new[] { "", "audience", "down" };
+            string Automatic() => T.IsScaffold ? "Automatic (audience)" : T.YM >= Truss.OverCrowdM ? "Automatic (down)" : "Automatic";
             var picker = (ComboBox)UI.Picker(aims, T.Aim ?? "", a => a switch
             {
-                "" => T.YM >= Truss.OverCrowdM ? "Automatic (down)" : "Automatic",
+                "" => Automatic(),
                 "audience" => "Towards the audience",
                 _ => "Down",
             }, a => editor.UpdateTruss(id, "Change Aim", t => t.Aim = a.Length == 0 ? null : a))
@@ -432,7 +463,7 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
             var lights = UI.VStack(10, UI.Row("Aim", picker), note).Bind(editor, [nameof(RigEditorModel.Version)], _ =>
             {
                 picker.Select(T.Aim ?? "");
-                if (picker.Items.FirstOrDefault() is ComboBoxItem first) first.Content = T.YM >= Truss.OverCrowdM ? "Automatic (down)" : "Automatic";
+                if (picker.Items.FirstOrDefault() is ComboBoxItem first) first.Content = Automatic();
                 note.Text = AimNote(T);
             });
             s.Children.Add(EditorUI.Section("Lights", lights));
@@ -508,6 +539,15 @@ public sealed class FixtureInspector(AppModel model, RigEditorModel editor, IRig
                     f.Mount = m;
                     if (m == "floor" && f.Truss is null) f.ZM = RigEditorModel.FloorHeight(editor.Doc.Stage, f);
                 })));
+        }
+        if (truss is { IsScaffold: true } wall)
+        {
+            var wid = wall.Id;
+            Truss Wall() => editor.Doc.Trusses.FirstOrDefault(t => t.Id == wid) ?? wall;
+            int Lift() => Math.Min(Wall().ScaffoldLifts, Math.Max(1, F.TrussLift ?? Wall().ScaffoldLifts));
+            mounting.Add(EditorUI.Stepper(editor, () => $"Lift {Lift()} of {Wall().ScaffoldLifts}, {TrussInspector.Metres(Wall().LiftHeight(Lift()))}",
+                () => editor.SetLift(editor.SelectedFixtures, Math.Max(1, Lift() - 1)),
+                () => editor.SetLift(editor.SelectedFixtures, Math.Min(Wall().ScaffoldLifts, Lift() + 1))));
         }
         if (truss is { } tr)
         {
