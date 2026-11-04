@@ -125,6 +125,17 @@ def test_a_set_placed_on_a_second_rig_keeps_its_places_on_the_first(config):
     assert tool("check_show", rig="festival")["not_mounted"] == []
 
 
+def test_a_dj_on_the_floor_stays_with_the_rig(config):
+    tool("create_rig", name="home", template="booth")
+    tool("create_set", name="gear")
+    show = tool("get_show")["show"]
+    assert not show["stage"].get("dj_floor")
+    show["stage"]["dj_floor"] = True
+    tool("save_show", show=show)
+    assert store.rigs.load("home")["stage"]["dj_floor"] is True
+    assert tool("get_show")["show"]["stage"]["dj_floor"] is True
+
+
 def test_the_command_never_watches_stdin_for_a_stop(monkeypatch, capsys):
     """Its stdin is the conversation: the stop-on-EOF watch (amadeus/shutdown.py) would read the messages away."""
     import threading

@@ -131,6 +131,8 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             EditorUI.Toggle(editor, "Stage on scaffold", () => editor.Doc.Stage.DeckScaffold, v => editor.UpdateStage(s => s.DeckScaffold = v),
                     "Open tube under the stage instead of a solid front")
                 .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.DeckM > 0 ? Visibility.Visible : Visibility.Collapsed),
+            EditorUI.Toggle(editor, "DJ on the floor", () => editor.Doc.Stage.DjFloor, v => editor.UpdateStage("Change DJ Booth", s => s.DjFloor = v),
+                "The DJ stands on the floor at a lower console, no riser (on a raised stage: on the stage). Only how it is drawn"),
             EditorUI.Toggle(editor, "LED wall behind the DJ", () => editor.Doc.HasScreen, editor.SetScreen),
             d.Stage.Outdoor ? null
                 : EditorUI.Toggle(editor, "Beams stay off the ceiling", () => editor.Doc.Stage.CeilingGuard, v => editor.UpdateStage(s => s.CeilingGuard = v),

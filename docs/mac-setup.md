@@ -156,7 +156,8 @@ delete stays gone.
 
 Then **Create and Mount**: the assistant hangs every fixture the way a lighting tech would. Fine-tune it on
 the **Rigs** page: drag fixtures onto trusses, add round trusses, draw zones that keep beams off walls and
-lasers out of the audience, and switch **Outdoor** on for an open-air stage.
+lasers out of the audience, switch **Outdoor** on for an open-air stage, and **DJ on the floor** when there is no
+riser and the DJ stands at a lower console.
 
 **Playing a venue with its own house rig?** Skip the assistant: **Import from Documents…** on the Rigs page
 builds the set and the rig from what the venue sends you. An MVR scene (Vectorworks, Capture, grandMA3) or a

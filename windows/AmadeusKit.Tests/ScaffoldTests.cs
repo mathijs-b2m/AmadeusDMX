@@ -275,4 +275,32 @@ public class ScaffoldTests
         // on the floor there is nothing to stand on: as it was
         Assert.Equal(new Scenery([], new Stage(12), false).Vertices.Count, new Scenery([], new Stage(12) { DeckScaffold = true }, false).Vertices.Count);
     }
+
+    [Fact]
+    public void ADjOnTheFloorStandsThereAtALowerConsole()
+    {
+        Assert.True(J.DecodeOrThrow(new Stage { DjFloor = true }.ToJSON().ToJson(), Stage.From).DjFloor);
+        Assert.False(J.DecodeOrThrow(new Stage().ToJSON().ToJson(), Stage.From).DjFloor);
+        static float Top(Scenery s, float y) => s.Vertices.Where(v => MathF.Abs(v.Pos.Y - y) < 0.15f).Max(v => v.Pos.Z);
+        var riser = new Scenery([], new Stage(12), false);
+        var floor = new Scenery([], new Stage(12) { DjFloor = true }, false);
+        // a big rig: no riser, no 15 cm deck; the DJ stays where they were, only lower, their head a person's height up
+        Assert.Null(floor.Deck);
+        Assert.Equal(riser.DjHead.Y, floor.DjHead.Y);
+        Assert.Equal(1.62f, floor.DjHead.Z, 3);
+        Assert.True(riser.DjHead.Z > 2.5f);
+        // the console: 88 cm to the platters, under the DJ's chest and 1.6 m wide
+        var y = floor.DjHead.Y + 0.7f;
+        Assert.Equal(0.88f, Top(floor, y), 3);
+        Assert.Equal(0.85f, floor.Vertices.Where(v => MathF.Abs(v.Pos.Z - 0.85f) < 1e-4f).Max(v => v.Pos.X) - 6, 3);
+        // on a raised stage the stage is their floor: it stays, the riser goes
+        var raised = new Scenery([], new Stage(12) { DeckM = 1.5, DjFloor = true }, false);
+        Assert.Equal(1.5f, raised.Deck!.Value.Top);
+        Assert.Equal(1.5f + 1.62f, raised.DjHead.Z, 3);
+        // a small rig has no riser anyway: only the console comes down
+        var small = new Scenery([], new Stage(4), false);
+        var lower = new Scenery([], new Stage(4) { DjFloor = true }, false);
+        Assert.Equal(small.DjHead, lower.DjHead);
+        Assert.True(Top(lower, -1.5f) < Top(small, -1.5f));
+    }
 }

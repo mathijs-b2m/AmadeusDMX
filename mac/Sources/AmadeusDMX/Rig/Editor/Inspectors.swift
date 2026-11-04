@@ -101,6 +101,9 @@ struct EditorInspector: View {
                                                           set: { v in editor.updateStage("Change Stage") { $0.deckScaffold = v } }))
                     .help("Open tube under the stage instead of a solid front")
             }
+            Toggle("DJ on the floor", isOn: Binding(get: { editor.doc.stage.djFloor },
+                                                    set: { v in editor.updateStage("Change DJ Booth") { $0.djFloor = v } }))
+                .help("The DJ stands on the floor at a lower console, no riser (on a raised stage: on the stage). Only how it is drawn")
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
             if !editor.doc.stage.outdoor {
                 Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },

@@ -311,29 +311,33 @@ function drawScenery(P, st) {
     }
   }
 
-  let booth;  // where the DJ stands: [y of the booth front, z of the floor under it]
+  // where the DJ stands: by the y of the booth front, bz the floor under it. A DJ on the floor (stage.dj_floor) has no
+  // deck or riser and a lower, narrower console; bh the console's height
+  const onFloor = !!st.dj_floor;
+  let by = -1.3, bz = 0;
   if (big) {
     const back = Math.min(-3, (show.ext?.back ?? -6) + 1.0);
-    box(-0.5, st.width_m + 0.5, back, -0.2, 0, 0.15, "#0c0d12", "#101219", "#1d2029");       // stage deck
     const ry = Math.max(back + 0.5, -4.5), rd = 2.2, rw = Math.min(5, st.width_m * 0.3);
-    box(cx - rw / 2, cx + rw / 2, ry - rd, ry, 0.15, 0.95, "#11131a", "#161922", "#262a35");  // DJ riser
-    booth = [ry - 0.4, 0.95];
-  } else {
-    booth = [-1.3, 0];
+    by = ry - 0.4;
+    if (!onFloor) {
+      box(-0.5, st.width_m + 0.5, back, -0.2, 0, 0.15, "#0c0d12", "#101219", "#1d2029");       // stage deck
+      box(cx - rw / 2, cx + rw / 2, ry - rd, ry, 0.15, 0.95, "#11131a", "#161922", "#262a35");  // DJ riser
+      bz = 0.95;
+    }
   }
-  const [by, bz] = booth, bw = big ? 2.4 : 1.6;
+  const bw = big && !onFloor ? 2.4 : 1.6, bh = onFloor ? 0.85 : 1.05;
   // the DJ (behind the booth): body and head
   const dy = by - 0.55;
   poly([[cx - 0.25, dy, bz + 0.9], [cx + 0.25, dy, bz + 0.9], [cx + 0.22, dy, bz + 1.5], [cx - 0.22, dy, bz + 1.5]], "#07080b");
   const hp = P([cx, dy, bz + 1.68]);
   if (hp) { ctx.fillStyle = "#07080b"; ctx.beginPath(); ctx.arc(hp[0], hp[1], 0.12 * hp[3], 0, 7); ctx.fill(); }
   // the booth: a table with a front panel, decks on top with a few lit controls
-  box(cx - bw / 2, cx + bw / 2, by - 0.7, by, bz, bz + 1.05, "#14161e", "#1b1e28", "#2a2e3a");
+  box(cx - bw / 2, cx + bw / 2, by - 0.7, by, bz, bz + bh, "#14161e", "#1b1e28", "#2a2e3a");
   for (const off of [-0.55, 0, 0.55]) {
     const w = off === 0 ? 0.35 : 0.42;
-    box(cx + off * (bw / 2.4) - w / 2, cx + off * (bw / 2.4) + w / 2, by - 0.55, by - 0.12, bz + 1.05, bz + 1.1,
+    box(cx + off * (bw / 2.4) - w / 2, cx + off * (bw / 2.4) + w / 2, by - 0.55, by - 0.12, bz + bh, bz + bh + 0.05,
         "#0d0e13", "#22252f", null);
-    const led = P([cx + off * (bw / 2.4), by - 0.3, bz + 1.11]);
+    const led = P([cx + off * (bw / 2.4), by - 0.3, bz + bh + 0.06]);
     if (led) { ctx.fillStyle = off === 0 ? "rgba(255,204,51,.8)" : "rgba(122,162,255,.75)";
                ctx.beginPath(); ctx.arc(led[0], led[1], Math.max(1.2, 0.025 * led[3]), 0, 7); ctx.fill(); }
   }
@@ -344,7 +348,7 @@ function drawScenery(P, st) {
     c = [0, 1, 2].map(m => pars.reduce((t, [, x]) => t + x[1 + m] * x[0], 0) / pars.length);
     const mx = Math.max(...c, 1e-3); c = c.map(v => v / mx); k = Math.min(1, 0.25 + pars.reduce((t, [, x]) => t + x[0], 0) / pars.length);
   }
-  const a = P([cx - bw / 2, by, bz + 0.95]), b = P([cx + bw / 2, by, bz + 0.95]);
+  const a = P([cx - bw / 2, by, bz + bh - 0.1]), b = P([cx + bw / 2, by, bz + bh - 0.1]);
   if (a && b) { ctx.strokeStyle = rgb(c, 0.8 * k); ctx.lineWidth = Math.max(1.5, 0.02 * a[3]);
                 ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
 }

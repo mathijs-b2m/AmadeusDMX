@@ -81,12 +81,13 @@ public sealed class Scenery
 
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
-        // audience; else a big rig's deck stands 15 cm high
-        float boothY, boothZ;
+        // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such
+        // deck under them (a raised stage stays: that is their floor) and a lower, narrower console
+        float boothY = -1.3f, boothZ = 0;
         var raised = MathF.Max(0, (float)stage.DeckM);
-        if (Big || raised > 0)
+        var deckBack = wallFront ?? MathF.Min(-3, back + 1.0f);
+        if (raised > 0 || (Big && !stage.DjFloor))
         {
-            var deckBack = wallFront ?? MathF.Min(-3, back + 1.0f);
             float deckTop = raised > 0 ? raised : 0.15f, front = raised > 0 ? 0 : -0.2f;
             if (stage.DeckScaffold && raised > 0)  // a plate on open tube
             {
@@ -98,39 +99,36 @@ public sealed class Scenery
                 Box(-0.5f, W + 0.5f, deckBack, front, 0, deckTop, V(0.055f, 0.058f, 0.07f));
             }
             Deck = (-0.5f, W + 0.5f, deckBack, front, deckTop);
-            if (Big)
-            {
-                // (against a scaffold: the riser and the DJ stay in front of the LED wall)
-                float ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f), rd = wallFront is null ? 2.2f : MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
-                Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8f, V(0.07f, 0.074f, 0.09f));
-                boothY = ry - 0.4f; boothZ = deckTop + 0.8f;
-            }
-            else
-            {
-                boothY = -1.3f; boothZ = deckTop;
-            }
+            boothZ = deckTop;
             // a lit edge along the front of the deck
             Box(-0.5f, W + 0.5f, front - 0.04f, front, deckTop - 0.02f, deckTop, V(0.25f, 0.27f, 0.35f), emissive: 0.6f);
         }
-        else
+        if (Big)
         {
-            boothY = -1.3f; boothZ = 0;
+            // (against a scaffold: the riser and the DJ stay in front of the LED wall)
+            float ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f), rd = wallFront is null ? 2.2f : MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
+            boothY = ry - 0.4f;
+            if (!stage.DjFloor)
+            {
+                Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, boothZ, boothZ + 0.8f, V(0.07f, 0.074f, 0.09f));
+                boothZ += 0.8f;
+            }
         }
-        var bw = Big ? 2.4f : 1.6f;
-        Box(cx - bw / 2, cx + bw / 2, boothY - 0.55f, boothY, boothZ, boothZ + 1.0f, V(0.08f, 0.085f, 0.10f));
-        Box(cx - bw / 2 - 0.05f, cx + bw / 2 + 0.05f, boothY - 0.6f, boothY + 0.05f, boothZ + 1.0f, boothZ + 1.05f,
+        float bw = Big && !stage.DjFloor ? 2.4f : 1.6f, bh = stage.DjFloor ? 0.8f : 1.0f;
+        Box(cx - bw / 2, cx + bw / 2, boothY - 0.55f, boothY, boothZ, boothZ + bh, V(0.08f, 0.085f, 0.10f));
+        Box(cx - bw / 2 - 0.05f, cx + bw / 2 + 0.05f, boothY - 0.6f, boothY + 0.05f, boothZ + bh, boothZ + bh + 0.05f,
             V(0.12f, 0.13f, 0.16f));
         // decks: two faintly lit platters
         foreach (var ddx in new[] { -0.45f, 0.45f })
-            Box(cx + ddx - 0.18f, cx + ddx + 0.18f, boothY - 0.45f, boothY - 0.1f, boothZ + 1.05f, boothZ + 1.08f,
+            Box(cx + ddx - 0.18f, cx + ddx + 0.18f, boothY - 0.45f, boothY - 0.1f, boothZ + bh + 0.05f, boothZ + bh + 0.08f,
                 V(0.3f, 0.35f, 0.5f), emissive: 0.5f);
         // the DJ
         float dy = boothY - 0.9f, dz = boothZ;
         Box(cx - 0.12f, cx + 0.12f, dy - 0.1f, dy + 0.1f, dz, dz + 0.85f, V(0.05f, 0.05f, 0.06f));            // legs
         Box(cx - 0.22f, cx + 0.22f, dy - 0.13f, dy + 0.13f, dz + 0.85f, dz + 1.45f, V(0.06f, 0.06f, 0.07f));  // torso
         Box(cx - 0.11f, cx + 0.11f, dy - 0.11f, dy + 0.11f, dz + 1.5f, dz + 1.75f, V(0.07f, 0.065f, 0.065f)); // head
-        Box(cx - 0.36f, cx - 0.22f, dy + 0.0f, dy + 0.4f, dz + 1.15f, dz + 1.25f, V(0.06f, 0.06f, 0.07f));    // arms on the decks
-        Box(cx + 0.22f, cx + 0.36f, dy + 0.0f, dy + 0.4f, dz + 1.15f, dz + 1.25f, V(0.06f, 0.06f, 0.07f));
+        Box(cx - 0.36f, cx - 0.22f, dy + 0.0f, dy + 0.4f, dz + bh + 0.15f, dz + bh + 0.25f, V(0.06f, 0.06f, 0.07f));    // arms on the decks
+        Box(cx + 0.22f, cx + 0.36f, dy + 0.0f, dy + 0.4f, dz + bh + 0.15f, dz + bh + 0.25f, V(0.06f, 0.06f, 0.07f));
         DjHead = V(cx, dy, dz + 1.62f);
 
         // the LED wall behind the DJ

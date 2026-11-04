@@ -62,12 +62,13 @@ struct Scenery {
 
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
-        // audience; else a big rig's deck stands 15 cm high
-        var boothY: Float, boothZ: Float
+        // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such
+        // deck under them (a raised stage stays: that is their floor) and a lower, narrower console
+        var boothY: Float = -1.3, boothZ: Float = 0
         let raised = Float(max(0, stage.deckM))
-        if big || raised > 0 {
-            let wallFront = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) }
-            let deckBack = wallFront ?? min(-3, back + 1.0)
+        let wallFront = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) }
+        let deckBack = wallFront ?? min(-3, back + 1.0)
+        if raised > 0 || (big && !stage.djFloor) {
             let deckTop: Float = raised > 0 ? raised : 0.15, front: Float = raised > 0 ? 0 : -0.2
             if stage.deckScaffold && raised > 0 {  // a plate on open tube
                 box(-0.5, W + 0.5, deckBack, front, deckTop - 0.1, deckTop, [0.055, 0.058, 0.07])
@@ -76,26 +77,26 @@ struct Scenery {
                 box(-0.5, W + 0.5, deckBack, front, 0, deckTop, [0.055, 0.058, 0.07])
             }
             deck = (-0.5, W + 0.5, deckBack, front, deckTop)
-            if big {
-                // (against a scaffold: the riser and the DJ stay in front of the LED wall)
-                let ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5), rd = wallFront == nil ? 2.2 : min(2.2, ry - deckBack), rw = min(5, W * 0.3)
-                box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8, [0.07, 0.074, 0.09])
-                boothY = ry - 0.4; boothZ = deckTop + 0.8
-            } else {
-                boothY = -1.3; boothZ = deckTop
-            }
+            boothZ = deckTop
             // a lit edge along the front of the deck
             box(-0.5, W + 0.5, front - 0.04, front, deckTop - 0.02, deckTop, [0.25, 0.27, 0.35], emissive: 0.6)
-        } else {
-            boothY = -1.3; boothZ = 0
         }
-        let bw: Float = big ? 2.4 : 1.6
-        box(cx - bw / 2, cx + bw / 2, boothY - 0.55, boothY, boothZ, boothZ + 1.0, [0.08, 0.085, 0.10])
-        box(cx - bw / 2 - 0.05, cx + bw / 2 + 0.05, boothY - 0.6, boothY + 0.05, boothZ + 1.0, boothZ + 1.05,
+        if big {
+            // (against a scaffold: the riser and the DJ stay in front of the LED wall)
+            let ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5), rd = wallFront == nil ? 2.2 : min(2.2, ry - deckBack), rw = min(5, W * 0.3)
+            boothY = ry - 0.4
+            if !stage.djFloor {
+                box(cx - rw / 2, cx + rw / 2, ry - rd, ry, boothZ, boothZ + 0.8, [0.07, 0.074, 0.09])
+                boothZ += 0.8
+            }
+        }
+        let bw: Float = big && !stage.djFloor ? 2.4 : 1.6, bh: Float = stage.djFloor ? 0.8 : 1.0
+        box(cx - bw / 2, cx + bw / 2, boothY - 0.55, boothY, boothZ, boothZ + bh, [0.08, 0.085, 0.10])
+        box(cx - bw / 2 - 0.05, cx + bw / 2 + 0.05, boothY - 0.6, boothY + 0.05, boothZ + bh, boothZ + bh + 0.05,
             [0.12, 0.13, 0.16])
         // decks: two faintly lit platters
         for dx: Float in [-0.45, 0.45] {
-            box(cx + dx - 0.18, cx + dx + 0.18, boothY - 0.45, boothY - 0.1, boothZ + 1.05, boothZ + 1.08,
+            box(cx + dx - 0.18, cx + dx + 0.18, boothY - 0.45, boothY - 0.1, boothZ + bh + 0.05, boothZ + bh + 0.08,
                 [0.3, 0.35, 0.5], emissive: 0.5)
         }
         // the DJ
@@ -103,8 +104,8 @@ struct Scenery {
         box(cx - 0.12, cx + 0.12, dy - 0.1, dy + 0.1, dz, dz + 0.85, [0.05, 0.05, 0.06])          // legs
         box(cx - 0.22, cx + 0.22, dy - 0.13, dy + 0.13, dz + 0.85, dz + 1.45, [0.06, 0.06, 0.07]) // torso
         box(cx - 0.11, cx + 0.11, dy - 0.11, dy + 0.11, dz + 1.5, dz + 1.75, [0.07, 0.065, 0.065]) // head
-        box(cx - 0.36, cx - 0.22, dy + 0.0, dy + 0.4, dz + 1.15, dz + 1.25, [0.06, 0.06, 0.07])   // arms on the decks
-        box(cx + 0.22, cx + 0.36, dy + 0.0, dy + 0.4, dz + 1.15, dz + 1.25, [0.06, 0.06, 0.07])
+        box(cx - 0.36, cx - 0.22, dy + 0.0, dy + 0.4, dz + bh + 0.15, dz + bh + 0.25, [0.06, 0.06, 0.07])   // arms on the decks
+        box(cx + 0.22, cx + 0.36, dy + 0.0, dy + 0.4, dz + bh + 0.15, dz + bh + 0.25, [0.06, 0.06, 0.07])
         djHead = [cx, dy, dz + 1.62]
 
         // the LED wall behind the DJ

@@ -75,6 +75,9 @@ truss's `z_m`, `ceiling_m`) count from the hall floor, so on a 1.5 m stage a fix
 auto-mount puts its floor rows on the deck, beams land on it, and the hang sheet gives a stage truss's height above
 the stage as well.
 
+`stage.dj_floor: true` puts the DJ on the floor at a lower, narrower console, with no riser under them (and no low
+deck on a big rig; on a raised stage they stand on the stage). It only changes how the stage is drawn.
+
 `stage.outdoor: true` is an open-air stage: there is no ceiling (`ceiling_m` and the ceiling guard are ignored),
 the sky aim goes higher and wider, the directors aim at the sky far more often (the AI is told it is an outdoor
 show), and smoke clears in about a minute instead of five. Indoors nothing changes: the ceiling guard keeps
