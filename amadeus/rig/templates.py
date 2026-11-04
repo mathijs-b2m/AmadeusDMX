@@ -16,8 +16,12 @@ TEMPLATES = {
     "club": "Two trusses over the booth, front and back.",
     "stage": "A concert stage: two overhead trusses, a low truss at the back and a tower on each side.",
     "ring": "A round truss over the DJ booth, a half circle behind it.",
+    "festival": "A festival stage: a scaffold wall behind a raised deck on scaffold, the LED wall hanging on it.",
     "carre": "A carré round the DJ booth: a square of truss standing on its own four legs on the floor.",
 }
+
+
+FESTIVAL_DECK_M = 1.5  # a festival stage stands this high
 
 
 def _truss(tid: str, length: float, x: float, y: float, z: float, vertical: bool = False) -> dict:
@@ -66,6 +70,9 @@ def rig(template: str, width: float = 8.0, height: float = 4.5, depth: float = 1
     elif template == "carre":  # the biggest hired size that fits the stage, round the booth at the stage edge
         w, d = [c for c in T.CARRE_SIZES_M if c[0] <= max(W - 1, T.CARRE_SIZES_M[0][0])][-1]
         trusses.append(T.carre("carre", w, d, W / 2, 1.0 - d / 2, min(height, T.CARRE_HEIGHT_M + 0.5)))
+    elif template == "festival":  # the wall behind the stage, a little wider than it, with room for the DJ before it
+        back = min(10.0, max(6.5, W * 0.45))
+        trusses.append(T.scaffold("wall", _length(W + 1), height, W / 2, -back - T.SCAFFOLD_DEPTH_M / 2))
     top = max([t["z_m"] + (t["length_m"] / 2 if t.get("vertical") else 0) for t in trusses] or [height])
     out = {
         "description": TEMPLATES[template],
@@ -73,6 +80,8 @@ def rig(template: str, width: float = 8.0, height: float = 4.5, depth: float = 1
                   "room_depth_m": round(depth, 1), "eye_safety": False},
         "trusses": trusses,
     }  # fmt: skip
+    if template == "festival":
+        out["stage"].update(deck_m=FESTIVAL_DECK_M, deck_scaffold=True, outdoor=True)
     if screen:
         out["screen"] = {"width_m": round(min(10.0, W * 0.55), 1)}
     return out

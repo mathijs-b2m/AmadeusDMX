@@ -400,7 +400,7 @@ TOOLS = {
                    "Becomes the active rig unless make_active is false.", _schema({
                        "name": {"type": "string"},
                        "template": {"type": "string",
-                                    "enum": ["floor", "stands", "bridge", "booth", "club", "stage", "ring", "carre"]},
+                                    "enum": ["floor", "stands", "bridge", "booth", "club", "stage", "ring", "carre", "festival"]},
                        "width_m": {"type": "number", "description": "stage width (default 8)"},
                        "truss_height_m": {"type": "number", "description": "default 4.5"},
                        "room_depth_m": {"type": "number", "description": "room in front of the stage (default 15)"},

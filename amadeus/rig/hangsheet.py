@@ -152,6 +152,11 @@ def _where(f: dict, t: dict | None, W: float) -> tuple[float, str]:
             return t["length_m"] + 1, "on top of the tower"
         face = toward(*T.tower_normal(t, side))
         return u, f"{u:.2f} m up from the base, on the face towards {face}"
+    if T.is_scaffold(t):  # along its ledger, from its reference end
+        ref, _, sign = _ends(t)
+        d = t["length_m"] / 2 + sign * u
+        lift = f.get("truss_lift") or T.scaffold_lifts(t)
+        return d, f"lift {lift} ({T.lift_height(t, lift):.1f} m), {d:.2f} m from the {ref}, {SIDE_TEXT.get(side, side)}"
     if T.is_carre(t):  # round its frame from the front middle, like a ring
         d = u % t["length_m"]
         return (
@@ -191,6 +196,7 @@ def layout(merged: dict) -> dict:
             "facing": facing(f, defn, t),
             "side": f.get("truss_side", ""),
             "pos": f.get("truss_pos_m", 0.0),
+            "lift": f.get("truss_lift") or (T.scaffold_lifts(t) if t and T.is_scaffold(t) else 0),
             "x_m": f.get("x", 0.5) * W,
             "y_m": f.get("y_m", 0.0),
             "_key": key,
@@ -205,11 +211,11 @@ def layout(merged: dict) -> dict:
             floor.append(row)
     structures = []
     for tid, t in trusses.items():
-        fx = sorted(by[tid], key=lambda r: r["_key"])
+        fx = sorted(by[tid], key=lambda r: (-r["lift"], r["_key"]))  # a scaffold: from the top lift down
         for n, r in enumerate(fx, 1):
             r["label"] = f"{tid} {n}"
-        kind = "tower" if t.get("vertical") else "ring" if T.is_loop(t) else "truss"
-        ends = _ends(t)[:2] if kind == "truss" or (kind == "ring" and not T.is_closed(t)) else None
+        kind = "tower" if t.get("vertical") else "ring" if T.is_loop(t) else "scaffold" if T.is_scaffold(t) else "truss"
+        ends = _ends(t)[:2] if kind in ("truss", "scaffold") or (kind == "ring" and not T.is_closed(t)) else None
         structures.append({"id": tid, "kind": kind, "truss": t, "fixtures": fx, "ends": ends,
                            "watts": sum(r["watts"] for r in fx), "kg": sum(r["kg"] for r in fx),
                            "kg_unknown": sum(1 for r in fx if not r["kg"])})  # fmt: skip
@@ -313,9 +319,38 @@ def _plan_svg(merged: dict, lay: dict) -> str:
     return "".join(out)
 
 
+def _wall_svg(st: dict) -> str:
+    """A scaffold seen from the audience: its bays and lifts, the fixtures on their ledgers (stage left on the right,
+    measured from there)."""
+    t, fx = st["truss"], st["fixtures"]
+    L, H, lifts, bays = t["length_m"], t["z_m"], T.scaffold_lifts(t), T.scaffold_bays(t)
+    S = min(900 / max(L, 1.0), 520 / max(H, 1.0))
+    w, h = L * S, H * S
+    out = [f'<svg viewBox="-70 -30 {w + 140:.0f} {h + 60:.0f}" class="wall">']
+    for k in range(bays + 1):
+        x = w * k / bays
+        out.append(f'<line x1="{x:.1f}" y1="0" x2="{x:.1f}" y2="{h:.1f}" class="tick"/>')
+    for k in range(1, lifts + 1):
+        y = h - h * k / lifts
+        out.append(f'<line x1="0" y1="{y:.1f}" x2="{w:.1f}" y2="{y:.1f}" class="tick"/>'
+                   f'<text x="-8" y="{y + 4:.1f}" class="dim" text-anchor="end">{k}</text>')  # fmt: skip
+    ref, other = st["ends"]
+    out.append(f'<text x="{w:.1f}" y="-12" class="end r">{_e(ref)} · 0 m</text>'
+               f'<text x="0" y="-12" class="end">{_e(other)} · {L:.2f} m</text>')  # fmt: skip
+    for r in fx:
+        x, y = w - r["_key"] * S, h - h * r["lift"] / lifts
+        y += {"top": -9, "front": 0, "back": 0}.get(r["side"], 9)
+        ring = ' class="face"' if r["side"] in ("front", "back") else ""
+        out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="10" fill="{ROLE_COLOR.get(r["role"], "#555")}"{ring}/>'
+                   f'<text x="{x:.1f}" y="{y + 3.5:.1f}" class="fn">{_e(_num(r))}</text>')  # fmt: skip
+    return "".join(out) + "</svg>"
+
+
 def _strip_svg(st: dict) -> str:
     """One truss or tower drawn on its own: the fixtures at their distance from the reference end."""
     t, fx = st["truss"], st["fixtures"]
+    if st["kind"] == "scaffold":
+        return _wall_svg(st)
     if st["kind"] == "ring":
         if T.is_carre(t):  # as far out as its corners
             R = max(math.hypot(x - t["x_m"], y - t["y_m"]) for x, y in T.carre_corners(t))
@@ -423,7 +458,7 @@ th, td { border: 1px solid #bbb; padding: 3px 6px; text-align: left; vertical-al
 th { background: #eee; } tr { break-inside: avoid; }
 td.lbl { font-weight: 700; white-space: nowrap; } td.dmx { font-weight: 700; white-space: nowrap; }
 svg { width: 100%; height: auto; display: block; }
-svg.plan { max-height: 150mm; } svg.ring { max-width: 90mm; } svg.tower-svg { max-width: 110mm; }
+svg.plan { max-height: 150mm; } svg.wall { max-height: 130mm; } svg.ring { max-width: 90mm; } svg.tower-svg { max-width: 110mm; }
 .stage { fill: #f3f3f3; stroke: #999; } .truss { stroke: #444; stroke-width: 6; fill: none; }
 .truss-box { fill: #ddd; stroke: #444; } .tower { fill: #ccc; stroke: #444; }
 .tick { stroke: #999; stroke-dasharray: 3 3; }
@@ -481,6 +516,10 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
         t = st["truss"]
         if st["kind"] == "tower":
             what = f"tower {t['length_m']:.1f} m high, at {t['x_m']:.2f} m from the SL edge"
+        elif T.is_scaffold(t):
+            what = (f"scaffold {t['length_m']:.1f} m wide and {t['z_m']:.1f} m high, {T.scaffold_bays(t)} bays, "
+                    f"{T.scaffold_lifts(t)} lifts, {abs(t['y_m']):.1f} m "
+                    + ("upstage of" if t["y_m"] < 0 else "in front of") + " the stage edge")  # fmt: skip
         elif T.is_carre(t):
             w, d = T.carre_size(t)
             what = f"carré {w:.1f} × {d:.1f} m on four legs, the frame at {t['z_m']:.1f} m"
@@ -501,6 +540,10 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
         if st["kind"] == "truss":
             p.append("<p class='note'>Seen from the audience. Dots under the truss hang under it, dots on top "
                      "stand on it, outlined dots are on its front or back face.</p>")  # fmt: skip
+        elif st["kind"] == "scaffold":
+            p.append("<p class='note'>Seen from the audience, lifts counted from the bottom. Fixtures clamp to the "
+                     "ledgers of the front frame: dots under a ledger hang under it, dots on it stand on it, outlined "
+                     "dots are on its front or back.</p>")  # fmt: skip
         elif st["kind"] == "ring":
             start = (
                 "the middle of its front side, going stage right first"

@@ -7,6 +7,9 @@
 - strobes and blinders on the front face of the front truss: strobes in the middle, blinders at the ends;
 - bars on the floor along the front edge of the stage, pars on the floor at the back (uplighting).
 
+A scaffold wall counts as a stack of straight trusses: its ledgers from the top down, a row every ROW_GAP_M or so,
+none near the stage floor, and those level with its LED wall only left and right of it.
+
 Fixtures of the same model stay together and every row is symmetric. Fixtures already mounted keep their
 place and their room on a truss is left free.
 
@@ -37,6 +40,9 @@ TOWER_SHARE = 0.2  # share of the heads on the towers, when there are trusses to
 FLOOR_FROM = 16  # a set with this many heads or more…
 FLOOR_SHARE = 0.25  # …puts this share of them on the stage floor
 FLOOR_PAR_M = 0.25  # a par or bar on the floor: its lens this high (its body is 10 cm round it)
+ROW_GAP_M = 1.4  # on a scaffold: rows of fixtures this far above each other (a head and its swing)
+OVER_DECK_M = 1.8  # …and the lowest this far over the stage, clear of what stands on it
+SCREEN_CLEAR_M = 0.4  # a fixture stays this far off the LED wall's edge
 ROLES = ("head", "laser", "strobe", "blinder", "bar", "par")
 
 
@@ -47,6 +53,25 @@ def role(defn: dict) -> str:
     if kind == "par_bar":
         return "bar"
     return kind if kind in ROLES else "par"
+
+
+def ledgers(t: dict, merged: dict, big: bool) -> list[dict]:
+    """The ledgers of a scaffold to mount on, from the top down. One level with its LED wall has a `gap`: nothing
+    within that distance of its middle."""
+    deck = float(merged.get("stage", {}).get("deck_m", 0.0) or 0.0)
+    n = T.scaffold_lifts(t)
+    every = max(1, math.ceil(ROW_GAP_M / (t["z_m"] / n) - 1e-6))
+    rows = [T.ledger(t, k) for k in range(n, 0, -every)]
+    rows = [r for r in rows if r["z_m"] >= deck + OVER_DECK_M] or rows[:1]
+    wall = T.screen_wall(merged.get("trusses", []))
+    rect = T.screen_rect(merged, big) if wall and wall["id"] == t["id"] else None
+    if rect:
+        half, bottom, top = rect
+        off = abs(t["x_m"] - float(merged.get("stage", {}).get("width_m", 6.0)) / 2)
+        for r in rows:  # what hangs under a ledger just over the wall's top would hang in front of it
+            if bottom - SCREEN_CLEAR_M <= r["z_m"] <= top + 0.8:
+                r["gap"] = half + off + SCREEN_CLEAR_M
+    return rows
 
 
 def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
@@ -64,13 +89,17 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
             merged["trusses"] = standard_structure(merged)
     trusses = merged.get("trusses", [])
     horiz = sorted((t for t in trusses if not t.get("vertical")), key=lambda t: -t["y_m"])  # front first
+    big = W >= 6 or sum(role(fxlib.get(f["fixture"])) == "head" for f in merged.get("fixtures", [])) >= 8
+    walls = [t for t in horiz if T.is_scaffold(t)]
+    horiz = [r for t in horiz for r in (ledgers(t, merged, big) if T.is_scaffold(t) else [t])]
     towers = sorted((t for t in trusses if t.get("vertical")), key=lambda t: t["x_m"])
     todo = [f for f in merged.get("fixtures", []) if ids is None or f["id"] in ids]
     taken = {f["id"] for f in todo}
     used: dict[tuple[str, str], list[float]] = defaultdict(list)  # (truss, side) → positions already in use
     for f in merged.get("fixtures", []):
         if f["id"] not in taken and f.get("truss") and not f.get("_unplaced"):
-            used[(f["truss"], f.get("truss_side", "front"))].append(f.get("truss_pos_m", 0.0))
+            bar = f"{f['truss']}/{f['truss_lift']}" if f.get("truss_lift") else f["truss"]
+            used[(bar, f.get("truss_side", "front"))].append(f.get("truss_pos_m", 0.0))
 
     by_role: dict[str, list[dict]] = defaultdict(list)
     for f in sorted(todo, key=lambda f: f["fixture"]):  # the same models together
@@ -85,12 +114,15 @@ def automount(merged: dict, ids: list[str] | None = None) -> dict[str, dict]:
     lasers = by_role["laser"]  # first: they need the high spots
     if lasers:
         high = [t for t in horiz if t["z_m"] >= LOW_TRUSS_M]
-        back = [(high[-1] if high else horiz[-1], "top")] if horiz else []
+        top = next((t for t in high if t.get("scaffold")), None)  # a scaffold's top ledger is its high spot
+        back = [(top or (high[-1] if high else horiz[-1]), "top")] if horiz else []
         rest = m.trusses(lasers, back, "laser", share=0.6)
         rest = m.towers(rest, towers, lowest=LASER_MIN_M)
         m.row(rest, y=-1.5, z=2.2, mount="stand", span=0.5)
     heads = by_role["head"]
     back_y = min([t["y_m"] for t in horiz] or [-1.5]) - 0.6
+    if walls:  # the back of the stage is in front of the scaffold (and its LED wall)
+        back_y = max(t["y_m"] + T.scaffold_depth(t) / 2 for t in walls) + 0.9
     if heads:
         on_floor = []
         if len(heads) >= FLOOR_FROM:  # a big set: some heads on the stage floor, as a lighting tech would
@@ -319,6 +351,8 @@ class _Mounter:
         stand's bar, fixtures `width` wide (their housing) go side by side, a hand apart."""
         if T.is_closed(t):  # round a circle or a carré: evenly all the way round, no ends to keep clear
             return self._round(t, side, n, kind)
+        if t.get("gap"):
+            return self._wings(t, side, n, kind, share)
         span = t["length_m"] * share
         step, least = SPACING[kind], MIN_SPACING[kind]
         if T.is_stand(t):
@@ -339,6 +373,15 @@ class _Mounter:
         if len(slots) <= n:
             return slots
         return [slots[round(i * (len(slots) - 1) / (n - 1))] for i in range(n)] if n > 1 else [slots[len(slots) // 2]]
+
+    def _wings(self, t: dict, side: str, n: int, kind: str, share: float) -> list[float]:
+        """Up to `n` positions left and right of a ledger's `gap`, mirrored."""
+        span = t["length_m"] / 2 * share - t["gap"]
+        k = min((n + 1) // 2, int(span / SPACING[kind] + 1e-9) + 1) if span > 0 else 0
+        busy = self.used.get((t["id"], side), [])
+        us = [t["gap"] + span * (i + 0.5) / k for i in range(k)]
+        us = [u for u in us if all(abs(s * u - b) >= MIN_SPACING[kind] for b in busy for s in (-1, 1))]
+        return sorted([-u for u in us] + us)
 
     def _round(self, t: dict, side: str, n: int, kind: str) -> list[float]:
         L = T.normalise(t)["length_m"]
