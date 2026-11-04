@@ -23,7 +23,8 @@ public sealed partial class StageRenderer
         var highlight = Highlight;
         // a spot lands where there's a surface to see: not on the back wall while it is cut away
         var backCut = s.BackCut(eye);
-        bool Lands(Room.Surface surf) => surf != Room.Surface.Air && !(backCut && surf == Room.Surface.Back);
+        var inRoom = InRoom;
+        bool Lands(Room.Surface surf) => surf != Room.Surface.Air && !(backCut && surf == Room.Surface.Back) && !(inRoom && s.ShellCut(surf, eye));
 
         void Beam(Vector3 p, Vector3 d, float spreadDeg, Vector3 color, float intensity, float maxLen = 30, bool spot = true)
         {

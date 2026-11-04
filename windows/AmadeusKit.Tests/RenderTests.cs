@@ -255,10 +255,10 @@ public class RenderTests
         int Drawn() => ranges.Sum(r => r.Count);
         bool BackWallDrawn() => ranges.Any(r => Enumerable.Range(r.Start, r.Count)
             .Any(i => s.Vertices[i].Pos.Y == s.Room.Back && s.Vertices[i].Normal == new Vector3(0, 1, 0)));
-        // from the audience: everything, the back wall and the LED wall too
+        // from the audience: everything (but the room's shell, only there with the room button on), the back wall and the LED wall too
         var front = new Vector3(s.Room.Width / 2, 10, 3);
         s.VisibleRanges(front, ranges);
-        Assert.Equal(s.Vertices.Count, Drawn());
+        Assert.Equal(s.Vertices.Count - s.Shell.Sum(c => c.End - c.Start), Drawn());
         Assert.True(BackWallDrawn());
         Assert.False(s.ScreenCut(front) || s.BackCut(front));
         // orbiting round behind the room: no back wall, no LED wall, the rest (the DJ, the rig) still there

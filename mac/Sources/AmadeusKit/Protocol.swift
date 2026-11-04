@@ -52,6 +52,8 @@ public struct Stage: Codable, Sendable, Equatable {
     public var roomDepthM: Double
     /// The hall's width, its side walls the same distance either side of the stage; nil: 2 m either side.
     public var roomWidthM: Double?
+    /// How far the room's back wall stands behind the stage's front edge; nil: 1.5 m behind the rig (Room).
+    public var roomBackM: Double?
     /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
     public var deckM = 0.0
     /// The deck stands on scaffold: open tube under it, not a solid front (only how it is drawn).
@@ -66,7 +68,7 @@ public struct Stage: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case deckM = "deck_m", deckScaffold = "deck_scaffold", djFloor = "dj_floor", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m"
+        case deckM = "deck_m", deckScaffold = "deck_scaffold", djFloor = "dj_floor", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m", roomBackM = "room_back_m"
     }
 
     /// The room either side of the stage when the rig doesn't give the hall's width (amadeus/rig/geometry.py).
@@ -97,6 +99,7 @@ public struct Stage: Codable, Sendable, Equatable {
         backGuard = try c.decodeIfPresent(Bool.self, forKey: .backGuard) ?? true
         outdoor = try c.decodeIfPresent(Bool.self, forKey: .outdoor) ?? false
         roomWidthM = try c.decodeIfPresent(Double.self, forKey: .roomWidthM)
+        roomBackM = try c.decodeIfPresent(Double.self, forKey: .roomBackM)
     }
 }
 

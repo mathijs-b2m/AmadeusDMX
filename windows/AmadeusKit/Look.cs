@@ -35,6 +35,31 @@ public static class Sections
     public static Vector3 Color(string s) => Colors.GetValueOrDefault(s, new Vector3(0.4f, 0.4f, 0.45f));
 }
 
+/// Where the camera may be while it stays inside the room.
+public readonly record struct CameraBox(Vector3 Lo, Vector3 Hi)
+{
+    public Vector3 Clamp(Vector3 p) => Vector3.Clamp(p, Lo, Hi);
+
+    /// What the camera looks at keeps this far from the walls: the eye always fits between it and the wall behind.
+    public CameraBox Targets
+    {
+        get
+        {
+            var m = Vector3.Min(new Vector3(0.5f), (Hi - Lo) / 2);
+            return new CameraBox(Lo + m, Hi - m);
+        }
+    }
+
+    /// How far from `p` (inside) along the unit vector `d` the box ends.
+    public float Exit(Vector3 p, Vector3 d)
+    {
+        var t = float.MaxValue;
+        for (var i = 0; i < 3; i++)
+            if (MathF.Abs(d[i]) > 1e-5f) t = MathF.Min(t, ((d[i] > 0 ? Hi[i] : Lo[i]) - p[i]) / d[i]);
+        return MathF.Max(0, t);
+    }
+}
+
 /// The room the show happens in: floor, ceiling, walls. Beams stop where they would hit one.
 public sealed record Room
 {
@@ -50,7 +75,11 @@ public sealed record Room
     /// The stage's height above the hall floor: beams landing behind its front edge (y ≤ 0) stop on it.
     public float Deck { get; init; }
 
-    /// The back wall stands 1.5 m behind the rearmost fixture or truss (a round truss: its back edge).
+    /// Whether the rig says where the back wall stands (stage.room_back_m): then nothing moves it.
+    public bool BackFixed { get; init; }
+
+    /// The back wall stands where the rig says, else 1.5 m behind the rearmost fixture or truss (a round truss: its
+    /// back edge).
     public Room(Stage stage, IEnumerable<FixtureInfo> fixtures, IEnumerable<Truss>? trusses = null)
     {
         Width = (float)stage.WidthM;
@@ -62,6 +91,18 @@ public sealed record Room
         var trussBack = (trusses ?? []).Select(t => t.Vertical ? t.YM : t.Pieces().Select(p => Math.Min(p.A.Y, p.B.Y)).DefaultIfEmpty(t.YM).Min());
         var rear = fixtures.Select(f => f.Pos.Y).Concat(trussBack).DefaultIfEmpty(-1).Min();
         Back = Math.Min(-2.5f, (float)rear - 1.5f);
+        if (stage.RoomBackM is { } b) { Back = -(float)b; BackFixed = true; }
+    }
+
+    /// Where the camera may be to stay inside: a hand's width off the walls and the ceiling. Outdoors there is no room.
+    public CameraBox? CameraBox
+    {
+        get
+        {
+            if (Outdoor) return null;
+            const float m = 0.25f;
+            return new CameraBox(new Vector3(-Side + m, Back + m, 0.15f), new Vector3(Width + Side - m, Depth - m, Ceiling - m));
+        }
     }
 
     /// Where a beam from `p` along `d` ends: distance and surface (at most `maxLen`).

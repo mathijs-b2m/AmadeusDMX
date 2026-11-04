@@ -1,5 +1,6 @@
 // An orbit camera around the stage (drag to turn, scroll/pinch to zoom, ⌥-drag to pan) with presets that
 // glide into place.
+import AmadeusKit
 import Foundation
 import simd
 
@@ -39,6 +40,18 @@ struct CameraPose: Equatable {
         let v = eye - target, d = simd_length(v)
         return CameraPose(target: target, yaw: atan2(v.x, v.y), pitch: asin(v.z / max(d, 1e-3)), distance: d)
     }
+
+    /// This view from inside `box`: the same way of looking, the eye brought in as far as the wall behind it.
+    func inside(_ box: CameraBox) -> CameraPose {
+        var p = self
+        p.target = box.targets.clamp(target)
+        let dir = SIMD3(sin(yaw) * cos(pitch), cos(yaw) * cos(pitch), sin(pitch))
+        p.distance = min(distance, box.exit(from: p.target, along: dir))
+        return p
+    }
+
+    /// A preset's view from inside `box`: from the nearest place in it, still looking at the same thing.
+    func fitted(_ box: CameraBox) -> CameraPose { .from(eye: box.clamp(eye), target: box.targets.clamp(target)) }
 }
 
 enum CameraPreset: String, CaseIterable, Identifiable {

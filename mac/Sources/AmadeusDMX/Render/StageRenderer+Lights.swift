@@ -20,7 +20,10 @@ extension StageRenderer {
         var lightSum = SIMD3<Float>(repeating: 0)
         // a spot lands where there's a surface to see: not on the back wall while it is cut away
         let backCut = s.backCut(eye: eye)
-        func lands(_ surf: Room.Surface) -> Bool { surf != .air && !(backCut && surf == .back) }
+        let inRoom = self.inRoom
+        func lands(_ surf: Room.Surface) -> Bool {
+            surf != .air && !(backCut && surf == .back) && !(inRoom && s.shellCut(surf, eye: eye))
+        }
 
         func beam(_ p: SIMD3<Float>, _ d: SIMD3<Float>, spreadDeg: Float, color: SIMD3<Float>, intensity: Float,
                   maxLen: Float = 30, spot: Bool = true) {

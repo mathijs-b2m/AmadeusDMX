@@ -174,6 +174,12 @@ final class RigEditorModel: StageEditing {
 
     // MARK: - the venue
 
+    /// How far behind the stage's front edge the room's back wall stands: where the rig puts it, else where it follows the rig.
+    var roomBack: Double {
+        doc.stage.roomBackM ?? Double(-Room(stage: doc.stage, fixtures: RigElements.elements(doc) { [unowned self] in definition($0) },
+                                            trusses: doc.trusses).back)
+    }
+
     func updateStage(_ name: String = "Change Stage", _ body: (inout Stage) -> Void) {
         change(name) { d in
             body(&d.stage)

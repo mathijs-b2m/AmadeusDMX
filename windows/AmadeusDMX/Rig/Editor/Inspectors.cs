@@ -121,10 +121,13 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             EditorUI.Toggle(editor, "Outdoor", () => editor.Doc.Stage.Outdoor, v => editor.UpdateStage(s => s.Outdoor = v),
                 "An open-air stage: no ceiling, so the director uses the sky far more (beams up into the night). Indoors the ceiling is kept clear."),
             d.Stage.Outdoor ? null
-                : EditorUI.ValueSlider(editor, "Ceiling", () => editor.Doc.Stage.CeilingM, v => editor.UpdateStage(s => s.CeilingM = v), 2.5, 20, 0.5),
-            EditorUI.ValueSlider(editor, "Room depth", () => editor.Doc.Stage.RoomDepthM, v => editor.UpdateStage(s => s.RoomDepthM = v), 3, 60, 1),
+                : EditorUI.ValueSlider(editor, "Ceiling", () => editor.Doc.Stage.CeilingM, v => editor.UpdateStage(s => s.CeilingM = v), 2.5, 20, 0.1),
+            EditorUI.ValueSlider(editor, "Room depth", () => editor.Doc.Stage.RoomDepthM, v => editor.UpdateStage(s => s.RoomDepthM = v), 3, 60, 0.1)
+                .Tooltip("From the stage's front edge to the far wall"),
+            EditorUI.ValueSlider(editor, "Behind the stage", () => editor.RoomBack, v => editor.UpdateStage("Change Back Wall", s => s.RoomBackM = v), 2, 40, 0.1)
+                .Tooltip("From the stage's front edge back to the room's back wall. The room's whole length is this plus the room depth. Left alone, the wall stands 1.5 m behind the rig"),
             EditorUI.ValueSlider(editor, "Room width", () => editor.Doc.Stage.RoomWidth, v => editor.UpdateStage("Change Room Width", s => s.RoomWidthM = v),
-                () => editor.Doc.Width, () => Math.Max(80, editor.Doc.Width), 1)
+                () => editor.Doc.Width, () => Math.Max(80, editor.Doc.Width), 0.1)
                 .Tooltip("The hall's width, wall to wall: beams end on its side walls and the haze fills it. The stage stands in its middle"),
             EditorUI.NumberField(editor, "Stage height", () => editor.Doc.Stage.DeckM, editor.SetDeck, 0, 3, 0.1,
                 help: "How high the stage stands above the hall floor: heights count from the hall floor, so the stage's grid is its height plus the height above the stage"),

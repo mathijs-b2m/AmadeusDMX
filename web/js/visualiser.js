@@ -66,6 +66,7 @@ function onHello(msg) {
     : t.shape === "carre" ? t.y_m - Math.hypot(t.width_m || 3, t.depth_m || 3) / 2  // (a carré: round its corners)
     : t.y_m - Math.abs(Math.sin((t.rot_deg || 0) * Math.PI / 180)) * (t.length_m || 2) / 2);
   show.ext = {top: Math.max(2, ...ps.map(p => p[2])), back: Math.min(-1, ...ps.map(p => p[1]), ...trussBack) - 1.5};
+  if (msg.stage.room_back_m != null) show.ext.back = -msg.stage.room_back_m;  // the rig says where the back wall stands
   $("waiting").style.display = "none";
   $("track").textContent = msg.track;
   $("bpm").textContent = `${msg.bpm} BPM`;
@@ -275,6 +276,7 @@ function drawScenery(P, st) {
     const carrier = (show.trusses || []).filter(t => t.type === "scaffold" && !t.vertical && Math.abs(t.rot_deg || 0) < 1)
       .sort((a, b) => b.length_m - a.length_m)[0];
     const sy = carrier ? carrier.y_m + (carrier.depth_m ?? 1) / 2 + 0.37
+      : st.room_back_m != null ? Math.max(big ? Math.min(-4.5, -st.room_back_m + 1.5) - 2.2 : -2.0, -st.room_back_m + 0.45)
       : big ? Math.min(-4.5, (show.ext?.back ?? -6) + 1.5) - 2.2 : -2.0;
     const sz = (big ? 1.4 : 1.15) + (carrier ? st.deck_m || 0 : 0);
     // the picture's left edge goes on the corner that appears on the left (seen from the audience; else mirrored)

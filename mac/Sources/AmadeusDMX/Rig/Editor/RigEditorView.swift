@@ -322,7 +322,7 @@ struct RigEditorView: View {
     private var cameraButtons: some View {
         GlassEffectContainer(spacing: 6) {
             HStack(spacing: 6) {
-                CameraButtons(stage: stage)
+                CameraButtons(stage: stage, outdoor: editor.doc.stage.outdoor)
             }
         }
     }

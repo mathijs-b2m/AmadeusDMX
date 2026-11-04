@@ -181,15 +181,48 @@ final class StageRenderer: NSObject, MTKViewDelegate {
 
     func setPreset(_ p: CameraPreset, animated: Bool = true) {
         wake()
+        pose = shown
         preset = p
         guard let s = scenery else { return }
-        let target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling, deck: s.room.deck)
+        var target = p.pose(width: s.room.width, top: s.top, back: s.room.back, ceiling: s.room.ceiling, deck: s.room.deck)
+        if let box = cameraBox { target = target.fitted(box) }
         if animated { goal = target } else { pose = target; goal = nil }
+    }
+
+    /// Show the room's walls and ceiling and keep the camera inside them. Plan keeps looking from above, through the
+    /// ceiling: from under it there would be no plan to see.
+    var inRoom = false {
+        didSet {
+            guard inRoom != oldValue else { return }
+            wake()
+            if !fly { setPreset(preset) }
+        }
+    }
+
+    /// Where the camera has to stay right now, if anywhere.
+    private var cameraBox: CameraBox? { inRoom && (fly || preset != .plan) ? scenery?.room.cameraBox : nil }
+
+    /// What the camera shows: `pose`, seen from inside the room. Orbiting keeps `pose` itself as it is, so the view
+    /// swings out to its old distance again once the wall is no longer behind it. Gliding to a preset goes straight.
+    private var shown: CameraPose {
+        guard goal == nil, !fly, let box = cameraBox else { return pose }
+        return pose.inside(box)
+    }
+
+    /// Walking and flying stop at the walls.
+    private func keepInside() {
+        guard goal == nil, let box = cameraBox else { return }
+        if fly {
+            let eye = pose.eye
+            pose.target += box.clamp(eye) - eye
+        } else {
+            pose.target = box.targets.clamp(pose.target)
+        }
     }
 
     /// The ray through a point of the view (in points, origin bottom-left like AppKit), for picking.
     func ray(at p: CGPoint, in size: CGSize) -> (origin: SIMD3<Float>, dir: SIMD3<Float>) {
-        let eye = pose.eye, f = simd_normalize(pose.target - eye)
+        let pose = shown, eye = pose.eye, f = simd_normalize(pose.target - eye)
         let right = simd_normalize(simd_cross(f, [0, 0, 1])), up = simd_cross(right, f)
         let aspect = Float(max(1, size.width) / max(1, size.height)), t = tan(Float(0.75) / 2)
         let nx = Float(p.x / max(1, size.width)) * 2 - 1, ny = Float(p.y / max(1, size.height)) * 2 - 1
@@ -208,7 +241,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         wake()
         goal = nil
         if fly { move(forward: (1 - factor) * 6); return }
-        pose.distance = min(120, max(0.6, pose.distance * factor))
+        pose.distance = min(120, max(0.6, shown.distance * factor))
     }
 
     // MARK: flying
@@ -220,8 +253,12 @@ final class StageRenderer: NSObject, MTKViewDelegate {
             wake()
             goal = nil
             // keep the eye where it is; only the point it turns around changes: right in front of you while flying
-            // (looking around turns your head), a stage-sized step ahead again when orbiting
-            setDistance(fly ? Self.flyReach : max(6, simd_length(pose.target - pose.eye)))
+            // (looking around turns your head), a stage-sized step ahead again when orbiting (inside the room: as
+            // far as there is room ahead)
+            if fly, let box = cameraBox { pose = pose.inside(box) }
+            let eye = pose.eye, ahead = simd_normalize(pose.target - eye)
+            let room = cameraBox.map { max(Self.flyReach, $0.exit(from: $0.clamp(eye), along: ahead) - 0.6) } ?? .greatestFiniteMagnitude
+            setDistance(fly ? Self.flyReach : min(room, max(6, simd_length(pose.target - eye))))
         }
     }
     static let flyReach: Float = 1
@@ -334,6 +371,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         if !heldKeys.isEmpty, !(view.window?.isKeyWindow ?? false) { heldKeys = [] }  // keyUp went elsewhere
         applyHeldKeys(dt)
         if autoOrbit && goal == nil && !fly { pose.yaw += dt * 0.05 }
+        keepInside()
 
         adaptScale(now)
         ensureTargets(CGSize(width: (view.drawableSize.width * renderScale).rounded(),
@@ -342,11 +380,11 @@ final class StageRenderer: NSObject, MTKViewDelegate {
               let target = snapshot?.target ?? view.currentDrawable?.texture, let cmd = queue.makeCommandBuffer() else { return }
 
         // camera
-        let eye = pose.eye
+        let view3D = shown, eye = view3D.eye
         let aspect = Float(max(1, view.drawableSize.width) / max(1, view.drawableSize.height))
-        let viewM = float4x4.lookAt(eye: eye, target: pose.target, up: [0, 0, 1])
+        let viewM = float4x4.lookAt(eye: eye, target: view3D.target, up: [0, 0, 1])
         let proj = float4x4.perspective(fovY: 0.75, aspect: aspect, near: 0.1, far: 300)
-        let f = simd_normalize(pose.target - eye), right = simd_normalize(simd_cross(f, [0, 0, 1])), up = simd_cross(right, f)
+        let f = simd_normalize(view3D.target - eye), right = simd_normalize(simd_cross(f, [0, 0, 1])), up = simd_cross(right, f)
 
         // lights
         var beams: [BeamInstance] = [], sprites: [SpriteInstance] = [], decals: [DecalInstance] = [], lines: [LineInstance] = []
@@ -406,7 +444,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 enc.setRenderPipelineState(solidPipe)
                 enc.setDepthStencilState(solidDepth)
                 enc.setVertexBuffer(sb, offset: 0, index: 0)
-                for r in s.visibleRanges(eye: eye) where r.upperBound <= sceneryCount {
+                for r in s.visibleRanges(eye: eye, inRoom: inRoom) where r.upperBound <= sceneryCount {
                     enc.drawPrimitives(type: .triangle, vertexStart: r.lowerBound, vertexCount: r.count)
                 }
             }

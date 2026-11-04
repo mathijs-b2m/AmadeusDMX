@@ -41,6 +41,21 @@ public sealed class StageFrame
     }
 }
 
+/// The room button: walls and ceiling shown and the camera kept inside them, the same in the show and the rig editor,
+/// and remembered (Swift: @AppStorage("stageInRoom") in CameraButtons).
+public sealed class StageRoom : Observable
+{
+    public static readonly StageRoom Shared = new();
+    bool _on = Defaults.Standard.Bool("stageInRoom");
+    public bool On
+    {
+        get => _on;
+        set { if (Set(ref _on, value)) Defaults.Standard.Set("stageInRoom", value); }
+    }
+
+    public const string Help = "Inside the room: show the walls and the ceiling and keep the camera between them (Plan still looks from above; an open-air stage has neither). The room's size is in the rig editor, under Venue.";
+}
+
 public sealed partial class StageRenderer
 {
     static readonly Stopwatch Clock = Stopwatch.StartNew();
@@ -200,17 +215,60 @@ public sealed partial class StageRenderer
     public void SetPreset(CameraPreset p, bool animated = true)
     {
         Wake();
+        Pose = Shown;
         Preset = p;
         if (Scenery is not { } s) return;
         var target = p.Pose(s.Room.Width, s.Top, s.Room.Back, s.Room.Ceiling, s.Room.Deck);
+        if (RoomBox is { } box) target = target.Fitted(box);
         if (animated) Goal = target; else { Pose = target; Goal = null; }
+    }
+
+    bool _inRoom;
+    /// Show the room's walls and ceiling and keep the camera inside them. Plan keeps looking from above, through the
+    /// ceiling: from under it there would be no plan to see.
+    public bool InRoom
+    {
+        get => _inRoom;
+        set
+        {
+            if (_inRoom == value) return;
+            _inRoom = value;
+            Wake();
+            if (!Fly) SetPreset(Preset);
+        }
+    }
+
+    /// Follows the button (StageRoom), every frame: the show and the rig editor; other stages show no room.
+    public bool FollowsRoom { get; set; }
+
+    /// Where the camera has to stay right now, if anywhere.
+    CameraBox? RoomBox => InRoom && (Fly || Preset != CameraPreset.Plan) ? Scenery?.Room.CameraBox : null;
+
+    /// What the camera shows: `Pose`, seen from inside the room. Orbiting keeps `Pose` itself as it is, so the view
+    /// swings out to its old distance again once the wall is no longer behind it. Gliding to a preset goes straight.
+    public CameraPose Shown => Goal is null && !Fly && RoomBox is { } box ? Pose.Inside(box) : Pose;
+
+    /// Walking and flying stop at the walls.
+    void KeepInside()
+    {
+        if (Goal is not null || RoomBox is not { } box) return;
+        if (Fly)
+        {
+            var eye = Pose.Eye;
+            Pose = Pose with { Target = Pose.Target + box.Clamp(eye) - eye };
+        }
+        else
+        {
+            Pose = Pose with { Target = box.Targets.Clamp(Pose.Target) };
+        }
     }
 
     /// The ray through a point of the view (in points, origin bottom-left like AppKit), for picking.
     public (Vector3 Origin, Vector3 Dir) Ray(Vector2 p, Vector2 size)
     {
-        var eye = Pose.Eye;
-        var f = Vector3.Normalize(Pose.Target - eye);
+        var pose = Shown;
+        var eye = pose.Eye;
+        var f = Vector3.Normalize(pose.Target - eye);
         var right = Vector3.Normalize(Vector3.Cross(f, new(0, 0, 1)));
         var up = Vector3.Cross(right, f);
         var aspect = MathF.Max(1, size.X) / MathF.Max(1, size.Y);
@@ -232,7 +290,7 @@ public sealed partial class StageRenderer
         Wake();
         Goal = null;
         if (Fly) { Move(forward: (1 - factor) * 6); return; }
-        Pose = Pose with { Distance = MathF.Min(120, MathF.Max(0.6f, Pose.Distance * factor)) };
+        Pose = Pose with { Distance = MathF.Min(120, MathF.Max(0.6f, Shown.Distance * factor)) };
     }
 
     // MARK: flying
@@ -249,8 +307,13 @@ public sealed partial class StageRenderer
             Wake();
             Goal = null;
             // keep the eye where it is; only the point it turns around changes: right in front of you while flying
-            // (looking around turns your head), a stage-sized step ahead again when orbiting
-            SetDistance(_fly ? FlyReach : MathF.Max(6, (Pose.Target - Pose.Eye).Length()));
+            // (looking around turns your head), a stage-sized step ahead again when orbiting (inside the room: as
+            // far as there is room ahead)
+            if (_fly && RoomBox is { } box) Pose = Pose.Inside(box);
+            var eye = Pose.Eye;
+            var ahead = Vector3.Normalize(Pose.Target - eye);
+            var room = RoomBox is { } b ? MathF.Max(FlyReach, b.Exit(b.Clamp(eye), ahead) - 0.6f) : float.MaxValue;
+            SetDistance(_fly ? FlyReach : MathF.Min(room, MathF.Max(6, (Pose.Target - eye).Length())));
         }
     }
     public const float FlyReach = 1;
@@ -362,17 +425,20 @@ public sealed partial class StageRenderer
         if (_heldKeys.Count > 0 && HasKeyFocus is { } focus && !focus()) _heldKeys = [];  // keyUp went elsewhere
         ApplyHeldKeys(dt);
         if (AutoOrbit && Goal is null && !Fly) Pose = Pose with { Yaw = Pose.Yaw + dt * 0.05f };
+        if (FollowsRoom) InRoom = StageRoom.Shared.On;
+        KeepInside();
 
         AdaptScale(now);
         out_.Width = Math.Max(1, (int)Math.Round(drawable.X * RenderScale));
         out_.Height = Math.Max(1, (int)Math.Round(drawable.Y * RenderScale));
 
         // camera
-        var eye = Pose.Eye;
+        var shown = Shown;
+        var eye = shown.Eye;
         var aspect = MathF.Max(1, drawable.X) / MathF.Max(1, drawable.Y);
-        var viewM = Float4x4.LookAt(eye, Pose.Target, new(0, 0, 1));
+        var viewM = Float4x4.LookAt(eye, shown.Target, new(0, 0, 1));
         var proj = Float4x4.Perspective(0.75f, aspect, 0.1f, 300);
-        var f = Vector3.Normalize(Pose.Target - eye);
+        var f = Vector3.Normalize(shown.Target - eye);
         var right = Vector3.Normalize(Vector3.Cross(f, new(0, 0, 1)));
         var up = Vector3.Cross(right, f);
 
@@ -380,7 +446,7 @@ public sealed partial class StageRenderer
         var ambient = Vector3.Zero;
         var t = (float)(now - _startTime);
         if (inp?.Hello?.Gobos is { } pics && (GoboPictures is null || !pics.Select(p => p.Key).SequenceEqual(GoboKeys))) SetGobos(pics);
-        if (Scenery is { } sc0) { sc0.VisibleRanges(eye, out_.SceneryRanges); out_.ScreenCut = sc0.ScreenCut(eye); }
+        if (Scenery is { } sc0) { sc0.VisibleRanges(eye, out_.SceneryRanges, InRoom); out_.ScreenCut = sc0.ScreenCut(eye); }
         else { out_.SceneryRanges.Clear(); out_.ScreenCut = false; }
         if (inp is not null && Scenery is { } s)
             BuildLights(inp, frame, s, eye, t, out_.Beams, out_.Sprites, out_.Decals, out_.Lines, out_.GoboBeams, out_.GoboDecals,

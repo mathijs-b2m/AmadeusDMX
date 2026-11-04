@@ -35,6 +35,9 @@ struct Scenery {
     /// What stands at the back (the room's back wall, the LED wall and its frame): its vertices and the depth of its
     /// back. While the camera is behind that (orbiting round the stage), it isn't drawn, so it doesn't hide the stage.
     var cutaways: [(range: Range<Int>, y: Float)] = []
+    /// The rest of the room's shell (side walls, the far wall, the ceiling), drawn only while the room is shown: its
+    /// vertices and a point and direction of its inside. Seen from behind (Plan, gliding out) it isn't drawn.
+    var shell: [(range: Range<Int>, at: SIMD3<Float>, inward: SIMD3<Float>)] = []
 
     init(fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss] = [], selected: Set<String> = []) {
         room = Room(stage: stage, fixtures: fixtures, trusses: trusses)
@@ -47,7 +50,7 @@ struct Scenery {
         let scaffoldWall = Truss.screenWall(trusses)
         if screen && scaffoldWall == nil {  // the LED wall stands behind the DJ: the room's back wall is behind it
             let wallY = big ? min(-4.5, room.back + 1.5) - 2.2 : -2.0
-            room.back = min(room.back, wallY - 0.8)
+            if !room.backFixed { room.back = min(room.back, wallY - 0.8) }
         }
         let back = room.back
 
@@ -59,15 +62,16 @@ struct Scenery {
         quad([-room.side - 8, back, 0], [W + room.side + 8, back, 0], [W + room.side + 8, back, room.ceiling],
              [-room.side - 8, back, room.ceiling], [0.018, 0.019, 0.024], normal: [0, 1, 0])
         cutaways.append((wallAt..<vertices.count, back))
+        roomShell()
 
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
         // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such
         // deck under them (a raised stage stays: that is their floor) and a lower, narrower console
-        var boothY: Float = -1.3, boothZ: Float = 0
+        var boothY: Float = room.backFixed ? max(-1.3, back + 1.1) : -1.3, boothZ: Float = 0
         let raised = Float(max(0, stage.deckM))
         let wallFront = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) }
-        let deckBack = wallFront ?? min(-3, back + 1.0)
+        let deckBack = wallFront ?? (room.backFixed ? back : min(-3, back + 1.0))
         if raised > 0 || (big && !stage.djFloor) {
             let deckTop: Float = raised > 0 ? raised : 0.15, front: Float = raised > 0 ? 0 : -0.2
             if stage.deckScaffold && raised > 0 {  // a plate on open tube
@@ -83,7 +87,10 @@ struct Scenery {
         }
         if big {
             // (against a scaffold: the riser and the DJ stay in front of the LED wall)
-            let ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5), rd = wallFront == nil ? 2.2 : min(2.2, ry - deckBack), rw = min(5, W * 0.3)
+            // (a back wall the rig fixes: all of it in front of that wall)
+            var ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5)
+            if room.backFixed && wallFront == nil { ry = min(-0.3, max(ry, back + 2.2)) }
+            let rd = wallFront == nil && !room.backFixed ? 2.2 : min(2.2, ry - deckBack), rw = min(5, W * 0.3)
             boothY = ry - 0.4
             if !stage.djFloor {
                 box(cx - rw / 2, cx + rw / 2, ry - rd, ry, boothZ, boothZ + 0.8, [0.07, 0.074, 0.09])
@@ -111,8 +118,9 @@ struct Scenery {
         // the LED wall behind the DJ
         if screen {
             let sw = big ? min(10, W * 0.55) : 2.6, sh = sw * 9 / 16
+            let free = big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0
             let sy = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) + 0.37 }
-                ?? (big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0)
+                ?? (room.backFixed ? max(free, back + 0.45) : free)  // (its frame against a back wall the rig fixes)
             let sz: Float = (big ? 1.4 : 1.15) + raised  // over the stage, as high as it stands
             wall = WallPlacement(center: [cx, sy, sz + sh / 2], width: sw, height: sh)
             let screenAt = vertices.count
@@ -178,12 +186,14 @@ struct Scenery {
     }
 
     /// The parts of `vertices` to draw with the camera at `eye`: all but what stands at the back while the camera is
-    /// behind it.
-    func visibleRanges(eye: SIMD3<Float>) -> [Range<Int>] {
+    /// behind it, and the room's shell unless it is shown (`inRoom`) and seen from inside.
+    func visibleRanges(eye: SIMD3<Float>, inRoom: Bool = false) -> [Range<Int>] {
         var out: [Range<Int>] = [], at = 0
-        for c in cutaways.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) where eye.y < c.y {
-            if c.range.lowerBound > at { out.append(at..<c.range.lowerBound) }
-            at = max(at, c.range.upperBound)
+        let hidden = cutaways.filter { eye.y < $0.y }.map(\.range)
+            + shell.filter { !inRoom || simd_dot(eye - $0.at, $0.inward) < 0 }.map(\.range)
+        for r in hidden.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+            if r.lowerBound > at { out.append(at..<r.lowerBound) }
+            at = max(at, r.upperBound)
         }
         if at < vertices.count { out.append(at..<vertices.count) }
         return out
@@ -192,10 +202,35 @@ struct Scenery {
     /// Whether the room's back wall is cut away with the camera at `eye` (beams then leave no spot on it).
     func backCut(eye: SIMD3<Float>) -> Bool { eye.y < room.back }
 
+    /// Whether a surface of the room shown (`inRoom`) is seen from behind, and so not drawn.
+    func shellCut(_ surf: Room.Surface, eye: SIMD3<Float>) -> Bool {
+        let n = Room.normal(surf)
+        return shell.contains { simd_dot($0.inward, n) > 0.5 && simd_dot(eye - $0.at, n) < 0 }
+    }
+
     /// Whether the LED wall is cut away with the camera at `eye`.
     func screenCut(eye: SIMD3<Float>) -> Bool { wall.map { eye.y < $0.center.y - 0.35 } ?? false }
 
     // MARK: building blocks
+
+    /// The walls and ceiling that make the room a room. Outdoors there is none.
+    private mutating func roomShell() {
+        guard !room.outdoor else { return }
+        let x0 = -room.side, x1 = room.width + room.side, y0 = room.back, y1 = room.depth, h = room.ceiling
+        let wall: SIMD3<Float> = [0.075, 0.078, 0.09], ceiling: SIMD3<Float> = [0.05, 0.052, 0.06]
+        func add(_ s: inout Scenery, _ a: SIMD3<Float>, _ b: SIMD3<Float>, _ c: SIMD3<Float>, _ d: SIMD3<Float>,
+                 _ color: SIMD3<Float>, _ inward: SIMD3<Float>) {
+            let at = s.vertices.count
+            s.quad(a, b, c, d, color, normal: inward)
+            s.shell.append((at..<s.vertices.count, a, inward))
+        }
+        // (the back wall as well, just in front of the darker one the stage always has)
+        add(&self, [x0, y0 + 0.002, 0], [x1, y0 + 0.002, 0], [x1, y0 + 0.002, h], [x0, y0 + 0.002, h], wall, [0, 1, 0])
+        add(&self, [x0, y0, 0], [x0, y1, 0], [x0, y1, h], [x0, y0, h], wall, [1, 0, 0])
+        add(&self, [x1, y1, 0], [x1, y0, 0], [x1, y0, h], [x1, y1, h], wall, [-1, 0, 0])
+        add(&self, [x0, y1, 0], [x1, y1, 0], [x1, y1, h], [x0, y1, h], wall, [0, -1, 0])
+        add(&self, [x0, y0, h], [x1, y0, h], [x1, y1, h], [x0, y1, h], ceiling, [0, 0, -1])
+    }
 
     private mutating func quad(_ a: SIMD3<Float>, _ b: SIMD3<Float>, _ c: SIMD3<Float>, _ d: SIMD3<Float>,
                                _ color: SIMD3<Float>, normal: SIMD3<Float>? = nil, emissive: Float = 0) {

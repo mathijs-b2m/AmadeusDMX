@@ -49,7 +49,7 @@ public static class StageHost
     /// the page switches back from Perform Only (no stage at all meanwhile: nothing drawn 60 times a second).
     public static FrameworkElement Create(AppModel model, StageSettings stage)
     {
-        var controller = new StageController { Input = () => (model.StageInput(), model.Feed.LatestFullFrame) };
+        var controller = new StageController { FollowsRoom = true, Input = () => (model.StageInput(), model.Feed.LatestFullFrame) };
         bool applying = false;
         void Apply()   // StageControls' bindings
         {

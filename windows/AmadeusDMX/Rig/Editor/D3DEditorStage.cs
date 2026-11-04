@@ -8,7 +8,7 @@ namespace AmadeusDMX;
 
 public sealed class D3DEditorStage : IEditorStage
 {
-    readonly StageController _controller = new();
+    readonly StageController _controller = new() { FollowsRoom = true };
     readonly StageView _view;
     IStageEditing? _editor;
 

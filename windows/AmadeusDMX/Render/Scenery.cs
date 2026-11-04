@@ -45,6 +45,9 @@ public sealed class Scenery
     /// What stands at the back (the room's back wall, the LED wall and its frame): its vertices and the depth of its
     /// back. While the camera is behind that (orbiting round the stage), it isn't drawn, so it doesn't hide the stage.
     public List<(int Start, int End, float Y)> Cutaways { get; } = [];
+    /// The rest of the room's shell (side walls, the far wall, the ceiling), drawn only while the room is shown: its
+    /// vertices and a point and direction of its inside. Seen from behind (Plan, gliding out) it isn't drawn.
+    public List<(int Start, int End, Vector3 At, Vector3 Inward)> Shell { get; } = [];
 
     static Vector3 V(float x, float y, float z) => new(x, y, z);
     static Vector3 V(double x, double y, double z) => new((float)x, (float)y, (float)z);
@@ -66,7 +69,7 @@ public sealed class Scenery
         if (screen && scaffoldWall is null)  // the LED wall stands behind the DJ: the room's back wall is behind it
         {
             var wallY = Big ? MathF.Min(-4.5f, Room.Back + 1.5f) - 2.2f : -2.0f;
-            Room = Room with { Back = MathF.Min(Room.Back, wallY - 0.8f) };
+            if (!Room.BackFixed) Room = Room with { Back = MathF.Min(Room.Back, wallY - 0.8f) };
         }
         var back = Room.Back;
 
@@ -78,14 +81,15 @@ public sealed class Scenery
         Quad(V(-Room.Side - 8, back, 0), V(W + Room.Side + 8, back, 0), V(W + Room.Side + 8, back, Room.Ceiling),
              V(-Room.Side - 8, back, Room.Ceiling), V(0.018f, 0.019f, 0.024f), normal: V(0, 1, 0));
         Cutaways.Add((wallAt, Vertices.Count, back));
+        RoomShell();
 
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
         // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such
         // deck under them (a raised stage stays: that is their floor) and a lower, narrower console
-        float boothY = -1.3f, boothZ = 0;
+        float boothY = Room.BackFixed ? MathF.Max(-1.3f, back + 1.1f) : -1.3f, boothZ = 0;
         var raised = MathF.Max(0, (float)stage.DeckM);
-        var deckBack = wallFront ?? MathF.Min(-3, back + 1.0f);
+        var deckBack = wallFront ?? (Room.BackFixed ? back : MathF.Min(-3, back + 1.0f));
         if (raised > 0 || (Big && !stage.DjFloor))
         {
             float deckTop = raised > 0 ? raised : 0.15f, front = raised > 0 ? 0 : -0.2f;
@@ -106,7 +110,10 @@ public sealed class Scenery
         if (Big)
         {
             // (against a scaffold: the riser and the DJ stay in front of the LED wall)
-            float ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f), rd = wallFront is null ? 2.2f : MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
+            // (a back wall the rig fixes: all of it in front of that wall)
+            var ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f);
+            if (Room.BackFixed && wallFront is null) ry = MathF.Min(-0.3f, MathF.Max(ry, back + 2.2f));
+            float rd = wallFront is null && !Room.BackFixed ? 2.2f : MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
             boothY = ry - 0.4f;
             if (!stage.DjFloor)
             {
@@ -136,8 +143,9 @@ public sealed class Scenery
         {
             var sw = Big ? MathF.Min(10, W * 0.55f) : 2.6f;
             var sh = sw * 9 / 16;
+            var free = Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
             var sy = wallFront is { } wf ? wf + 0.37f
-                : Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
+                : Room.BackFixed ? MathF.Max(free, back + 0.45f) : free;  // (its frame against a back wall the rig fixes)
             var sz = (Big ? 1.4f : 1.15f) + raised;  // over the stage, as high as it stands
             Wall = new WallPlacement(V(cx, sy, sz + sh / 2), sw, sh);
             var screenAt = Vertices.Count;
@@ -215,16 +223,17 @@ public sealed class Scenery
     }
 
     /// The parts of `Vertices` to draw with the camera at `eye` (start, count): all but what stands at the back while
-    /// the camera is behind it.
-    public void VisibleRanges(Vector3 eye, List<(int Start, int Count)> into)
+    /// the camera is behind it, and the room's shell unless it is shown (`inRoom`) and seen from inside.
+    public void VisibleRanges(Vector3 eye, List<(int Start, int Count)> into, bool inRoom = false)
     {
         into.Clear();
         var at = 0;
-        foreach (var c in Cutaways.OrderBy(c => c.Start))
+        var hidden = Cutaways.Where(c => eye.Y < c.Y).Select(c => (c.Start, c.End))
+            .Concat(Shell.Where(s => !inRoom || Vector3.Dot(eye - s.At, s.Inward) < 0).Select(s => (s.Start, s.End)));
+        foreach (var (start, end) in hidden.OrderBy(r => r.Start))
         {
-            if (eye.Y >= c.Y) continue;
-            if (c.Start > at) into.Add((at, c.Start - at));
-            at = Math.Max(at, c.End);
+            if (start > at) into.Add((at, start - at));
+            at = Math.Max(at, end);
         }
         if (at < Vertices.Count) into.Add((at, Vertices.Count - at));
     }
@@ -232,10 +241,37 @@ public sealed class Scenery
     /// Whether the room's back wall is cut away with the camera at `eye` (beams then leave no spot on it).
     public bool BackCut(Vector3 eye) => eye.Y < Room.Back;
 
+    /// Whether a surface of the room shown (`inRoom`) is seen from behind, and so not drawn.
+    public bool ShellCut(Room.Surface surf, Vector3 eye)
+    {
+        var n = Room.Normal(surf);
+        return Shell.Any(s => Vector3.Dot(s.Inward, n) > 0.5f && Vector3.Dot(eye - s.At, n) < 0);
+    }
+
     /// Whether the LED wall is cut away with the camera at `eye`.
     public bool ScreenCut(Vector3 eye) => Wall is { } w && eye.Y < w.Center.Y - 0.35f;
 
     // MARK: building blocks
+
+    /// The walls and ceiling that make the room a room. Outdoors there is none.
+    void RoomShell()
+    {
+        if (Room.Outdoor) return;
+        float x0 = -Room.Side, x1 = Room.Width + Room.Side, y0 = Room.Back, y1 = Room.Depth, h = Room.Ceiling;
+        Vector3 wall = V(0.075f, 0.078f, 0.09f), ceiling = V(0.05f, 0.052f, 0.06f);
+        void Add(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 color, Vector3 inward)
+        {
+            var at = Vertices.Count;
+            Quad(a, b, c, d, color, normal: inward);
+            Shell.Add((at, Vertices.Count, a, inward));
+        }
+        // (the back wall as well, just in front of the darker one the stage always has)
+        Add(V(x0, y0 + 0.002f, 0), V(x1, y0 + 0.002f, 0), V(x1, y0 + 0.002f, h), V(x0, y0 + 0.002f, h), wall, V(0, 1, 0));
+        Add(V(x0, y0, 0), V(x0, y1, 0), V(x0, y1, h), V(x0, y0, h), wall, V(1, 0, 0));
+        Add(V(x1, y1, 0), V(x1, y0, 0), V(x1, y0, h), V(x1, y1, h), wall, V(-1, 0, 0));
+        Add(V(x0, y1, 0), V(x1, y1, 0), V(x1, y1, h), V(x0, y1, h), wall, V(0, -1, 0));
+        Add(V(x0, y0, h), V(x1, y0, h), V(x1, y1, h), V(x0, y1, h), ceiling, V(0, 0, -1));
+    }
 
     void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 color, Vector3? normal = null, float emissive = 0)
     {
