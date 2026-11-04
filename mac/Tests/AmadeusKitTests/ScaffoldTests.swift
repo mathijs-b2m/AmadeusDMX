@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import AmadeusKit
 
@@ -8,6 +9,15 @@ import Testing
         #expect(t.isScaffold && !t.isStand && !t.isLoop)
         #expect(t.scaffoldBays == 6 && t.scaffoldLifts == 9)
         #expect(t.liftHeight(3) == 3 && t.nearestLift(4.2) == 4 && t.nearestLift(0) == 1 && t.nearestLift(30) == 9)
+    }
+
+    @Test func aDjOnTheFloorStaysWithTheStage() throws {
+        var st = Stage(widthM: 12)
+        #expect(!st.djFloor)
+        st.djFloor = true
+        let back = try JSONDecoder().decode(Stage.self, from: JSONEncoder().encode(st))
+        #expect(back.djFloor)
+        #expect(try !JSONDecoder().decode(Stage.self, from: Data("{}".utf8)).djFloor)
     }
 
     @Test func itsHeadsPlayToTheAudience() {
