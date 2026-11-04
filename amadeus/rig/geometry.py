@@ -259,6 +259,48 @@ def room_safe_v(d: np.ndarray, head_pos, st: dict, sideways: bool = False) -> np
     return np.where(changed[:, None], fixed, d)
 
 
+def _truss_rear(t: dict) -> float:
+    """The y of a truss's back edge (a ring or a carré: its whole round, to be safe)."""
+    y = float(t.get("y_m", 0.0))
+    if t.get("vertical"):
+        return y
+    if t.get("shape") == "circle":
+        return y - float(t.get("diameter_m", 4.0)) / 2
+    if t.get("shape") == "carre":
+        return y - math.hypot(float(t.get("width_m", 3.0)), float(t.get("depth_m", 3.0))) / 2
+    return y - abs(math.sin(math.radians(float(t.get("rot_deg", 0.0))))) * float(t.get("length_m", 2.0)) / 2
+
+
+def dj_head(rig: dict, ys: list[float], heads: int) -> np.ndarray:
+    """Where the DJ's head is, as the apps draw the booth (Scenery): the middle of the stage, on the riser of a big
+    rig, in front of the LED wall. `ys`: how far back every light stands; `heads`: how many moving heads the rig has."""
+    st = stage(rig)
+    trusses = rig.get("trusses", [])
+    W, raised = float(st["width_m"]), max(0.0, float(st.get("deck_m", 0.0) or 0.0))
+    big, floor = W >= 6 or heads >= 8, bool(st.get("dj_floor"))
+    walls = [
+        t for t in trusses if t.get("type") == "scaffold" and not t.get("vertical") and abs(t.get("rot_deg", 0.0)) < 1
+    ]
+    wall = max(walls, key=lambda t: t["length_m"], default=None)
+    fixed = st.get("room_back_m") is not None
+    back = -float(st["room_back_m"]) if fixed else min(-2.5, min([*ys, *map(_truss_rear, trusses)], default=-1.0) - 1.5)
+    if rig.get("screen") and wall is None and not fixed:  # the back wall stands behind the LED wall
+        back = min(back, (min(-4.5, back + 1.5) - 2.2 if big else -2.0) - 0.8)
+    front = float(wall["y_m"]) + float(wall.get("depth_m", 1.0)) / 2 if wall else None
+    deck_back = front if front is not None else back if fixed else min(-3.0, back + 1.0)
+    booth_y, z = max(-1.3, back + 1.1) if fixed else -1.3, 0.0
+    if raised > 0 or (big and not floor):
+        z = raised if raised > 0 else 0.15
+    if big:
+        ry = max(deck_back + (0.5 if front is None else 2.8), -4.5)
+        if fixed and front is None:
+            ry = min(-0.3, max(ry, back + 2.2))
+        booth_y = ry - 0.4
+        if not floor:
+            z += 0.8
+    return np.array([W / 2, booth_y - 0.9, z + 1.62])
+
+
 def beam_end(pos, d, st: dict, max_len: float = 12.0):
     """Where the beam lands: floor, ceiling (indoors), or max_len away. Returns (point, length, surface)."""
     p = np.asarray(pos, dtype=float)

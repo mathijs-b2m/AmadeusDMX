@@ -129,7 +129,7 @@ public sealed class Scenery
         foreach (var ddx in new[] { -0.45f, 0.45f })
             Box(cx + ddx - 0.18f, cx + ddx + 0.18f, boothY - 0.45f, boothY - 0.1f, boothZ + bh + 0.05f, boothZ + bh + 0.08f,
                 V(0.3f, 0.35f, 0.5f), emissive: 0.5f);
-        // the DJ
+        // the DJ (where the engine thinks their head is, to keep beams from meeting on it: geometry.dj_head)
         float dy = boothY - 0.9f, dz = boothZ;
         Box(cx - 0.12f, cx + 0.12f, dy - 0.1f, dy + 0.1f, dz, dz + 0.85f, V(0.05f, 0.05f, 0.06f));            // legs
         Box(cx - 0.22f, cx + 0.22f, dy - 0.13f, dy + 0.13f, dz + 0.85f, dz + 1.45f, V(0.06f, 0.06f, 0.07f));  // torso

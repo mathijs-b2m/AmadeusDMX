@@ -106,7 +106,7 @@ struct Scenery {
             box(cx + dx - 0.18, cx + dx + 0.18, boothY - 0.45, boothY - 0.1, boothZ + bh + 0.05, boothZ + bh + 0.08,
                 [0.3, 0.35, 0.5], emissive: 0.5)
         }
-        // the DJ
+        // the DJ (where the engine thinks their head is, to keep beams from meeting on it: geometry.dj_head)
         let dy = boothY - 0.9, dz = boothZ
         box(cx - 0.12, cx + 0.12, dy - 0.1, dy + 0.1, dz, dz + 0.85, [0.05, 0.05, 0.06])          // legs
         box(cx - 0.22, cx + 0.22, dy - 0.13, dy + 0.13, dz + 0.85, dz + 1.45, [0.06, 0.06, 0.07]) // torso

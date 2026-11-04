@@ -41,6 +41,28 @@ POINT_DISTANCE_M = 3.0  # focus/cross: how far in front of the rig the shared po
 FOCUS_SPREAD_M = 1.5  # …and how wide the heads spread around it: never every beam into one single spot
 
 
+DJ_CLEAR_M = 0.8  # focus/cross: every beam passes the DJ's head at least this far off (other looks may sweep over them)
+DJ_WAY_OUT = np.array([0.0, 0.6, 0.8])  # …on the side up and towards the audience when it would hit them square on
+
+
+def clear_of_dj(head_pos: np.ndarray, d: np.ndarray, dj: np.ndarray) -> np.ndarray:
+    """Beams of one head (rows of unit directions) that would pass the DJ's head too close, turned just past it: a look
+    where all the beams meet would otherwise meet on the DJ, who stands in the middle of the rig. The further off a
+    beam already is the less it turns, none at DJ_CLEAR_M, so the look goes on moving."""
+    to_dj = dj - head_pos
+    along = d @ to_dj
+    off = d * along[:, None] - to_dj  # from the DJ's head to the nearest point of the beam
+    dist = np.linalg.norm(off, axis=1, keepdims=True)
+    way = DJ_WAY_OUT - d * (d @ DJ_WAY_OUT)[:, None]  # (across the beam: along it would turn nothing)
+    length = np.linalg.norm(way, axis=1, keepdims=True)
+    way = np.where(length > 1e-3, way / np.maximum(length, 1e-3), np.cross(d, [1.0, 0.0, 0.0]))
+    side = off + np.clip(1 - dist / DJ_CLEAR_M, 0, 1) * DJ_CLEAR_M * way
+    past = to_dj + side / (np.linalg.norm(side, axis=1, keepdims=True) + 1e-9) * DJ_CLEAR_M
+    turned = past / np.linalg.norm(past, axis=1, keepdims=True)
+    hits = (dist[:, 0] < DJ_CLEAR_M) & (along > 0) & (np.linalg.norm(to_dj) > DJ_CLEAR_M)
+    return np.where(hits[:, None], turned, d)
+
+
 def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np.ndarray:
     """Each head's own spot around a shared point (rows of `point`/`d`): across the beam by where the head
     is in the rig (left to the left), up or down a little by its height, so the beams never meet in one spot."""
@@ -326,8 +348,10 @@ class MotionMixin:
             out /= np.linalg.norm(out) + 1e-9
         if self.zones.heads:  # artistic zones: off the walls/set, inside the keep-in area
             out = self.zones.filter(head_pos, out[None])[0]
-        out = self._room_safe_v(out[None], j)[0]
-        return geometry.eye_safe(out, head_pos[2], self.stage)
+        out = self._room_safe_v(out[None], j)
+        if f in ("focus", "cross"):  # (last: the limits above can turn a beam back onto the DJ)
+            out = clear_of_dj(head_pos, out, self.dj_head)
+        return geometry.eye_safe(out[0], head_pos[2], self.stage)
 
     # ---------------------------------------------------------------- pour
 
@@ -480,6 +504,7 @@ class MotionMixin:
                     self.stage,
                     self.rig.get("zones", []),
                     self.rig.get("trusses", []),  # a ring's shape and a truss's aim
+                    self.dj_head.tolist(),  # (it also follows the LED wall)
                     self.program,  # a program's head pictures depend on its hits
                     [len(self.cine_hits), float(self.cine_hits.t.sum()), self.CINE_VERSION] if self.program else None,
                     [(p.pickup_kind, round(p.pickup_start, 3)) for p in self.a.phrases if p.pickup_beats],
@@ -675,6 +700,8 @@ class MotionMixin:
         if self.zones.heads:
             out = self.zones.filter(head_pos, out)
         out = self._room_safe_v(out, j)  # off the ceiling, not back at the DJ, not into the rig
+        if f in ("focus", "cross"):  # (last: the limits above can turn a beam back onto the DJ)
+            out = clear_of_dj(head_pos, out, self.dj_head)
         return self._eye_safe_v(out, head_pos[2])
 
     def _room_safe_v(self, out: np.ndarray, j: int) -> np.ndarray:

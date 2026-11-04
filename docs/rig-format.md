@@ -75,6 +75,9 @@ truss's `z_m`, `ceiling_m`) count from the hall floor, so on a 1.5 m stage a fix
 auto-mount puts its floor rows on the deck, beams land on it, and the hang sheet gives a stage truss's height above
 the stage as well.
 
+Looks where all the beams meet (focus, cross) pass the DJ's head at least 0.8 m off: the rig's middle is where the DJ
+stands, and the meeting point would otherwise land on them. Other looks may sweep over the DJ as they like.
+
 `stage.room_back_m` says how far behind the stage's front edge the room's back wall stands; without it the wall
 stands 1.5 m behind the rig. The room's whole length is `room_back_m` plus `room_depth_m`, so a room of 6 × 8.5 m with
 a 3.4 m ceiling is `"room_width_m": 6, "room_back_m": 2.5, "room_depth_m": 6, "ceiling_m": 3.4`. The apps' room button

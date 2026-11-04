@@ -133,6 +133,8 @@ class Engine(
         self.stage = geometry.stage(rig)
         fixtures = {f["id"]: f for f in rig["fixtures"]}
         self.head_pos = [np.array(geometry.position(rig, e, fixtures[e["fixture"]])) for e in self.heads]
+        rows = [geometry.position(rig, e, fixtures[e["fixture"]])[1] for e in rig["elements"]]
+        self.dj_head = geometry.dj_head(rig, rows, len(self.heads))
         self.zones = zones.Zones(rig)  # where beams may (not) go: drawn in the rig editor
         self.head_fx = [(fixtures[e["fixture"]], fxlib.get(fixtures[e["fixture"]]["fixture"])) for e in self.heads]
         self._init_high_risk(rig, fixtures)
