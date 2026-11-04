@@ -16,6 +16,13 @@ public class ScaffoldTests
     static PlacedFixture Fx(RigEditorModel e, string id) => e.Doc.Fixtures.First(f => f.Id == id);
 
     [Fact]
+    public void ItsHeadsPlayToTheAudience()
+    {
+        var t = Truss.Scaffold("w", 16, 9, 8, -7);
+        Assert.Equal("audience", t.LightAim);
+    }
+
+    [Fact]
     public void SharesItsSizeIntoBaysAndLifts()
     {
         var t = Truss.Scaffold("w", width: 16, height: 9, xM: 8, yM: -7);

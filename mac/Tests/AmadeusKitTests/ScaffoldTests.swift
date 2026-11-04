@@ -10,6 +10,13 @@ import Testing
         #expect(t.liftHeight(3) == 3 && t.nearestLift(4.2) == 4 && t.nearestLift(0) == 1 && t.nearestLift(30) == 9)
     }
 
+    @Test func itsHeadsPlayToTheAudience() {
+        var t = Truss.scaffold(id: "w", width: 16, height: 9, xM: 8, yM: -7)
+        #expect(t.lightAim == "audience")
+        t.aim = "down"
+        #expect(t.lightAim == "down")
+    }
+
     @Test func ledgersAreOnItsFrontFrame() {
         let t = Truss.scaffold(id: "w", width: 16, height: 9, xM: 8, yM: -7)
         let l = t.ledger(4)

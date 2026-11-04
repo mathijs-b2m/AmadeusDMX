@@ -78,7 +78,7 @@ struct Scenery {
             deck = (-0.5, W + 0.5, deckBack, front, deckTop)
             if big {
                 // (against a scaffold: the riser and the DJ stay in front of the LED wall)
-                let ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5), rd = min(2.2, ry - deckBack), rw = min(5, W * 0.3)
+                let ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5), rd = wallFront == nil ? 2.2 : min(2.2, ry - deckBack), rw = min(5, W * 0.3)
                 box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8, [0.07, 0.074, 0.09])
                 boothY = ry - 0.4; boothZ = deckTop + 0.8
             } else {

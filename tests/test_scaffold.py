@@ -1,7 +1,5 @@
 """Scaffold: the tube wall of a festival stage, fixtures on its ledgers at any height."""
 
-from dataclasses import replace
-
 import numpy as np
 import pytest
 
@@ -16,11 +14,15 @@ from tests.synthetic import synthetic_analysis
 W = 16.0
 
 
+def heads_of(n: int) -> list[dict]:
+    return [{"id": f"h{k}", "fixture": "claypaky/sharpy", "universe": 1 + k // 20, "address": 1 + 20 * (k % 20)}
+            for k in range(n)]  # fmt: skip
+
+
 def festival_rig(heads: int = 24, screen: bool = True) -> dict:
     """The "festival" template with auto-mounted heads and pars."""
     rig = templates.rig("festival", width=W, height=9.0, screen=screen)
-    rig["fixtures"] = [{"id": f"h{k}", "fixture": "claypaky/sharpy", "universe": 1 + k // 20, "address": 1 + 20 * (k % 20)}
-                       for k in range(heads)]  # fmt: skip
+    rig["fixtures"] = heads_of(heads)
     rig["fixtures"] += [{"id": f"p{k}", "fixture": "cameo/flat-pro-18", "universe": 5, "address": 1 + 10 * k}
                         for k in range(4)]  # fmt: skip
     for fid, spot in automount.automount(rig).items():
@@ -36,6 +38,7 @@ def test_a_scaffold_shares_its_size_into_bays_and_lifts():
     assert T.nearest_lift(t, 4.2) == 4 and T.nearest_lift(t, 0.0) == 1 and T.nearest_lift(t, 30.0) == 9
     big = {**t, "bay_m": 4.0, "lift_m": 2.0, "z_m": 10.0}
     assert T.scaffold_bays(big) == 4 and T.scaffold_lifts(big) == 5
+    assert T.scaffold_bays({**t, "length_m": 6.25}) == 3  # a half rounds up, as in the apps
 
 
 def test_a_fixture_clamps_to_a_ledger_of_the_front_frame():
@@ -78,8 +81,7 @@ def test_the_template_puts_the_wall_behind_a_raised_outdoor_stage():
 @pytest.mark.parametrize("width", [8.0, 12.0, 16.0, 24.0])
 def test_auto_mount_fills_the_wall_mirrored_and_clear_of_the_led_wall(width):
     rig = templates.rig("festival", width=width, height=9.0, screen=True)
-    rig["fixtures"] = [{"id": f"h{k}", "fixture": "claypaky/sharpy", "universe": 1 + k // 20, "address": 1 + 20 * (k % 20)}
-                       for k in range(16)]  # fmt: skip
+    rig["fixtures"] = heads_of(16)
     spots = automount.automount(rig)
     half, bottom, top = T.screen_rect(rig)
     on = [s for s in spots.values() if s.get("truss") == "wall"]

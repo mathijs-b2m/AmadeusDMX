@@ -212,18 +212,23 @@ def is_tube(t: dict) -> bool:
     return is_stand(t) or t.get("type") == "ledger"
 
 
+def _whole(v: float) -> int:
+    """To the nearest whole number, a half up: as the apps round, so a wall has the same bays and lifts in them all."""
+    return math.floor(v + 0.5)
+
+
 def scaffold_depth(t: dict) -> float:
     return float(t.get("depth_m", SCAFFOLD_DEPTH_M))
 
 
 def scaffold_bays(t: dict) -> int:
     """How many bays across (the standards share its length evenly)."""
-    return max(1, round(t["length_m"] / float(t.get("bay_m", BAY_M))))
+    return max(1, _whole(t["length_m"] / float(t.get("bay_m", BAY_M))))
 
 
 def scaffold_lifts(t: dict) -> int:
     """How many lifts up: its ledgers share its height evenly, the top one at `z_m`."""
-    return max(1, round(t["z_m"] / float(t.get("lift_m", LIFT_M))))
+    return max(1, _whole(t["z_m"] / float(t.get("lift_m", LIFT_M))))
 
 
 def lift_height(t: dict, lift: int) -> float:
@@ -233,7 +238,7 @@ def lift_height(t: dict, lift: int) -> float:
 def nearest_lift(t: dict, z: float) -> int:
     """The ledger nearest height `z`."""
     n = scaffold_lifts(t)
-    return min(n, max(1, round(z / t["z_m"] * n)))
+    return min(n, max(1, _whole(z / t["z_m"] * n)))
 
 
 def ledger(t: dict, lift: int) -> dict:
@@ -259,7 +264,8 @@ def scaffold(
 ) -> dict:
     """A scaffold wall `width` across and `height` high, its centre at `x`, `y`."""
     t = {"id": tid, "type": "scaffold", "length_m": round(width, 2), "x_m": round(x, 2), "y_m": round(y, 2),
-         "z_m": round(height, 2), "depth_m": round(depth, 2), "bay_m": round(bay, 2), "lift_m": round(lift, 2)}  # fmt: skip
+         "z_m": round(height, 2), "depth_m": round(depth, 2), "bay_m": round(bay, 2),
+         "lift_m": round(lift, 2)}  # fmt: skip
     if rot:
         t["rot_deg"] = round(rot, 1)
     return t

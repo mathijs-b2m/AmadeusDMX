@@ -162,7 +162,7 @@ public sealed record Truss
     public const double OverCrowdM = 1.0;
 
     /// Where the heads on it play, automatic resolved: "audience", "down", or nil (wherever the director aims).
-    public string? LightAim => Aim is "audience" or "down" ? Aim : !Vertical && YM >= OverCrowdM ? "down" : null;
+    public string? LightAim => Aim is "audience" or "down" ? Aim : IsScaffold ? "audience" : !Vertical && YM >= OverCrowdM ? "down" : null;
 
     public bool IsRing => Shape == "circle" && !Vertical;
     /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.

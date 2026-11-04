@@ -458,7 +458,8 @@ th, td { border: 1px solid #bbb; padding: 3px 6px; text-align: left; vertical-al
 th { background: #eee; } tr { break-inside: avoid; }
 td.lbl { font-weight: 700; white-space: nowrap; } td.dmx { font-weight: 700; white-space: nowrap; }
 svg { width: 100%; height: auto; display: block; }
-svg.plan { max-height: 150mm; } svg.wall { max-height: 130mm; } svg.ring { max-width: 90mm; } svg.tower-svg { max-width: 110mm; }
+svg.plan { max-height: 150mm; } svg.wall { max-height: 130mm; }
+svg.ring { max-width: 90mm; } svg.tower-svg { max-width: 110mm; }
 .stage { fill: #f3f3f3; stroke: #999; } .truss { stroke: #444; stroke-width: 6; fill: none; }
 .truss-box { fill: #ddd; stroke: #444; } .tower { fill: #ccc; stroke: #444; }
 .tick { stroke: #999; stroke-dasharray: 3 3; }

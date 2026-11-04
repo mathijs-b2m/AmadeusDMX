@@ -101,7 +101,7 @@ public sealed class Scenery
             if (Big)
             {
                 // (against a scaffold: the riser and the DJ stay in front of the LED wall)
-                float ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f), rd = MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
+                float ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f), rd = wallFront is null ? 2.2f : MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
                 Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8f, V(0.07f, 0.074f, 0.09f));
                 boothY = ry - 0.4f; boothZ = deckTop + 0.8f;
             }

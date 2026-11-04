@@ -140,6 +140,7 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// Where the heads on it play, automatic resolved: "audience", "down", or nil (wherever the director aims).
     public var lightAim: String? {
         if let aim, aim == "audience" || aim == "down" { return aim }
+        if isScaffold { return "audience" }  // a wall: nothing to play behind it
         return !vertical && yM >= Self.overCrowdM ? "down" : nil
     }
 
