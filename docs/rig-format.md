@@ -75,6 +75,11 @@ truss's `z_m`, `ceiling_m`) count from the hall floor, so on a 1.5 m stage a fix
 auto-mount puts its floor rows on the deck, beams land on it, and the hang sheet gives a stage truss's height above
 the stage as well.
 
+`stage.room_back_m` says how far behind the stage's front edge the room's back wall stands; without it the wall
+stands 1.5 m behind the rig. The room's whole length is `room_back_m` plus `room_depth_m`, so a room of 6 × 8.5 m with
+a 3.4 m ceiling is `"room_width_m": 6, "room_back_m": 2.5, "room_depth_m": 6, "ceiling_m": 3.4`. The apps' room button
+(next to Fly) shows those walls and the ceiling and keeps the camera inside them. Only how it is drawn.
+
 `stage.dj_floor: true` puts the DJ on the floor at a lower, narrower console, with no riser under them (and no low
 deck on a big rig; on a raised stage they stand on the stage). It only changes how the stage is drawn.
 

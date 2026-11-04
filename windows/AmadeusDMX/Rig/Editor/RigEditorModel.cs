@@ -284,6 +284,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     // MARK: - the venue
 
+    /// How far behind the stage's front edge the room's back wall stands: where the rig puts it, else where it follows the rig.
+    public double RoomBack => Doc.Stage.RoomBackM ?? -new Room(Doc.Stage, RigElements.Elements(Doc, Definition), Doc.Trusses).Back;
+
     public void UpdateStage(Action<Stage> body) => UpdateStage("Change Stage", body);
 
     public void UpdateStage(string name, Action<Stage> body) => Change(name, d => PutStage(d, body));

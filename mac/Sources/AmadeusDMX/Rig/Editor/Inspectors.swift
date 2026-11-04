@@ -86,12 +86,17 @@ struct EditorInspector: View {
             Toggle("Outdoor", isOn: Binding(get: { editor.doc.stage.outdoor }, set: { v in editor.updateStage { $0.outdoor = v } }))
                 .help("An open-air stage: no ceiling, so the director uses the sky far more (beams up into the night). Indoors the ceiling is kept clear.")
             if !editor.doc.stage.outdoor {
-                ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.5)
+                ValueSlider(title: "Ceiling", value: stageBinding(\.ceilingM), range: 2.5...20, step: 0.1)
             }
-            ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 1)
+            ValueSlider(title: "Room depth", value: stageBinding(\.roomDepthM), range: 3...60, step: 0.1)
+                .help("From the stage's front edge to the far wall")
+            ValueSlider(title: "Behind the stage", value: Binding(get: { editor.roomBack }, set: { v in
+                editor.updateStage("Change Back Wall") { $0.roomBackM = v }
+            }), range: 2...40, step: 0.1)
+            .help("From the stage's front edge back to the room's back wall. The room's whole length is this plus the room depth. Left alone, the wall stands 1.5 m behind the rig")
             ValueSlider(title: "Room width", value: Binding(get: { editor.doc.stage.roomWidth }, set: { v in
                 editor.updateStage("Change Room Width") { $0.roomWidthM = v }
-            }), range: editor.doc.width...max(80, editor.doc.width), step: 1)
+            }), range: editor.doc.width...max(80, editor.doc.width), step: 0.1)
             .help("The hall's width, wall to wall: beams end on its side walls and the haze fills it. The stage stands in its middle")
             ValueSlider(title: "Stage height", value: Binding(get: { editor.doc.stage.deckM }, set: { editor.setStageHeight($0) }),
                         range: 0...3, step: 0.1)

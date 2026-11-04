@@ -8,7 +8,7 @@ Amadeus DMX runs a light show to the music by itself. You help the user set up w
 - A **set** is the user's lighting gear: each fixture's model (`fixture`, a library key), DMX `mode`, `universe`
   and start `address`, its calibration (`pan_invert`, `tilt_invert`, `pan_home_deg`, …), where the DMX goes,
   safety and the decision model. Most people have one or two.
-- A **rig** is a venue: the stage (`width_m`, `ceiling_m`, `room_depth_m`, `room_width_m` (the hall wall to wall; missing: 2 m either side of the stage), `outdoor`, `dj_floor` (the DJ on the floor at a lower console, no riser)), the trusses and towers,
+- A **rig** is a venue: the stage (`width_m`, `ceiling_m`, `room_depth_m`, `room_width_m` (the hall wall to wall; missing: 2 m either side of the stage), `room_back_m` (from the stage's front edge back to the back wall; missing: 1.5 m behind the rig; the whole room's length is this plus `room_depth_m`), `outdoor`, `dj_floor` (the DJ on the floor at a lower console, no riser)), the trusses and towers,
   the LED wall (`screen`), zones. It remembers, per set, where each of that set's fixtures hangs on it.
 - A show plays **one set on one rig**. The active pair is what the apps open and what a show plays.
 

@@ -303,4 +303,60 @@ public class ScaffoldTests
         Assert.Equal(small.DjHead, lower.DjHead);
         Assert.True(Top(lower, -1.5f) < Top(small, -1.5f));
     }
+
+    static Stage SmallRoom() => J.DecodeOrThrow(
+        Encoding.UTF8.GetBytes("""{"width_m": 6, "ceiling_m": 3.4, "room_depth_m": 6, "room_width_m": 6, "room_back_m": 2.5}"""), Stage.From);
+
+    [Fact]
+    public void ABackWallTheRigFixesStaysThere()
+    {
+        var st = SmallRoom();
+        var room = new Room(st, []);
+        Assert.Equal(-2.5f, room.Back);
+        Assert.True(room.BackFixed);
+        Assert.Equal(8.5f, room.Depth - room.Back);
+        Assert.Equal(6f, room.Width + 2 * room.Side);
+        Assert.Equal(2.5, J.DecodeOrThrow(st.ToJSON().ToJson(), Stage.From).RoomBackM);
+        Assert.False(new Room(new Stage(), []).BackFixed);
+        // an LED wall doesn't push it back, and everything stands in front of it
+        var s = new Scenery([], st, true);
+        Assert.Equal(-2.5f, s.Room.Back);
+        Assert.True(s.DjHead.Y > -2.5f);
+        Assert.True(s.Wall!.Value.Center.Y > -2.5f);
+    }
+
+    [Fact]
+    public void TheCameraStaysInsideTheRoom()
+    {
+        var box = new Room(SmallRoom(), []).CameraBox!.Value;
+        Assert.Equal(new Vector3(0.25f, 5.75f, 3.15f), box.Clamp(new Vector3(-5, 20, 9)));
+        Assert.Equal(4.75f, box.Exit(new Vector3(3, 1, 2), Vector3.UnitY), 3);
+        // from any side, however far out it was: the eye ends up inside, looking the same way
+        for (var yaw = 0f; yaw < 6.3f; yaw += 0.3f)
+        {
+            var pose = new CameraPose(new Vector3(3, 0, 1.5f), yaw, 0.4f, 40);
+            var inside = pose.Inside(box);
+            Assert.Equal(inside.Eye, box.Clamp(inside.Eye));
+            Assert.Equal(pose.Yaw, inside.Yaw);
+            Assert.True(inside.Distance >= 0.5f);
+        }
+        var preset = CameraPose.From(new Vector3(3, 12, 8), new Vector3(3, -1, 1)).Fitted(box);
+        Assert.Equal(5.75f, preset.Eye.Y, 3);
+        Assert.Null(new Room(new Stage { Outdoor = true }, []).CameraBox);
+    }
+
+    [Fact]
+    public void TheRoomsWallsShowOnlyWhenAskedAndFromInside()
+    {
+        var s = new Scenery([], SmallRoom(), false);
+        var drawn = new List<(int Start, int Count)>();
+        int Count(Vector3 eye, bool inRoom) { s.VisibleRanges(eye, drawn, inRoom); return drawn.Sum(r => r.Count); }
+        var inside = new Vector3(3, 2, 1.7f);
+        Assert.Equal(s.Vertices.Count - s.Shell.Sum(c => c.End - c.Start), Count(inside, false));
+        Assert.Equal(s.Vertices.Count, Count(inside, true));
+        Assert.Equal(s.Vertices.Count - 6, Count(new Vector3(3, 2, 12), true));   // Plan: through the ceiling
+        Assert.True(s.ShellCut(Room.Surface.Ceiling, new Vector3(3, 2, 12)));
+        Assert.False(s.ShellCut(Room.Surface.Ceiling, inside));
+        Assert.Empty(new Scenery([], new Stage { Outdoor = true }, false).Shell);
+    }
 }

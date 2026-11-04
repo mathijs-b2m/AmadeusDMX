@@ -222,6 +222,8 @@ final class StageController: ObservableObject {
             if fly, let v = view { v.window?.makeFirstResponder(v) }   // the keys go to the stage
         }
     }
+    /// Show the room's walls and ceiling and keep the camera inside them.
+    var inRoom = false { didSet { renderer?.inRoom = inRoom } }
     var workLight: Float = 0 { didSet { renderer?.workLight = workLight } }
     @Published var wallScene: WallScene = .auto { didSet { renderer?.wallScene = wallScene } }
 
@@ -242,6 +244,7 @@ final class StageController: ObservableObject {
         r.exposure = Float(exposure)
         r.autoOrbit = autoOrbit
         r.fly = fly
+        r.inRoom = inRoom
         r.workLight = workLight
         r.wallScene = wallScene
         r.setPreset(preset, animated: false)

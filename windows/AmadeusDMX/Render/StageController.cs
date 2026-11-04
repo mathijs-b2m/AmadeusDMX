@@ -31,6 +31,9 @@ public interface StageEditing
 
 public sealed class StageController : Observable
 {
+    /// Follows the room button: the show's and the rig editor's stage.
+    public bool FollowsRoom { get; init; }
+
     public StageRenderer? Renderer { get; private set; }
     internal StageView? View;
 
@@ -89,6 +92,8 @@ public sealed class StageController : Observable
         r.Exposure = (float)Exposure;
         r.AutoOrbit = AutoOrbit;
         r.Fly = Fly;
+        r.FollowsRoom = FollowsRoom;
+        r.InRoom = FollowsRoom && StageRoom.Shared.On;
         r.WorkLight = WorkLight;
         r.WallScene = WallScene;
         r.SetPreset(Preset, animated: false);

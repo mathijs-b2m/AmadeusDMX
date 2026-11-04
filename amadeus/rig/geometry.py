@@ -29,6 +29,8 @@ DEFAULT_STAGE = {
     # given, ROOM_SIDE_M either side
     "deck_m": 0.0,  # the stage's height above the hall floor (heights count from the hall floor)
     "deck_scaffold": False,  # the deck stands on scaffold (open tube under it), not on a solid front (drawing only)
+    # "room_back_m": how far the room's back wall stands behind the stage's front edge; when it isn't there, 1.5 m
+    # behind the rig (drawing only: the apps and the visualiser)
     "dj_floor": False,  # the DJ stands on the floor at a lower console, no riser under them (drawing only)
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …

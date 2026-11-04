@@ -10,7 +10,7 @@ struct StageControls: View {
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
-                CameraButtons(stage: stage)
+                CameraButtons(stage: stage, outdoor: model.stageInput()?.stage.outdoor ?? false)
                 Menu {
                     Picker("LED Wall", selection: $stage.wallScene) {
                         ForEach(WallScene.allCases) { s in Label(s.title, systemImage: s.symbol).tag(s) }
@@ -55,6 +55,9 @@ struct StageControls: View {
 struct CameraButtons: View {
     @ObservedObject var stage: StageController
     var presets: [CameraPreset] = CameraPreset.allCases
+    var outdoor = false
+    /// The same in the show and the rig editor, and remembered.
+    @AppStorage("stageInRoom") private var inRoom = false
 
     var body: some View {
         if stage.fly {
@@ -81,5 +84,15 @@ struct CameraButtons: View {
         }
         .buttonStyle(stage.fly ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
         .help("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, ⇧ faster. Without flying: WASD still walks, +/− zoom.")
+        Button {
+            inRoom.toggle()
+        } label: {
+            Image(systemName: "cube.transparent").frame(width: 18, height: 18)
+        }
+        .buttonStyle(inRoom && !outdoor ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
+        .disabled(outdoor)
+        .help(outdoor ? "An open-air stage has no walls or ceiling"
+                      : "Inside the room: show the walls and the ceiling and keep the camera between them (Plan still looks from above). The room's size is in the rig editor, under Venue.")
+        .onChange(of: inRoom, initial: true) { stage.inRoom = inRoom }
     }
 }

@@ -28,6 +28,29 @@ public enum Sections {
     public static func color(_ s: String) -> SIMD3<Float> { colors[s] ?? [0.4, 0.4, 0.45] }
 }
 
+/// Where the camera may be while it stays inside the room.
+public struct CameraBox: Sendable, Equatable {
+    public var lo: SIMD3<Float>
+    public var hi: SIMD3<Float>
+
+    public init(lo: SIMD3<Float>, hi: SIMD3<Float>) { self.lo = lo; self.hi = hi }
+
+    public func clamp(_ p: SIMD3<Float>) -> SIMD3<Float> { simd_clamp(p, lo, hi) }
+
+    /// What the camera looks at keeps this far from the walls: the eye always fits between it and the wall behind.
+    public var targets: CameraBox {
+        let m = simd_min(SIMD3(repeating: 0.5), (hi - lo) / 2)
+        return CameraBox(lo: lo + m, hi: hi - m)
+    }
+
+    /// How far from `p` (inside) along the unit vector `d` the box ends.
+    public func exit(from p: SIMD3<Float>, along d: SIMD3<Float>) -> Float {
+        var t = Float.greatestFiniteMagnitude
+        for i in 0..<3 where abs(d[i]) > 1e-5 { t = min(t, ((d[i] > 0 ? hi[i] : lo[i]) - p[i]) / d[i]) }
+        return max(0, t)
+    }
+}
+
 /// The room the show happens in: floor, ceiling, walls. Beams stop where they would hit one.
 public struct Room: Sendable {
     public enum Surface: Sendable { case floor, ceiling, back, front, left, right, air }
@@ -42,7 +65,11 @@ public struct Room: Sendable {
     /// The stage's height above the hall floor: beams landing behind its front edge (y ≤ 0) stop on it.
     public var deck: Float = 0
 
-    /// The back wall stands 1.5 m behind the rearmost fixture or truss (a round truss: its back edge).
+    /// Whether the rig says where the back wall stands (stage.room_back_m): then nothing moves it.
+    public var backFixed = false
+
+    /// The back wall stands where the rig says, else 1.5 m behind the rearmost fixture or truss (a round truss: its
+    /// back edge).
     public init(stage: Stage, fixtures: [FixtureInfo], trusses: [Truss] = []) {
         width = Float(stage.widthM)
         ceiling = Float(stage.ceilingM)
@@ -55,6 +82,14 @@ public struct Room: Sendable {
         }
         let rear = (fixtures.map { Double($0.pos.y) } + trussBack).min() ?? -1
         back = min(-2.5, Float(rear) - 1.5)
+        if let b = stage.roomBackM { back = -Float(b); backFixed = true }
+    }
+
+    /// Where the camera may be to stay inside: a hand's width off the walls and the ceiling. Outdoors there is no room.
+    public var cameraBox: CameraBox? {
+        guard !outdoor else { return nil }
+        let m: Float = 0.25
+        return CameraBox(lo: [-side + m, back + m, 0.15], hi: [width + side - m, depth - m, ceiling - m])
     }
 
     /// Where a beam from `p` along `d` ends: distance and surface (at most `maxLen`).

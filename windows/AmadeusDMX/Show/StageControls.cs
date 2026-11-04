@@ -15,6 +15,8 @@ public sealed class StageControls(StageSettings stage, AppModel model)
         row.Children.Add(Glassy(UI.IconButton("figure.walk.motion",
             "Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom.",
             () => stage.Fly = !stage.Fly), () => stage.Fly, nameof(StageSettings.Fly)));
+        row.Children.Add(Glassy(UI.IconButton("cube.transparent", StageRoom.Help, () => StageRoom.Shared.On = !StageRoom.Shared.On),
+            () => StageRoom.Shared.On, nameof(StageRoom.On), StageRoom.Shared));
 
         var wall = new Button { Padding = new Thickness(8, 6, 8, 6) }.Tooltip("LED wall: the director's choice, or try one scene");
         var wallMenu = new MenuFlyout();

@@ -57,6 +57,17 @@ public readonly record struct CameraPose(Vector3 Target, float Yaw, float Pitch,
         var d = v.Length();
         return new CameraPose(target, MathF.Atan2(v.X, v.Y), MathF.Asin(v.Z / MathF.Max(d, 1e-3f)), d);
     }
+
+    /// This view from inside `box`: the same way of looking, the eye brought in as far as the wall behind it.
+    public CameraPose Inside(CameraBox box)
+    {
+        var target = box.Targets.Clamp(Target);
+        var dir = new Vector3(MathF.Sin(Yaw) * MathF.Cos(Pitch), MathF.Cos(Yaw) * MathF.Cos(Pitch), MathF.Sin(Pitch));
+        return this with { Target = target, Distance = MathF.Min(Distance, box.Exit(target, dir)) };
+    }
+
+    /// A preset's view from inside `box`: from the nearest place in it, still looking at the same thing.
+    public CameraPose Fitted(CameraBox box) => From(box.Clamp(Eye), box.Targets.Clamp(Target));
 }
 
 public enum CameraPreset { FrontOfHouse, Crowd, Drone, Side, Dj, Plan }

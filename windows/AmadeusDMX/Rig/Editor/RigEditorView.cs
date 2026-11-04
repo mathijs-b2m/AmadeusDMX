@@ -415,6 +415,13 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             }.Tooltip("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom.");
             fly.Click += (_, _) => stage.Fly = !stage.Fly;
             row.Children.Add(fly.Bind(stage, nameof(IEditorStage.Fly), f => f.IsChecked = stage.Fly));
+            var room = new ToggleButton
+            {
+                Content = UI.Icon("cube.transparent", 14), Padding = new Thickness(8, 6, 8, 6),
+                Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"),
+            }.Tooltip(StageRoom.Help);
+            room.Click += (_, _) => StageRoom.Shared.On = !StageRoom.Shared.On;
+            row.Children.Add(room.Bind(StageRoom.Shared, nameof(StageRoom.On), r => r.IsChecked = StageRoom.Shared.On));
         }
         row.VerticalAlignment = VerticalAlignment.Bottom;
         return row;

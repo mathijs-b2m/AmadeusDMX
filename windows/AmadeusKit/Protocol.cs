@@ -199,6 +199,8 @@ public sealed record Stage
     public double RoomDepthM { get; set; } = 6;
     /// The hall's width, its side walls the same distance either side of the stage; null: 2 m either side.
     public double? RoomWidthM { get; set; }
+    /// How far the room's back wall stands behind the stage's front edge; null: 1.5 m behind the rig (Room).
+    public double? RoomBackM { get; set; }
     /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
     public double DeckM { get; set; }
     /// The deck stands on scaffold: open tube under it, not a solid front (only how it is drawn).
@@ -228,6 +230,7 @@ public sealed record Stage
         CeilingM = J.Val(c, "ceiling_m", J.Double) ?? 4.5,
         RoomDepthM = J.Val(c, "room_depth_m", J.Double) ?? 6,
         RoomWidthM = J.Val(c, "room_width_m", J.Double),
+        RoomBackM = J.Val(c, "room_back_m", J.Double),
         DeckM = J.Val(c, "deck_m", J.Double) ?? 0,
         DeckScaffold = J.Val(c, "deck_scaffold", J.Bool) ?? false,
         DjFloor = J.Val(c, "dj_floor", J.Bool) ?? false,
@@ -244,6 +247,7 @@ public sealed record Stage
             ["deck_scaffold"] = DeckScaffold, ["dj_floor"] = DjFloor, ["ceiling_guard"] = CeilingGuard, ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
         };
         if (RoomWidthM is { } w) o["room_width_m"] = w;
+        if (RoomBackM is { } b) o["room_back_m"] = b;
         return JSONValue.Of(o);
     }
 }
