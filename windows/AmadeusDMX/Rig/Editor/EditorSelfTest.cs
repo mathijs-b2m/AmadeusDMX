@@ -32,6 +32,11 @@ public static partial class EditorSelfTest
         Truss Tr(string id) => e.Doc.Trusses.First(t => t.Id == id);
         var W = e.Doc.Width;
         static double Rounded(double v) => Math.Round(v, MidpointRounding.AwayFromZero);
+        if (e.Doc.Trusses.FirstOrDefault(t => t.IsScaffold) is { } wall)  // a set on a scaffold: only what is its own
+        {
+            Scaffold(e, wall with { }, Check);
+            return out_;
+        }
 
         // 1. pick a truss between its fixtures
         var front = Tr("front") with { };
@@ -221,5 +226,36 @@ public static partial class EditorSelfTest
             Check("save", false, ex.Message);
         }
         return out_;
+    }
+
+    /// Fixtures up and down a scaffold's ledgers, looking at it from the audience. Needs a fixture "h1" not on it yet.
+    static void Scaffold(RigEditorModel e, Truss wall, Action<string, bool, string> check)
+    {
+        var eye = new Vector3((float)wall.XM, 25, 3);
+        Vector3 Toward(double u, double z) =>
+            Vector3.Normalize(new Vector3((float)(wall.XM + u), (float)(wall.YM + wall.ScaffoldDepth / 2), (float)z) - eye);
+        PlacedFixture H1() => e.Doc.Fixtures.First(f => f.Id == "h1");
+        Truss W() => e.Doc.Trusses.First(t => t.Id == wall.Id);
+        check("dropped on a ledger", e.Drop(RigEditorModel.Payload(["h1"]), eye, Toward(-6, 6)) && H1().Truss == wall.Id && H1().TrussLift == 6,
+              $"truss {H1().Truss ?? "-"} lift {H1().TrussLift ?? 0}");
+        check("hangs under that ledger", Math.Abs(H1().ZM - (6 - RigEditorModel.TubeDrop)) < 0.01 && H1().Mount == "hang", $"z {F(H1().ZM)}");
+        var at = H1().Position(e.Doc.Width);
+        check("picked on the wall", e.Pick(eye, Vector3.Normalize(new Vector3((float)at.X, (float)at.Y, (float)at.Z) - eye), false)
+              && e.Selection == EditorSelection.Fixture("h1"), "");
+        e.Drag(eye, Toward(-3, 3.1), false);
+        check("dragged down the wall and along it", H1().TrussLift == 3 && Math.Abs((H1().TrussPos ?? 0) + 3) < 0.13,
+              $"lift {H1().TrussLift ?? 0} pos {F(H1().TrussPos ?? double.NaN)}");
+        e.Drag(eye, Toward(-3, 99), false);
+        check("above the wall: off it, or the top", H1().Truss is null || H1().TrussLift == W().ScaffoldLifts, $"truss {H1().Truss ?? "-"}");
+        e.Drag(eye, Toward(-3, 4), false);
+        e.EndDrag();
+        check("back on a lower ledger", H1().Truss == wall.Id && H1().TrussLift == 4, $"lift {H1().TrussLift ?? 0}");
+        e.UpdateTruss(wall.Id, t => t.YM -= 1);
+        check("follows the scaffold", Math.Abs(H1().YM - (W().YM + W().ScaffoldDepth / 2)) < 0.01, $"y {F(H1().YM)}");
+        e.UpdateTruss(wall.Id, t => t.ZM = 2 * wall.ZM);
+        check("a taller scaffold: the same ledger, higher", H1().TrussLift == 4 && Math.Abs(H1().ZM - (W().LiftHeight(4) - RigEditorModel.TubeDrop)) < 0.01,
+              $"lifts {W().ScaffoldLifts} z {F(H1().ZM)}");
+        e.UpdateTruss(wall.Id, t => t.ZM = 3);
+        check("a lower scaffold: the highest there is", H1().TrussLift == W().ScaffoldLifts, $"lift {H1().TrussLift ?? 0}");
     }
 }

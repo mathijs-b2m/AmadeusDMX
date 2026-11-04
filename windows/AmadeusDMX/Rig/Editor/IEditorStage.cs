@@ -298,7 +298,20 @@ public sealed class PlaceholderStage : IEditorStage
             }
             else
             {
-                foreach (var (a, b) in t.Pieces()) AddLine(a, b, color, Math.Max(3, 0.3 * _scale));
+                if (t.IsScaffold)  // from above: its two frames and the transoms between them, a bay apart
+                {
+                    var n = new Vec3(t.Normal.X, t.Normal.Y, 0) * (t.ScaffoldDepth / 2);
+                    Vec3 end0 = t.Point(-t.LengthM / 2), end1 = t.Point(t.LengthM / 2);
+                    AddLine(end0 + n, end1 + n, color, 2);
+                    AddLine(end0 - n, end1 - n, color, 2);
+                    for (var bay = 0; bay <= t.ScaffoldBays; bay++)
+                    {
+                        var p = t.Point(-t.LengthM / 2 + t.LengthM * bay / t.ScaffoldBays);
+                        AddLine(p + n, p - n, color, 1.5);
+                    }
+                }
+                else
+                    foreach (var (a, b) in t.Pieces()) AddLine(a, b, color, Math.Max(3, 0.3 * _scale));
                 foreach (var leg in t.CarreCorners) AddSquare(new Vec3(leg.X, leg.Y, 0), 0.3, color);  // a carré's legs
                 if (on && !t.IsLoop)
                     foreach (var end in new[] { t.Point(-t.LengthM / 2), t.Point(t.LengthM / 2) }) AddSquare(end, 0.26, HandleColor);

@@ -201,6 +201,8 @@ public sealed record Stage
     public double? RoomWidthM { get; set; }
     /// The stage's height above the hall floor (0: the stage is the floor). Heights count from the hall floor.
     public double DeckM { get; set; }
+    /// The deck stands on scaffold: open tube under it, not a solid front (only how it is drawn).
+    public bool DeckScaffold { get; set; }
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public bool CeilingGuard { get; set; } = true;
     public bool BackGuard { get; set; } = true;
@@ -225,6 +227,7 @@ public sealed record Stage
         RoomDepthM = J.Val(c, "room_depth_m", J.Double) ?? 6,
         RoomWidthM = J.Val(c, "room_width_m", J.Double),
         DeckM = J.Val(c, "deck_m", J.Double) ?? 0,
+        DeckScaffold = J.Val(c, "deck_scaffold", J.Bool) ?? false,
         CeilingGuard = J.Val(c, "ceiling_guard", J.Bool) ?? true,
         BackGuard = J.Val(c, "back_guard", J.Bool) ?? true,
         Outdoor = J.Val(c, "outdoor", J.Bool) ?? false,
@@ -235,7 +238,7 @@ public sealed record Stage
         var o = new Dictionary<string, JSONValue>
         {
             ["width_m"] = WidthM, ["ceiling_m"] = CeilingM, ["room_depth_m"] = RoomDepthM, ["deck_m"] = DeckM,
-            ["ceiling_guard"] = CeilingGuard, ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
+            ["deck_scaffold"] = DeckScaffold, ["ceiling_guard"] = CeilingGuard, ["back_guard"] = BackGuard, ["outdoor"] = Outdoor,
         };
         if (RoomWidthM is { } w) o["room_width_m"] = w;
         return JSONValue.Of(o);

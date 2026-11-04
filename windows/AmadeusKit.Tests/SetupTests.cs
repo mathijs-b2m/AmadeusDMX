@@ -373,6 +373,9 @@ public class MapperAndSettingsTests
         Assert.Equal("carre", RigTemplate.Carre.RawValue());  // the engine's name for it
         Assert.Equal("Carré", RigTemplate.Carre.Title());
         Assert.Equal((8.0, 3.0, 12.0), RigTemplate.Carre.Size());
+        Assert.Equal("festival", RigTemplate.Festival.RawValue());
+        Assert.Equal("Festival Stage", RigTemplate.Festival.Title());
+        Assert.Equal((16.0, 9.0, 30.0), RigTemplate.Festival.Size());
         Assert.True(RigTemplates.IsDefaultName("club2"));
         Assert.False(RigTemplates.IsDefaultName("paradiso"));
     }

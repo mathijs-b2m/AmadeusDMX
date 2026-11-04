@@ -11,6 +11,7 @@
 //   fixture.mount   hang (under a truss) | stand (on top / on a stand) | floor
 //   fixture.truss, truss_pos_m, truss_side: the truss it is clamped to, where along it, and on which of the
 //                   box truss's four sides: under | top | front (audience side) | back (editor bookkeeping)
+//   fixture.truss_lift: on a scaffold, which of its ledgers (1 is the lowest)
 //
 // Swift's structs are value types; here the editable ones are classes with Clone() (RigDocument.Clone copies
 // everything), so an editor keeps a copy before it changes one.
@@ -39,6 +40,10 @@ public sealed record Truss
     public double? ArcDeg { get; set; }
     public double? WidthM { get; set; }
     public double? DepthM { get; set; }
+    /// A scaffold (type "scaffold"): a wall of tube standing on the floor (amadeus/rig/trusses.py), straight like a
+    /// truss, ZM its top, about `BayM` between its standards, `LiftM` between its ledgers, `DepthM` between its frames.
+    public double? BayM { get; set; }
+    public double? LiftM { get; set; }
     /// Where the heads on it play: "audience" or "down"; nil: automatic (down when it hangs over the crowd).
     public string? Aim { get; set; }
     /// A light stand's (type "bridge" or "tbar") limits as the maker gives them: what it takes, how high it goes.
@@ -54,6 +59,8 @@ public sealed record Truss
     public static readonly (double W, double D)[] CarreSizes = [(3, 3), (4, 3), (4, 4), (6, 4)];
     public const double CarreHeightM = 3.0;
     public const double CornerClearM = 0.25;
+    /// Scaffold walls to start from, width × height (any other size works too).
+    public static readonly (double W, double H)[] ScaffoldSizes = [(8, 5), (12, 7), (16, 9), (20, 11)];
 
     /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
     public sealed record StandPreset(string Type, double LengthM, double? MinHeightM, double MaxHeightM, double MaxKg)
@@ -96,6 +103,8 @@ public sealed record Truss
             ArcDeg = J.Val(c, "arc_deg", J.Double),
             WidthM = J.Val(c, "width_m", J.Double),
             DepthM = J.Val(c, "depth_m", J.Double),
+            BayM = J.Val(c, "bay_m", J.Double),
+            LiftM = J.Val(c, "lift_m", J.Double),
             Aim = J.Ref(c, "aim", J.String),
             MaxKg = J.Val(c, "max_kg", J.Double),
             MaxHeightM = J.Val(c, "max_height_m", J.Double),
@@ -119,6 +128,8 @@ public sealed record Truss
         if (ArcDeg is { } a) o["arc_deg"] = a;
         if (WidthM is { } w) o["width_m"] = w;
         if (DepthM is { } dp) o["depth_m"] = dp;
+        if (BayM is { } bay) o["bay_m"] = bay;
+        if (LiftM is { } lift) o["lift_m"] = lift;
         if (Aim is not null) o["aim"] = Aim;
         if (MaxKg is { } kg) o["max_kg"] = kg;
         if (MaxHeightM is { } top) o["max_height_m"] = top;
@@ -143,6 +154,10 @@ public sealed record Truss
         return t;
     }
 
+    /// A scaffold wall `width` across and `height` high.
+    public static Truss Scaffold(string id, double width, double height, double xM, double yM) =>
+        new(id, width, xM, yM, height) { Type = "scaffold", DepthM = 1, BayM = 2.5, LiftM = 1 };
+
     /// A truss this far in front of the stage edge hangs over the crowd (amadeus/rig/trusses.py OVER_CROWD_M).
     public const double OverCrowdM = 1.0;
 
@@ -152,6 +167,28 @@ public sealed record Truss
     public bool IsRing => Shape == "circle" && !Vertical;
     /// A light stand: a tube on tripods (a bridge or a T-bar), not a box truss.
     public bool IsStand => Type is "bridge" or "tbar" && !Vertical && !IsLoop;
+    /// A scaffold wall: tube, bays across and lifts up, standing on the floor.
+    public bool IsScaffold => Type == "scaffold" && !Vertical && !IsLoop;
+    /// A bar fixtures clamp close to: a light stand's tube, or a ledger of a scaffold.
+    public bool IsTube => IsStand || Type == "ledger";
+    public double ScaffoldDepth => DepthM ?? 1;
+    /// How many bays across and lifts up: the standards and ledgers share its size evenly, the top ledger at ZM.
+    public int ScaffoldBays => Math.Max(1, (int)Math.Round(LengthM / (BayM ?? 2.5), MidpointRounding.AwayFromZero));
+    public int ScaffoldLifts => Math.Max(1, (int)Math.Round(ZM / (LiftM ?? 1), MidpointRounding.AwayFromZero));
+    public double LiftHeight(int lift) => ZM * lift / ScaffoldLifts;
+    /// The ledger nearest height `z`.
+    public int NearestLift(double z) =>
+        Math.Min(ScaffoldLifts, Math.Max(1, (int)Math.Round(z / ZM * ScaffoldLifts, MidpointRounding.AwayFromZero)));
+    /// Ledger `lift` of a scaffold's front frame, as a straight bar (under the scaffold's own id).
+    public Truss Ledger(int lift)
+    {
+        var k = Math.Min(ScaffoldLifts, Math.Max(1, lift));
+        var n = Normal * (ScaffoldDepth / 2);
+        return new Truss(Id, LengthM, XM + n.X, YM + n.Y, LiftHeight(k), RotDeg) { Type = "ledger" };
+    }
+    /// The scaffold an LED wall hangs on: the widest one that faces the audience.
+    public static Truss? ScreenWall(IEnumerable<Truss> trusses) =>
+        trusses.Where(t => t.IsScaffold && Math.Abs(t.RotDeg) < 1).MaxBy(t => t.LengthM);
     /// A carré: a rectangle of truss on four legs.
     public bool IsCarre => Shape == "carre" && !Vertical;
     /// A truss whose heads play round it: a round truss (or an arc) or a carré.
@@ -244,6 +281,8 @@ public sealed record Truss
 
     /// Unit vector along the truss (horizontal trusses).
     public Vec2 Axis => new(Math.Cos(RotDeg * Math.PI / 180), Math.Sin(RotDeg * Math.PI / 180));
+    /// Unit vector out of its front (towards the audience when it isn't turned).
+    public Vec2 Normal => new(-Axis.Y, Axis.X);
 
     /// A point on the truss: `u` metres from its centre along it (or above its base, for a tower).
     public Vec3 Point(double u)
@@ -266,6 +305,12 @@ public sealed record Truss
     /// sides), for drawing and picking.
     public IReadOnlyList<(Vec3 A, Vec3 B)> Pieces(double step = 0.4)
     {
+        if (IsScaffold)  // the ledgers of its front frame
+            return Enumerable.Range(1, ScaffoldLifts).Select(k =>
+            {
+                var l = Ledger(k);
+                return (l.Point(-LengthM / 2), l.Point(LengthM / 2));
+            }).ToList();
         if (IsCarre)
         {
             var c = CarreCorners.Select(p => new Vec3(p.X, p.Y, ZM)).ToList();
@@ -444,6 +489,7 @@ public sealed class PlacedFixture
     public Vec2? Aim { get; set; }         // azimuth, elevation (fixtures without motors)
     public string? Truss { get; set; }
     public double? TrussPos { get; set; }
+    public int? TrussLift { get; set; }    // on a scaffold: which ledger (1 is the lowest)
     public string? Side { get; set; }      // under | top | front | back (on a truss)
     public double? MountRoll { get; set; } // 90: on the front face, 270: on the back face (rolled about the truss)
     /// Not mounted on this rig yet: it waits on the floor at the front (the engine's waiting spot).
@@ -477,7 +523,7 @@ public sealed class PlacedFixture
     public bool SamePlace(PlacedFixture o) =>
         Id == o.Id && Key == o.Key && Mode == o.Mode && Universe == o.Universe && Address == o.Address && Mount == o.Mount
         && X == o.X && YM == o.YM && ZM == o.ZM && RotDeg == o.RotDeg && Aim == o.Aim && Truss == o.Truss
-        && TrussPos == o.TrussPos && Side == o.Side && MountRoll == o.MountRoll && Waiting == o.Waiting;
+        && TrussPos == o.TrussPos && TrussLift == o.TrussLift && Side == o.Side && MountRoll == o.MountRoll && Waiting == o.Waiting;
 }
 
 /// A set on a rig, editable. `Raw` keeps everything the editor doesn't touch.
@@ -494,7 +540,7 @@ public sealed class RigDocument
     /// What belongs to the rig rather than the set, and a fixture's fields that say where it is
     /// (amadeus/rig/store.py: RIG_KEYS, PLACEMENT_KEYS).
     public static readonly string[] RigKeys = ["stage", "trusses", "zones", "screen"];
-    public static readonly string[] PlacementKeys = ["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_side",
+    public static readonly string[] PlacementKeys = ["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_lift", "truss_side",
                                                      "mount_roll_deg", "reverse", "width", "group"];
     public const string UnplacedKey = "_unplaced";
 
@@ -560,6 +606,7 @@ public sealed class RigDocument
                 o.GetValueOrDefault("truss")?.String, N("truss_pos_m"), o.GetValueOrDefault("truss_side")?.String,
                 N("mount_roll_deg"))
             {
+                TrussLift = (int?)N("truss_lift"),
                 Waiting = o.ContainsKey(UnplacedKey),
             };
         }).OfType<PlacedFixture>().ToList();
@@ -591,11 +638,11 @@ public sealed class RigDocument
         {
             var f = Fixtures[k];
             f.Mount = from.Mount; f.X = from.X; f.YM = from.YM; f.ZM = from.ZM; f.RotDeg = from.RotDeg; f.Aim = from.Aim;
-            f.Truss = from.Truss; f.TrussPos = from.TrussPos; f.Side = from.Side; f.MountRoll = from.MountRoll;
+            f.Truss = from.Truss; f.TrussPos = from.TrussPos; f.TrussLift = from.TrussLift; f.Side = from.Side; f.MountRoll = from.MountRoll;
             f.Waiting = from.Waiting;
         }
         // the placement fields the editor doesn't model (reverse, width, group) trade places too
-        var other = PlacementKeys.Except(["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_side",
+        var other = PlacementKeys.Except(["x", "y_m", "z_m", "mount", "rot_deg", "aim", "truss", "truss_pos_m", "truss_lift", "truss_side",
                                           "mount_roll_deg"]).ToList();
         var ra = RawFixture(a);
         var rb = RawFixture(b);
@@ -682,6 +729,7 @@ public sealed class RigDocument
             Put(o, "aim", f.Aim is { } a ? JSONValue.Of([Round(a.X, 10), Round(a.Y, 10)]) : null);
             Put(o, "truss", f.Truss is { } t ? JSONValue.Of(t) : null);
             Put(o, "truss_pos_m", f.TrussPos is { } tp ? Round(tp, 1000) : null);
+            Put(o, "truss_lift", f.Truss is not null && f.TrussLift is { } tl ? tl : null);
             Put(o, "truss_side", f.Truss is null || f.Side is null ? null : JSONValue.Of(f.Side));
             Put(o, "mount_roll_deg", (f.MountRoll ?? 0) == 0 ? null : f.MountRoll!.Value);
             return JSONValue.Of(o);

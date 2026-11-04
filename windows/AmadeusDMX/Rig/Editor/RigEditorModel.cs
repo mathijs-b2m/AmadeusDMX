@@ -374,6 +374,19 @@ public sealed class RigEditorModel : Observable, IStageEditing
         Selection = EditorSelection.Truss(t.Id);
     }
 
+    /// A scaffold wall at the back of the stage: as many as there are, each a little further back. The LED wall hangs
+    /// on it.
+    public void AddScaffold(double width, double height)
+    {
+        var W = Doc.Width;
+        var n = Doc.Trusses.Count(x => x.IsScaffold);
+        var back = Math.Min(10, Math.Max(6.5, W * 0.45)) + 0.5 + n * 2.0;
+        var h = Doc.Stage.Outdoor ? height : Math.Min(height, Doc.Stage.CeilingM - 0.3);
+        var t = Truss.Scaffold(NewTrussID("wall"), width, h, W / 2, -back);
+        Change("Add Scaffold", d => d.Trusses.Add(t));
+        Selection = EditorSelection.Truss(t.Id);
+    }
+
     public void UpdateTruss(string id, Action<Truss> body) => UpdateTruss(id, "Change Truss", body);
 
     public void UpdateTruss(string id, string name, Action<Truss> body) => Change(name, d =>
@@ -398,6 +411,14 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// Clamp a fixture to a truss (amadeus/rig/trusses.py place: the same rules).
     public static void Place(PlacedFixture f, Truss t, double u, double width)
     {
+        if (t.IsScaffold)  // onto the ledger it is on (new here: the top one)
+        {
+            var lift = Math.Min(t.ScaffoldLifts, Math.Max(1, f.TrussLift ?? t.ScaffoldLifts));
+            Place(f, t.Ledger(lift), u, width);
+            f.TrussLift = lift;
+            return;
+        }
+        f.TrussLift = null;
         if (t.IsClosed) u = t.Wrapped(u);  // round the loop: past one end is the other
         if (t.IsCarre) u = t.CarreClear(u);  // not on a corner
         u = t.Vertical ? Math.Max(0.2, Math.Min(t.LengthM, u)) : Math.Max(-t.LengthM / 2, Math.Min(t.LengthM / 2, u));
@@ -452,7 +473,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             var q = p.XY;
             var z = p.Z;
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
-            double drop = t.IsStand ? TubeDrop : HangDrop, outward = t.IsStand ? TubeOut : SideOut;
+            double drop = t.IsTube ? TubeDrop : HangDrop, outward = t.IsTube ? TubeOut : SideOut;
             switch (side)
             {
                 case "top": z += drop; break;
@@ -470,6 +491,17 @@ public sealed class RigEditorModel : Observable, IStageEditing
     }
 
     static string Capitalized(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
+
+    /// Every selected fixture on a scaffold: onto this ledger.
+    public void SetLift(IReadOnlySet<string> ids, int lift) => Change($"Move to Lift {lift}", d =>
+    {
+        foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
+        {
+            if (d.Trusses.FirstOrDefault(t => t.Id == f.Truss) is not { IsScaffold: true } t) continue;
+            f.TrussLift = lift;
+            Place(f, t, f.TrussPos ?? 0, d.Width);
+        }
+    });
 
     public void SetSide(string id, string side) => UpdateFixture(id, $"Move to {Capitalized(side)}", f => f.Side = side);
 
@@ -561,8 +593,10 @@ public sealed class RigEditorModel : Observable, IStageEditing
         // keep the whole row on the truss
         double lo = t.Vertical ? 0.3 : -t.LengthM / 2, hi = t.Vertical ? t.LengthM - 0.3 : t.LengthM / 2;
         var mine = ids.ToHashSet();
+        var lift = d.Fixtures.FirstOrDefault(f => f.Id == ids.FirstOrDefault())?.TrussLift;
         var busy = d.Fixtures
-            .Where(f => !mine.Contains(f.Id) && f.Truss == t.Id && (t.Vertical || (f.Side ?? "under") == (side ?? "under")))
+            .Where(f => !mine.Contains(f.Id) && f.Truss == t.Id && (t.Vertical || (f.Side ?? "under") == (side ?? "under"))
+                        && (!t.IsScaffold || f.TrussLift == lift))
             .Where(f => f.TrussPos is not null)
             .Select(f => (Pos: f.TrussPos!.Value, Width: t.Vertical ? 0.45 : width(f))).ToList();
         bool Fits(double start) =>  // housings at least `gap` apart
@@ -1002,6 +1036,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 f.Aim = p.GetValueOrDefault("aim")?.Array is { Count: 2 } a ? new Vec2(a[0].Number ?? 0, a[1].Number ?? 0) : null;
                 f.Truss = p.GetValueOrDefault("truss")?.String;
                 f.TrussPos = p.GetValueOrDefault("truss_pos_m")?.Number;
+                f.TrussLift = (int?)p.GetValueOrDefault("truss_lift")?.Number;
                 f.Side = p.GetValueOrDefault("truss_side")?.String;
                 f.MountRoll = p.GetValueOrDefault("mount_roll_deg")?.Number;
             }
@@ -1417,9 +1452,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
     }
 
     /// The truss a ray passes closest to (within `radius`), and where along it.
-    (Truss Truss, double U)? TrussNear(Vec3 o, Vec3 d, double radius)
+    (Truss Truss, double U, double Z)? TrussNear(Vec3 o, Vec3 d, double radius)
     {
-        (Truss T, double U, double Dist)? best = null;
+        (Truss T, double U, double Dist, double Z)? best = null;
         foreach (var t in Doc.Trusses)
         {
             IReadOnlyList<(Vec3 A, Vec3 B)> pieces = t.Vertical ? [(new Vec3(t.XM, t.YM, 0), new Vec3(t.XM, t.YM, t.ZM + t.LengthM / 2))] : t.Pieces();
@@ -1429,10 +1464,58 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 if (!(dist < radius) || best is { } bb && !(dist < bb.Dist)) continue;
                 var hit = o + d * along;
                 var u = t.Vertical ? hit.Z - (t.ZM - t.LengthM / 2) : t.Project(hit.XY).U;
-                best = (t, u, dist);
+                best = (t, u, dist, hit.Z);  // (the hit's height: on a scaffold, its ledger)
             }
         }
-        return best is { } r ? (r.T, r.U) : null;
+        return best is { } r ? (r.T, r.U, r.Z) : null;
+    }
+
+    /// Where a ray goes through the front of a scaffold, within its reach: which one, how far along, which ledger, and
+    /// how far along the ray.
+    (Truss T, double U, int Lift, double Ray)? Wall(Vec3 o, Vec3 d)
+    {
+        (Truss T, double U, int Lift, double Ray)? best = null;
+        foreach (var t in Doc.Trusses.Where(x => x.IsScaffold))
+        {
+            var n = new Vec3(t.Normal.X, t.Normal.Y, 0);
+            var den = Vec3.Dot(d, n);
+            if (!(Math.Abs(den) > 1e-4)) continue;
+            var front = new Vec3(t.XM, t.YM, 0) + n * (t.ScaffoldDepth / 2);
+            var ray = Vec3.Dot(front - o, n) / den;
+            var hit = o + d * ray;
+            var u = Vec2.Dot(new Vec2(hit.X - t.XM, hit.Y - t.YM), t.Axis);
+            if (!(ray > 0 && Math.Abs(u) <= t.LengthM / 2 + 0.5 && hit.Z >= 0 && hit.Z <= t.ZM + 0.8
+                  && ray < (best?.Ray ?? double.PositiveInfinity))) continue;
+            best = (t, u, t.NearestLift(hit.Z), ray);
+        }
+        return best;
+    }
+
+    /// A fixture dragged over a scaffold's front: up and down its ledgers with the pointer. One that is on it follows
+    /// the pointer over all of it; one coming from elsewhere only once the pointer is past the wall (on its way
+    /// across the stage it stays in the stage).
+    bool DragOnWall(string id, (EditorSelection Sel, Vec3 Grab, Vec3 Start, RigDocument Before) g, Vec3 o, Vec3 d)
+    {
+        if (Doc.Fixtures.FirstOrDefault(x => x.Id == id) is not { } f || Wall(o, d) is not { } w) return false;
+        var plane = Math.Abs(d.Z) > 1e-4 ? (g.Grab.Z - o.Z) / d.Z : double.PositiveInfinity;
+        if (!(f.Truss == w.T.Id || plane <= 0 || plane >= w.Ray - 0.9)) return false;
+        var u = Snap ? Rounded(w.U / Grid) * Grid : w.U;
+        if (f.Truss != w.T.Id)
+        {
+            f.Side = null;
+            if (f.Mount == "floor") f.Mount = "hang";
+        }
+        f.TrussLift = w.Lift;
+        f.Waiting = false;
+        Place(f, w.T, u, Doc.Width);
+        if (_group.Count > 0)  // the others come along, in a row on the same ledger
+        {
+            var ids = RowOrder([id, .. _group], g.Before);
+            foreach (var o2 in Doc.Fixtures.Where(x => ids.Contains(x.Id))) o2.TrussLift = w.Lift;
+            Arrange(Doc, ids, w.T, GroupCentre(ids, id, u), f.Side, HousingWidth);
+        }
+        Refresh();
+        return true;
     }
 
     // MARK: - building trusses
@@ -1679,6 +1762,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (DragBuild(S(origin), S(dir), free)) return;
         if (_drag is not { } g) return;
         Vec3 o = S(origin), d = S(dir);
+        if (g.Sel.Kind == EditorSelectionKind.Fixture && !free && DragOnWall(g.Sel.Id, g, o, d)) return;
         // move in the horizontal plane at the height where it was grabbed
         if (!(Math.Abs(d.Z) > 1e-4)) return;
         var t0 = (g.Grab.Z - o.Z) / d.Z;
@@ -1714,7 +1798,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 f.Waiting = false;
                 var p2 = target.XY;
                 // snap onto the nearest truss within reach (towers by their footprint)
-                var near = Doc.Trusses.Select(t => (T: t, P: t.Project(p2))).Where(x => x.P.Distance < 0.9).ToList();
+                var near = Doc.Trusses.Where(t => !t.IsScaffold).Select(t => (T: t, P: t.Project(p2))).Where(x => x.P.Distance < 0.9).ToList();
                 if (near.Count > 0 && (Snap || !free))
                 {
                     var (tr, pr) = near.MinBy(x => x.P.Distance);
@@ -1861,6 +1945,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
             {
                 Change(ids.Count == 1 ? "Mount Fixture" : $"Mount {ids.Count} Fixtures", doc =>
                 {
+                    if (near.Truss.IsScaffold)  // onto the ledger it was dropped on
+                        foreach (var f in doc.Fixtures.Where(f => ids.Contains(f.Id))) f.TrussLift = near.Truss.NearestLift(near.Z);
                     Arrange(doc, ids, near.Truss, near.U, null, HousingWidth);
                     LineUpWaiting(doc);
                 });

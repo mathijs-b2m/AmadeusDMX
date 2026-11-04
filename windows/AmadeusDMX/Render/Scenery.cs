@@ -60,7 +60,10 @@ public sealed class Scenery
         var heads = fixtures.Count(f => f.Kind == FixtureKind.Head);
         Big = W >= 6 || heads >= 8;
         Top = MathF.Max(2, fixtures.Count > 0 ? (float)fixtures.Max(f => f.Pos.Z) : 2);
-        if (screen)  // the LED wall stands behind the DJ: the room's back wall is behind it
+        // a scaffold wall behind the stage: the LED wall hangs on its front, the stage stops at it
+        var scaffoldWall = Truss.ScreenWall(trusses);
+        float? wallFront = scaffoldWall is null ? null : (float)(scaffoldWall.YM + scaffoldWall.ScaffoldDepth / 2);
+        if (screen && scaffoldWall is null)  // the LED wall stands behind the DJ: the room's back wall is behind it
         {
             var wallY = Big ? MathF.Min(-4.5f, Room.Back + 1.5f) - 2.2f : -2.0f;
             Room = Room with { Back = MathF.Min(Room.Back, wallY - 0.8f) };
@@ -83,13 +86,22 @@ public sealed class Scenery
         var raised = MathF.Max(0, (float)stage.DeckM);
         if (Big || raised > 0)
         {
-            var deckBack = MathF.Min(-3, back + 1.0f);
+            var deckBack = wallFront ?? MathF.Min(-3, back + 1.0f);
             float deckTop = raised > 0 ? raised : 0.15f, front = raised > 0 ? 0 : -0.2f;
-            Box(-0.5f, W + 0.5f, deckBack, front, 0, deckTop, V(0.055f, 0.058f, 0.07f));
+            if (stage.DeckScaffold && raised > 0)  // a plate on open tube
+            {
+                Box(-0.5f, W + 0.5f, deckBack, front, deckTop - 0.1f, deckTop, V(0.055f, 0.058f, 0.07f));
+                ScaffoldDeck(-0.5f, W + 0.5f, deckBack, front, deckTop - 0.1f);
+            }
+            else
+            {
+                Box(-0.5f, W + 0.5f, deckBack, front, 0, deckTop, V(0.055f, 0.058f, 0.07f));
+            }
             Deck = (-0.5f, W + 0.5f, deckBack, front, deckTop);
             if (Big)
             {
-                float ry = MathF.Max(deckBack + 0.5f, -4.5f), rd = 2.2f, rw = MathF.Min(5, W * 0.3f);
+                // (against a scaffold: the riser and the DJ stay in front of the LED wall)
+                float ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f), rd = MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
                 Box(cx - rw / 2, cx + rw / 2, ry - rd, ry, deckTop, deckTop + 0.8f, V(0.07f, 0.074f, 0.09f));
                 boothY = ry - 0.4f; boothZ = deckTop + 0.8f;
             }
@@ -126,12 +138,13 @@ public sealed class Scenery
         {
             var sw = Big ? MathF.Min(10, W * 0.55f) : 2.6f;
             var sh = sw * 9 / 16;
-            var sy = Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
+            var sy = wallFront is { } wf ? wf + 0.37f
+                : Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
             var sz = (Big ? 1.4f : 1.15f) + raised;  // over the stage, as high as it stands
             Wall = new WallPlacement(V(cx, sy, sz + sh / 2), sw, sh);
             var screenAt = Vertices.Count;
             Box(cx - sw / 2 - 0.12f, cx + sw / 2 + 0.12f, sy - 0.35f, sy - 0.02f, sz - 0.12f, sz + sh + 0.12f, V(0.03f, 0.03f, 0.035f));
-            if (Big)  // legs
+            if (Big && scaffoldWall is null)  // legs
             {
                 Box(cx - sw / 2 - 0.1f, cx - sw / 2 + 0.1f, sy - 0.3f, sy - 0.1f, 0, sz, V(0.06f, 0.06f, 0.07f));
                 Box(cx + sw / 2 - 0.1f, cx + sw / 2 + 0.1f, sy - 0.3f, sy - 0.1f, 0, sz, V(0.06f, 0.06f, 0.07f));
@@ -162,6 +175,8 @@ public sealed class Scenery
             {
                 if (t.IsStand)
                     LightStand(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
+                else if (t.IsScaffold)
+                    Scaffold(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
                 else
                     TrussBeam(t, color: sel ? pick : hov ? lit : truss, emissive: sel ? 0.6f : hov ? 0.3f : 0);
                 if (sel && !t.IsLoop)  // the end handles: drag one to stretch or turn the truss
@@ -274,6 +289,75 @@ public sealed class Scenery
         Quad(P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1), P(-1, -1, -1), color, normal: -ay, emissive: emissive);
         Quad(P(1, 1, -1), P(1, 1, 1), P(1, -1, 1), P(1, -1, -1), color, normal: ax, emissive: emissive);
         Quad(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, 1), P(-1, 1, -1), color, normal: -ax, emissive: emissive);
+    }
+
+    /// A scaffold wall: two frames of standards and ledgers, transoms between them, every other bay braced, base plates.
+    void Scaffold(Truss t, Vector3 color, float emissive)
+    {
+        float rot = (float)t.RotDeg, r = rot * MathF.PI / 180, L = (float)t.LengthM, H = (float)t.ZM, D = (float)t.ScaffoldDepth;
+        Vector3 ax = V(MathF.Cos(r), MathF.Sin(r), 0), ay = V(-MathF.Sin(r), MathF.Cos(r), 0), c = V(t.XM, t.YM, 0);
+        int bays = t.ScaffoldBays, lifts = t.ScaffoldLifts;
+        float tube = 0.05f, bay = L / bays, lift = H / lifts;
+        Vector3 At(float u, float v, float z) => c + ax * u + ay * v + V(0, 0, z);
+        foreach (var v in new[] { D / 2, -D / 2 })
+        {
+            for (var k = 0; k <= bays; k++)
+            {
+                var u = -L / 2 + bay * k;
+                RotatedBox(At(u, v, H / 2 + 0.15f), V(tube, tube, H + 0.3f), rot, color, emissive: emissive);
+                RotatedBox(At(u, v, 0.015f), V(0.2f, 0.2f, 0.03f), rot, color * 0.7f, emissive: emissive);
+            }
+            for (var k = 1; k <= lifts; k++) RotatedBox(At(0, v, lift * k), V(L, tube, tube), rot, color, emissive: emissive);
+            for (var k = 0; k < bays; k += 2)  // a brace up each braced bay, zigzag from lift to lift
+            {
+                var u = -L / 2 + bay * k;
+                for (var j = 0; j < lifts; j++)
+                {
+                    var z = lift * j;
+                    var up = j % 2 == 0;
+                    Strut(At(up ? u : u + bay, v, z), At(up ? u + bay : u, v, z + lift), color * 0.85f, emissive: emissive);
+                }
+            }
+        }
+        for (var k = 0; k <= bays; k++)  // transoms between the frames
+        {
+            var u = -L / 2 + bay * k;
+            for (var j = 1; j <= lifts; j++) RotatedBox(At(u, 0, lift * j), V(tube * 0.8f, D, tube * 0.8f), rot, color * 0.9f, emissive: emissive);
+        }
+    }
+
+    /// Open tube under a raised stage's plate: standards about 2 m apart, a ledger round each row, braces.
+    void ScaffoldDeck(float x0, float x1, float y0, float y1, float top)
+    {
+        var c = V(0.16f, 0.17f, 0.2f);
+        const float t = 0.025f;
+        int nx = Math.Max(1, (int)MathF.Round((x1 - x0) / 2.5f, MidpointRounding.AwayFromZero));
+        int ny = Math.Max(1, (int)MathF.Round((y1 - y0) / 2.5f, MidpointRounding.AwayFromZero));
+        float dx = (x1 - x0) / nx, dy = (y1 - y0) / ny;
+        for (var i = 0; i <= nx; i++)
+            for (var j = 0; j <= ny; j++)
+            {
+                float x = x0 + dx * i, y = y0 + dy * j;
+                Box(x - t, x + t, y - t, y + t, 0, top, c);
+            }
+        foreach (var z in new[] { top * 0.5f, top - 0.05f })
+        {
+            for (var j = 0; j <= ny; j++) { var y = y0 + dy * j; Box(x0, x1, y - t, y + t, z - t, z + t, c); }
+            for (var i = 0; i <= nx; i++) { var x = x0 + dx * i; Box(x - t, x + t, y0, y1, z - t, z + t, c); }
+        }
+        for (var i = 0; i < nx; i += 2)  // the bays along the front and the back, braced
+        {
+            var x = x0 + dx * i;
+            foreach (var y in new[] { y0, y1 }) Strut(V(x, y, 0), V(x + dx, y, top - 0.05f), c * 0.85f);
+        }
+    }
+
+    /// A thin tube from `a` to `b` in any direction (a brace).
+    void Strut(Vector3 a, Vector3 b, Vector3 color, float emissive = 0)
+    {
+        var m = new MeshBuilder();
+        m.Cylinder((a + b) / 2, Vector3.Normalize(b - a), radius: 0.016f, length: (b - a).Length(), color, emissive: emissive, segments: 5);
+        Vertices.AddRange(m.V);
     }
 
     /// A light stand: its bar (a 40 mm tube) and a tripod under each end of a bridge, under the middle of a T-bar,
