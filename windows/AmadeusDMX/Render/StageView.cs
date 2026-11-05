@@ -29,6 +29,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using SharpGen.Runtime;
@@ -60,10 +61,13 @@ public sealed partial class StageView : SwapChainPanel
     Point _last;
     bool _dragging, _picked;
     uint? _captured;
+    UIElement? _rootContent;
+    readonly PointerEventHandler _releasedAnywhere;
 
     public StageView(StageController controller)
     {
         _controller = controller;
+        _releasedAnywhere = OnReleasedAnywhere;
         // no Background: a SwapChainPanel takes none (it is hit-tested over its whole area anyway)
         IsTabStop = true;
         AllowDrop = true;
@@ -110,6 +114,9 @@ public sealed partial class StageView : SwapChainPanel
             root.Changed += OnRootChanged;
             _visible = root.IsHostVisible;
             TakeKeys(FocusManager.GetFocusedElement(root));   // the sidebar item that brought this page up
+            _rootContent?.RemoveHandler(PointerReleasedEvent, _releasedAnywhere);
+            _rootContent = root.Content;
+            _rootContent?.AddHandler(PointerReleasedEvent, _releasedAnywhere, handledEventsToo: true);
         }
         FocusManager.GotFocus -= OnFocusMoved;   // once, though WinUI can load a view twice before unloading it
         FocusManager.GotFocus += OnFocusMoved;
@@ -129,11 +136,22 @@ public sealed partial class StageView : SwapChainPanel
         });
     }
 
+    // a click on a button or on an empty part of the page leaves the keys there, where nothing uses them; on the Mac
+    // those never take them from the stage. After the release: taken away during the press, a button loses its click.
+    void OnReleasedAnywhere(object sender, PointerRoutedEventArgs e) =>
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!_loaded || XamlRoot is not { } root || VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Count > 0) return;   // a menu or sheet keeps them
+            if (FocusManager.GetFocusedElement(root) is Control { FocusState: FocusState.Pointer } and (ButtonBase or ScrollViewer)) FocusForKeys();
+        });
+
     void OnUnloaded(object sender, RoutedEventArgs e)
     {
         if (IsLoaded) return;   // moved to another parent (WinUI can send the new Loaded before the old Unloaded)
         _loaded = false;
         FocusManager.GotFocus -= OnFocusMoved;
+        _rootContent?.RemoveHandler(PointerReleasedEvent, _releasedAnywhere);
+        _rootContent = null;
         if (XamlRoot is { } root) root.Changed -= OnRootChanged;
         StopLoop();
         if (_controller.View == this) _controller.View = null;
@@ -333,6 +351,7 @@ public sealed partial class StageView : SwapChainPanel
     void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         _renderer?.Wake();
+        e.Handled = true;   // ours, like the release
         var pt = e.GetCurrentPoint(this);
         _last = pt.Position;
         Focus(FocusState.Pointer);
@@ -376,6 +395,7 @@ public sealed partial class StageView : SwapChainPanel
 
     void OnPointerReleased(object sender, PointerRoutedEventArgs e)
     {
+        e.Handled = true;   // left to bubble, the window's root ScrollViewer takes the keys away from the stage
         var props = e.GetCurrentPoint(this).Properties;
         if (props.IsLeftButtonPressed || props.IsRightButtonPressed || props.IsMiddleButtonPressed) return;   // another button still down
         EndPointer();

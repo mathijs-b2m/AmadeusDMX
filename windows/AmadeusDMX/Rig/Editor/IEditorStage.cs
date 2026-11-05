@@ -165,6 +165,7 @@ public sealed class PlaceholderStage : IEditorStage
     void Pressed(object sender, PointerRoutedEventArgs e)
     {
         _host.Focus(FocusState.Pointer);
+        e.Handled = true;   // ours, like the release
         var pt = e.GetCurrentPoint(_canvas);
         _last = pt.Position;
         if (pt.Properties.IsRightButtonPressed || pt.Properties.IsMiddleButtonPressed)
@@ -179,7 +180,6 @@ public sealed class PlaceholderStage : IEditorStage
             {
                 _host.CapturePointer(e.Pointer);
                 _dragging = true;
-                e.Handled = true;
                 return;
             }
             editor.ClickedEmpty();
@@ -213,7 +213,9 @@ public sealed class PlaceholderStage : IEditorStage
     {
         if (_dragging) { _dragging = false; Editor?.EndDrag(); }
         _panning = false;
-        if (e is not null) _host.ReleasePointerCapture(e.Pointer);
+        if (e is null) return;
+        e.Handled = true;   // left to bubble, the window's root ScrollViewer takes the keys away from the stage
+        _host.ReleasePointerCapture(e.Pointer);
     }
 
     void Wheel(object sender, PointerRoutedEventArgs e)
