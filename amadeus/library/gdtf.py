@@ -120,6 +120,7 @@ class _Channel:
                     "wheel": wheels.get(cf.get("Wheel", ""), []),
                     "sets": sets,
                     "phys": (float(cf.get("PhysicalFrom") or 0), float(cf.get("PhysicalTo") or 1)),
+                    "fade": float(cf.get("RealFade") or 0),  # seconds from the function's first value to its last
                 }
                 self.functions.append(f)
                 if self.default is None and cf.get("Default") and initial.endswith(f".{f['name']}"):
@@ -194,7 +195,8 @@ def _classify(ch: _Channel, byte: int) -> dict:
             if not OPEN_WORDS.search(s["name"]):
                 out.append({"name": s["name"].lower() or "colour", "from": lo, "to": hi, "rgb": s["rgb"]})
         if len(out) > 1:
-            return {"attr": "color_wheel", "_slots": out}
+            fade = f["fade"] / (len(out) - 1) if f["fade"] > 0 and len(out) > 1 else 0.0
+            return {"attr": "color_wheel", "_slots": out, **({"_slot_s": round(fade, 3)} if fade else {})}
     if a == "Gobo1":
         f = ch.functions[0]
         slots = _slot_sets(f)
@@ -304,7 +306,7 @@ def convert(src: str | Path | bytes, name: str = "") -> dict:
         "physical": {"pan_deg": 540, "tilt_deg": 270, **_physical(ft)},
         "modes": {},
     }
-    wheel_slots, beam_fx, gobo_names = None, {"open": {}}, None
+    wheel_slots, wheel_slot_s, beam_fx, gobo_names = None, None, {"open": {}}, None
     for mode in ft.iter("DMXMode"):
         inst = _instances(geometries, mode.get("Geometry", "")) if geometries is not None else {}
         heads = [n for refs in inst.values() for _, n in refs]
@@ -342,6 +344,7 @@ def convert(src: str | Path | bytes, name: str = "") -> dict:
                     spec = fxlib.smoke_channel(name_, ch.ranges(), have) or spec
             if spec.get("_slots"):
                 wheel_slots = wheel_slots or spec["_slots"]
+                wheel_slot_s = wheel_slot_s or spec.get("_slot_s")
             if spec["attr"] == "gobo":
                 if spec.get("_gobos"):
                     beam_fx["gobo"] = {"gobo": spec["_gobos"]}
@@ -370,6 +373,8 @@ def convert(src: str | Path | bytes, name: str = "") -> dict:
         return out
     if wheel_slots:
         out["color_wheel"] = {"verified": True, "_note": "Slot colours from the GDTF file.", "slots": wheel_slots}
+        if wheel_slot_s:
+            out["color_wheel"]["slot_s"] = wheel_slot_s  # the wheel's real speed (wheels.py)
     if len(beam_fx) > 1:
         out["beam_fx"] = beam_fx
     if gobo_names:

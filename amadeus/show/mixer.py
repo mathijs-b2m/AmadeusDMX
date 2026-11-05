@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from amadeus.engine import NUMERIC, State
+from amadeus.engine.wheels import wheel_fixtures
 
 DOMINANCE_MARGIN = 1.2  # the heads switch decks only when the other deck is clearly louder
 HEAD_FIELDS = ("pan", "tilt", "dmx_pan", "dmx_tilt", "fx", "gobo", "fx_speed", "fx_reverse", "zoom", "strobe")
@@ -27,6 +28,7 @@ class Mixer:
     def __init__(self, rig: dict):
         self.heads = [e["id"] for e in rig["elements"] if e["kind"] == "head"]
         self.lasers = [e["id"] for e in rig["elements"] if e["kind"] == "laser"]
+        self.wheels = list(wheel_fixtures(rig))  # a wheel has no colours in between: it stays with one deck
         self.dominant: int | None = None  # the deck the heads follow
 
     def mix(self, parts: list[tuple]) -> tuple[dict[str, State], tuple]:
@@ -36,7 +38,7 @@ class Mixer:
         dom = cur if cur and loudest[0] < cur[0] * DOMINANCE_MARGIN else loudest
         self.dominant = dom[2].deck
         states = blend([(w, st) for w, st, *_ in parts])
-        for ids, fields in ((self.heads, HEAD_FIELDS), (self.lasers, LASER_FIELDS)):
+        for ids, fields in ((self.heads, HEAD_FIELDS), (self.lasers, LASER_FIELDS), (self.wheels, ("r", "g", "b"))):
             for eid in ids:
                 src = dom[1][eid]
                 for f in fields:

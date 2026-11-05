@@ -119,6 +119,7 @@ def build(rig: dict, bpm: float, duration: float, style_genre: str = "", real_ou
     )
     plan = direct(a, d, verbose=False)
     engine = Engine(a, plan, rig, real_output=real_output, fog_carry=True)
+    engine.wheel_gaps = False  # never dark: its wheels wait for a gap of the groove's own
     return a, plan, engine, NAME
 
 

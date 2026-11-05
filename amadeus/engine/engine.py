@@ -1,7 +1,8 @@
 """Scene engine: turns (time, decisions, analysis) into fixture states and DMX.
 
 The engine is stateless with respect to time: `render(t)` only reads
-precomputed arrays, so seeking and real-time playback behave identically.
+precomputed arrays, so seeking and real-time playback behave identically
+(but for the colour wheels, whose plan is made a few seconds ahead: `wheels`).
 All white flashes and strobe hits go through one precomputed, rate-limited
 flash timeline (see `safety.max_flash_hz`).
 
@@ -29,6 +30,7 @@ from amadeus.engine.rings import RingsMixin
 from amadeus.engine.rolls import RollsMixin
 from amadeus.engine.state import State
 from amadeus.engine.timing import TimingMixin, _ease, note_env, pick_stabs
+from amadeus.engine.wheels import WheelsMixin
 from amadeus.engine.zoom import ZoomMixin
 from amadeus.library import fixtures as fxlib
 from amadeus.library import gobos
@@ -58,6 +60,7 @@ class Engine(
     FogMixin,
     RollsMixin,
     ZoomMixin,
+    WheelsMixin,
 ):
     def __init__(
         self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False, fog_carry: bool = False
@@ -144,6 +147,7 @@ class Engine(
         self._init_lasers(rig, fixtures)
         self._init_fog(rig, fixtures)
         self._init_zoom(rig, fixtures)  # (before the cinematic program: it plays the washes' zoom too)
+        self._init_wheels(rig)
         # synth/melody notes for the lasers to play: from the separated synth instrument when available
         if analysis.synth_notes is not None and len(analysis.synth_notes[0]):
             self.syn_t, self.syn_s, self.syn_p = (np.asarray(x, float) for x in analysis.synth_notes)
@@ -210,9 +214,15 @@ class Engine(
     # ------------------------------------------------------------ public
 
     def render(self, t: float) -> tuple[int, dict[str, State]]:
+        i, states = self._look(t)
+        self._wheels_play(t, states)
+        return i, states
+
+    def _look(self, t: float, peek: bool = False) -> tuple[int, dict[str, State]]:
+        """The look at time t, as the show wants it. `peek`: only to see what's coming (wheels.py), not played."""
         i, d = self.decision_at(t)
         if self.program:
-            return i, self._finish(self._cinematic_scene(t), t)
+            return i, self._finish(self._cinematic_scene(t), t, peek)
         states = self._scene(d, t)
         big = self.drop_strength is None or self.drop_strength >= DROP_DARK_FROM  # (small drops: no moving in black)
         ahead = self._drop_ahead(i, t) if big else None
@@ -226,11 +236,11 @@ class Engine(
         if i > 0 and t - d.start < XFADE and i not in self.drop_idx and not self._led_in(i):  # drops: a hard cut
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
-            states = {fid: prev[fid].blend(s, k) for fid, s in states.items()}
+            states = self._wheel_colours({fid: prev[fid].blend(s, k) for fid, s in states.items()}, states)
         self._roll(t, states, skip={e["id"] for e in self.heads} if ahead is not None else frozenset())
         self._kick_return(t, states)
         self._drop_moment(t, states)
-        return i, self._finish(states, t)
+        return i, self._finish(states, t, peek)
 
     def _pickup_of(self, i: int):
         """Phrase i's anacrusis (it starts before its downbeat), if it has one the lights act on: not into a
@@ -256,7 +266,7 @@ class Engine(
         if p.pickup_kind == "early":
             ahead = self._scene(nxt, t)
             k = PICKUP_LEAD * _ease(progress)
-            return {fid: s.blend(ahead[fid], k) for fid, s in states.items()}
+            return self._wheel_colours({fid: s.blend(ahead[fid], k) for fid, s in states.items()}, states)
         hits = self.fill_t[(self.fill_t >= p.pickup_start - 0.02) & (self.fill_t <= t)]
         if not len(hits):
             return states
@@ -284,7 +294,7 @@ class Engine(
                 f"  ⚠ {', '.join(risky)}: risk group 2/3, stays dark with real lights in this alpha version", flush=True
             )
 
-    def _finish(self, states: dict[str, State], t: float) -> dict[str, State]:
+    def _finish(self, states: dict[str, State], t: float, peek: bool = False) -> dict[str, State]:
         """What every look gets last: the heads' real and target positions, dark while crossing the eye band,
         colours the wheels can make, the smoke machines, and the laser guard."""
         self._fog(states, t)
@@ -314,7 +324,7 @@ class Engine(
             slot = fxlib.nearest_slot(defn, (s.r, s.g, s.b))
             s.r, s.g, s.b = slot["rgb"]
             s.dimmer, s.white = max(s.dimmer, s.white), 0.0
-        if self.lasers:  # the very last word: nothing after this may light a laser again
+        if self.lasers and not peek:  # the very last word: nothing after this may light a laser again
             self._laser_guard(states, t)
         return states
 
