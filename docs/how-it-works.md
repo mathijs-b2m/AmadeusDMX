@@ -129,18 +129,22 @@ meanwhile); for a track on its own with **Start › Play a Track as Lightshow…
 on the now-playing card while it plays (the track starts again where it was); from the command line with
 `--director lightshow`. It is the cinematic program, hit by hit, turned all the way up:
 
-- **every light plays**: the rig is played in families, one per fixture model however many trusses it hangs
-  on (all the PARs, all the Auras…), each in a few blocks left to right for its chases. Every family plays an
+- **every light gets its turn**: the rig is played in families, one per fixture model however many trusses it
+  hangs on (all the PARs, all the Auras…), each in a few blocks left to right for its chases; a rig of one or two
+  models splits them into interleaved halves or thirds, so it has groups to vary too. Every family plays an
   instrument of the music (booms, cymbals, stabs, ticks); with more families than instruments, an instrument
   gets several, and they play it together when the music is loud;
-- **a build-up**: one family starts with every hit, and every loud phrase brings a third of the rig in, so the
-  whole rig plays from the third loud phrase on. A quiet part takes families away, the next loud part brings
-  them back at once. The colours warm up as it builds (cool, warm, fire), and the heads change picture at the
-  phrases, then every two bars, with the whole rig in every bar;
-- **flashing**: hits are short and hard, at full level. Strong hits are played by every family at once, white,
-  with the strobes; once the whole rig plays, the strobes also hit every kick and snare. Snare rolls into the
-  drops flash on their hits, the impacts hit the whole rig, the strobes and the lasers. A busy family's hit is
-  played by another, and the families that play glow between the hits (dark in silences);
+- **a build-up**: one family starts with every hit, and every loud phrase brings a third of the rig in. A quiet
+  part takes families away. The colours warm up as it builds (cool, warm, fire), and the heads change picture at
+  the phrases, then every two bars, at a climax every bar;
+- **layers and turns**: every four bars the line-up changes. A phrase starts with half of the families it may
+  use and adds a layer each time; when it can't add any, another part of the families takes over and some stay.
+  The whole rig plays only at the climaxes: a drop hits with all of it, thins out and builds back to it;
+- **flashing**: hits are short and hard, at full level. Strong hits are played by every family of the line-up at
+  once, white, with the strobes; while the whole rig plays, the strobes also hit every kick and snare. Snare
+  rolls into the drops flash on their hits. The impacts hit the strobes, the lasers and the line-up, and the whole
+  rig when it plays or a phrase starts on them. A busy family's hit is played by another. The line-up glows
+  between the hits (dark in silences), in a quiet phrase only one family of it; the rest of the rig stays dark;
 - **heads in pictures that fit the room**: every picture is checked from where each head hangs, with the drift
   around it. A head the ceiling or the back-wall guard would have to bend, or that would light the ceiling
   nearby, takes a picture that works from its place (down onto the floor ahead), and a picture most heads

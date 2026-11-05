@@ -1,5 +1,6 @@
-"""The lightshow program: switched on by hand, it builds up layer by layer, every voice keeps its own section,
-it is brighter than the cinematic program, and the no-flicker rules still hold."""
+"""The lightshow program: switched on by hand, it builds up layer by layer, the groups take turns and the whole
+rig is kept for the climaxes, every voice keeps its own section, it is brighter than the cinematic program, and
+the no-flicker rules still hold."""
 
 from pathlib import Path
 
@@ -53,7 +54,8 @@ def test_the_layers_build_up_one_by_one():
     assert max(got) > 1
     r = D.ranks(a)
     for k, rank in zip(got, r):
-        assert k <= max(1, 1 + round(rank / D.FULL_FROM * (n - 1)))  # a quiet part thins out
+        assert k <= max(1, 1 + round(rank / D.CLIMAX * (n - 1)))  # a quiet part thins out
+        assert k < n or rank >= D.CLIMAX  # the whole rig is kept for the climaxes
 
 
 def test_the_build_reaches_everything_at_a_long_climax():
@@ -62,6 +64,73 @@ def test_the_build_reaches_everything_at_a_long_climax():
     a.phrases = [a.phrases[0].__class__(**{**a.phrases[0].__dict__, "loudness_pct": v}) for v in loud]
     got = D.layers(a, 5)
     assert got[-1] == 5 and got[0] == 1
+
+
+def test_a_phrase_starts_with_half_and_adds_layers():
+    assert D.passages(6, 4, climax=False, opens=False) == [3, 4, 5, 6]
+    assert D.passages(1, 3, climax=False, opens=False) == [1, 1, 1]
+    assert D.passages(5, 1, climax=False, opens=False) == [3]
+    assert D.passages(6, 1, climax=True, opens=False) == [6]
+    assert D.passages(6, 4, climax=True, opens=True) == [6, 4, 5, 6]  # a drop hits with everything, then thins out
+
+
+def varied(a, rig):
+    return Engine(a, direct(a, LightshowDirector(), verbose=False), rig, real_output=False)
+
+
+@pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
+def test_the_groups_take_turns(path):
+    a = rock()
+    e = varied(a, load_rig(path))
+    if len(e.cine_sections) < 2:
+        pytest.skip("nothing to vary")
+    lineups = [frozenset(s["active"]) for s in e.ls_scores]
+    assert len(set(lineups)) >= 3
+    ts = np.arange(0, a.duration, 0.25)
+    full = np.mean([e._score_at(float(t), e.decision_at(float(t))[0])["full"] for t in ts])
+    assert 0 < full < 0.5  # the whole rig at the climaxes only
+
+
+def test_a_layer_adds_to_the_line_up_and_a_turn_keeps_some_of_it(show):
+    _, _, e = show
+    scores = e.ls_scores
+    layered = turned = 0
+    for x, y in zip(scores, scores[1:]):
+        a_, b_ = set(x["active"]), set(y["active"])
+        if len(b_) > len(a_) and x["build"] == y["build"]:
+            assert a_ < b_  # (within a phrase) nobody leaves when a layer joins
+            layered += 1
+        elif a_ != b_ and len(a_) > 1 and len(b_) > 1:
+            assert a_ & b_  # some stay, the others take over
+            turned += 1
+    assert layered and turned
+
+
+def test_who_is_not_in_the_line_up_stays_dark(show):
+    a, _, e = show
+    impacts = a.hits.t[a.hits.impact]
+    for q, score in enumerate(e.ls_scores[:-1]):
+        if score["full"]:
+            continue
+        t = e.ls_times[q + 1] - 0.1  # (the glow of the line-up before has long gone)
+        if e.ls_times[q + 1] - e.ls_times[q] < 3 or (len(impacts) and np.min(np.abs(impacts - t)) < 1.5):
+            continue
+        states = e.render(float(t))[1]
+        for si, sec in enumerate(e.cine_sections):
+            if si not in score["active"]:
+                assert all(states[eid].dimmer < 0.05 for u in sec["units"] for eid in u), sec["name"]
+
+
+def test_a_rig_of_one_model_gets_groups_to_vary():
+    rig = load_rig("tests/sets/concert60.json")
+    e = varied(rock(), rig)
+    assert len(e.cine_sections) == 3
+    ids = [eid for s in e.cine_sections for u in s["units"] for eid in u]
+    assert len(ids) == len(set(ids)) == sum(el["kind"] == "head" for el in rig["elements"])  # every light, once
+    spans = [
+        [el["x"] for el in rig["elements"] if el["id"] in {i for u in s["units"] for i in u}] for s in e.cine_sections
+    ]
+    assert all(np.ptp(x) > 0.5 * np.ptp(sum(spans, [])) for x in spans)  # each group across the whole rig
 
 
 @pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)

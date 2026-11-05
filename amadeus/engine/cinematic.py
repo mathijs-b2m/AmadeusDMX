@@ -531,7 +531,8 @@ class CinematicMixin:
     def _cinematic_scene(self, t: float) -> dict[str, State]:
         i, d = self.decision_at(t)
         cols = self._colours(d)
-        score = self.cine_score[min(i, len(self.cine_score) - 1)]
+        score = self._score_at(t, i)
+        floor = self._floor_now(score)
         before_impact = len(self.cine_moves) and self._pre_move(t)
         room = self._at(self.cine_room, t)
         glow = self._at(self.cine_lowglow, t)
@@ -556,7 +557,7 @@ class CinematicMixin:
             power = self.cine_power.get(eid, 0.0)
             duck = 1 - self.duck_depth * power * room  # the powerful lights step down for the small ones' accents
             dim, col = 0.0, cols[0]
-            if eid in self.cine_floor and glow > 0:  # the lows glow on the floor
+            if eid in floor and glow > 0:  # the lows glow on the floor
                 dim = glow * duck
             if eid in layer:
                 v, c = layer[eid]
@@ -584,6 +585,12 @@ class CinematicMixin:
                 s.fx, s.lcolor, s.size, s.phase = ("fan" if s.dimmer > 0.05 else "off"), "base", 0.8, -1.0
             out[eid] = s
         return out
+
+    def _score_at(self, t: float, i: int) -> dict:
+        return self.cine_score[min(i, len(self.cine_score) - 1)]
+
+    def _floor_now(self, score: dict) -> set:
+        return self.cine_floor
 
     def _pre_move(self, t: float) -> bool:
         q = bisect.bisect_right(self.cine_moves, t)

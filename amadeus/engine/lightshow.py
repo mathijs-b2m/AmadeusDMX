@@ -2,19 +2,24 @@
 Track as Lightshow, `--director lightshow`). It is the cinematic program (amadeus/engine/cinematic.py: every
 hit at its exact time, played by its own fixtures), turned all the way up:
 
-- **every light plays**: the rig is played in **families**, one per fixture model however many trusses it
-  hangs on (all the PARs, all the Auras…), each split into a few blocks left to right for its gestures. Every
-  family gets an instrument of the music (booms on the floor lights and blinders, cymbals on the beams…; with
-  more families than instruments, an instrument gets several, and they play it together);
+- **every light gets its turn**: the rig is played in **families**, one per fixture model however many trusses
+  it hangs on (all the PARs, all the Auras…), each split into a few blocks left to right for its gestures; a rig
+  of one or two models splits them into interleaved halves or thirds, so it has groups to vary too. Every family
+  gets an instrument of the music (booms on the floor lights and blinders, cymbals on the beams…; with more
+  families than instruments, an instrument gets several, and they play it together);
 - **a build-up**: one family starts with every hit, and every loud phrase brings the next one in
-  (amadeus/director/lightshow.py, `layers`); at full volume the whole rig plays. A quiet part takes families
-  away, the next loud part brings them back at once. An instrument whose family hasn't joined yet is played by
-  one that has. The whole rig plays from the third loud phrase on;
+  (amadeus/director/lightshow.py, `layers`). A quiet part takes families away. An instrument whose family isn't
+  playing is played by one that is;
+- **layers and turns**: a phrase is played in **passages** of a few bars with a line-up of their own. It starts
+  with half of the families it may use and adds a layer per passage; when it can't add any, another part of
+  the families takes over, keeping some of the ones before. The whole rig plays only at the climaxes: a drop
+  hits with all of it, thins out and builds back to it;
 - **flashing**: hits are short and hard (hit, a short hold, a quick release), at full level. Strong hits are
-  played by every family at once, white, with the strobes, and once the whole rig plays the strobes hit every
-  kick and snare as well; the snare rolls into the drops flash on their hits,
-  and the impacts hit the whole rig, the strobes and the lasers. A busy family's hit goes to another family
-  instead of being left out, and the families that play glow between the hits (ramped, and dark in silences);
+  played by every family of the line-up at once, white, with the strobes, and while the whole rig plays the
+  strobes hit every kick and snare as well; the snare rolls into the drops flash on their hits. The impacts hit
+  the strobes, the lasers and the line-up, and the whole rig when it plays or a phrase starts on them. A busy
+  family's hit goes to another family instead of being left out. The line-up glows between the hits (ramped,
+  and dark in silences), in a quiet phrase only one family of it; whoever isn't in the line-up stays dark;
 - **heads in pictures that fit the room**: the heads change picture at the phrases and, as it builds, every
   two bars, then every bar. Every picture is checked from where each head hangs: a head the ceiling or the
   back-wall guard would have to bend takes a picture that works from its place, and a picture most heads
@@ -31,7 +36,7 @@ import math
 
 import numpy as np
 
-from amadeus.director.lightshow import NAME, layers, ranks
+from amadeus.director.lightshow import CLIMAX, NAME, layers, passages, ranks
 from amadeus.engine.cinematic import (
     BEAM_DEG,
     BIG_HIT,
@@ -49,16 +54,18 @@ from amadeus.rig import geometry
 
 LEVELS = (0.7, 0.85, 1.0)  # a hit goes straight to one of these
 BLOCKS = 8  # a family is played in at most this many blocks, left to right
+MIN_FAMILIES = 3  # a rig of fewer models than this splits them, interleaved: three groups to vary at least
+PASSAGE_BARS = 4  # the line-up changes every this many bars
+OPENS_S = 1.0  # an impact this close to a phrase's start hits the whole rig, whatever the line-up
 MOTIF_GAP_S = 0.5  # a pause this long ends a motif; the next one answers
 TOGETHER_FROM = 0.5  # from this loud a phrase (its rank) an instrument's families play every hit together
 STRONG = 0.7  # hits this strong are played by every family that plays, white, with the strobes
 SPECIALS_FROM = 0.34  # the build this far: the strobes on the strong hits, impacts on the whole rig, lasers…
-DRUMS_FROM = 0.99  # …and with the whole rig in, the strobes on every kick and snare too (within max_flash_hz)
-DRUM_HIT = 0.35  # (the drums' hits at least this strong)
+DRUM_HIT = 0.35  # …and while the whole rig plays, the strobes on every kick and snare this strong too
 HOLD_S = (0.12, 0.45)  # a hit is held for half the time until its instrument plays again, within this…
 RELEASE_S = 0.2  # …and let go this fast (the booms: twice as slow)
 FAST_HZ = 10.0  # with allow_fast_strobe, a fixture may be hit this often
-BED = (0.15, 0.45)  # the glow between hits: at the start of the build, and with every family in
+BED = (0.15, 0.45)  # the glow between hits: at the start of the build, and at its top
 BED_RAMP_S = 0.6
 BED_QUIET = 0.25  # the bars quieter than this (breath) let the glow go: silences stay dark
 MOVE_BARS = ((0.99, 1), (0.5, 2))  # the build this far: the heads change pictures every this many bars
@@ -100,7 +107,8 @@ class LightshowMixin(CinematicMixin):
     # ---------------------------------------------------------------- the families
 
     def _cine_sections(self, rig: dict) -> list[dict]:
-        """One family per fixture model, its fixtures in a few blocks left to right (each block a unit)."""
+        """One family per fixture model, its fixtures in a few blocks left to right (each block a unit). With
+        fewer models than MIN_FAMILIES, a model is split into interleaved families, each across the whole rig."""
         if self.program != NAME:
             return super()._cine_sections(rig)
         by_fixture: dict[str, list[dict]] = {}
@@ -112,8 +120,13 @@ class LightshowMixin(CinematicMixin):
             if f["id"] in by_fixture:
                 models.setdefault(f["fixture"], []).append(f)
         sections = []
+        split = math.ceil(MIN_FAMILIES / max(len(models), 1))
+        groups = []
         for model, fs in models.items():
             fs = sorted(fs, key=lambda f: np.mean([e["x"] for e in by_fixture[f["id"]]]))
+            parts = min(split, len(fs))
+            groups += [(model, fs[p::parts]) for p in range(parts)]
+        for model, fs in groups:
             blocks = np.array_split(np.arange(len(fs)), min(BLOCKS, len(fs)))
             units = [
                 [e["id"] for k in b for e in sorted(by_fixture[fs[k]["id"]], key=lambda e: e["x"])] for b in blocks
@@ -160,13 +173,17 @@ class LightshowMixin(CinematicMixin):
         self.ls_layers = layers(self.a, n)
 
     def _orchestrate(self, i: int) -> dict:
+        """Phrase i's score with every family it may use; `_ls_passages` plays it in line-ups of those."""
         if self.program != NAME:
             return super()._orchestrate(i)
         if not hasattr(self, "ls_order"):
             self._ls_seats()
+        k = self.ls_layers[min(i, len(self.ls_layers) - 1)] if self.ls_layers else len(self.cine_sections)
+        return self._ls_score(i, self.ls_order[:k], k)
+
+    def _ls_score(self, i: int, active: list[int], top: int) -> dict:
+        """The score of a line-up in phrase i, `top` families being what the phrase may use."""
         n = len(self.cine_sections)
-        k = self.ls_layers[min(i, len(self.ls_layers) - 1)] if self.ls_layers else n
-        active = self.ls_order[:k]
         rank = float(self.ls_ranks[min(i, len(self.ls_ranks) - 1)]) if len(self.ls_ranks) else 0.5
         secs = self.cine_sections
         parts: dict[str, list[tuple[int, str]]] = {}
@@ -178,8 +195,48 @@ class LightshowMixin(CinematicMixin):
         melody = max(active, key=lambda s: self._suits(secs[s], "melody"), default=None)
         pads = sorted((s for s in active if s != melody), key=lambda s: -self._suits(secs[s], "pad"))
         return {"parts": parts, "small": [s for s in active if not secs[s]["big"]], "melody": melody,
-                "pad": pads[0] if pads else None, "rank": rank, "active": active,
-                "build": (k - 1) / (n - 1) if n > 1 else 1.0}  # fmt: skip
+                "pad": pads[0] if pads else None, "rank": rank, "active": active, "full": len(active) >= n,
+                "build": (top - 1) / (n - 1) if n > 1 else 1.0}  # fmt: skip
+
+    def _ls_passages(self):
+        """The line-ups: every PASSAGE_BARS bars of a phrase a score of its own. A passage with more families
+        than the one before it in the phrase keeps those and adds to them (a layer); otherwise the line-up moves
+        on through the families that have joined, by half of itself: some stay, the others take over."""
+        bars = np.asarray(self.downbeat_times, float)
+        self.ls_times: list[float] = []
+        self.ls_scores: list[dict] = []
+        joined = turn = before = 0
+        for i, d in enumerate(self.plan):
+            phrase = self.cine_score[min(i, len(self.cine_score) - 1)]
+            top = len(phrase["active"])
+            joined = max(joined, top)
+            pool = self.ls_order[:joined]
+            inside = bars[(bars > d.start + 1e-3) & (bars < d.end)]
+            starts = [d.start, *(float(b) for b in inside[PASSAGE_BARS - 1 :: PASSAGE_BARS])]
+            climax = phrase["rank"] >= CLIMAX
+            opens = climax and d.section == "drop" and (i == 0 or self.plan[i - 1].section != "drop")
+            for j, (t, k) in enumerate(zip(starts, passages(top, len(starts), climax, opens))):
+                if not pool:
+                    self.ls_times.append(t)
+                    self.ls_scores.append(phrase)
+                    continue
+                if not (j and k > before):
+                    turn += max(1, k // 2)
+                before = k
+                self.ls_times.append(t)
+                self.ls_scores.append(self._ls_score(i, [pool[(turn + q) % len(pool)] for q in range(k)], top))
+
+    def _score_at(self, t: float, i: int) -> dict:
+        if self.program != NAME:
+            return super()._score_at(t, i)
+        return self.ls_scores[max(bisect.bisect_right(self.ls_times, t) - 1, 0)]
+
+    def _floor_now(self, score: dict) -> set:
+        """The low glow: only on the floor lights of the line-up."""
+        if self.program != NAME:
+            return super()._floor_now(score)
+        playing = {eid for si in score["active"] for u in self.cine_sections[si]["units"] for eid in u}
+        return self.cine_floor & playing
 
     # ---------------------------------------------------------------- the hits
 
@@ -187,6 +244,7 @@ class LightshowMixin(CinematicMixin):
         """Every hit → which blocks flash, how bright, in what colour (see the module's description)."""
         if self.program != NAME:
             return super()._cine_events()
+        self._ls_passages()
         h = self.cine_hits
         events: dict[str, list[tuple]] = {}
         last_hit: dict[str, float] = {}
@@ -224,10 +282,11 @@ class LightshowMixin(CinematicMixin):
             t, s, voice = float(h.t[k]), float(h.strength[k]), int(h.voice[k])
             i, d = self.decision_at(t)
             cols = self._colours(d)
-            score = self.cine_score[min(i, len(self.cine_score) - 1)]
+            score = self._score_at(t, i)
             specials = score["build"] >= SPECIALS_FROM
             if h.impact[k]:
-                pool = range(len(members)) if specials else score["active"]
+                whole = specials and (score["full"] or t - d.start < OPENS_S)
+                pool = range(len(members)) if whole else score["active"]
                 ids = [eid for si in pool for eid in members[si] if free([eid], t)]
                 play(ids, t, 1.0, 0.25, 0.5, WHITE if specials else cols[2 % len(cols)], impact=True)
                 if specials:
@@ -246,7 +305,7 @@ class LightshowMixin(CinematicMixin):
             if t - last > MOTIF_GAP_S:
                 m, step = m + 1, 0
             motif[role] = [t, m, step + 1]
-            if score["build"] >= DRUMS_FROM and role in ("low", "mid") and s >= DRUM_HIT:
+            if score["full"] and role in ("low", "mid") and s >= DRUM_HIT:
                 strobe(t)  # the whole rig in: the strobes play the drums
             sounds = max(float(h.decay[k]), float(next_same[k]))
             hold = float(np.clip(0.5 * sounds, *HOLD_S))
@@ -354,7 +413,8 @@ class LightshowMixin(CinematicMixin):
     # ---------------------------------------------------------------- the glow between the hits
 
     def _ls_bed(self):
-        """Per family, its glow over time: while it plays, at the build's level, ramped in and out."""
+        """Per family, its glow over time: while it is in the line-up, at the build's level, ramped in and out.
+        In a quiet phrase only the family that holds the line-up together glows (its pad, or its melody alone)."""
         grid = self._grid()
         bars = np.interp(grid, np.arange(len(self.breath)) / self.a.fps, self.breath)
         gate = np.clip(bars / BED_QUIET, 0, 1)
@@ -362,10 +422,11 @@ class LightshowMixin(CinematicMixin):
         self.ls_beds = []
         for si in range(len(self.cine_sections)):
             want = np.zeros(len(grid))
-            for i, d in enumerate(self.plan):
-                score = self.cine_score[min(i, len(self.cine_score) - 1)]
-                if si in score["active"]:
-                    a, b = int(d.start * GRID_HZ), int(d.end * GRID_HZ)
+            for q, score in enumerate(self.ls_scores):
+                holds = score["melody"] if score["pad"] is None else score["pad"]
+                if si == holds or (si in score["active"] and score["rank"] >= TOGETHER_FROM):
+                    a = int(self.ls_times[q] * GRID_HZ)
+                    b = int(self.ls_times[q + 1] * GRID_HZ) if q + 1 < len(self.ls_times) else len(grid)
                     want[a:b] = BED[0] + (BED[1] - BED[0]) * score["build"]
             y, out = 0.0, np.zeros(len(grid))
             for k, v in enumerate(want):  # a slow ramp: never wobbling with the music
