@@ -53,5 +53,9 @@ public static class RigTemplates
     };
 
     /// A rig name still one of the templates' own (or empty) follows the template chosen; one typed stays.
-    public static bool IsDefaultName(string name) => name.Length == 0 || All.Any(t => name.StartsWith(t.RawValue(), StringComparison.Ordinal));
+    public static bool IsDefaultName(string name)
+    {
+        var bare = name.TrimEnd("0123456789".ToCharArray());  // "club2": the second club
+        return name.Length == 0 || All.Any(t => t.RawValue() == bare);
+    }
 }

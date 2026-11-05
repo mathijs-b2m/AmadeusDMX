@@ -150,6 +150,7 @@ public sealed class LiveFeed : Observable, IDisposable
                     message.Write(buffer, 0, r.Count);
                     if (message.Length > 16 << 20) return;  // nothing the engine sends is this big
                 } while (!r.EndOfMessage);
+                var first = !connected;
                 if (!connected)
                 {
                     connected = true;
@@ -161,6 +162,7 @@ public sealed class LiveFeed : Observable, IDisposable
                         _ui.Post(() => Hello = h);
                         break;
                     case FrameMessage { Frame: var f }:
+                        if (first) _ui.Post(() => Hello = null);  // the engine greets with its track: it has none, this is the last one's
                         var now = DateTime.UtcNow;
                         lock (_box) { _latest = f; _arrival = now; }
                         count++;

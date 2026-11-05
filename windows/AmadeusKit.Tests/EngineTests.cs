@@ -129,6 +129,42 @@ public class EngineTests
         http.Stop();
     }
 
+    [Fact]
+    public async Task AnEngineWithoutATrackClearsTheLastOne()
+    {
+        var port = FreePort();
+        using var http = new HttpListener();
+        http.Prefixes.Add($"http://127.0.0.1:{port}/");
+        http.Start();
+        var connections = 0;
+        var server = Task.Run(async () =>
+        {
+            while (http.IsListening)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await http.GetContextAsync(); } catch { return; }
+                var ws = (await ctx.AcceptWebSocketAsync(null)).WebSocket;
+                var withTrack = ++connections == 1;  // the first engine plays a track; the next waits for the DJ
+                if (withTrack)
+                    await ws.SendAsync(Encoding.UTF8.GetBytes("""{"type": "hello", "track": "Deck 1: song.mp3", "bpm": 126}"""), WebSocketMessageType.Text, true, default);
+                for (var i = 0; i < (withTrack ? 10 : 400) && ws.State == WebSocketState.Open; i++)
+                {
+                    try { await ws.SendAsync(Encoding.UTF8.GetBytes("""{"type": "frame", "lite": true, "t": 0, "phrase": 0, "decks": []}"""), WebSocketMessageType.Text, true, default); }
+                    catch (WebSocketException) { break; }
+                    await Task.Delay(25);
+                }
+                try { await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, null, default); }
+                catch (WebSocketException) { }
+            }
+        });
+        var feed = new LiveFeed(new Uri($"ws://127.0.0.1:{port}"));
+        feed.Start();
+        await Until(() => feed.Hello is not null, 10);
+        await Until(() => feed.Hello is null && connections >= 2, 15);
+        feed.Stop();
+        http.Stop();
+    }
+
     static int FreePort()
     {
         var l = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);

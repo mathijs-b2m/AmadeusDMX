@@ -76,10 +76,10 @@ public static class RigSketch
                 break;
             case RigTemplate.Ring:  // seen a little from below: a flat ellipse, the half circle a wider arc behind it
             {
-                double cx = w / 2, cy = h * 0.2, r = w * 0.36;
-                Point At(double deg) => new(cx + r * Math.Cos(deg * Math.PI / 180), cy + r * Math.Sin(deg * Math.PI / 180));
+                double cx = w / 2, cy = h * 0.24, r = w * 0.36, flat = h * 0.2;  // flat: it stays inside the sketch at any width
+                Point At(double deg) => new(cx + r * Math.Cos(deg * Math.PI / 180), cy + flat * Math.Sin(deg * Math.PI / 180));
                 var fig = new PathFigure { StartPoint = At(195), IsClosed = false };
-                fig.Segments.Add(new ArcSegment { Point = At(345), Size = new Size(r, r), SweepDirection = SweepDirection.Clockwise });
+                fig.Segments.Add(new ArcSegment { Point = At(345), Size = new Size(r, flat), SweepDirection = SweepDirection.Clockwise });
                 var geo = new PathGeometry();
                 geo.Figures.Add(fig);
                 c.Children.Add(new Microsoft.UI.Xaml.Shapes.Path { Data = geo, Stroke = truss, StrokeThickness = 3 });
@@ -147,7 +147,7 @@ public sealed class NewRigSheet(AppModel model)
 
     Border TemplateCard(RigTemplate t)
     {
-        var body = UI.VStack(6, RigSketch.Build(t), UI.Text(t.Title(), Font.Headline), UI.Text(t.Detail(), Font.Caption).Secondary().Wrap());
+        var body = UI.VStack(6, RigSketch.Build(t).Fill(), UI.Text(t.Title(), Font.Headline), UI.Text(t.Detail(), Font.Caption).Secondary().Wrap());
         body.Alignment = 0;
         var b = new Border
         {
@@ -162,7 +162,7 @@ public sealed class NewRigSheet(AppModel model)
 
     void Pick(RigTemplate t)
     {
-        var wasDefault = RigTemplates.All.Any(x => x.RawValue() == _name) || _name.Length == 0;
+        var wasDefault = RigTemplates.IsDefaultName(_name);
         _template = t;
         (_width, _height, _depth) = t.Size();
         _screen = t is RigTemplate.Club or RigTemplate.Stage or RigTemplate.Festival;
