@@ -3,9 +3,11 @@ lightshow`), for one song that should be a light show of its own (a demo, a head
 
 It plays like the cinematic program (amadeus/engine/lightshow.py: every hit by its own fixtures), but the story
 around the hits is a **build-up**: the track starts with one section of lights playing everything, and with
-every phrase that has the music for it a third of the rig joins with instruments of their own, until the whole
-rig plays together (from the third loud phrase on). A quiet part afterwards takes layers away again (a
-breakdown), the next loud part brings them all back at once. The colours warm up with the layers: cool, warm, then fire.
+every phrase that has the music for it a third of the rig joins with instruments of their own. The whole rig
+is kept for the climaxes: below them a phrase plays part of the rig, starting with half of what it may use and
+adding a layer every few bars (`passages`); the engine changes which sections those are, so the groups take
+turns. A quiet part afterwards takes layers away again (a breakdown). The colours warm up with the layers: cool,
+warm, then fire.
 """
 
 from __future__ import annotations
@@ -20,8 +22,8 @@ from amadeus.director.decision import Decision
 NAME = "lightshow"
 JOINS_FROM = 0.3  # a phrase at least this loud (its rank in the track) brings more sections in…
 JOIN_SHARE = 1 / 3  # …this share of the rig at a time: the whole rig plays from the third loud phrase
-FULL_FROM = 0.4  # a phrase this loud wants every section (a quieter one fewer, the quietest one)
-CLIMAX = 0.75  # a phrase this loud is the climax
+CLIMAX = 0.75  # a phrase this loud is the climax: only here the whole rig plays (a quieter one fewer, the quietest one)
+START_SHARE = 0.5  # a phrase starts with this share of the sections it may use, and adds layers up to all of them
 
 
 def ranks(a: Analysis) -> np.ndarray:
@@ -31,18 +33,30 @@ def ranks(a: Analysis) -> np.ndarray:
 
 
 def layers(a: Analysis, n: int) -> list[int]:
-    """Per phrase, how many of the rig's `n` sections play (1..n): never more than the music's loudness asks for
-    (a quiet part thins out; from FULL_FROM on, all), and a phrase loud enough brings at most a third of the rig
-    that hasn't played yet (the build-up: the whole rig by the third loud phrase). After a breakdown the ones
-    that played before come back at once."""
+    """Per phrase, how many of the rig's `n` sections it may use (1..n): never more than the music's loudness asks
+    for (a quiet part thins out; all of them only at a climax), and a phrase loud enough brings at most a third of
+    the rig that hasn't played yet (the build-up). After a breakdown the ones that played before come back at once."""
     if n <= 0:
         return [0] * len(a.phrases)
     out, top = [], 1
     for r in ranks(a):
-        wants = n if r >= FULL_FROM else 1 + int(round(r / FULL_FROM * (n - 1)))
+        wants = n if r >= CLIMAX else min(max(n - 1, 1), 1 + int(round(r / CLIMAX * (n - 1))))
         k = max(1, min(wants, top + math.ceil(n * JOIN_SHARE) if r >= JOINS_FROM else top))
         top = max(top, k)
         out.append(k)
+    return out
+
+
+def passages(top: int, m: int, climax: bool, opens: bool) -> list[int]:
+    """How many sections play in each of a phrase's `m` passages, `top` being what it may use: it starts with half
+    and adds layers up to all of them. A climax that `opens` (a drop arriving) hits with all of them first, thins
+    out and builds again."""
+    start = math.ceil(top * START_SHARE)
+    if m <= 1:
+        return [top if climax else start] * m
+    out = [start + int(round((top - start) * j / (m - 1))) for j in range(m)]
+    if opens:
+        out[0] = top
     return out
 
 
