@@ -249,7 +249,7 @@ on your rig by eye: lights late on the kick → raise it.
 - **No strobing with the music:** nothing strobes along with synth stutters; the strobe fixtures flash on the beat into a drop (or on a snare roll's hits) and on the big hits in drops (always within `max_flash_hz`).
 - **Heads never freeze:** `still` is a slow drift, and an upward aim under a low ceiling comes down below it with a swing it can still make (in a living room, "sky" would otherwise be clamped flat).
 - **Beam effects** are mapped per fixture (`beam_fx` in the fixture JSON): gobos by style, rotation speed following the energy, mirrored heads rotating the opposite way.
-- **Colour wheels:** colours snap to the nearest wheel slot; flashes become a dimmer bump instead of moving the wheel.
+- **Colour wheels:** colours snap to the nearest wheel slot; flashes become a dimmer bump instead of moving the wheel. A beam never shows its wheel turning: a head without CMY changes colour once, not through a fade, and the engine looks a few seconds ahead for a dark gap long enough for the turn (by the distance round the wheel), up to a bar early or late. With no gap the old note lets go early and the new colour hits on time, at most once in two bars; colours too short for a wheel are skipped (`engine/wheels.py`).
 
 ## Big rigs
 

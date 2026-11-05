@@ -1,7 +1,8 @@
 """What each fixture really puts out, for the visualiser (the engine says what it WANTS).
 
 - Colour wheels only have their slots: the beam snaps to the slot the DMX selects, and when the wheel
-  turns to a far slot it scrolls through the colours in between (half/half while a slot edge passes).
+  turns to a far slot it scrolls through the colours in between (half/half while a slot edge passes), at the speed
+  the show counts on (wheels.py).
 - CMY fixtures mix subtractively: what the C/M/Y filters let through.
 - Lasers only have their colour macros.
 - Brightness of a beam in haze follows the light packed into the beam: lumens / beam angle². A 4° LED
@@ -18,10 +19,10 @@ from __future__ import annotations
 
 import math
 
+from amadeus.engine.wheels import slot_seconds
 from amadeus.library import fixtures as fxlib
 from amadeus.library import gobos
 
-WHEEL_SLOTS_PER_S = 14.0  # a typical colour wheel moves about 14 slots per second (shortest way round)
 REF_LUMENS = 1500.0  # the light of a beam drawn at full strength (a Sharpy's); the visualisers scale from it
 FLUX_RANGE = (0.25, 2.5)  # how much weaker or stronger than that a head is drawn (the square root of its lumens' share)
 FIELD = 1.8  # field angle (10 % of the centre's light) over beam angle (50 %): a smooth lens; physical.field_deg says
@@ -134,7 +135,7 @@ class Realism:
                 if info["kind"] == "laser":  # macros switch at once
                     r, g, b = slots[target]["rgb"]
                 else:
-                    r, g, b = self._wheel(eid, slots, target, dt)
+                    r, g, b = self._wheel(eid, slots, target, dt / slot_seconds(info["defn"]))
                 white = 0.0  # a wheel/macro can't add white on top of a colour: the slot is what you get
             out[eid] = (s.dimmer, r, g, b, white)
         return out
@@ -196,11 +197,10 @@ class Realism:
             1 if fx in h["prism"] else 0,
         ]
 
-    def _wheel(self, eid: str, slots: list, target: int, dt: float):
+    def _wheel(self, eid: str, slots: list, target: int, step: float):
         n = len(slots)
         pos = self.wheel_pos.get(eid, float(target))
         diff = (target - pos + n / 2) % n - n / 2  # shortest way round
-        step = WHEEL_SLOTS_PER_S * dt
         pos = target if abs(diff) <= step else (pos + math.copysign(step, diff)) % n
         self.wheel_pos[eid] = pos
         k = int(math.floor(pos)) % n
