@@ -61,7 +61,7 @@ public static class Symbols
         // the Set page, the wizard
         ["rays"] = "\uE945", ["lightbulb"] = "\uEA80",
         // the rig editor
-        ["lamp.floor"] = "\uEA80", ["square"] = "\uE739",
+        ["lamp.floor"] = "\uEA80", ["square"] = "\uE739", ["star.circle"] = "\uE734", ["star.circle.fill"] = "\uE735",
     };
 
     public static string Glyph(string symbol) =>

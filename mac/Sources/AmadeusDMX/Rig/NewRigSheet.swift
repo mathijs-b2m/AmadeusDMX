@@ -110,6 +110,7 @@ struct NewRigSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var template: RigTemplate = .club
     @State private var name = "club"
+    @State private var suggested = "club"  // the name we gave it ("club2"), not one that was typed
     @State private var width = 10.0
     @State private var height = 4.5
     @State private var depth = 15.0
@@ -170,11 +171,14 @@ struct NewRigSheet: View {
     }
 
     private func pick(_ t: RigTemplate) {
-        let wasDefault = RigTemplate.allCases.contains { $0.rawValue == name } || name.isEmpty
+        let wasDefault = name == suggested || name.isEmpty
         template = t
         (width, height, depth) = t.size
         screen = t == .club || t == .stage || t == .festival
-        if wasDefault { name = unique(t.rawValue) }
+        if wasDefault {
+            name = unique(t.rawValue)
+            suggested = name
+        }
     }
 
     private func unique(_ base: String) -> String {

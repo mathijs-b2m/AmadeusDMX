@@ -1,5 +1,5 @@
 // The live feed client: connects to the engine's WebSocket (ws://127.0.0.1:8765 by default), keeps
-// reconnecting, and keeps the last hello + frame.
+// reconnecting, and keeps the last hello + frame (until an engine without a track connects).
 //
 // Frames (40 a second) are received and decoded off the main thread: if they were decoded on it, every busy
 // moment of the UI (layout, glass, the inspector) would hold them up and the show would stutter. The renderer
@@ -97,6 +97,7 @@ public final class LiveFeed {
         do {
             while !Task.isCancelled {
                 let msg = try await task.receive()
+                let first = !connected
                 if !connected { connected = true; await feed?.set(state: .connected) }
                 let data: Data
                 switch msg {
@@ -109,6 +110,7 @@ public final class LiveFeed {
                 case .hello(let h):
                     await feed?.set(hello: h)
                 case .frame(let f):
+                    if first { await feed?.set(hello: nil) }  // the engine greets with its track: it has none, this is the last one's
                     let now = Date()
                     box.withLock { $0 = (f, now) }
                     count += 1
@@ -139,7 +141,7 @@ public final class LiveFeed {
     }
 
     private func set(state s: State) { if state != s { state = s } }
-    private func set(hello h: Hello) { hello = h }
+    private func set(hello h: Hello?) { hello = h }
 
     private func update(time t: Double, phrase p: Int, decks d: [DeckInfo]?, guard g: [String: String], link l: LinkStatus?,
                         arc a: ArcStatus?, fps f: Double?) {

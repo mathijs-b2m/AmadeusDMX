@@ -378,6 +378,7 @@ public class MapperAndSettingsTests
         Assert.Equal((16.0, 9.0, 30.0), RigTemplate.Festival.Size());
         Assert.True(RigTemplates.IsDefaultName("club2"));
         Assert.False(RigTemplates.IsDefaultName("paradiso"));
+        Assert.False(RigTemplates.IsDefaultName("club-melkweg"));  // typed: it stays when another template is picked
     }
 }
 

@@ -572,7 +572,11 @@ public static class Modifiers
 
     public static T Visible<T>(this T e, bool visible) where T : UIElement
     {
-        e.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        var v = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (e.Visibility == v) return e;
+        e.Visibility = v;
+        // a child that was collapsed from the start doesn't ask its stack for room by itself: it would stay out of sight
+        (VisualTreeHelper.GetParent(e) as UIElement)?.InvalidateMeasure();
         return e;
     }
 
