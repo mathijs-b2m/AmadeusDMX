@@ -7,7 +7,7 @@ import threading
 import time
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import aikey, paths
 from amadeus.audio.analysis import analyze, cache_paths, readable_audio
 from amadeus.director import (
     MODEL,
@@ -172,6 +172,8 @@ def get_plan(
             plan = direct(a, d, cancel=cancel, progress=progress)
     else:
         plan = direct(a, d, cancel=cancel, progress=progress)
+    if director == "openai" and aikey.stood_in(plan):
+        return a, plan  # not kept: with a new key the AI plans this track
     save_plan(plan, path)
     print(f"Plan saved to {path}")
     return a, plan

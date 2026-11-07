@@ -259,6 +259,11 @@ public sealed class AppModel : Observable
     public bool PlayingLightshow { get => _playingLightshow; private set => Set(ref _playingLightshow, value); }
     bool _setupReady;
     public bool SetupReady { get => _setupReady; private set => Set(ref _setupReady, value); }
+    string? _aiKeyChecked;
+    /// What the setup service found out about the key in use (it holds the current key), see AiKeyWarning.
+    public string? AiKeyChecked { get => _aiKeyChecked; private set => Set(ref _aiKeyChecked, value); }
+    /// OpenAI refuses the key: the warning. The running show has the last word, it may hold an older key.
+    public string? AiKeyWarning => Feed.AiKey ?? AiKeyChecked;
 
     (string Key, StageInput Input)? _previewCache;
     readonly SynchronizationContext? _ui = SynchronizationContext.Current;
@@ -304,6 +309,8 @@ public sealed class AppModel : Observable
         WatchLimiter();
         WatchConfig();
         _ = RefreshClaudeDesktop();
+        // with a key the setup service asks OpenAI about it now: an expired key is news before the show, not during it
+        if (KeySource.Current(Keychain.OpenAIKey, Workspace).Where != KeySource.Kind.None) _ = EnsureSetupService();
     }
 
     public bool NeedsSetup => Workspace is null;
@@ -548,15 +555,22 @@ public sealed class AppModel : Observable
 
     public async Task<bool> EnsureSetupService()
     {
-        if (await Api.IsUp()) { SetupReady = true; return true; }
+        if (await Api.IsUp()) { SetupUp(); return true; }
         if (Workspace is not { } ws) return false;
         if (!Setup.IsRunning) Setup.Start(ws, ["setup", "--port", "8181"], EngineEnvironment, readyWhen: "Fixture setup");
         for (var i = 0; i < 60; i++)
         {
-            if (await Api.IsUp()) { SetupReady = true; return true; }
+            if (await Api.IsUp()) { SetupUp(); return true; }
             await Task.Delay(250);
         }
         return false;
+    }
+
+    async void SetupUp()
+    {
+        SetupReady = true;
+        try { AiKeyChecked = await Api.AiKeyProblem(); }  // (the service asks OpenAI once, not for every call)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or SetupAPIException) { }
     }
 
     /// Start the setup service again (e.g. with a new OpenAI key or Ollama address), when it runs.

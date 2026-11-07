@@ -8,6 +8,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+from amadeus import aikey
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director.arc import apply_arc, laser_star, song_arc
 from amadeus.director.decision import (
@@ -33,6 +34,10 @@ HOLD_CONFIDENCE = 0.35  # mean look confidence below this, in an unchanged secti
 
 
 PROMPT_VERSION = 27
+
+
+class KeyRefused(Exception):
+    """OpenAI refused the key earlier: the phrase isn't asked."""
 
 
 class OpenAIDirector:
@@ -69,6 +74,8 @@ class OpenAIDirector:
     def _ask(self, prompt: str) -> dict:
         key = hashlib.sha1(json.dumps([self.model, PROMPT_VERSION, prompt, self.questions]).encode()).hexdigest()
         if key not in self.cache:
+            if aikey.problem():  # refused already: not once more for every phrase
+                raise KeyRefused
             t0 = time.perf_counter()
             decision = self.client.decisions.create(model=self.model, input=prompt, questions=self.questions)
             self.timings.append(time.perf_counter() - t0)
@@ -84,8 +91,11 @@ class OpenAIDirector:
         d.prompt = prompt
         try:
             answers = self._ask(prompt)
+        except KeyRefused:
+            return d
         except Exception as e:  # network/API errors must never stop the show
-            print(f"  phrase {i}: Decisions API failed ({e.__class__.__name__}: {e}); using rules")
+            if not aikey.note(e):
+                print(f"  phrase {i}: Decisions API failed ({e.__class__.__name__}: {e}); using rules")
             return d
 
         d.source = self.name

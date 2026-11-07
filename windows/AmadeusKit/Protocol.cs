@@ -683,6 +683,8 @@ public sealed class Frame
     public IReadOnlyDictionary<string, string>? LaserGuard { get; init; }
     /// VirtualDJ on another computer: the link's health.
     public LinkStatus? Link { get; init; }
+    /// OpenAI refuses the key: the warning to show.
+    public string? AiKey { get; init; }
     /// A status frame (Perform mode): time, phrase, decks; no fixtures.
     public bool Lite { get; init; }
     /// Each smoke machine's output now, 0..1 (element id → level).
@@ -753,6 +755,7 @@ public sealed class Frame
         Decks = J.Ref(c, "decks", J.ArrayOf(DeckInfo.From)),
         LaserGuard = J.Try(() => J.Ref(c, "guard", J.DictOf(J.String))),
         Link = J.Try(() => J.Ref(c, "link", LinkStatus.From)),
+        AiKey = J.Try(() => J.Ref(c, "ai_key", J.String)),
         Lite = J.Val(c, "lite", J.Bool) ?? false,
         Fog = J.Try(() => J.Ref(c, "fog", J.DictOf(J.Float))) ?? new Dictionary<string, float>(),
         Arc = J.Try(() => J.Ref(c, "arc", ArcStatus.From)),

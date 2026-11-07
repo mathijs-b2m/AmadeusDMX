@@ -348,6 +348,13 @@ public class ProtocolTests
         Assert.Equal(0.25, BeamLight.Flux(10));
         Assert.Equal(2.5, BeamLight.Flux(1e6));
     }
+
+    [Fact]
+    public void AFrameCarriesTheWarningAboutARefusedKey()
+    {
+        Assert.Equal("refused", DecodeFrame("""{"type": "frame", "t": 1, "phrase": 0, "ai_key": "refused"}""").AiKey);
+        Assert.Null(DecodeFrame("""{"type": "frame", "t": 1, "phrase": 0}""").AiKey);
+    }
 }
 
 static class TestHelpers

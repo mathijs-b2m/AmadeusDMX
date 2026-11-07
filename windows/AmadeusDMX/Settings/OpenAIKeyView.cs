@@ -38,7 +38,7 @@ public sealed class OpenAIKeyView(AppModel model)
         if (t.StartsWith("sk-", StringComparison.Ordinal)) save.Prominent();
         var check = UI.Button(_checking ? "Checking…" : "Check Key", () => _ = Verify())
             .Disabled(_checking || (t.Length == 0 && _source.Where == KeySource.Kind.None));
-        _inUse.Content = InUse();
+        _inUse.Content = UI.VStack(10, InUse(), model.AiKeyWarning is { } refused ? Form.Note("key", refused, Tint.Orange) : null);
         _warning.Content = t.Length > 0 && !t.StartsWith("sk-", StringComparison.Ordinal)
             ? Form.Note("exclamationmark.triangle", "OpenAI keys start with sk-", Tint.Orange) : null;
         _buttons.Content = UI.HStack(8,

@@ -21,7 +21,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import aikey, paths
 from amadeus.web.events import event
 
 JOBS: dict[str, dict] = {}
@@ -86,7 +86,8 @@ def _run(job: str, files: list[Path], name: str, folder: Path):
         state.update(state="cancelled", step="Cancelled")
         event(f"import: {name} cancelled")
     except Exception as e:  # noqa: BLE001 - the app shows it
-        state.update(state="failed", error=f"{e.__class__.__name__}: {e}")
+        state.update(state="failed", error=aikey.classify(e) or f"{e.__class__.__name__}: {e}")
+        aikey.note(e)
     finally:
         shutil.rmtree(folder, ignore_errors=True)
 
