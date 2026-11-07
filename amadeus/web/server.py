@@ -20,6 +20,7 @@ POST /api/fixture/new        {"manufacturer", "model", "template", "channels", â
 POST /api/fixture/lens       {"key", "beam_deg", "beam_deg_max"?, "lumens"?}: its lens and light, as the manual says
 POST /api/fixture/gdtf       {"name", "data": base64 .gdtf}: convert a GDTF file into your library (key, mode)
 GET  /api/directors          decision models available right now (rules, OpenAI, local Ollama decision models)
+GET  /api/ai-key             {"problem"}: the warning when OpenAI refuses the key, else null
 POST /api/director           {"director": "..."}: switch the decision model (saved in the rig file on its own)
 GET  /api/catalog?q=fuze     search our library + the QLC+, Open Fixture and DMXControl DDF libraries
 GET  /api/catalog/details?key=...   modes and channels of one catalogue entry

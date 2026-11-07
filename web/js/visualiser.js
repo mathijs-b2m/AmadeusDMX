@@ -745,6 +745,7 @@ function rulesNote() {
            `It takes over as soon as it is done.`;
   if (st.stems === "running")
     return "Quick plan for now: the instruments are being separated first; then the AI decides this track.";
+  if (st.ai === "failed") return "OpenAI refused the API key: the rule-based director lights this track.";
   return "The rule-based director has no probabilities. Choose OpenAI or a local decision model on the " +
          "<a href='/setup.html' style='color:inherit'>setup page</a> to let the AI decide.";
 }
@@ -774,6 +775,8 @@ function onFrame(msg) {
   const lim = msg.limit ?? 1;  // the brightness limiter: the visualiser shows the show, the lights get at most this
   $("limitBar").hidden = lim >= 1;
   if (lim < 1) $("limitText").textContent = `⚠ Brightness limited to ${Math.round(lim * 100)}% · the lights get at most this; set it to 100% for a show`;
+  $("keyBar").hidden = !msg.ai_key;
+  if (msg.ai_key) $("keyText").textContent = `⚠ ${msg.ai_key}`;
   if (msg.decks) $("decks").innerHTML = msg.decks.map(deckLine).join("");
   const rn = document.getElementById("rulesNote");
   if (rn) { const t = rulesNote(); if (rn.innerHTML !== t) rn.innerHTML = t; }

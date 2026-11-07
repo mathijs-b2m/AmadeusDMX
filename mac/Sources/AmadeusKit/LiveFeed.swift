@@ -24,6 +24,8 @@ public final class LiveFeed {
     public private(set) var laserGuard: [String: String] = [:]
     /// VirtualDJ on another computer (Amadeus Link): the link's health, else nil.
     public private(set) var link: LinkStatus?
+    /// The running show found that OpenAI refuses the key: the warning, else nil.
+    public private(set) var aiKey: String?
     /// Frames per second actually received.
     public private(set) var fps: Double = 0
     /// Live mode: the show arc (the night's stage and knobs), else nil.
@@ -127,9 +129,9 @@ public final class LiveFeed {
                     // the UI: a few times a second, or at once when the phrase changes
                     if now.timeIntervalSince(lastUI) >= 0.2 || f.phrase != lastPhrase || fps != nil {
                         lastUI = now; lastPhrase = f.phrase
-                        let t = f.t, p = f.phrase, d = f.decks, g = f.laserGuard ?? [:], l = f.link, a = f.arc
+                        let t = f.t, p = f.phrase, d = f.decks, g = f.laserGuard ?? [:], l = f.link, a = f.arc, k = f.aiKey
                         // hand the UI its update without waiting: a busy main thread must never hold up the frames
-                        Task { @MainActor in feed?.update(time: t, phrase: p, decks: d, guard: g, link: l, arc: a, fps: fps) }
+                        Task { @MainActor in feed?.update(time: t, phrase: p, decks: d, guard: g, link: l, arc: a, aiKey: k, fps: fps) }
                     }
                 }
             }
@@ -144,8 +146,9 @@ public final class LiveFeed {
     private func set(hello h: Hello?) { hello = h }
 
     private func update(time t: Double, phrase p: Int, decks d: [DeckInfo]?, guard g: [String: String], link l: LinkStatus?,
-                        arc a: ArcStatus?, fps f: Double?) {
+                        arc a: ArcStatus?, aiKey k: String?, fps f: Double?) {
         if l != link { link = l }
+        if k != aiKey { aiKey = k }
         if a != arc { arc = a }
         time = t
         if p != phrase { phrase = p }

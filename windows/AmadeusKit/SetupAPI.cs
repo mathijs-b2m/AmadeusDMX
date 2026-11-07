@@ -195,6 +195,9 @@ public sealed class SetupAPI
 
     public Task<DirectorOption[]> Directors(CancellationToken ct = default) => Get("api/directors", J.ArrayOf(DirectorOption.From), ct: ct);
 
+    /// The warning when OpenAI refuses the key in use, else null: no key, or no answer from OpenAI, is no problem here.
+    public Task<string?> AiKeyProblem(CancellationToken ct = default) => Get("api/ai-key", c => J.Ref(c, "problem", J.String), ct: ct);
+
     /// The decision model of a set (on a rig; the active ones by default). A live show follows the change.
     public Task SetDirector(string value, string? rig = null, string? set = null, CancellationToken ct = default) =>
         Post("api/director", new { director = value }, SaveResult.From, Pair(rig, set), ct: ct);

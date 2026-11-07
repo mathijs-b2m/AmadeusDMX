@@ -167,6 +167,13 @@ public struct SetupAPI: Sendable {
 
     public func directors() async throws -> [DirectorOption] { try await get("api/directors") }
 
+    /// The warning when OpenAI refuses the key in use, else nil: no key, or no answer from OpenAI, is no problem here.
+    public func aiKeyProblem() async throws -> String? {
+        struct R: Decodable { var problem: String? }
+        let r: R = try await get("api/ai-key")
+        return r.problem
+    }
+
     /// The decision model of a set (on a rig; the active ones by default). A live show follows the change.
     public func setDirector(_ value: String, rig: String? = nil, set: String? = nil) async throws {
         let _: SaveResult = try await post("api/director", ["director": value], query: pair(rig, set))

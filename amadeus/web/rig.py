@@ -8,7 +8,7 @@ import threading
 import time
 import urllib.request
 
-from amadeus import paths
+from amadeus import aikey, paths
 from amadeus.director import MODEL
 from amadeus.library import fixtures as fxlib
 from amadeus.web.events import event
@@ -44,6 +44,11 @@ def save_rig(req):
     if not problems:
         req.show.save(rig)
     return {"saved": not problems, "problems": problems, "warnings": fxlib.overlaps(rig)}
+
+
+def ai_key(req=None) -> dict:
+    """{"problem"}: the warning when OpenAI refuses the key, else null (no key, or no answer, is no problem here)."""
+    return {"problem": aikey.check()}
 
 
 def directors(req=None) -> list[dict]:
@@ -526,6 +531,7 @@ def page_log(req):
 GET = {
     "/api/rig": get_rig,
     "/api/directors": directors,
+    "/api/ai-key": ai_key,
     "/api/outputs": outputs_info,
     "/api/devices": get_devices,
     "/api/sets": list_sets,

@@ -23,6 +23,7 @@ public sealed class LiveFeed : Observable, IDisposable
     IReadOnlyList<DeckInfo> _decks = [];
     IReadOnlyDictionary<string, string> _laserGuard = new Dictionary<string, string>();
     LinkStatus? _link;
+    string? _aiKey;
     double _fps;
     ArcStatus? _arc;
 
@@ -36,6 +37,8 @@ public sealed class LiveFeed : Observable, IDisposable
     public IReadOnlyDictionary<string, string> LaserGuard { get => _laserGuard; private set => Set(ref _laserGuard, value); }
     /// VirtualDJ on another computer (Amadeus Link): the link's health, else nil.
     public LinkStatus? Link { get => _link; private set => Set(ref _link, value); }
+    /// The running show found that OpenAI refuses the key: the warning, else nil.
+    public string? AiKey { get => _aiKey; private set => Set(ref _aiKey, value); }
     /// Frames per second actually received.
     public double Fps { get => _fps; private set => Set(ref _fps, value); }
     /// Live mode: the show arc (the night's stage and knobs), else nil.
@@ -204,6 +207,7 @@ public sealed class LiveFeed : Observable, IDisposable
     void Update(Frame f, double? fps)
     {
         if (f.Link != Link) Link = f.Link;
+        if (f.AiKey != AiKey) AiKey = f.AiKey;
         if (f.Arc != Arc) Arc = f.Arc;
         Time = f.T;
         Phrase = f.Phrase;

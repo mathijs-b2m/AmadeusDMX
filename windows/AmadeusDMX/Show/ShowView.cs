@@ -53,7 +53,15 @@ public sealed class ShowView(AppModel model)
             .Bind(model, nameof(AppModel.Mode), e => e.Visible(model.Mode.Renders3D()));
         var bottom = UI.HStack(12, timeline.Grow(), controls);
 
-        var cards = UI.VStack(12, top, UI.Spacer(), bottom).Padding(16);
+        // OpenAI refuses the key: the show goes on with the rules, so it has to be said
+        var key = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
+        void Key(ContentControl c) => c.Content = model.AiKeyWarning is { } warning ? ShowUI.Glass(UI.HStack(10,
+            Form.Note("key", warning, Tint.Orange).Grow(),
+            UI.Button("Open Settings…", () => { model.SettingsTab = "director"; model.Section = Section.Settings; })
+                .Tooltip("Settings › Director: enter a new OpenAI API key")), 10, 10) : null;
+        key.Bind(feed, nameof(LiveFeed.AiKey), Key).Bind(model, nameof(AppModel.AiKeyChecked), Key);
+
+        var cards = UI.VStack(12, key, top, UI.Spacer(), bottom).Padding(16);
         var stage = UI.ZStack(back, noSet, cards);
 
         // the director, in the inspector at the right (Ctrl+Alt+I, the toolbar's button)

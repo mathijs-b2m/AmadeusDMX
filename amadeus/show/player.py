@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 
+from amadeus import aikey
 from amadeus.audio.model import Analysis
 from amadeus.director import Decision
 from amadeus.dmx.outputs import drives_real_lights, open_output
@@ -79,6 +80,7 @@ async def play(
                         "beat": beat,
                         "bp": round(beat + phase, 3),
                         **({"guard": guard} if guard else {}),
+                        **({"ai_key": aikey.problem()} if aikey.problem() else {}),
                     }
 
                     def fixtures(t=t, states=states):
