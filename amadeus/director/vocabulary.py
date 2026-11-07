@@ -280,7 +280,8 @@ LAYER_SPLITS = [  # layering: which heads carry a dim base layer and which play 
     ("none", "No layering: every head plays the same light."),
     (
         "alternate",
-        "Every other head in each group holds a soft base glow; the heads in between play the accents. "
+        "Every other section (one model in one place, left and right alike) holds a soft base glow; the sections "
+        "in between play the accents. "
         "A carpet of light with hits popping out of it.",
     ),
     (
