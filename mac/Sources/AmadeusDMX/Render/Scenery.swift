@@ -68,7 +68,7 @@ struct Scenery {
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
         // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such
         // deck under them (a raised stage stays: that is their floor) and a lower, narrower console
-        var boothY: Float = room.backFixed ? max(-1.3, back + 1.1) : -1.3, boothZ: Float = 0
+        var boothY: Float = stage.djYM.map { Float($0) } ?? (room.backFixed ? max(-1.3, back + 1.1) : -1.3), boothZ: Float = 0
         let raised = Float(max(0, stage.deckM))
         let wallFront = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) }
         let deckBack = wallFront ?? (room.backFixed ? back : min(-3, back + 1.0))
@@ -90,6 +90,7 @@ struct Scenery {
             // (a back wall the rig fixes: all of it in front of that wall)
             var ry = max(deckBack + (wallFront == nil ? 0.5 : 2.8), -4.5)
             if room.backFixed && wallFront == nil { ry = min(-0.3, max(ry, back + 2.2)) }
+            if let y = stage.djYM { ry = Float(y) + 0.4 }
             let rd = wallFront == nil && !room.backFixed ? 2.2 : min(2.2, ry - deckBack), rw = min(5, W * 0.3)
             boothY = ry - 0.4
             if !stage.djFloor {

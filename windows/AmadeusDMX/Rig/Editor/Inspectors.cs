@@ -136,6 +136,8 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
                 .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.DeckM > 0 ? Visibility.Visible : Visibility.Collapsed),
             EditorUI.Toggle(editor, "DJ on the floor", () => editor.Doc.Stage.DjFloor, v => editor.UpdateStage("Change DJ Booth", s => s.DjFloor = v),
                 "The DJ stands on the floor at a lower console, no riser (on a raised stage: on the stage). Only how it is drawn"),
+            EditorUI.ValueSlider(editor, "DJ from the stage front", () => -(editor.Doc.Stage.DjYM ?? -1.3), v => editor.UpdateStage("Move DJ Booth", s => s.DjYM = -v), 0, 8, 0.1)
+                .Tooltip("How far behind the stage's front edge the front of the DJ's booth stands. Left alone, it follows the stage and the rig"),
             EditorUI.Toggle(editor, "LED wall behind the DJ", () => editor.Doc.HasScreen, editor.SetScreen),
             d.Stage.Outdoor ? null
                 : EditorUI.Toggle(editor, "Beams stay off the ceiling", () => editor.Doc.Stage.CeilingGuard, v => editor.UpdateStage(s => s.CeilingGuard = v),
