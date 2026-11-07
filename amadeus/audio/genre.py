@@ -36,7 +36,7 @@ from pathlib import Path
 
 import numpy as np
 
-from amadeus import paths
+from amadeus import aikey, paths
 from amadeus.audio import disco
 from amadeus.audio.dembow import dembow
 from amadeus.audio.model import Analysis
@@ -273,7 +273,7 @@ def artist_title(a: Analysis, meta: dict) -> tuple[str, str]:
 def from_model(artist: str, title: str) -> tuple[str, float] | None:
     """Ask the Decisions API which genre a track is, from its artist and title only (cached per track).
     None without a key or on any failure."""
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not os.environ.get("OPENAI_API_KEY") or aikey.problem():
         return None
     prompt = f"Artist: {artist or 'unknown'}\nTitle: {title}\nWhich genre is this track?"
     key = hashlib.sha1(json.dumps([prompt, list(GENRES)]).encode()).hexdigest()[:16]
@@ -291,6 +291,7 @@ def from_model(artist: str, title: str) -> tuple[str, float] | None:
         r = OpenAI().decisions.create(model=MODEL, input=prompt, questions=[q])
         ans = next((x.model_dump() for x in r.answers if x.name == "genre"), {})
     except Exception as e:  # noqa: BLE001 - no genre from the model: the fallbacks decide
+        aikey.note(e)
         print(f"  genre: the Decisions API didn't answer ({e.__class__.__name__}); using the fallback")
         return None
     genre, confidence = ans.get("choice"), float(ans.get("confidence", 0.0))

@@ -106,6 +106,14 @@ struct ImportSheet: View {
                         Button("Open Settings…") { model.settingsTab = "director"; openSettings() }
                             .help("Settings ▸ Director: enter your OpenAI API key (the same key the AI director uses)")
                     }
+                } else if hasPDF, let warning = model.aiKeyWarning {
+                    HStack {
+                        Label(warning, systemImage: "key.slash")
+                            .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Open Settings…") { model.settingsTab = "director"; openSettings() }
+                            .help("Settings ▸ Director: enter a new OpenAI API key")
+                    }
                 }
             }
             HStack {

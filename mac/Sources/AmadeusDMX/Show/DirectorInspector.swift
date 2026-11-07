@@ -131,6 +131,7 @@ struct DirectorInspector: View {
             return "Quick plan for now: the AI is still deciding this track (\(st?.aiDone ?? 0)/\(st?.aiTotal.map(String.init) ?? "…") phrases). It takes over when it is done."
         }
         if st?.stems == "running" { return "Quick plan for now: the instruments are separated first, then the AI decides." }
+        if st?.ai == "failed" { return "OpenAI refused the API key: the rule-based director lights this track." }
         return "The rule-based director has no probabilities. Choose an AI director in the set's settings to see how sure it is."
     }
 

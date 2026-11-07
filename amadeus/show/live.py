@@ -18,7 +18,7 @@ import threading
 import time
 from pathlib import Path
 
-from amadeus import paths
+from amadeus import aikey, paths
 from amadeus.dmx.outputs import drives_real_lights, open_output
 from amadeus.engine import State
 from amadeus.engine.realism import Realism
@@ -388,6 +388,7 @@ async def run(
                         "arc": arc.snapshot(wall),
                         **({"link": listener.status()} if remote else {}),
                         **({"guard": guard} if guard else {}),
+                        **({"ai_key": aikey.problem()} if aikey.problem() else {}),
                     }
 
                     def fixtures(engine=engine, states=states, t=t, parts=parts):
