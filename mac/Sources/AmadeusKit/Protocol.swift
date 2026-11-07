@@ -60,6 +60,8 @@ public struct Stage: Codable, Sendable, Equatable {
     public var deckScaffold = false
     /// The DJ stands on the floor at a lower console, no riser under them (only how it is drawn).
     public var djFloor = false
+    /// Where the front of the DJ's booth stands (0 the stage's front edge, back negative); nil: it follows the stage.
+    public var djYM: Double?
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public var ceilingGuard = true
     public var backGuard = true
@@ -68,7 +70,7 @@ public struct Stage: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case deckM = "deck_m", deckScaffold = "deck_scaffold", djFloor = "dj_floor", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m", roomBackM = "room_back_m"
+        case deckM = "deck_m", deckScaffold = "deck_scaffold", djFloor = "dj_floor", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m", roomBackM = "room_back_m", djYM = "dj_y_m"
     }
 
     /// The room either side of the stage when the rig doesn't give the hall's width (amadeus/rig/geometry.py).
@@ -100,6 +102,7 @@ public struct Stage: Codable, Sendable, Equatable {
         outdoor = try c.decodeIfPresent(Bool.self, forKey: .outdoor) ?? false
         roomWidthM = try c.decodeIfPresent(Double.self, forKey: .roomWidthM)
         roomBackM = try c.decodeIfPresent(Double.self, forKey: .roomBackM)
+        djYM = try c.decodeIfPresent(Double.self, forKey: .djYM)
     }
 }
 

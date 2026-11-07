@@ -316,10 +316,10 @@ function drawScenery(P, st) {
   // where the DJ stands: by the y of the booth front, bz the floor under it. A DJ on the floor (stage.dj_floor) has no
   // deck or riser and a lower, narrower console; bh the console's height
   const onFloor = !!st.dj_floor;
-  let by = -1.3, bz = 0;
+  let by = st.dj_y_m ?? -1.3, bz = 0;
   if (big) {
     const back = Math.min(-3, (show.ext?.back ?? -6) + 1.0);
-    const ry = Math.max(back + 0.5, -4.5), rd = 2.2, rw = Math.min(5, st.width_m * 0.3);
+    const ry = st.dj_y_m != null ? st.dj_y_m + 0.4 : Math.max(back + 0.5, -4.5), rd = 2.2, rw = Math.min(5, st.width_m * 0.3);
     by = ry - 0.4;
     if (!onFloor) {
       box(-0.5, st.width_m + 0.5, back, -0.2, 0, 0.15, "#0c0d12", "#101219", "#1d2029");       // stage deck

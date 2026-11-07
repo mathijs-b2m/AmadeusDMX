@@ -76,3 +76,8 @@ def test_the_djs_head_is_where_the_booth_is_drawn():
     assert at(room_back_m=2.5).tolist() == pytest.approx([3, -1.6, 2.57])  # in front of a back wall the rig fixes
     small = geometry.dj_head({"stage": {"width_m": 3}}, [-0.5], 2)
     assert small.tolist() == pytest.approx([1.5, -2.2, 1.62])
+
+
+def test_a_rig_can_say_where_the_booth_stands():
+    head = geometry.dj_head({"stage": {"width_m": 6, "dj_floor": True, "dj_y_m": -0.2}}, [-1.0], 8)
+    assert head[1] == pytest.approx(-1.1)
