@@ -263,6 +263,8 @@ A rig with several groups of moving heads (overhead truss, back of the stage, fr
 
 **Layering** on top of that: per phrase the director picks which heads hold a soft **base** glow (low, medium or breathing, in the base colour) and which play the **accents** on the hits: every other head, the outer vs inner heads of each group, high vs low heads, or the featured groups vs the rest.
 
+**Sections** tie the rig together across its groups. `amadeus/rig/sections.py` puts fixtures of one model in one place into a section (the two Fuzes on the truss, the pars along the walls; the same model on the floor is a section of its own) and pairs every fixture with its mirror image on the other side of the stage. The show hands out its parts by whole sections, or by mirrored pairs on a rig with too few sections: who plays the accents, who holds the glow in an alternating layer, who takes which kick, who plays to the camera, who joins a roll. So a model plays as one and left and right stay alike. Waves, chases, individual heads and the kick pattern `sides` (left against right) overrule this on purpose.
+
 Towers fan out in height, waves span at most 4 beats, and safety nets keep drops from going solo and make the grouping and the featured part change regularly. Plans are cached per group layout (and per house style).
 
 ### Lasers
