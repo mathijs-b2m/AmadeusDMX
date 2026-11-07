@@ -31,6 +31,10 @@ struct OpenAIKeyView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             inUse
+            if let warning = model.aiKeyWarning {
+                Label(warning, systemImage: "key.slash").font(.callout).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             SecureField("OpenAI API key", text: $entry, prompt: Text("Paste your key: sk-…"))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)

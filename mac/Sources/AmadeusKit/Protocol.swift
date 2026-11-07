@@ -459,6 +459,8 @@ public struct Frame: Decodable, Sendable {
     public var laserGuard: [String: String]?
     /// VirtualDJ on another computer: the link's health.
     public var link: LinkStatus?
+    /// OpenAI refuses the key: the warning to show.
+    public var aiKey: String?
     /// A status frame (Perform mode): time, phrase, decks; no fixtures.
     public var lite: Bool
     /// Each smoke machine's output now, 0..1 (element id → level).
@@ -466,12 +468,12 @@ public struct Frame: Decodable, Sendable {
     /// The show arc (live mode).
     public var arc: ArcStatus?
 
-    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, gobo, zoom, ring, bee, decks, laserGuard = "guard", link, lite, fog, arc }
+    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, gobo, zoom, ring, bee, decks, laserGuard = "guard", link, aiKey = "ai_key", lite, fog, arc }
 
     /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
     public init(fx: [[Float]], dirs: [SIMD3<Float>?]) {
         t = 0; phrase = 0; bp = nil; self.fx = fx; bands = []; beam = dirs.map { $0 == nil ? nil : "open" }
-        self.dirs = dirs; lz = fx.map { _ in nil }; gobo = []; zoom = []; ring = []; bee = []; decks = nil; laserGuard = nil; link = nil; lite = false; fog = [:]; arc = nil
+        self.dirs = dirs; lz = fx.map { _ in nil }; gobo = []; zoom = []; ring = []; bee = []; decks = nil; laserGuard = nil; link = nil; aiKey = nil; lite = false; fog = [:]; arc = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -504,6 +506,7 @@ public struct Frame: Decodable, Sendable {
         decks = try c.decodeIfPresent([DeckInfo].self, forKey: .decks)
         laserGuard = try? c.decodeIfPresent([String: String].self, forKey: .laserGuard)
         link = try? c.decodeIfPresent(LinkStatus.self, forKey: .link)
+        aiKey = try? c.decodeIfPresent(String.self, forKey: .aiKey)
         lite = try c.decodeIfPresent(Bool.self, forKey: .lite) ?? false
         fog = (try? c.decodeIfPresent([String: Float].self, forKey: .fog)) ?? [:]
         arc = try? c.decodeIfPresent(ArcStatus.self, forKey: .arc)

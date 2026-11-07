@@ -2,6 +2,25 @@
 import AmadeusKit
 import SwiftUI
 
+/// OpenAI refuses the key: the show goes on with the rules, so it has to be said.
+struct AIKeyBanner: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
+    var text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Label(text, systemImage: "key.slash").font(.callout).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("Open Settings…") { model.settingsTab = "director"; openSettings() }
+                .help("Settings ▸ Director: enter a new OpenAI API key")
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.regularMaterial, in: .rect(cornerRadius: 10))
+    }
+}
+
 struct ShowView: View {
     @Environment(AppModel.self) private var model
     @ObservedObject var stage: StageController
@@ -23,6 +42,7 @@ struct ShowView: View {
             }
 
             VStack(spacing: 12) {
+                if let warning = model.aiKeyWarning { AIKeyBanner(text: warning) }
                 HStack(alignment: .top, spacing: 12) {
                     NowPlayingCard()
                     Spacer(minLength: 12)

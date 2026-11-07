@@ -67,6 +67,7 @@ picture or words). Frames point into this list.
 | `decks` | live mode: each deck's track, volume, play state and preparation progress |
 | `link` | Amadeus Link: the link's health (offset, jitter, lost packets) |
 | `guard` | what the laser guard did this frame (laser id → note) |
+| `ai_key` | OpenAI refuses the key: the warning to show (only then) |
 | `arc` | live mode: the show arc (below) |
 | `limit` | only while the brightness limiter is on: its ceiling, 0.05..1 (the lights get at most this; `fx` shows the show unlimited) |
 

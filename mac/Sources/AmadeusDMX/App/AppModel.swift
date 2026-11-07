@@ -188,6 +188,10 @@ final class AppModel {
     /// night card).
     var playingLightshow = false
     var setupReady = false
+    /// What the setup service found out about the key in use (it holds the current key), see `aiKeyWarning`.
+    var aiKeyChecked: String?
+    /// OpenAI refuses the key: the warning. The running show has the last word, it may hold an older key.
+    var aiKeyWarning: String? { feed.aiKey ?? aiKeyChecked }
 
     @ObservationIgnored private var setupStartedAt: Date?
     @ObservationIgnored private var configStamp = ""
@@ -234,6 +238,8 @@ final class AppModel {
         watchLimiter()
         watchConfig()
         Task { await refreshClaudeDesktop() }
+        // with a key the setup service asks OpenAI about it now: an expired key is news before the show, not during it
+        if KeySource.current(workspace) != .none { Task { _ = await ensureSetupService() } }
     }
 
     var needsSetup: Bool { workspace == nil }
@@ -451,16 +457,21 @@ final class AppModel {
     // MARK: setup service (the engine's setup API, for the wizard and the rig tools)
 
     func ensureSetupService() async -> Bool {
-        if await api.isUp() { setupReady = true; return true }
+        if await api.isUp() { setupUp(); return true }
         guard let ws = workspace else { return false }
         if !setup.isRunning {
             setup.start(ws, ["setup", "--port", "8181"], environment: engineEnvironment, readyWhen: "Fixture setup")
         }
         for _ in 0..<60 {
-            if await api.isUp() { setupReady = true; return true }
+            if await api.isUp() { setupUp(); return true }
             try? await Task.sleep(for: .milliseconds(250))
         }
         return false
+    }
+
+    private func setupUp() {
+        setupReady = true
+        Task { aiKeyChecked = try? await api.aiKeyProblem() }  // (the service asks OpenAI once, not for every call)
     }
 
     /// Start the setup service again (e.g. with a new OpenAI key or Ollama address), when it runs.
