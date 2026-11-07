@@ -32,6 +32,8 @@ DEFAULT_STAGE = {
     # "room_back_m": how far the room's back wall stands behind the stage's front edge; when it isn't there, 1.5 m
     # behind the rig (drawing only: the apps and the visualiser)
     "dj_floor": False,  # the DJ stands on the floor at a lower console, no riser under them (drawing only)
+    # "dj_y_m": where the front of the DJ's booth stands (0 the stage's front edge, back is negative); when it isn't
+    # there, it follows the stage and the rig
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
     "audience_min_down_deg": 20.0,  # beams towards the audience must point at least this far down …
     "audience_min_up_deg": 35.0,  # … or this far up (heads below 2.5 m); 10° for higher heads
@@ -288,6 +290,7 @@ def dj_head(rig: dict, ys: list[float], heads: int) -> np.ndarray:
         back = min(back, (min(-4.5, back + 1.5) - 2.2 if big else -2.0) - 0.8)
     front = float(wall["y_m"]) + float(wall.get("depth_m", 1.0)) / 2 if wall else None
     deck_back = front if front is not None else back if fixed else min(-3.0, back + 1.0)
+    placed = st.get("dj_y_m")
     booth_y, z = max(-1.3, back + 1.1) if fixed else -1.3, 0.0
     if raised > 0 or (big and not floor):
         z = raised if raised > 0 else 0.15
@@ -298,6 +301,8 @@ def dj_head(rig: dict, ys: list[float], heads: int) -> np.ndarray:
         booth_y = ry - 0.4
         if not floor:
             z += 0.8
+    if placed is not None:
+        booth_y = float(placed)
     return np.array([W / 2, booth_y - 0.9, z + 1.62])
 
 

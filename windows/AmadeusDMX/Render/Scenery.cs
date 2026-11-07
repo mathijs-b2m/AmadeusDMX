@@ -87,7 +87,7 @@ public sealed class Scenery
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
         // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such
         // deck under them (a raised stage stays: that is their floor) and a lower, narrower console
-        float boothY = Room.BackFixed ? MathF.Max(-1.3f, back + 1.1f) : -1.3f, boothZ = 0;
+        float boothY = stage.DjYM is { } djY ? (float)djY : Room.BackFixed ? MathF.Max(-1.3f, back + 1.1f) : -1.3f, boothZ = 0;
         var raised = MathF.Max(0, (float)stage.DeckM);
         var deckBack = wallFront ?? (Room.BackFixed ? back : MathF.Min(-3, back + 1.0f));
         if (raised > 0 || (Big && !stage.DjFloor))
@@ -113,6 +113,7 @@ public sealed class Scenery
             // (a back wall the rig fixes: all of it in front of that wall)
             var ry = MathF.Max(deckBack + (wallFront is null ? 0.5f : 2.8f), -4.5f);
             if (Room.BackFixed && wallFront is null) ry = MathF.Min(-0.3f, MathF.Max(ry, back + 2.2f));
+            if (stage.DjYM is { } placed) ry = (float)placed + 0.4f;
             float rd = wallFront is null && !Room.BackFixed ? 2.2f : MathF.Min(2.2f, ry - deckBack), rw = MathF.Min(5, W * 0.3f);
             boothY = ry - 0.4f;
             if (!stage.DjFloor)
