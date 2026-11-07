@@ -222,20 +222,17 @@ BUILD_MIN_R = 0.6  # a build: the tension rises at least this steadily (correlat
 
 SLAM_LOW_JUMP = 0.25  # the low end (0..1 over the track) of the two bars from here against the two before
 SLAM_SEARCH_BARS = 6  # a phrase boundary this close to a slam moves onto it; farther away the phrase is split
+SLAM_MIN_BARS = 4  # what slams in runs this long at least
+SLAM_END_FALL = 0.15  # the low end (0..1 over the track) of the two bars from here under the two before: it has ended
 
 
-def _slams(feats, fps, beat_times, db_times, kicks) -> list[int]:
-    """The bars where a drop lands, wherever the phrase grid is: the kick starts RUNNING (on most beats of this
-    bar and the next, after bars with at most half) and the low end jumps in with it.
-
-    Songs don't keep a 4-bar grid from their first bar (a pop song's piano intro, a bar of silence before the
-    drop), so the grid can put a boundary bars away from the drop, and a long phrase that only gets its beat
-    halfway would count as a drop from its first, beatless bar."""
+def _bar_levels(feats, fps, beat_times, db_times, kicks) -> tuple[np.ndarray, np.ndarray]:
+    """Per bar: the share of its beats with a kick, and its low end (0..1 over the track)."""
     low = np.maximum(feats["sub"], feats["bass"]).astype(float)
     lo, hi = np.percentile(low, [5, 95])
     low = np.clip((low - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
     n = len(db_times) - 1
-    on = np.zeros(n)  # per bar: the share of its beats with a kick
+    on = np.zeros(n)
     lv = np.zeros(n)
     for k in range(n):
         t0, t1 = db_times[k], db_times[k + 1]
@@ -243,8 +240,18 @@ def _slams(feats, fps, beat_times, db_times, kicks) -> list[int]:
         if len(beats) and len(kicks):
             on[k] = np.mean([np.any(np.abs(kicks - b) < 0.08) for b in beats])
         lv[k] = low[int(t0 * fps) : max(int(t1 * fps), int(t0 * fps) + 1)].mean()
+    return on, lv
+
+
+def _slams(on: np.ndarray, lv: np.ndarray) -> list[int]:
+    """The bars where a drop lands, wherever the phrase grid is: the kick starts RUNNING (on most beats of this
+    bar and the next, after bars with at most half) and the low end jumps in with it.
+
+    Songs don't keep a 4-bar grid from their first bar (a pop song's piano intro, a bar of silence before the
+    drop), so the grid can put a boundary bars away from the drop, and a long phrase that only gets its beat
+    halfway would count as a drop from its first, beatless bar."""
     found: list[tuple[float, int]] = []
-    for k in range(2, n - 1):
+    for k in range(2, len(on) - 1):
         running = on[k] >= 0.75 and on[k + 1] >= 0.75
         before = on[k - 2 : k].mean() <= 0.5
         jump = lv[k : k + 2].mean() - lv[k - 2 : k].mean()
@@ -275,14 +282,36 @@ def _land_on_slams(segments: list[tuple[int, int]], slams: list[int]) -> list[tu
     return list(zip(cuts[:-1], cuts[1:]))
 
 
+def _slam_end(b0: int, b1: int, on, lv) -> int | None:
+    """The bar in phrase b0..b1, which starts on a slam, where the kick stops running and the low end falls away."""
+    for k in range(b0 + SLAM_MIN_BARS, b1 - 1):
+        fell = lv[k - 2 : k].mean() - lv[k : k + 2].mean()
+        if on[k - 2 : k].mean() >= 0.75 and on[k : k + 2].mean() <= 0.5 and fell >= SLAM_END_FALL:
+            return k
+    return None
+
+
 def build_phrases(feats, fps, beat_times, downbeat_idx, onsets):
     db_times = beat_times[downbeat_idx]
     if len(db_times) < 3:
         db_times = beat_times[::4]
     bars = _bar_features(feats, fps, beat_times, db_times)
     segments = _segment_bars(bars)
-    segments = _land_on_slams(segments, _slams(feats, fps, beat_times, db_times, onsets["kick"][0]))
+    on, lv = _bar_levels(feats, fps, beat_times, db_times, onsets["kick"][0])
+    slams = _slams(on, lv)
+    segments = _land_on_slams(segments, slams)
     phrases = _phrases_from(feats, fps, beat_times, db_times, bars, onsets, segments)
+
+    # A slam whose phrase runs on past it: the bars after the kick stopped are the way out, and averaged in they make
+    # the drop sound like a groove. It ends there when that shows it was a drop.
+    for i in range(len(segments) - 1, 0, -1):
+        b0, b1 = segments[i]
+        k = _slam_end(b0, b1, on, lv) if b0 in slams and phrases[i].drop_score < DROP_THRESHOLD else None
+        if k is not None:
+            cut = [*segments[:i], (b0, k), (k, b1), *segments[i + 1 :]]
+            got = _phrases_from(feats, fps, beat_times, db_times, bars, onsets, cut)
+            if got[i].drop_score >= DROP_THRESHOLD:
+                segments, phrases = cut, got
 
     # Drops: move each drop's boundary onto the bar it really lands on, then recompute the features
     # so the drop phrase and the buildup before it describe the right bars.

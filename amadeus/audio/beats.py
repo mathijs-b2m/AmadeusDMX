@@ -215,28 +215,137 @@ def attack_offset(audio: np.ndarray, sr: int, beat_times: np.ndarray, max_s: flo
 
 
 STRUCTURE_SHARE = 0.45  # the low end's changes pick the bar phase when this share of them falls on one phase
+STRUCTURE_SILENT_DB = 30  # the low end this far under its usual level: the track hasn't started yet
+FIRST_SOUND_VOTE = 2.0  # a first sound the biggest changes overrule counts this many usual changes
+RUN_LOW_MARGIN = 2  # a stretch on its own bar phase needs this many more low-end changes on it than on the next one's
+SLAM_RISE = 0.3  # the low end (0..1 over the track) jumping this much from one beat to the next: it comes in here
+CHORD_SPAN = 4  # beats of harmony either side of a beat, to tell how much the chord changes there
 
 
-def downbeats(beat_frames: np.ndarray, accent_env: np.ndarray, low: np.ndarray | None = None) -> np.ndarray:
+def _low_changes(lb: np.ndarray) -> np.ndarray:
+    """Per beat how much the low end (per beat, dB) changes there: one beat per change, the big changes only."""
+    n = len(lb)
+    nov = np.zeros(n)
+    for i in range(4, n - 4):
+        nov[i] = abs(lb[i : i + 4].mean() - lb[i - 4 : i].mean())
+    peak = np.array([nov[i] > 0 and nov[i] >= nov[max(0, i - 2) : i + 3].max() for i in range(n)])
+    nov = np.where(peak, nov, 0.0)  # one beat per change: where it changes most
+    if (nov > 0).any():
+        nov = np.where(nov >= np.percentile(nov[nov > 0], 75), nov, 0.0)  # the big changes only
+    return nov
+
+
+def _first_sound_overruled(lb: np.ndarray, nov: np.ndarray) -> np.ndarray:
+    """The changes, with the first sound after a silent start in its place. Measured from digital silence it weighs
+    more than every drop in reach, and music often comes in on a pickup. When the track's two biggest changes after
+    it agree on a beat of the bar that isn't the first sound's, those are the bar lines: it counts as a change like
+    the others. Otherwise a track that starts on its one keeps that (a silence inside a track always counts)."""
+    first = int(np.argmax(lb > np.median(lb) - STRUCTURE_SILENT_DB))
+    if first < 4:
+        return nov
+    heard = lb.copy()
+    heard[:first] = lb[first]
+    rest = _low_changes(heard)
+    top = np.argsort(rest)[::-1][:2]
+    if (rest[top] > 0).all() and top[0] % 4 == top[1] % 4 != first % 4:
+        rest[first] = FIRST_SOUND_VOTE * np.median(rest[rest > 0])
+        return rest
+    return nov
+
+
+def _per_beat(x: np.ndarray, beat_frames: np.ndarray) -> np.ndarray:
+    """The mean of a per-frame feature over each beat."""
+    edges = np.r_[beat_frames, min(len(x), beat_frames[-1] + int(np.median(np.diff(beat_frames))))]
+    return np.array([x[a:b].mean(axis=0) if b > a else x[min(a, len(x) - 1)] for a, b in zip(edges, edges[1:])])
+
+
+def _chord_changes(chroma: np.ndarray) -> np.ndarray:
+    """Per beat how much the harmony (chroma per beat) changes there: the bar after against the bar before, as far
+    as that is more than the track's usual difference between two bars."""
+    c = np.sqrt(np.maximum(chroma, 0.0))
+    c = c / (np.linalg.norm(c, axis=1, keepdims=True) + 1e-9)
+    change = np.zeros(len(c))
+    for i in range(CHORD_SPAN, len(c) - CHORD_SPAN):
+        a, b = c[i - CHORD_SPAN : i].mean(axis=0), c[i : i + CHORD_SPAN].mean(axis=0)
+        change[i] = 1 - a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9)
+    return np.maximum(change - np.median(change), 0.0)
+
+
+def _slam_beats(lb: np.ndarray, low: np.ndarray) -> np.ndarray:
+    """The beats where the low end comes in at once: a jump from the beat before, the biggest within two beats."""
+    lo, hi = np.percentile(low, [5, 95])
+    level = np.clip((lb - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
+    rise = np.r_[0.0, np.diff(level)]
+    return np.array([r >= SLAM_RISE and r >= rise[max(0, i - 2) : i + 3].max() for i, r in enumerate(rise)])
+
+
+def _settled(phases: list[int], n: int, changes: np.ndarray, chords: np.ndarray, slams: np.ndarray) -> list[list[int]]:
+    """The stretches of one bar phase, (first beat, end, phase), without the ones the music in them doesn't back.
+
+    The vote looks well past its window, so a change far away can turn a stretch that has nothing of its own, and the
+    bars then jump there and back for nothing. A stretch joins the phase next to it unless its own music says otherwise:
+    RUN_LOW_MARGIN more low-end changes on its phase, or more of the chord changes and about as many low-end changes
+    (a margin of one low-end change is chance; a clear one nearly always has the chords with it). A slam off the
+    neighbour's bar lines keeps it apart too: bars never move away from where the low end comes in, even when that is on
+    a third phase. A flip that stands stays where the vote put it: moving it to where the music turns fits the bars
+    better, but costs drops."""
+    runs = [[s * 64, min(n, (s + 1) * 64), int(p)] for s, p in enumerate(phases)]
+
+    def joined(rs: list[list[int]]) -> list[list[int]]:
+        out: list[list[int]] = []
+        for r in rs:
+            if out and out[-1][2] == r[2]:
+                out[-1][1] = r[1]
+            else:
+                out.append(list(r))
+        return out
+
+    def chord_share(a: int, b: int, p: int) -> float:
+        total = chords[a:b].sum()
+        return float(chords[a:b][(np.arange(a, b) - p) % 4 == 0].sum() / total) if total > 0 else 0.0
+
+    def unbacked(a: int, b: int, p: int, q: int) -> tuple[int, float] | None:
+        """How little a stretch on phase p holds against phase q next to it; None when it stands."""
+        beat = np.arange(a, b)
+        if slams[a:b][(beat - q) % 4 != 0].any():
+            return None
+        margin = int((changes[a:b][(beat - p) % 4 == 0] > 0).sum() - (changes[a:b][(beat - q) % 4 == 0] > 0).sum())
+        chord = chord_share(a, b, p) - chord_share(a, b, q)
+        return None if margin >= RUN_LOW_MARGIN or (margin >= -1 and chord > 0) else (margin, chord)
+
+    runs = joined(runs)
+    while len(runs) > 1:
+        weak = [
+            (unbacked(a, b, p, q), k, q)
+            for k, (a, b, p) in enumerate(runs)
+            for q in sorted({r[2] for r in runs[max(0, k - 1) : k] + runs[k + 1 : k + 2]})
+        ]
+        weak = [w for w in weak if w[0] is not None]
+        if not weak:
+            break
+        _, k, q = min(weak, key=lambda w: w[0])
+        runs[k][2] = q
+        runs = joined(runs)
+    return runs
+
+
+def downbeats(
+    beat_frames: np.ndarray, accent_env: np.ndarray, low: np.ndarray | None = None, chroma: np.ndarray | None = None
+) -> np.ndarray:
     """Pick the bar phase (0..3) per 64-beat window; assumes 4/4 like nearly all DJ music.
 
     First by the music's structure: drops, breaks, the kick or bass coming in or out all start on the one, so
     the beats where the low end changes most (its level over the next bar against the bar before) mark the bar
     lines. With a steady four-on-the-floor kick the beats' own accents are nearly equal and pick a phase
     almost by chance; they decide only where the structure says nothing clear (fewer than STRUCTURE_SHARE of
-    the change on one phase, looking a few windows around)."""
+    the change on one phase, looking a few windows around). With the track's chroma, a flip of the phase then has to
+    be backed by the music where it happens (`_settled`)."""
     strength = accent_env[beat_frames]
     n = len(beat_frames)
     nov = np.zeros(n)
     if low is not None and n > 8:
-        edges = np.r_[beat_frames, min(len(low), beat_frames[-1] + int(np.median(np.diff(beat_frames))))]
-        lb = np.array([low[a:b].mean() if b > a else low[min(a, len(low) - 1)] for a, b in zip(edges, edges[1:])])
-        for i in range(4, n - 4):
-            nov[i] = abs(lb[i : i + 4].mean() - lb[i - 4 : i].mean())
-        peak = np.array([nov[i] > 0 and nov[i] >= nov[max(0, i - 2) : i + 3].max() for i in range(n)])
-        nov = np.where(peak, nov, 0.0)  # one beat per change: where it changes most
-        if (nov > 0).any():
-            nov = np.where(nov >= np.percentile(nov[nov > 0], 75), nov, 0.0)  # the big changes only
+        lb = _per_beat(low, beat_frames)
+        nov = _first_sound_overruled(lb, _low_changes(lb))
     phases = []
     for s in range(0, n, 64):
         seg = strength[s : s + 64]
@@ -250,6 +359,10 @@ def downbeats(beat_frames: np.ndarray, accent_env: np.ndarray, low: np.ndarray |
         phases.append(int(np.argmax(scores)))
     if len(phases) >= 3:  # a phase flip needs agreement from neighbours
         phases = list(median_filter(np.array(phases), size=3, mode="nearest"))
+    if low is not None and chroma is not None and n > 8 and len(set(phases)) > 1:
+        chords = _chord_changes(_per_beat(chroma, beat_frames))
+        runs = _settled(phases, n, nov, chords, _slam_beats(lb, low))
+        return np.array([i for a, b, p in runs for i in range(a, b) if i % 4 == p], dtype=int)
     idx = [i for i in range(n) if i % 4 == phases[min(i // 64, len(phases) - 1)]]
     return np.array(idx, dtype=int)
 
