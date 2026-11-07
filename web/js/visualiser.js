@@ -407,11 +407,20 @@ function drawTruss(P, t, line) {
   }
   if (t.type === "bridge" || t.type === "tbar") {  // a light stand: the bar, a tripod under each end (a T-bar: the middle)
     const z = t.z_m, on = u => [t.x_m + ax[0] * u, t.y_m + ax[1] * u, z];
-    line(on(-L / 2), on(L / 2), col);
+    if (t.bar === "deco") {  // a triangle of deco truss, point up, laced
+      const pts = [[-0.11, -0.095], [0.11, -0.095], [0, 0.095]];
+      const de = (u, [sv, sz]) => [t.x_m + ax[0] * u + nx[0] * sv, t.y_m + ax[1] * u + nx[1] * sv, z + sz];
+      for (const p of pts) line(de(-L / 2, p), de(L / 2, p), col);
+      const bays = Math.max(1, Math.round(L / 0.22));
+      for (let i = 0; i < 3; i++) for (let k = 0; k < bays; k++) {
+        const a = pts[i], b = pts[(i + 1) % 3], u = -L / 2 + L * k / bays;
+        line(de(u, k % 2 ? b : a), de(u + L / bays, k % 2 ? a : b), "#2a2e3a");
+      }
+    } else line(on(-L / 2), on(L / 2), col);
     const spread = Math.min(0.75, 0.25 + z * 0.15), hub = Math.min(0.7, z * 0.3);
     for (const u of t.type === "tbar" ? [0] : [-(L / 2 - 0.05), L / 2 - 0.05]) {
       const [fx, fy] = on(u);
-      line([fx, fy, 0], [fx, fy, z], col);
+      line([fx, fy, 0], [fx, fy, t.bar === "deco" ? z - 0.095 : z], col);
       // a bridge's tripods with one leg in along the bar (they stick out least past its ends), a T-bar's to the crowd
       const first = t.type === "tbar" ? r + Math.PI / 2 : Math.atan2(t.y_m - fy, t.x_m - fx);
       for (let k = 0; k < 3; k++) {

@@ -26,3 +26,11 @@ import simd
     #expect(simd_length(t.carreCorners[0] - SIMD2(-1, 2)) < 1e-9)
     #expect(t.directionDeg(0) == 90)
 }
+
+@Test func aStandCanCarryDecoTruss() throws {
+    let json = #"{"id": "b", "type": "bridge", "bar": "deco", "length_m": 3, "x_m": 2, "y_m": -1.5, "z_m": 3}"#
+    let t = try JSONDecoder().decode(Truss.self, from: Data(json.utf8))
+    #expect(t.isDeco && t.isStand && t.isTube)
+    let again = try JSONDecoder().decode(Truss.self, from: JSONEncoder().encode(t))
+    #expect(again.bar == "deco")
+}

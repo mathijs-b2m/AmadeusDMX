@@ -451,6 +451,17 @@ struct TrussInspector: View {
                 ValueSlider(title: "Rotation", value: binding(\.rotDeg), range: -180...180, step: 15, unit: "°")
             }
         }
+        if truss.isStand {
+            SwiftUI.Section("Bar") {
+                Picker("Bar", selection: Binding(get: { truss.bar ?? "" }, set: { v in
+                    editor.updateTruss(truss.id, "Change Bar") { $0.bar = v.isEmpty ? nil : v }
+                })) {
+                    Text("Tube").tag("")
+                    Text("Deco truss (triangle)").tag("deco")
+                }
+                .help("What the stand carries: a plain tube, or a triangle of deco truss")
+            }
+        }
         if !truss.vertical {
             SwiftUI.Section("Lights") {
                 Picker("Aim", selection: Binding(get: { truss.aim ?? "" }, set: { v in

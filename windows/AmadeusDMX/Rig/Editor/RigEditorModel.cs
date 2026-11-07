@@ -116,6 +116,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
     public const double SideOut = 0.4;     // a fixture on the front/back face: its centre out from the truss centre
     public const double TubeDrop = 0.28;   // the same on a light stand's tube (40 mm, not 30 cm)
     public const double TubeOut = 0.27;
+    public const double DecoDrop = 0.36;   // the same on a light stand's deco truss (a triangle about 22 cm across)
+    public const double DecoOut = 0.36;
     public static readonly string[] Sides = ["under", "top", "front", "back"];
     public static readonly string[] TowerSides = ["front", "back", "left", "right", "top"];
     public const double TowerOut = 0.32;   // a fixture on a tower's face: its centre out from the tower's centre
@@ -476,7 +478,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             var q = p.XY;
             var z = p.Z;
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
-            double drop = t.IsTube ? TubeDrop : HangDrop, outward = t.IsTube ? TubeOut : SideOut;
+            double drop = t.IsDeco ? DecoDrop : t.IsTube ? TubeDrop : HangDrop, outward = t.IsDeco ? DecoOut : t.IsTube ? TubeOut : SideOut;
             switch (side)
             {
                 case "top": z += drop; break;

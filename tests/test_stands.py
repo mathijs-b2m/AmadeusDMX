@@ -55,3 +55,13 @@ def test_four_small_heads_go_side_by_side_on_a_tbar():
     assert len(us) == 4 and us == sorted(us) and us[0] == pytest.approx(-us[-1])
     assert all(b - a >= 0.25 + automount.STAND_GAP - 1e-9 for a, b in zip(us, us[1:]))
     assert len(m._free(t, "under", 4, "head", automount.USE, width=0.4)) == 3  # bigger heads: fewer
+
+
+def test_a_stand_with_deco_truss_holds_its_fixtures_further_out_than_a_tube():
+    bridge = T.stand("b", "bridge", 3.0, 4.0, -1.5, 3.0)
+    assert not T.is_deco(bridge)
+    deco = {**bridge, "bar": "deco"}
+    assert T.is_deco(deco) and T.is_stand(deco) and T.stand_feet(deco) == T.stand_feet(bridge)
+    assert not T.is_deco({"id": "t", "type": "quatro", "length_m": 3, "x_m": 4, "y_m": -1, "z_m": 3, "bar": "deco"})
+    under = T.place({"id": "f"}, deco, 0.0, 8.0, "under")
+    assert under["z_m"] == pytest.approx(3.0 - T.DECO_DROP) and T.DECO_DROP > T.TUBE_DROP

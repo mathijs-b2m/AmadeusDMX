@@ -50,6 +50,8 @@ public sealed record Truss
     public double? MaxKg { get; set; }
     public double? MaxHeightM { get; set; }
     public double? MinHeightM { get; set; }
+    /// A light stand's bar: "deco" a triangle of deco truss (about 22 cm across); null the 40 mm tube.
+    public string? Bar { get; set; }
 
     /// The usual round truss sizes (any other works too) and arcs.
     public static readonly double[] RingDiameters = [2, 3, 4, 5, 6, 8];
@@ -107,6 +109,7 @@ public sealed record Truss
             LiftM = J.Val(c, "lift_m", J.Double),
             Aim = J.Ref(c, "aim", J.String),
             MaxKg = J.Val(c, "max_kg", J.Double),
+            Bar = J.Ref(c, "bar", J.String),
             MaxHeightM = J.Val(c, "max_height_m", J.Double),
             MinHeightM = J.Val(c, "min_height_m", J.Double),
         };
@@ -132,6 +135,7 @@ public sealed record Truss
         if (LiftM is { } lift) o["lift_m"] = lift;
         if (Aim is not null) o["aim"] = Aim;
         if (MaxKg is { } kg) o["max_kg"] = kg;
+        if (Bar is not null) o["bar"] = Bar;
         if (MaxHeightM is { } top) o["max_height_m"] = top;
         if (MinHeightM is { } bottom) o["min_height_m"] = bottom;
         return JSONValue.Of(o);
@@ -170,6 +174,8 @@ public sealed record Truss
     /// A scaffold wall: tube, bays across and lifts up, standing on the floor.
     public bool IsScaffold => Type == "scaffold" && !Vertical && !IsLoop;
     /// A bar fixtures clamp close to: a light stand's tube, or a ledger of a scaffold.
+    /// A light stand whose bar is a triangle of deco truss.
+    public bool IsDeco => IsStand && Bar == "deco";
     public bool IsTube => IsStand || Type == "ledger";
     public double ScaffoldDepth => DepthM ?? 1;
     /// How many bays across and lifts up: the standards and ledgers share its size evenly, the top ledger at ZM.

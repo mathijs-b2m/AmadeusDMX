@@ -400,13 +400,37 @@ public sealed class Scenery
     {
         var m = new MeshBuilder();
         float z = (float)t.ZM, r = (float)t.RotDeg * MathF.PI / 180;
-        m.Cylinder(V(t.XM, t.YM, z), V(MathF.Cos(r), MathF.Sin(r), 0), radius: 0.02f, length: (float)t.LengthM, color,
-                   emissive: emissive, segments: 10);
+        var pole = t.IsDeco ? z - 0.095f : z - 0.02f;  // where the stand's pole meets the bar
+        if (t.IsDeco)
+        {
+            // three chords, point up, laced on each face
+            Vector3 ax = V(MathF.Cos(r), MathF.Sin(r), 0), n = V(-MathF.Sin(r), MathF.Cos(r), 0), mid = V(t.XM, t.YM, z);
+            var len = (float)t.LengthM;
+            Vector3[] chords = [n * -0.11f + V(0, 0, -0.095f), n * 0.11f + V(0, 0, -0.095f), V(0, 0, 0.095f)];
+            foreach (var c in chords) m.Cylinder(mid + c, ax, radius: 0.012f, length: len, color, emissive: emissive, segments: 6);
+            var bays = Math.Max(1, (int)MathF.Round(len / 0.22f));
+            for (var i = 0; i < 3; i++)
+            {
+                Vector3 c = chords[i], d = chords[(i + 1) % 3];
+                for (var k = 0; k < bays; k++)
+                {
+                    float u0 = -len / 2 + len * k / bays, u1 = u0 + len / bays;
+                    Vector3 a = mid + ax * u0 + (k % 2 == 0 ? c : d), b = mid + ax * u1 + (k % 2 == 0 ? d : c);
+                    m.Cylinder((a + b) / 2, Vector3.Normalize(b - a), radius: 0.006f, length: (b - a).Length(), color,
+                               emissive: emissive, segments: 4);
+                }
+            }
+        }
+        else
+        {
+            m.Cylinder(V(t.XM, t.YM, z), V(MathF.Cos(r), MathF.Sin(r), 0), radius: 0.02f, length: (float)t.LengthM, color,
+                       emissive: emissive, segments: 10);
+        }
         var spread = MathF.Min(0.75f, 0.25f + z * 0.15f);  // a taller stand stands wider
         foreach (var f in t.StandFeet)
         {
             float px = (float)f.X, py = (float)f.Y;
-            m.Cylinder(V(px, py, (z - 0.02f) / 2), V(0, 0, 1), radius: 0.025f, length: z - 0.02f, color * 0.85f,
+            m.Cylinder(V(px, py, pole / 2), V(0, 0, 1), radius: 0.025f, length: pole, color * 0.85f,
                        emissive: emissive, segments: 8);
             var hub = V(px, py, MathF.Min(0.7f, z * 0.3f));
             // three legs out from the hub to the floor: a bridge's with one leg in along the bar (as a crew sets it,
