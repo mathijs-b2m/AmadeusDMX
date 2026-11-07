@@ -199,7 +199,7 @@ class Feed:
         fx = []
         for e in self.ids:
             s = states[e]
-            dim, r, g, b, w = shown.get(e, (s.dimmer, s.r, s.g, s.b, s.white))
+            dim, r, g, b, w = shown.get(e, (s.lit, s.r, s.g, s.b, s.white))
             if e in self.dark:
                 dim = w = 0.0
             fx.append([round(v, 3) for v in (dim, r, g, b, w, s.pan, s.tilt)])

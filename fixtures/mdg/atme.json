@@ -24,13 +24,13 @@
     "categories": [
       "Hazer"
     ],
-    "converter": 5,
+    "converter": 6,
     "key": "mdg/atme"
   },
   "physical": {
     "beam_deg": 25,
     "fog": {
-      "_note": "Output estimated from the power; set m3_min (m\u00b3 per minute), max_burst_s and rest_s from the manual for better timing (engine/fog.py).",
+      "_note": "Output estimated from the power; set m3_min (m³ per minute), max_burst_s and rest_s from the manual for better timing (engine/fog.py).",
       "estimated": true,
       "type": "haze"
     },

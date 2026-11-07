@@ -162,7 +162,15 @@
       },
       {
         "attr": "shutter_strobe",
-        "default": 15
+        "default": 15,
+        "strobe_range": [
+          21,
+          117
+        ],
+        "strobe_hz": [
+          1.0,
+          25.0
+        ]
       },
       {
         "attr": "dimmer"
@@ -303,7 +311,15 @@
       },
       {
         "attr": "shutter_strobe",
-        "default": 15
+        "default": 15,
+        "strobe_range": [
+          21,
+          117
+        ],
+        "strobe_hz": [
+          1.0,
+          25.0
+        ]
       },
       {
         "attr": "dimmer"
@@ -524,7 +540,15 @@
       },
       {
         "attr": "shutter_strobe",
-        "default": 15
+        "default": 15,
+        "strobe_range": [
+          21,
+          117
+        ],
+        "strobe_hz": [
+          1.0,
+          25.0
+        ]
       },
       {
         "attr": "dimmer"
@@ -659,7 +683,7 @@
       "Moving Head",
       "Color Changer"
     ],
-    "converter": 5,
+    "converter": 6,
     "key": "ayrton/diablo-s"
   },
   "physical": {

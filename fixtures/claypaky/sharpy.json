@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Clay_Paky/Clay-Paky-Sharpy.qxf",
     "type": "Moving Head",
-    "converter": 8
+    "converter": 10
   },
   "physical": {
     "pan_deg": 540,
@@ -28,7 +28,15 @@
       },
       {
         "attr": "shutter",
-        "default": 105
+        "default": 105,
+        "strobe_range": [
+          4,
+          103
+        ],
+        "strobe_hz": [
+          1.0,
+          12.0
+        ]
       },
       {
         "attr": "dimmer"
@@ -88,7 +96,15 @@
       },
       {
         "attr": "shutter",
-        "default": 105
+        "default": 105,
+        "strobe_range": [
+          4,
+          103
+        ],
+        "strobe_hz": [
+          1.0,
+          12.0
+        ]
       },
       {
         "attr": "dimmer"

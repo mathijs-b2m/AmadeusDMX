@@ -144,7 +144,9 @@ The **setup page** (`/setup.html`) edits the active set on the active rig: pick 
 
 ## Fixture library (`fixtures/<manufacturer>/<model>.json`)
 
-Every DMX mode from the manual, safe defaults for channels the engine doesn't drive (shutter open, prism off, no programs, strobe channel never driven), plus:
+Every DMX mode from the manual, safe defaults for channels the engine doesn't drive (shutter open, prism off, no programs), plus:
+
+- **`strobe_range`, `strobe_hz`:** on a shutter or strobe channel, its steady strobe: the values from slowest to fastest, and their speeds when the manual gives them. The engine strobes the fixture on this channel.
 
 - **`motion`:** speed and acceleration per axis (measure with `amadeus motion`).
 - **`beam_fx`:** DMX values per beam effect, including rotation ranges.

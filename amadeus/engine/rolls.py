@@ -200,6 +200,7 @@ class RollsMixin:
             if eid in flashes:
                 s.dimmer, s.white = flashes[eid], flashes[eid]
                 s.r, s.g, s.b = 1.0, 1.0, 1.0
+                s.strobe_hz, s.gate = 0.0, 1.0  # the hits of the roll, one by one: on the dimmer, exactly on them
             elif eid in self.roll_strobes:
                 s.dimmer, s.white = 0.0, 0.0
             elif eid in self.roll_lights:

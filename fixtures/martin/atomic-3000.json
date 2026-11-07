@@ -6,13 +6,21 @@
     "Mode1": [
       {
         "attr": "shutter",
-        "default": 252
+        "default": 252,
+        "strobe_range": [
+          6,
+          249
+        ]
       }
     ],
     "Mode1withColour": [
       {
         "attr": "shutter",
-        "default": 252
+        "default": 252,
+        "strobe_range": [
+          6,
+          249
+        ]
       },
       {
         "attr": "colour",
@@ -22,7 +30,11 @@
     "Mode1withColourandFan": [
       {
         "attr": "shutter",
-        "default": 252
+        "default": 252,
+        "strobe_range": [
+          6,
+          249
+        ]
       },
       {
         "attr": "colour",
@@ -43,7 +55,15 @@
       },
       {
         "attr": "rate",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          6,
+          255
+        ],
+        "strobe_hz": [
+          0.5,
+          25.0
+        ]
       }
     ],
     "Mode2withColour": [
@@ -56,7 +76,15 @@
       },
       {
         "attr": "rate",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          6,
+          255
+        ],
+        "strobe_hz": [
+          0.5,
+          25.0
+        ]
       },
       {
         "attr": "colour",
@@ -73,7 +101,15 @@
       },
       {
         "attr": "rate",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          6,
+          255
+        ],
+        "strobe_hz": [
+          0.5,
+          25.0
+        ]
       },
       {
         "attr": "colour",
@@ -94,7 +130,15 @@
       },
       {
         "attr": "rate",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          6,
+          255
+        ],
+        "strobe_hz": [
+          0.5,
+          25.0
+        ]
       },
       {
         "attr": "effects",
@@ -111,7 +155,15 @@
       },
       {
         "attr": "rate",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          6,
+          255
+        ],
+        "strobe_hz": [
+          0.5,
+          25.0
+        ]
       },
       {
         "attr": "effects",
@@ -132,7 +184,15 @@
       },
       {
         "attr": "rate",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          6,
+          255
+        ],
+        "strobe_hz": [
+          0.5,
+          25.0
+        ]
       },
       {
         "attr": "effects",
@@ -160,7 +220,7 @@
     "watts": 3000
   },
   "qlc": {
-    "converter": 8,
+    "converter": 10,
     "key": "Martin/Martin-Atomic-3000.qxf",
     "type": "Strobe"
   },

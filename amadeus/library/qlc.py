@@ -20,6 +20,7 @@ from pathlib import Path
 
 from amadeus import paths
 from amadeus.library import fixtures as fxlib
+from amadeus.library import strobe
 
 QLC_DIR = paths.CACHE / "qlc"
 REPO_DIR = paths.CACHE / "qlcplus"
@@ -27,7 +28,7 @@ FIXTURES_DIR = REPO_DIR / "resources" / "fixtures"
 REPO_URL = "https://github.com/mcallegari/qlcplus.git"
 RAW_URL = "https://raw.githubusercontent.com/mcallegari/qlcplus/master/resources/fixtures/{path}"
 NS = {"q": "http://www.qlcplus.org/FixtureDefinition"}
-CONVERTER_VERSION = 9
+CONVERTER_VERSION = 10
 
 PRESET_ATTR = {
     "IntensityMasterDimmer": "dimmer",
@@ -179,6 +180,7 @@ def _caps(ch) -> list[dict]:
                 "max": int(c.get("Max", 255)),
                 "preset": c.get("Preset", ""),
                 "res": c.get("Res1") or c.get("Res") or "",
+                "res2": c.get("Res2") or "",
                 "name": (c.text or "").strip(),
             }
         )
@@ -230,6 +232,25 @@ def _roll(caps: list[dict]) -> dict | None:
         fast_first = "FastToSlow" in pre or "fast to slow" in n
         out.setdefault("ccw" if ccw else "cw", [c["max"], c["min"]] if fast_first else [c["min"], c["max"]])
     return out if "cw" in out or "ccw" in out else None
+
+
+def _strobe_ranges(ch) -> list[tuple]:
+    """A channel's value ranges for strobe.pick, in its words: the preset says as much as the name, and on a
+    channel called Strobe a plain "Slow - fast" is its speed."""
+    name = ch.get("Name", "")
+    caps = _caps(ch)
+    if not caps and "strobe" in name.lower():  # (a QLC+ channel preset: all of it)
+        return [(1, 255, f"{name} {ch.get('Preset', '')}")]
+    out = []
+    for c in caps:
+        if c["preset"].startswith(("Pulse", "Ramp", "Shutter")):
+            continue  # (a ramp in a strobe's words; open and closed, even when a file names a strobe that)
+        preset = c["preset"].replace("Random", "")  # (often a file's plain strobe: its name says if it is random)
+        words = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", preset).replace("Freq Range", "").replace("Frequency", "")
+        hz = (c["res"], c["res2"]) if "Freq" in c["preset"] else (None, None)
+        speed = re.search(r"slow|fast|hz", c["name"], re.I) and re.search(r"strobe|\brate\b", name, re.I)
+        out.append((c["min"], c["max"], f"{words} {c['name']} {'strobe' if speed else ''}", *hz))
+    return out
 
 
 def _classify(ch) -> dict:
@@ -404,6 +425,8 @@ def convert(rel: str) -> dict:
         for n in range(len(order)):
             ch = channels.get(order.get(n))
             spec = _classify(ch) if ch is not None else {"attr": "unused", "default": 0}
+            if ch is not None:
+                strobe.mark(spec, _strobe_ranges(ch))
             if dark and ch is not None:
                 caps = [(c["min"], c["name"]) for c in _caps(ch)]
                 spec = {"attr": spec["attr"]}  # held at its off value

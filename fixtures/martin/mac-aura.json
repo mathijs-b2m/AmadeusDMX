@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Martin/Martin-MAC-Aura.qxf",
     "type": "Moving Head",
-    "converter": 4
+    "converter": 10
   },
   "physical": {
     "pan_deg": 539,
@@ -25,7 +25,11 @@
     "Extended": [
       {
         "attr": "shutter",
-        "default": 22
+        "default": 22,
+        "strobe_range": [
+          64,
+          25
+        ]
       },
       {
         "attr": "dimmer"
@@ -93,7 +97,11 @@
       },
       {
         "attr": "shutter",
-        "default": 22
+        "default": 22,
+        "strobe_range": [
+          64,
+          25
+        ]
       },
       {
         "attr": "dimmer"
@@ -115,7 +123,11 @@
     "Standard": [
       {
         "attr": "shutter",
-        "default": 22
+        "default": 22,
+        "strobe_range": [
+          64,
+          25
+        ]
       },
       {
         "attr": "dimmer"

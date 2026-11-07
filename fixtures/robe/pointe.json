@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Robe/Robe-Pointe.qxf",
     "type": "Moving Head",
-    "converter": 8
+    "converter": 10
   },
   "physical": {
     "pan_deg": 540,
@@ -106,7 +106,11 @@
       },
       {
         "attr": "shutter",
-        "default": 47
+        "default": 47,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"
@@ -172,7 +176,11 @@
       },
       {
         "attr": "shutter",
-        "default": 47
+        "default": 47,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"
@@ -285,7 +293,11 @@
       },
       {
         "attr": "shutter",
-        "default": 47
+        "default": 47,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"

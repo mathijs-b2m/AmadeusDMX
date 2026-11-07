@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Chauvet/Chauvet-ColorBand-Pix-M.qxf",
     "type": "LED Bar (Beams)",
-    "converter": 4
+    "converter": 10
   },
   "physical": {
     "pan_deg": 0,
@@ -110,7 +110,11 @@
       },
       {
         "attr": "speed_strobe",
-        "default": 255
+        "default": 255,
+        "strobe_range": [
+          0,
+          254
+        ]
       },
       {
         "attr": "auto_programs",
@@ -614,7 +618,11 @@
       },
       {
         "attr": "speed_strobe",
-        "default": 255
+        "default": 255,
+        "strobe_range": [
+          0,
+          254
+        ]
       },
       {
         "attr": "auto_programs",

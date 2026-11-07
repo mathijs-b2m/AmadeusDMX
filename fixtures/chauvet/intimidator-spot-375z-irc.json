@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Chauvet/Chauvet-Intimidator-Spot-375Z-IRC.qxf",
     "type": "Moving Head",
-    "converter": 8
+    "converter": 10
   },
   "physical": {
     "pan_deg": 540,
@@ -64,7 +64,11 @@
       },
       {
         "attr": "shutter",
-        "default": 5
+        "default": 5,
+        "strobe_range": [
+          8,
+          76
+        ]
       },
       {
         "attr": "control_functions",
@@ -108,7 +112,11 @@
       },
       {
         "attr": "shutter",
-        "default": 5
+        "default": 5,
+        "strobe_range": [
+          8,
+          76
+        ]
       },
       {
         "attr": "zoom",

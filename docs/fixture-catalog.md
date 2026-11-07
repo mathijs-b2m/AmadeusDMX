@@ -38,7 +38,9 @@ safety rules below.
 
 Driven channels get their role (dimmer, colours, pan/tilt with fine, colour wheel, gobo and its rotation,
 prism, frost, zoom). Every other channel gets a value that keeps the fixture quiet: shutter open, no programs, no
-macros. OFL 16-bit channels are scaled to bytes, and an OFL alias follows the fixture it points to.
+macros. A shutter or strobe channel also keeps its steady strobe (`strobe_range`, with `strobe_hz` when the source
+gives the speeds): the show strobes the fixture on it. A fixture added earlier gets these from the catalogue; one
+without a known strobe range flashes on its dimmer. OFL 16-bit channels are scaled to bytes, and an OFL alias follows the fixture it points to.
 Moving heads get an estimated speed (measure it), brightness comes from the lumens or else the power.
 
 ### Gobos and zoom

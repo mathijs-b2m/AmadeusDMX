@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Martin/Martin-Atomic-3000-LED.qxf",
     "type": "Strobe",
-    "converter": 4
+    "converter": 10
   },
   "physical": {
     "beam_deg": 110.0,
@@ -29,7 +29,15 @@
       },
       {
         "attr": "shutter",
-        "default": 255
+        "default": 255,
+        "strobe_range": [
+          1,
+          255
+        ],
+        "strobe_hz": [
+          0.29,
+          16.67
+        ]
       }
     ],
     "4-ch": [
@@ -42,7 +50,15 @@
       },
       {
         "attr": "shutter",
-        "default": 255
+        "default": 255,
+        "strobe_range": [
+          1,
+          255
+        ],
+        "strobe_hz": [
+          0.29,
+          16.67
+        ]
       },
       {
         "attr": "beam_special_effects",
@@ -59,7 +75,15 @@
       },
       {
         "attr": "shutter",
-        "default": 255
+        "default": 255,
+        "strobe_range": [
+          1,
+          255
+        ],
+        "strobe_hz": [
+          0.29,
+          16.67
+        ]
       },
       {
         "attr": "beam_special_effects",
@@ -83,7 +107,11 @@
       },
       {
         "attr": "shutter",
-        "default": 20
+        "default": 20,
+        "strobe_range": [
+          50,
+          200
+        ]
       },
       {
         "attr": "dimmer"

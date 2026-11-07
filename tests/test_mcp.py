@@ -235,7 +235,7 @@ def test_a_fixture_the_library_lacks_is_made_from_its_chart_then_patched(fixture
 
     defn = fxlib.get(made["key"])
     chans = defn["modes"]["15CH"]
-    assert chans[7] == {"attr": "shutter", "default": 255}  # held open: the light shows
+    assert chans[7] == {"attr": "shutter", "default": 255, "strobe_range": [8, 254]}  # held open: the light shows
     assert chans[12] == {"attr": "zoom", "default": 128}
     assert [c["attr"] for c in chans if "default" not in c] == [
         "pan", "pan_fine", "tilt", "tilt_fine", "dimmer", "dimmer_fine", "red", "green", "blue", "white"]  # fmt: skip

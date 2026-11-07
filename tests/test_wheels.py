@@ -34,7 +34,7 @@ def played(track, path):
 
 
 def level(s):
-    return s.strobe or max(s.dimmer, s.white)
+    return max(s.dimmer, s.white)
 
 
 @pytest.mark.parametrize("bpm", [100.0, 128.0, 174.0])

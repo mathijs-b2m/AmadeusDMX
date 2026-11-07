@@ -23,17 +23,24 @@ class State:
     spin: float = 0.0  # lasers: rotation -1..1 (0 = still)
     lcolor: str = ""  # lasers: colour mode (base/accent/white/cycle: one colour; multi/rainbow: per beam)
     phase: float = -1.0  # lasers: ripple position across the fan 0..1 (-1: all beams lit)
-    strobe: float = 0.0  # moving heads: strobing, a flash this bright (0: not strobing; the show arc holds the
-    # beam steady at this level where its flashes knob is down, and never smooths a strobe)
+    strobe_hz: float = 0.0  # strobing this fast (0: not): a fixture with a strobe channel flashes on it, its dimmer
+    # open at `dimmer` (library/strobe.py). Everything that dims or darkens a light works on `dimmer`, so it holds here
+    gate: float = 1.0  # the flash on the beat grid: how much of `dimmer` is lit now. A light without a strobe channel
+    # flashes with it on its dimmer, and the visualisers show it (`lit`); the show arc holds a head steady at gate 1
     dmx_pan: float | None = None  # pan/tilt sent as DMX (the target, slightly ahead); pan/tilt above is the
     dmx_tilt: float | None = None  # predicted real position, used by the visualiser
+
+    @property
+    def lit(self) -> float:
+        """The level this frame, with the flash: what a dimmer plays and the visualisers show."""
+        return self.dimmer * self.gate
 
     def blend(self, o: State, k: float) -> State:
         out = State(*(getattr(self, f) * (1 - k) + getattr(o, f) * k for f in NUMERIC))
         src = o if k >= 0.5 else self  # discrete: switch halfway
         out.fx, out.gobo, out.fx_speed, out.fx_reverse = src.fx, src.gobo, src.fx_speed, src.fx_reverse
         out.size, out.spin, out.lcolor, out.phase = src.size, src.spin, src.lcolor, src.phase
-        out.dmx_pan, out.dmx_tilt, out.strobe = src.dmx_pan, src.dmx_tilt, src.strobe
+        out.dmx_pan, out.dmx_tilt, out.strobe_hz, out.gate = src.dmx_pan, src.dmx_tilt, src.strobe_hz, src.gate
         out.zoom = self.zoom * (1 - k) + o.zoom * k
         return out
 

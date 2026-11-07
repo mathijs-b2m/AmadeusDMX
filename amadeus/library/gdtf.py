@@ -21,6 +21,7 @@ import zipfile
 from pathlib import Path
 
 from amadeus.library import fixtures as fxlib
+from amadeus.library import strobe
 
 CONVERTER_VERSION = 1
 
@@ -171,6 +172,15 @@ def _slot_sets(f: dict) -> list[tuple[int, int, dict]]:
     return out
 
 
+def _strobe_ranges(ch: _Channel) -> list[tuple]:
+    """A shutter's steady strobes for strobe.pick: PhysicalFrom/To are their speeds in Hz (the default 0..1 says
+    nothing)."""
+    return [
+        (f["from"], f["to"], "strobe", *(f["phys"] if f["phys"] != (0.0, 1.0) else (None, None)))
+        for f in ch.by_attr(r"Shutter\d*Strobe")
+    ]
+
+
 def _classify(ch: _Channel, byte: int) -> dict:
     """What the engine does with this channel (byte 0 = coarse, 1 = fine)."""
     a = ch.attr  # only the first wheel, prism and frost are played: Gobo2 and the like stay put
@@ -230,7 +240,7 @@ def _classify(ch: _Channel, byte: int) -> dict:
     if a in ("PanTiltMSpeed", "PanMSpeed", "TiltMSpeed", "MSpeed", "PanTiltMTime"):
         return {"attr": re.sub(r"[^a-z0-9]+", "_", a.lower()), "default": 0}  # tracking: the engine times moves
     if a.startswith("Shutter"):
-        return {"attr": "shutter", "default": ch.quiet()}
+        return strobe.mark({"attr": "shutter", "default": ch.quiet()}, _strobe_ranges(ch))
     return {"attr": re.sub(r"[^a-z0-9]+", "_", a.lower()).strip("_") or "channel", "default": ch.quiet()}
 
 
