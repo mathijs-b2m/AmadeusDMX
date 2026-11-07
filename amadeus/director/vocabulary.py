@@ -57,6 +57,10 @@ PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 
         "Hot pink, violet, gold and turquoise. Glitter: a lit-up dance floor, disco.",
         [(1.0, 0.0, 0.55), (0.55, 0.0, 1.0), (1.0, 0.7, 0.05), (0.0, 0.85, 0.8)],
     ),
+    "rave": (
+        "Hot pink, azure, sunshine yellow and lime: a 90s rave flyer, happy hardcore.",
+        [(1.0, 0.0, 0.5), (0.0, 0.55, 1.0), (1.0, 0.85, 0.0), (0.3, 1.0, 0.0)],
+    ),
     "stage": (
         "Warm white, amber and deep blue. A concert stage: rock, live bands.",
         [(1.0, 0.85, 0.65), (1.0, 0.55, 0.1), (0.1, 0.2, 0.9), (1.0, 1.0, 1.0)],

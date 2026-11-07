@@ -21,6 +21,9 @@ choice, the Decisions API from its artist and title, its tag) is lit in its own 
 techno set is still pop. A genre with a program of its own (cinematic) plays that program and leaves the
 set's genre alone.
 
+A genre can have two faces, told by the track's sound (`style_for`): hardcore is Thunderdome's red and white, or
+happy hardcore's rave colours and piano.
+
 A **named show** is a style sheet of its own within a genre ("Prydz Tomorrow", a techno show): the DJ picks it for
 their set, and every track is lit in it, whatever its genre, until it is switched off. Besides its colours and
 leans it says what it always does (`always`, per section): the colours of the pars and heads, how the heads light
@@ -30,12 +33,12 @@ and move. Those are not leans but the show, in every phrase, for both directors.
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from amadeus.director.vocabulary import DEFAULT_PALETTES, PALETTES
 
 SWITCH_AFTER = 2  # a different genre this many tracks in a row becomes the set's genre
-KNOWN = {"you", "ai", "tag"}  # where a genre is known, not guessed from the audio: the track keeps its own style
+KNOWN = {"you", "ai", "tag", "sound"}  # where a genre is known, not guessed from the audio: its own style
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,9 @@ class Style:
     beat: str = ""  # a trigger that IS the genre (reggaeton: boom-tac): not a lean, the beat of its body
     looks: dict[str, dict] = field(default_factory=dict)  # per section: the genre's own look there (disco's
     # mirror ball in the break), every layer it names
+    break_kick: float = 0.5  # a phrase with a kick on fewer of its beats than this is a break (hardcore's kick is on
+    # all of them: a bass note on every other beat is no kick)
+    flavour: str = ""  # the genre's other face (hardcore: "happy"), a plan of its own
     title: str = ""  # a named show: its name (and `of`: the genre it belongs to)
     of: str = ""
     always: dict[str, dict] = field(default_factory=dict)  # a named show: per section ("*": all), per layer,
@@ -137,6 +143,17 @@ MIRROR_BALL = {"beam_fx": "gobo_rotate", "gobo_style": "dots", "movement": "circ
                "aim": "crowd", "head_light": "steady", "head_color": "white"}  # fmt: skip
 
 
+# Hardcore's return after a break: the heads strobe on the kick (the flash limit brings them down to one flash a kick),
+# swinging left and right in open white over the crowd, everything at once: the rig's one moment as a single block.
+HARDCORE_DROP = {"head_light": "strobe", "movement": "swing", "formation": "mirror", "aim": "crowd",
+                 "head_color": "white", "beam_fx": "open", "par_base": "off", "par_accent": "pulse"}  # fmt: skip
+HAPPY_DROP = {**HARDCORE_DROP, "par_base": "full", "par_accent": "color_pop"}  # …and happy: the colour stays on
+# Happy hardcore's break: the kick rests, and the pars play the piano and the singer note by note under a fan of
+# coloured beams turning slowly up in the air.
+PIANO_BREAK = {"trigger": "lead", "par_base": "dim", "par_accent": "melody", "head_light": "breathe",
+               "movement": "circle", "formation": "fan", "aim": "sky", "head_color": "cycle",
+               "beam_fx": "open"}  # fmt: skip
+
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
 _CALM_AVOID = {"head_light": {"flick", "beat", "random", "strobe"},
                "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave", "pour"},
@@ -215,6 +232,35 @@ STYLES: dict[str, Style] = {
                 "movement": ("bounce", "step_on_beat", "ballyhoo"),
                 "head_light": ("flick", "beat", "pulse"),
             },
+        ),  # fmt: skip
+        _style(
+            "hardcore",
+            "Hardcore: Rotterdam, Thunderdome. Black, red and white, and the kick is everything: 170 BPM, distorted, "
+            "on every beat, and the crowd stamps along. Lights on the kick, dark between the hits, the groups "
+            "taking turns so no light has to hit every kick. Big, hard, punchy moves that land with it, straight "
+            "open beams, no decoration, no soft fades. Where the kick returns after a break the whole rig goes: "
+            "the heads strobe on the kick and swing over the crowd. A kick on only "
+            "some of the beats is a break.",
+            ["fire", "ice"],
+            {
+                "par_base": {"fade", "full"},
+                "par_accent": {"none", "sparkle", "melody"},
+                "movement": {"still", "figure8", "circle"},
+                "head_light": {"breathe", "flick"},
+                "head_color": {"cycle"},
+                "beam_fx": {"prism_spin", "prism", "gobo_spin", "gobo_rotate", "frost"},
+            },
+            {
+                "par_base": ("off", "dim"),
+                "par_accent": ("alternate", "pulse", "chase"),
+                "movement": ("swing", "step_on_beat", "tilt_wave", "bounce"),
+                "head_light": ("beat", "alternate", "pulse"),
+                "head_color": ("white", "base"),
+                "beam_fx": ("open", "gobo_shake"),
+            },
+            beat="kick",
+            looks={"drop": HARDCORE_DROP},
+            break_kick=0.7,
         ),  # fmt: skip
         _style(
             "dnb",
@@ -383,6 +429,37 @@ STYLES: dict[str, Style] = {
 }
 
 
+# Hardcore's happy face (Paul Elstak, Party Animals, Dune): the same kick, with a piano, a singer and all the colours.
+HAPPY_HARDCORE = replace(
+    STYLES["hardcore"],
+    flavour="happy",
+    text="Happy hardcore: a 90s rave, a party at 170 BPM. Bright rave colours, hot pink, azure, yellow and lime, and "
+    "they stay on: the kick steps the pars through them, on every beat, the groups taking turns. Big swinging "
+    "moves that land on the kick, never dark, never menacing. In the break the kick rests and it turns sweet: the pars "
+    "play the piano and the singer note by note, the beams fan out into the sky in slowly changing colours. Then the "
+    "kick returns and everything goes: white strobes on the kick over full colour. A kick on only some of the beats "
+    "is a break.",
+    palettes=("rave", "neon"),
+    avoid={
+        "par_base": frozenset({"off"}),
+        "par_accent": frozenset({"none", "melody"}),
+        "movement": frozenset({"still", "nod"}),
+        "head_light": frozenset({"breathe", "flick"}),
+        "beam_fx": frozenset({"gobo_spin", "gobo_shake", "frost"}),
+    },
+    prefer={
+        "par_base": ("dim", "full"),
+        "par_accent": ("color_pop", "chase", "alternate", "pulse"),
+        "movement": ("swing", "tilt_wave", "step_on_beat", "circle"),
+        "head_light": ("alternate", "pulse", "beat"),
+        "beam_fx": ("open", "prism"),
+    },
+    looks={"drop": HAPPY_DROP, "breakdown": PIANO_BREAK},
+)
+HAPPY_SHARE = 0.4  # Happy Hardcore's share of the hardcore the style model hears (measured: Paul Elstak 0.54, Party
+# Animals 0.58, Dune 0.76; a hard remix 0.07)
+
+
 # The heads steal the show: every head plays the light (no glowing base layer), all groups at once.
 _HEADS_LEAD = {"layer_split": "none", "grouping": ("unison", "per_group")}
 
@@ -445,8 +522,11 @@ NAMED: dict[str, Style] = {
 }
 
 
-def style_for(genre: str | None) -> Style | None:
-    """The style sheet of a genre or a named show (None: no genre, or a genre with a program of its own)."""
+def style_for(genre: str | None, facts: dict | None = None) -> Style | None:
+    """The style sheet of a genre or a named show (None: no genre, or a genre with a program of its own). `facts`:
+    what the track sounds like (Analysis.genre_facts), for a genre with two faces."""
+    if genre == "hardcore" and (facts or {}).get("happy", 0.0) >= HAPPY_SHARE:
+        return HAPPY_HARDCORE
     return STYLES.get(genre or "") or NAMED.get(genre or "")
 
 
@@ -465,7 +545,7 @@ def check() -> list[str]:
     options = {name: {v for v, _ in opts} for name, opts, _ in LAYERS}
     known = {f.name for f in Decision.__dataclass_fields__.values()}
     out = []
-    for s in [*STYLES.values(), *NAMED.values()]:
+    for s in [*STYLES.values(), HAPPY_HARDCORE, *NAMED.values()]:
         if s.title and s.of not in STYLES:
             out.append(f"{s.genre}: genre {s.of}")
         for section, layers in s.always.items():

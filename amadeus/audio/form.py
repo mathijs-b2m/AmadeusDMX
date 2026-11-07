@@ -32,8 +32,8 @@ import numpy as np
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 
 SONG_GENRES = {"pop", "rock", "metal", "rnb", "hiphop", "latin", "funk", "jazz"}
-CLUB_GENRES = {"edm", "house", "techno", "trance", "psytrance", "hardstyle", "dnb", "dubstep"}
-KNOWN = {"you", "ai", "tag"}  # where a genre is known rather than guessed from the audio
+CLUB_GENRES = {"edm", "house", "techno", "trance", "psytrance", "hardstyle", "hardcore", "dnb", "dubstep"}
+KNOWN = {"you", "ai", "tag", "sound"}  # where a genre is known rather than guessed from the audio
 
 SUNG = 0.25  # a phrase with a voice singing the lead this share of the time is sung
 VOCAL_LOUD = 0.4  # a song: the voice sings at least this share of its loud phrases…

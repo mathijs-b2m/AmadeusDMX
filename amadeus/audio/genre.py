@@ -9,16 +9,19 @@ From strong to weak:
 4. the audio, as the fallback. Reggaeton first, by its rhythm whatever its form: the dembow, a snare (or rim)
    on the 16th before the second beat and on the "and" of it, every two beats (3+3+2), where house and pop
    put theirs on the beat. Then disco, by its sound (amadeus/audio/disco.py): its beat is house's, but
-   EffNet-Discogs hears the band, the strings and the bass guitar's octaves. Then its form
+   EffNet-Discogs hears the band, the strings and the bass guitar's octaves. Then hardcore, by its sound too
+   (amadeus/audio/hardcore.py), song or not: this is no guess, so the track keeps its own style in a set (source
+   "sound"). Then its form
    (amadeus/audio/form.py): a song, with a voice singing through its loud parts, is rock when guitars lead it,
    hip-hop when it is slow and they don't, else pop; never a beat-less genre, however loose its groove.
    Otherwise how much of the track grooves (the same rhythm pattern bar after bar, in the low end or the highs)
    tells music made for a pulse from music that isn't (cinematic, ambient); for music with a groove the tempo
-   gives the club family.
+   gives the club family: at drum and bass's tempo a kick on (nearly) every beat is hardcore.
 
 A Latin call (from the model or a tag) on a track with a dembow is reggaeton: the model knows Karol G sings
 Latin music, the audio hears which kind. Likewise a funk or house call on a track that unmistakably sounds like
-disco is disco (with no disco to choose, the model called Klein & M.B.O.'s Italo-Disco "Dirty Talk" house).
+disco is disco (with no disco to choose, the model called Klein & M.B.O.'s Italo-Disco "Dirty Talk" house), and
+a hard dance call on a track that unmistakably sounds like hardcore is hardcore.
 
 The music facts behind the call are kept (`GenreCall.facts`) so the choice can be shown and checked.
 """
@@ -35,7 +38,7 @@ from pathlib import Path
 import numpy as np
 
 from amadeus import paths
-from amadeus.audio import disco
+from amadeus.audio import hardcore, sound
 from amadeus.audio.dembow import dembow
 from amadeus.audio.model import Analysis
 
@@ -48,7 +51,9 @@ GENRES = {
     "techno": "techno, minimal, melodic techno, high-tech minimal, industrial techno",
     "trance": "trance, uplifting, progressive trance: euphoric leads and long breakdowns",
     "psytrance": "psytrance, goa, full-on: rolling basslines, psychedelic",
-    "hardstyle": "hardstyle, hardcore, hard dance, gabber: distorted kicks",
+    "hardstyle": "hardstyle, rawstyle, jumpstyle, hard dance: reverse bass and distorted kicks, 145–160 BPM",
+    "hardcore": "hardcore, gabber, happy hardcore, frenchcore, speedcore: Paul Elstak, Thunderdome, Angerfist, Party "
+    "Animals; a distorted kick on every beat at 160–200 BPM, with hoovers or piano and a singer",
     "dnb": "drum and bass, jungle, liquid: breakbeats around 170 BPM",
     "dubstep": "dubstep, riddim, bass music: half-time, heavy wobble bass",
     "hiphop": "hip-hop, rap, trap, grime",
@@ -79,6 +84,9 @@ DISCO, DISCO_LEAD = 0.35, 0.5  # a track that sounds like disco this much on ave
 # leading ≤ 0.18, afrobeat-funk 0.44 leading 0.14)
 CLEARLY_DISCO, CLEARLY_DISCO_LEAD = 0.55, 0.65  # this much: a funk or house call is disco after all
 DISCO_BPM = (95, 136)  # disco's tempo (boogie and Chemise ~100, Chic 110, Donna Summer 120–130, Italo ~130)
+CLEARLY_HARDCORE = 0.8  # this much, leading as much: a hard dance call is hardcore after all
+HARDCORE_KICK = 0.85  # no sound to go by: a kick on this share of the beats of the loud parts, at drum and bass's
+# tempo, is hardcore (measured: Paul Elstak 1.0; drum and bass's broken beat misses at least every other beat)
 CINEMATIC_GROOVE = 0.35  # less of the track grooves than this: not music made for a pulse (cinematic
 # scores went to ~0.2, every club track tried ≥ 0.54)
 TAG_WORDS = {  # words in a file's genre tag → our word (first match wins: specific words first)
@@ -88,7 +96,9 @@ TAG_WORDS = {  # words in a file's genre tag → our word (first match wins: spe
     "soundtrack": "cinematic", "score": "cinematic", "cinematic": "cinematic", "trailer": "cinematic",
     "epic": "cinematic", "classical": "classical", "orchestra": "classical", "ambient": "ambient",
     "chill": "ambient", "downtempo": "ambient", "psy": "psytrance", "goa": "psytrance", "trance": "trance",
-    "hardstyle": "hardstyle", "hardcore": "hardstyle", "hard dance": "hardstyle", "drum": "dnb", "dnb": "dnb",
+    "hardcore punk": "rock", "hardcore hip": "hiphop", "hardcore rap": "hiphop", "hardcore": "hardcore",
+    "gabber": "hardcore", "gabba": "hardcore", "frenchcore": "hardcore", "speedcore": "hardcore",
+    "hardstyle": "hardstyle", "hard dance": "hardstyle", "drum": "dnb", "dnb": "dnb",
     "d&b": "dnb", "jungle": "dnb", "dubstep": "dubstep", "bass music": "dubstep", "techno": "techno",
     "minimal": "techno", "big room": "edm", "electro house": "edm", "edm": "edm", "dance": "edm",
     "house": "house", "hip": "hiphop", "rap": "hiphop", "trap": "hiphop", "r&b": "rnb", "rnb": "rnb",
@@ -101,7 +111,7 @@ TAG_WORDS = {  # words in a file's genre tag → our word (first match wins: spe
 @dataclass
 class GenreCall:
     genre: str
-    source: str  # "you", "tag", "audio", "audio+ai"
+    source: str  # "you", "ai", "tag", "sound" (heard for certain), "audio" (a guess)
     facts: dict = field(default_factory=dict)
 
     @property
@@ -147,6 +157,7 @@ def facts(a: Analysis) -> dict:
         if np.mean(loud[k : k + 16]) > floor
     ]
     weights = np.array([p.end - p.start for p in a.phrases]) if a.phrases else np.ones(1)
+    loud_parts = [p for p in a.phrases if p.loudness_pct >= 50]
     hats = np.array([p.hat_density for p in a.phrases]) if a.phrases else np.zeros(1)
     return {
         "groove": round(float(np.mean(counted)) if counted else 0.0, 2),
@@ -156,7 +167,8 @@ def facts(a: Analysis) -> dict:
         "hat_density": round(float(np.sum(weights * hats) / weights.sum()), 2),
         "dynamics_db": round(float(np.percentile(a.rms_db, 95) - np.percentile(a.rms_db, 10)), 1),
         "dembow": round(dembow(a), 2),
-        **disco.facts(a.path),
+        "kick_share": round(float(np.mean([p.kick_ratio for p in loud_parts])) if loud_parts else 0.0, 2),
+        **sound.facts(a.path),
     }
 
 
@@ -173,11 +185,19 @@ def is_disco(f: dict, clearly: bool = False) -> bool:
     return f.get("disco", 0.0) >= lo and f.get("disco_lead", 0.0) >= lead and DISCO_BPM[0] <= f["bpm"] <= DISCO_BPM[1]
 
 
+def is_hardcore(f: dict, clearly: bool = False) -> bool:
+    lo = CLEARLY_HARDCORE if clearly else hardcore.SOUND
+    fast = hardcore.BPM[0] <= f["bpm"] <= hardcore.BPM[1]
+    return fast and hardcore.heard(f) and f.get("hardcore", 0.0) >= lo and (not clearly or f["hardcore_lead"] >= lo)
+
+
 def from_audio(f: dict) -> str:
     if is_dembow(f):  # the rhythm says reggaeton, song or not (it is sung, and slow: it would be hip-hop)
         return "reggaeton"
     if is_disco(f):  # the sound says disco, song or club track (Donna Summer sings, Italo is synth-led)
         return "disco"
+    if is_hardcore(f):  # the sound says hardcore, sung or not ("Rainbow in the Sky" has a singer and a piano)
+        return "hardcore"
     if f.get("song"):  # a song: by what leads it, never by its tempo (Olivia Rodrigo at 144 BPM isn't psytrance)
         if f.get("guitar_led", 0.0) >= ROCK_GUITAR:
             return "rock"
@@ -201,7 +221,7 @@ def from_audio(f: dict) -> str:
         return "psytrance"
     if bpm < 162:
         return "hardstyle"
-    return "dnb"
+    return "hardcore" if f.get("kick_share", 0.0) >= HARDCORE_KICK else "dnb"
 
 
 # ---------------------------------------------------------------- tags, you, the model
@@ -308,13 +328,16 @@ def detect(a: Analysis, ask_model: bool = True, song: dict | None = None) -> Gen
     tagged = from_tag(meta)
     if tagged:
         return GenreCall(_kind_of(tagged, f), "tag", f)
-    return GenreCall(from_audio(f), "audio", f)
+    return GenreCall(from_audio(f), "sound" if is_hardcore(f) else "audio", f)
 
 
 def _kind_of(genre: str, f: dict) -> str:
-    """Latin, and the audio hears a dembow: reggaeton. Funk or house that unmistakably sounds like disco: disco."""
+    """Latin, and the audio hears a dembow: reggaeton. Funk or house that unmistakably sounds like disco: disco.
+    Hard dance that unmistakably sounds like hardcore: hardcore."""
     if genre == "latin" and is_dembow(f):
         return "reggaeton"
     if genre in ("funk", "house") and is_disco(f, clearly=True):
         return "disco"
+    if genre in ("hardstyle", "edm", "dnb", "techno", "trance") and is_hardcore(f, clearly=True):
+        return "hardcore"
     return genre
