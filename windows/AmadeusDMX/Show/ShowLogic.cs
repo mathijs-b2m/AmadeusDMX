@@ -361,6 +361,7 @@ public static class Genre
         "hiphop" or "rnb" => "music.mic",
         "jazz" or "funk" => "music.note.list",
         "disco" => "sparkles",
+        "hardstyle" => "bolt.fill",
         "pop" or "latin" or "reggaeton" => "music.note",
         _ => "waveform",
     };
@@ -370,6 +371,7 @@ public static class Genre
         "you" => "Your choice",
         "ai" => "From the artist and title (Decisions API)",
         "tag" => "From the file's genre tag",
+        "sound" => "From its sound (EffNet-Discogs)",
         _ => "From the audio: groove, bass and tempo",
     };
 

@@ -120,11 +120,19 @@ CALM_PATH = {  # per-beat and wild paths → smooth ones
     "swing": "sweep",
     "ballyhoo": "circle",
     "tilt_wave": "sweep",
+    "twister": "circle",
     "pour": "nod",
     "follow_lead": "sweep",
 }
 MODERATE_PATH = {"ballyhoo": "circle", "bounce": "nod", "swing": "sweep"}
-CALM_LIGHT = {"flick": "steady", "beat": "breathe", "alternate": "breathe", "random": "breathe", "pulse": "breathe"}
+CALM_LIGHT = {
+    "hammer": "pulse",
+    "flick": "steady",
+    "beat": "breathe",
+    "alternate": "breathe",
+    "random": "breathe",
+    "pulse": "breathe",
+}
 # The groups playing are the show arc's (Light Groups): calmer plans don't feature one group over the others
 # (it may be resting), nor light one group per beat.
 CALM_GROUPING = {"chase": "unison", "solo": "unison", "split": "unison"}

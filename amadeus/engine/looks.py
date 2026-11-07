@@ -66,6 +66,8 @@ MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 HEAD_STROBE_DIV = {"drop": 4, "groove": 2, "chorus": 2, "buildup": 2}  # elsewhere: on the beat
 HEAD_STROBE_ON_S = 0.05  # a flash: two DMX frames
 FAST_STROBE_HZ = 10.0
+HAMMER_BARS = 4  # the hammer (head light): this many bars of beams punching on the kick, then as many strobing. A
+# strobe is dark most of the time: alone it would chop a moving shape into dots, and a long climax needs its turns
 
 
 def kick_turn(pattern: str, k: int, n: int, hit: int) -> bool:
@@ -222,6 +224,10 @@ class LooksMixin:
         while div > 0.25 and div / max(period, 1e-3) > hz + 1e-6:
             div /= 2
         return div
+
+    def _hammering(self, d: Decision, t: float) -> bool:
+        """Is the hammer in its strobing bars at t? Counted from the start of the phrase."""
+        return int((t - d.start) / (4 * self._beat_s())) // HAMMER_BARS % 2 == 1
 
     def head_strobe_rate(self, d: Decision) -> float:
         """How fast the heads strobe in this look, flashes a second (0: strobe-free)."""
@@ -625,6 +631,8 @@ class LooksMixin:
             step = bar // 4 if cv is not None and cv < 0.5 else bar  # little colour variety: a slower cycle
             col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + step) % len(cols)]}[hc]
             hl = d.head_light
+            if hl == "hammer":
+                hl = "strobe" if self._hammering(d, t) else "pulse"
             mine = env if kick_turn(head_pattern, rank[f["id"]], nh, hit) else 0.0  # this head's kick
             gate = None  # strobing: the flash, applied last (the beam's level is worked out first)
             if role["movement"] == "pour" and hl != "off":  # the pour plays its own light: lit falling, dark rising

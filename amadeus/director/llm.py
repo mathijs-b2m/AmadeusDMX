@@ -131,6 +131,8 @@ class OpenAIDirector:
             d.section, guarded = CLUB_SECTION[d.section], True
         if part and d.section != "drop" and d.dynamics == "impact":
             d.dynamics, guarded = "steady", True  # in a song the impact curve is for its real drops only
+        if self.style and d.section != (form := self.style.section(a, i, d.section)):
+            d.section, guarded = form, True  # the genre's own form (hardstyle: climax, build, break)
 
         # High energy keeps moving: loud with a running kick (e.g. the phrases right after a drop).
         ph = a.phrases[i]
@@ -148,7 +150,8 @@ class OpenAIDirector:
         if self.style and self.style.own_look(d, history):  # the genre's own look (disco: the mirror ball)
             guarded = True
         # The heads' strobe is for energy: a drop, a peak, the top of a build; elsewhere they play the kick.
-        if d.head_light == "strobe" and (d.section not in ("drop", "buildup", "groove", "chorus") or d.intensity < 2):
+        strobing = d.head_light in ("strobe", "hammer")
+        if strobing and (d.section not in ("drop", "buildup", "groove", "chorus") or d.intensity < 2):
             d.head_light, guarded = "beat", True
         if d.movement == "follow_lead":  # retired option (old cached answers)
             d.movement, guarded = "sweep", True
@@ -230,6 +233,8 @@ class OpenAIDirector:
             guarded = True
         if apply_arc(d, arc, self.lasers, self.groups, next_best):  # the song's dramaturgy has the last word
             guarded = True
+        if self.style and self.style.no_arc:  # …unless the genre's show keeps its size (hardstyle's climaxes)
+            self.style.enforce(d, sum(1 for h in history if h.section == d.section))
         if guarded:
             d.source += "+guard"
         return d

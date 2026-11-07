@@ -89,7 +89,7 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 </td>
 <td valign="top">
 <h3>🎶 It hears the music, not just the beat</h3>
-<p>Every genre gets its own house style: techno in ice and fire, reggaeton's boom-tac, a mirror ball for disco, rock lit like a drum kit with the guitar's strums, film scores played hit by hit like an orchestra. Pop songs get verses and choruses, not fake EDM drops.</p>
+<p>Every genre gets its own house style: techno in ice and fire, reggaeton's boom-tac, a mirror ball for disco, hardstyle hammering its climaxes and isolating one twister of beams in the break, rock lit like a drum kit with the guitar's strums, film scores played hit by hit like an orchestra. Pop songs get verses and choruses, not fake EDM drops.</p>
 </td>
 </tr>
 <tr>
