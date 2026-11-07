@@ -337,17 +337,38 @@ struct Scenery {
         vertices += m.v
     }
 
-    /// A light stand: its bar (a 40 mm tube) and a tripod under each end of a bridge, under the middle of a T-bar,
+    /// A light stand: its bar (a 40 mm tube, or a triangle of deco truss) and a tripod under each end of a bridge, under the middle of a T-bar,
     /// from the floor up to the bar.
     private mutating func lightStand(_ t: Truss, color: SIMD3<Float>, emissive: Float) {
         var m = MeshBuilder()
         let z = Float(t.zM), r = Float(t.rotDeg) * .pi / 180
-        m.cylinder(SIMD3(Float(t.xM), Float(t.yM), z), [cos(r), sin(r), 0], radius: 0.02, length: Float(t.lengthM), color,
-                   emissive: emissive, segments: 10)
+        let foot = t.isDeco ? z - 0.095 : z - 0.02  // where the stand's pole meets the bar
+        if t.isDeco {
+            // three chords, point up, laced on each face
+            let ax = SIMD3<Float>(cos(r), sin(r), 0), n = SIMD3<Float>(-sin(r), cos(r), 0)
+            let L = Float(t.lengthM), mid = SIMD3<Float>(Float(t.xM), Float(t.yM), z)
+            let chords: [SIMD3<Float>] = [n * -0.11 + [0, 0, -0.095], n * 0.11 + [0, 0, -0.095], [0, 0, 0.095]]
+            for c in chords {
+                m.cylinder(mid + c, ax, radius: 0.012, length: L, color, emissive: emissive, segments: 6)
+            }
+            let bays = max(1, Int((L / 0.22).rounded()))
+            for (i, c) in chords.enumerated() {
+                let d = chords[(i + 1) % 3]
+                for k in 0..<bays {
+                    let u0 = -L / 2 + L * Float(k) / Float(bays), u1 = u0 + L / Float(bays)
+                    let a = mid + ax * u0 + (k % 2 == 0 ? c : d), b = mid + ax * u1 + (k % 2 == 0 ? d : c)
+                    m.cylinder((a + b) / 2, simd_normalize(b - a), radius: 0.006, length: simd_length(b - a), color,
+                               emissive: emissive, segments: 4)
+                }
+            }
+        } else {
+            m.cylinder(SIMD3(Float(t.xM), Float(t.yM), z), [cos(r), sin(r), 0], radius: 0.02, length: Float(t.lengthM), color,
+                       emissive: emissive, segments: 10)
+        }
         let spread = min(0.75, 0.25 + z * 0.15)  // a taller stand stands wider
         for f in t.standFeet {
             let p = SIMD2<Float>(Float(f.x), Float(f.y))
-            m.cylinder(SIMD3(p.x, p.y, (z - 0.02) / 2), [0, 0, 1], radius: 0.025, length: z - 0.02, color * 0.85,
+            m.cylinder(SIMD3(p.x, p.y, foot / 2), [0, 0, 1], radius: 0.025, length: foot, color * 0.85,
                        emissive: emissive, segments: 8)
             let hub = SIMD3<Float>(p.x, p.y, min(0.7, z * 0.3))
             // three legs out from the hub to the floor: a bridge's with one leg in along the bar (as a crew sets it,

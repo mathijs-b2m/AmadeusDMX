@@ -23,7 +23,8 @@ A light stand (`"type": "bridge"` or `"tbar"`) is the cheaper kind: a ~40 mm tub
 standing on tripods. A light bridge has a stand under each end of its bar, a T-bar one under its middle; `z_m` is
 the bar's height (the stands go down to the floor). Fixtures clamp to the tube like to a box truss's sides, only
 closer. It may say what it takes (`max_kg`) and how high it goes (`min_height_m`, `max_height_m`), as the maker
-gives them.
+gives them. Its bar may be a triangle of deco truss instead of the tube (`"bar": "deco"`, about 22 cm across):
+fixtures then sit a little further from its centre.
 
 A scaffold (`"type": "scaffold"`) is the wall of tube a festival stage is built against: standards every `bay_m`,
 ledgers every `lift_m`, braced, two frames `depth_m` apart, standing on the floor. It is a straight truss in every
@@ -48,6 +49,8 @@ HANG_DROP = 0.42  # a fixture under (or on top of) a truss: its centre this far 
 SIDE_OUT = 0.4  # a fixture on the front/back face: its centre this far out from the truss centre
 TUBE_DROP = 0.28  # the same on a light stand's tube (40 mm, not 30 cm)
 TUBE_OUT = 0.27
+DECO_DROP = 0.36  # the same on a light stand's deco truss (a triangle about 22 cm across)
+DECO_OUT = 0.36
 TOWER_OUT = 0.32  # a fixture on a tower's face: its centre this far out from the tower's centre
 TOWER_TOP = 0.3  # a fixture on top of a tower: its centre this far above the top
 SIDES = ("under", "top", "front", "back")
@@ -170,6 +173,11 @@ def carre(
 def is_stand(t: dict) -> bool:
     """A light stand: a bridge or a T-bar (a tube on tripods), not a box truss."""
     return t.get("type") in STANDS and not t.get("vertical") and not is_loop(t)
+
+
+def is_deco(t: dict) -> bool:
+    """A light stand whose bar is a triangle of deco truss, not a tube."""
+    return is_stand(t) and t.get("bar") == "deco"
 
 
 def stand_feet(t: dict) -> list[tuple[float, float]]:
@@ -430,7 +438,7 @@ def place(f: dict, t: dict, u: float, width: float, side: str | None = None) -> 
     rot = direction(t, u)
     r = math.radians(rot)
     nx, ny = -math.sin(r), math.cos(r)  # the face towards the audience (on a ring: out of the circle)
-    drop, out = (TUBE_DROP, TUBE_OUT) if is_tube(t) else (HANG_DROP, SIDE_OUT)
+    drop, out = (DECO_DROP, DECO_OUT) if is_deco(t) else (TUBE_DROP, TUBE_OUT) if is_tube(t) else (HANG_DROP, SIDE_OUT)
     if side == "top":
         z += drop
     elif side == "front":

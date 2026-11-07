@@ -44,6 +44,8 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     public var maxKg: Double?
     public var maxHeightM: Double?
     public var minHeightM: Double?
+    /// A light stand's bar: "deco" a triangle of deco truss (about 22 cm across); nil the 40 mm tube.
+    public var bar: String?
 
     /// The usual round truss sizes (any other works too) and arcs.
     public static let ringDiameters: [Double] = [2, 3, 4, 5, 6, 8]
@@ -58,7 +60,7 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, type, lengthM = "length_m", xM = "x_m", yM = "y_m", zM = "z_m", rotDeg = "rot_deg", vertical
-        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", widthM = "width_m", depthM = "depth_m", bayM = "bay_m", liftM = "lift_m", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m"
+        case shape, diameterM = "diameter_m", arcDeg = "arc_deg", widthM = "width_m", depthM = "depth_m", bayM = "bay_m", liftM = "lift_m", aim, maxKg = "max_kg", maxHeightM = "max_height_m", minHeightM = "min_height_m", bar
     }
 
     /// A light stand as it is sold (amadeus/rig/trusses.py): a bridge on two tripods or a T-bar on one.
@@ -106,6 +108,7 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
         maxKg = try c.decodeIfPresent(Double.self, forKey: .maxKg)
         maxHeightM = try c.decodeIfPresent(Double.self, forKey: .maxHeightM)
         minHeightM = try c.decodeIfPresent(Double.self, forKey: .minHeightM)
+        bar = try c.decodeIfPresent(String.self, forKey: .bar)
         normalise()
     }
 
@@ -150,6 +153,8 @@ public struct Truss: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// A scaffold wall: tube, bays across and lifts up, standing on the floor.
     public var isScaffold: Bool { type == "scaffold" && !vertical && !isLoop }
     /// A bar fixtures clamp close to: a light stand's tube, or a ledger of a scaffold.
+    /// A light stand whose bar is a triangle of deco truss.
+    public var isDeco: Bool { isStand && bar == "deco" }
     public var isTube: Bool { isStand || type == "ledger" }
     public var scaffoldDepth: Double { depthM ?? 1 }
     /// How many bays across and lifts up: the standards and ledgers share its size evenly, the top ledger at zM.

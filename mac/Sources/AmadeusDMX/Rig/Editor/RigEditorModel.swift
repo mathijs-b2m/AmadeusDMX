@@ -74,6 +74,8 @@ final class RigEditorModel: StageEditing {
     static let sideOut = 0.4      // a fixture on the front/back face: its centre out from the truss centre
     static let tubeDrop = 0.28    // the same on a light stand's tube (40 mm, not 30 cm)
     static let tubeOut = 0.27
+    static let decoDrop = 0.36    // the same on a light stand's deco truss (a triangle about 22 cm across)
+    static let decoOut = 0.36
     static let sides = ["under", "top", "front", "back"]
     static let towerSides = ["front", "back", "left", "right", "top"]
     static let towerOut = 0.32    // a fixture on a tower's face: its centre out from the tower's centre
@@ -348,7 +350,7 @@ final class RigEditorModel: StageEditing {
             let p = t.point(u), r = t.directionDeg(u) * .pi / 180, n = SIMD2(-sin(r), cos(r))
             var q = SIMD2(p.x, p.y), z = p.z
             // under = 0°, front = 90°, on top = 180°, back = 270°: the fixture rolled about the truss
-            let drop = t.isTube ? tubeDrop : hangDrop, out = t.isTube ? tubeOut : sideOut
+            let drop = t.isDeco ? decoDrop : t.isTube ? tubeDrop : hangDrop, out = t.isDeco ? decoOut : t.isTube ? tubeOut : sideOut
             switch side {
             case "top": z += drop
             case "front": q += n * out

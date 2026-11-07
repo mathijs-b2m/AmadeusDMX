@@ -453,6 +453,15 @@ public sealed class TrussInspector(RigEditorModel editor, string id)
         }
         s.Children.Add(EditorUI.Section("Size and Place", size));
 
+        if (truss.IsStand)
+        {
+            var bar = (ComboBox)UI.Picker(new[] { "", "deco" }, T.Bar ?? "", b => b.Length == 0 ? "Tube" : "Deco truss (triangle)",
+                b => editor.UpdateTruss(id, "Change Bar", t => t.Bar = b.Length == 0 ? null : b))
+                .Tooltip("What the stand carries: a plain tube, or a triangle of deco truss");
+            s.Children.Add(EditorUI.Section("Bar", UI.VStack(10, UI.Row("Bar", bar))
+                .Bind(editor, [nameof(RigEditorModel.Version)], _ => bar.Select(T.Bar ?? ""))));
+        }
+
         if (!truss.Vertical)
         {
             var aims = new[] { "", "audience", "down" };

@@ -30,7 +30,7 @@ A truss: `{"id", "type": "quatro", "length_m", "x_m" (its centre), "y_m", "z_m",
 `diameter_m`, `arc_deg`; a carré (a rectangle of truss on four legs, standing on the floor) `"shape": "carre"`,
 `width_m`, `depth_m`, `z_m` the frame's height (round it like round a full circle, from its front middle). A light stand is the cheap kind: `"type": "bridge"` (a bar on a tripod at each end) or
 `"tbar"` (a T-bar on one tripod), `z_m` the bar's height, with `max_kg`, `min_height_m` and `max_height_m` from
-the maker when known. A scaffold wall (the
+the maker when known, and `"bar": "deco"` when its bar is a triangle of deco truss, not a tube. A scaffold wall (the
 tube wall of a festival stage, standing on the floor) is a straight truss with `"type": "scaffold"`: `length_m` its
 width, `z_m` its top, `depth_m`, and about `bay_m` between its standards and `lift_m` between its ledgers. A truss may say where its heads play: `"aim": "audience"` or `"down"`.
 

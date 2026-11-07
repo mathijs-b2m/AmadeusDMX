@@ -278,6 +278,14 @@ public class RigModelTests
     // A carré (a rectangle of truss on four legs) goes round the same way as amadeus/rig/trusses.py has it
     // (mac/Tests/AmadeusKitTests/CarreTests.swift).
     [Fact]
+    public void AStandCanCarryDecoTruss()
+    {
+        var json = """{"id": "b", "type": "bridge", "bar": "deco", "length_m": 3, "x_m": 2, "y_m": -1.5, "z_m": 3}""";
+        var t = Truss.From(J.ParseElement(Encoding.UTF8.GetBytes(json)));
+        Assert.True(t.IsDeco && t.IsStand && t.IsTube);
+    }
+
+    [Fact]
     public void ACarreDecodesAndGoesRoundFromItsFrontMiddle()
     {
         var json = """{"id": "c", "type": "quatro", "shape": "carre", "width_m": 4, "depth_m": 3, "x_m": 4, "y_m": -1, "z_m": 3}""";
