@@ -138,6 +138,19 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
                 "The DJ stands on the floor at a lower console, no riser (on a raised stage: on the stage). Only how it is drawn"),
             EditorUI.ValueSlider(editor, "DJ from the stage front", () => -(editor.Doc.Stage.DjYM ?? -1.3), v => editor.UpdateStage("Move DJ Booth", s => s.DjYM = -v), 0, 8, 0.1)
                 .Tooltip("How far behind the stage's front edge the front of the DJ's booth stands. Left alone, it follows the stage and the rig"),
+            EditorUI.Toggle(editor, "Beams towards a camera", () => editor.Doc.Stage.CameraXM is not null, on => editor.UpdateStage("Change Camera", s =>
+                {
+                    s.CameraXM = on ? s.WidthM / 2 : null; s.CameraYM = on ? s.RoomDepthM * 0.7 : null;
+                    s.CameraZM = on ? 1.6 : null; s.CameraShare = null;
+                }), "For filming: most heads play towards the camera, wherever the show aims the rest"),
+            EditorUI.ValueSlider(editor, "Camera across", () => editor.Doc.Stage.CameraXM ?? 0, v => editor.UpdateStage("Move Camera", s => s.CameraXM = v), -10, 40, 0.1)
+                .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.CameraXM is null ? Visibility.Collapsed : Visibility.Visible),
+            EditorUI.ValueSlider(editor, "Camera from the stage front", () => editor.Doc.Stage.CameraYM ?? 0, v => editor.UpdateStage("Move Camera", s => s.CameraYM = v), 0, 60, 0.1)
+                .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.CameraXM is null ? Visibility.Collapsed : Visibility.Visible),
+            EditorUI.ValueSlider(editor, "Camera height", () => editor.Doc.Stage.CameraZM ?? 1.6, v => editor.UpdateStage("Move Camera", s => s.CameraZM = v), 0.2, 20, 0.1)
+                .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.CameraXM is null ? Visibility.Collapsed : Visibility.Visible),
+            EditorUI.ValueSlider(editor, "Heads on the camera", () => (editor.Doc.Stage.CameraShare ?? 0.7) * 100, v => editor.UpdateStage("Change Camera", s => s.CameraShare = v / 100), 10, 100, 5, "%")
+                .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.CameraXM is null ? Visibility.Collapsed : Visibility.Visible),
             EditorUI.Toggle(editor, "LED wall behind the DJ", () => editor.Doc.HasScreen, editor.SetScreen),
             d.Stage.Outdoor ? null
                 : EditorUI.Toggle(editor, "Beams stay off the ceiling", () => editor.Doc.Stage.CeilingGuard, v => editor.UpdateStage(s => s.CeilingGuard = v),

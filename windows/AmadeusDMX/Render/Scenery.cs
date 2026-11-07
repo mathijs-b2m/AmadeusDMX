@@ -83,6 +83,12 @@ public sealed class Scenery
         Cutaways.Add((wallAt, Vertices.Count, back));
         RoomShell();
 
+        if (stage.CameraXM is { } camX && stage.CameraYM is { } camY)  // the camera on its tripod
+        {
+            float cxm = (float)camX, cym = (float)camY, czm = (float)(stage.CameraZM ?? 1.6);
+            Box(cxm - 0.1f, cxm + 0.1f, cym - 0.14f, cym + 0.14f, czm - 0.08f, czm + 0.08f, V(0.1f, 0.1f, 0.12f));
+            Box(cxm - 0.02f, cxm + 0.02f, cym - 0.02f, cym + 0.02f, 0, czm - 0.08f, V(0.1f, 0.1f, 0.12f));
+        }
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
         // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such

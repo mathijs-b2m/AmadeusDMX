@@ -113,6 +113,27 @@ struct EditorInspector: View {
                 editor.updateStage("Move DJ Booth") { $0.djYM = -v }
             }), range: 0...8, step: 0.1)
                 .help("How far behind the stage's front edge the front of the DJ's booth stands. Left alone, it follows the stage and the rig")
+            Toggle("Beams towards a camera", isOn: Binding(get: { editor.doc.stage.cameraXM != nil }, set: { on in
+                editor.updateStage("Change Camera") { s in
+                    s.cameraXM = on ? s.widthM / 2 : nil; s.cameraYM = on ? s.roomDepthM * 0.7 : nil
+                    s.cameraZM = on ? 1.6 : nil; s.cameraShare = nil
+                }
+            }))
+                .help("For filming: most heads play towards the camera, wherever the show aims the rest")
+            if editor.doc.stage.cameraXM != nil {
+                ValueSlider(title: "Camera across", value: Binding(get: { editor.doc.stage.cameraXM ?? 0 }, set: { v in
+                    editor.updateStage("Move Camera") { $0.cameraXM = v }
+                }), range: -10...(editor.doc.stage.widthM + 10), step: 0.1)
+                ValueSlider(title: "Camera from the stage front", value: Binding(get: { editor.doc.stage.cameraYM ?? 0 }, set: { v in
+                    editor.updateStage("Move Camera") { $0.cameraYM = v }
+                }), range: 0...max(3, editor.doc.stage.roomDepthM), step: 0.1)
+                ValueSlider(title: "Camera height", value: Binding(get: { editor.doc.stage.cameraZM ?? 1.6 }, set: { v in
+                    editor.updateStage("Move Camera") { $0.cameraZM = v }
+                }), range: 0.2...max(3, editor.doc.stage.ceilingM), step: 0.1)
+                ValueSlider(title: "Heads on the camera", value: Binding(get: { (editor.doc.stage.cameraShare ?? 0.7) * 100 }, set: { v in
+                    editor.updateStage("Change Camera") { $0.cameraShare = v / 100 }
+                }), range: 10...100, step: 5, unit: "%")
+            }
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
             if !editor.doc.stage.outdoor {
                 Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
