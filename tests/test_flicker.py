@@ -52,7 +52,7 @@ def test_no_light_flickers(track, path):
     e = Engine(track, plan, rig)
     ids = [x["id"] for x in rig["elements"] if x["kind"] in ("head", "par")]
     ts = np.arange(0.05, track.duration - 0.1, 1 / FPS)
-    level = lambda s: s.strobe or max(s.dimmer, s.white)  # noqa: E731  (a head's strobe is meant: its level)
+    level = lambda s: max(s.dimmer, s.white)  # noqa: E731  (a head's strobe is meant: `dimmer` is its level)
     tr = np.array([[level(st[i]) for i in ids] for st in (e.render(float(t))[1] for t in ts)])
     assert sum(fast_cycles(c) for c in tr.T) == 0
 
@@ -132,7 +132,7 @@ def test_heads_strobe_on_the_grid_within_the_flash_limit(track, fast):
     beat = 60 / 128
     assert np.allclose(gaps, gaps[0], atol=0.01) and gaps[0] <= beat + 0.01  # a steady strobe, at least every beat
     st = e.render(float(starts[2]) + 0.01)[1][head]
-    assert st.strobe > 0 and st.dimmer > 0.5 * st.strobe  # a flash, at the head's level
+    assert st.strobe_hz > 0 and st.lit > 0.5 * st.dimmer  # a flash, at the head's level
 
 
 def test_head_strobe_lights_the_frame_nearest_the_beat(track):
@@ -158,4 +158,5 @@ def test_strobe_free_heads_pulse_instead(track):
     plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
     plan = [replace(d, head_light="strobe") for d in plan]
     e = Engine(track, plan, rig)
-    assert all(st.strobe == 0 for t in np.arange(1, track.duration - 1, 0.5) for st in e.render(float(t))[1].values())
+    times = np.arange(1, track.duration - 1, 0.5)
+    assert all(st.strobe_hz == 0 for t in times for st in e.render(float(t))[1].values())

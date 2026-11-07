@@ -21,9 +21,10 @@ import xml.etree.ElementTree as ET
 
 from amadeus import paths
 from amadeus.library import fixtures as fxlib
+from amadeus.library import strobe
 
 API = "https://ddf.api.dmxc.org/v0/ddfs"
-CONVERTER_VERSION = 2
+CONVERTER_VERSION = 3
 
 COLORS = {
     **{c: c for c in ("red", "green", "blue", "white", "cyan", "magenta", "yellow")},
@@ -67,6 +68,22 @@ def _quiet(el, default: int = 0) -> int:
     return default
 
 
+def _strobe_ranges(el) -> list[tuple]:
+    """A <strobe> or <shutter>'s value ranges for strobe.pick: a <range> sweeps its minval..maxval, in Hz."""
+    out = []
+    for s in el.iter():
+        if s.tag in ("step", "range") and s.get("mindmx") is not None:
+            lo, hi = _int(s, "mindmx"), _int(s, "maxdmx", 255)
+            words = f"{el.tag} {s.get('type', '')} {s.get('caption', '')}"
+            if s.tag == "step" and el.tag == "strobe" and s.get("type") in ("open", "closed", "off", "stop"):
+                continue
+            if s.tag == "step" and el.tag == "shutter" and "strobe" not in words[8:].lower():
+                continue
+            ends = (s.get("minval"), s.get("maxval"))
+            out.append((min(lo, hi), max(lo, hi), words, *(ends if lo <= hi else ends[::-1])))
+    return out
+
+
 def _outside(el) -> int:
     """For a strobe channel: the first value outside its strobe ranges (no strobe)."""
     taken = [(lo, hi) for lo, hi, *_ in _steps(el)]
@@ -90,8 +107,11 @@ class _Mode:
         if n is None or not n.lstrip("-").isdigit():
             return
         i = int(n)
+        old = self.ch.get(i, {})
         if override or i not in self.ch or self.ch[i]["attr"] in ("strobe", "unknown"):
             self.ch[i] = spec
+        if "default" in self.ch[i]:  # a <shutter> and a <strobe> on one channel: its strobe stays known
+            self.ch[i].update({k: v for s in (old, spec) for k, v in s.items() if k in ("strobe_range", "strobe_hz")})
 
     def fine(self, el, base: str):
         if el.get("finedmxchannel") is not None:
@@ -131,9 +151,9 @@ def _functions(m: _Mode, funcs: ET.Element, head: int = 0):
             m.put(n, spec, override=True)
             m.fine(el, "dimmer")
         elif tag == "strobe":
-            m.put(n, {"attr": "strobe", "default": _outside(el)})
+            m.put(n, strobe.mark({"attr": "strobe", "default": _outside(el)}, _strobe_ranges(el)))
         elif tag == "shutter":
-            m.put(n, {"attr": "shutter", "default": _quiet(el, 255)}, override=True)
+            m.put(n, strobe.mark({"attr": "shutter", "default": _quiet(el, 255)}, _strobe_ranges(el)), override=True)
         elif tag == "colorwheel":
             slots, opened = [], None
             for s in el.findall("step"):

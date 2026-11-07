@@ -6,7 +6,7 @@
   "qlc": {
     "key": "DTS/DTS-Katana.qxf",
     "type": "LED Bar (Beams)",
-    "converter": 4
+    "converter": 10
   },
   "physical": {
     "pan_deg": 0,
@@ -37,7 +37,15 @@
       },
       {
         "attr": "shutter",
-        "default": 14
+        "default": 14,
+        "strobe_range": [
+          30,
+          119
+        ],
+        "strobe_hz": [
+          0.31,
+          33.33
+        ]
       },
       {
         "attr": "dimmer"
@@ -126,7 +134,15 @@
       },
       {
         "attr": "shutter",
-        "default": 14
+        "default": 14,
+        "strobe_range": [
+          30,
+          119
+        ],
+        "strobe_hz": [
+          0.31,
+          33.33
+        ]
       },
       {
         "attr": "dimmer"
@@ -185,7 +201,15 @@
       },
       {
         "attr": "shutter",
-        "default": 14
+        "default": 14,
+        "strobe_range": [
+          30,
+          119
+        ],
+        "strobe_hz": [
+          0.31,
+          33.33
+        ]
       },
       {
         "attr": "dimmer"

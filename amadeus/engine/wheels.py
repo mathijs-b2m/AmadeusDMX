@@ -200,7 +200,7 @@ class WheelsMixin:
         for eid, w in self.wheel_heads.items():
             s = states[eid]
             w.want[frame] = w.index((s.r, s.g, s.b))
-            w.lit[frame] = (s.strobe or max(s.dimmer, s.white)) > DARK
+            w.lit[frame] = max(s.dimmer, s.white) > DARK
 
     def _wheel_hit(self, frame: int) -> float:
         """When the note at this look-ahead frame starts: on the beat it's next to."""
@@ -229,5 +229,4 @@ class WheelsMixin:
             w.decide(limit, frame + 1, self.wheel_bar, self._wheel_hit, self.wheel_bars.__contains__, self.wheel_gaps)
             s = states[eid]
             s.r, s.g, s.b = w.slots[int(w.slot[frame])]["rgb"]
-            gain = w.gain(t)
-            s.dimmer, s.strobe = s.dimmer * gain, s.strobe * gain
+            s.dimmer *= w.gain(t)

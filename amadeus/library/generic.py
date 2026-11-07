@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 
 from amadeus.library import fixtures as fxlib
+from amadeus.library import strobe
 
 # What it is, as the new-fixture sheet asks it: (type, label, kind, beam angle)
 TYPES = [
@@ -289,7 +290,9 @@ def create(
         "source": f"Made from the template '{TEMPLATES[template]['label']}': check it channel by channel on the "
         "fixture (Set page, Check Channels)",
         "physical": {"beam_deg": float(beam_deg) if 0.5 <= beam_deg <= 120 else beam},
-        "modes": {mode: [{k: v for k, v in c.items() if k in ("attr", "default")} for c in chans]},
+        "modes": {
+            mode: [strobe.mark({k: v for k, v in c.items() if k in ("attr", "default")}, c["ranges"]) for c in chans]
+        },  # fmt: skip
         "made": {
             "template": template,
             "type": type_,
@@ -386,6 +389,8 @@ def from_chart(
     if mode != first:
         defn["modes"] = {mode: defn["modes"].pop(first)}
         defn["mapped"]["modes"] = [mode]
+    for c, chart in zip(defn["modes"][mode], channels, strict=False):
+        strobe.mark(c, [tuple(r) for r in chart.get("ranges") or []])
     defn["made"].update(
         template="chart",
         type=tmpl_type,

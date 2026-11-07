@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Cameo/Cameo-Pixbar-600-PRO.qxf",
     "type": "LED Bar (Beams)",
-    "converter": 4
+    "converter": 10
   },
   "physical": {
     "beam_deg": 23.0,
@@ -35,7 +35,11 @@
       },
       {
         "attr": "shutter",
-        "default": 2
+        "default": 2,
+        "strobe_range": [
+          11,
+          250
+        ]
       },
       {
         "attr": "color_macro",
@@ -81,7 +85,11 @@
       },
       {
         "attr": "strobe_advanced",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          128,
+          250
+        ]
       },
       {
         "attr": "red"
@@ -110,7 +118,11 @@
       },
       {
         "attr": "strobe_advanced",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          128,
+          250
+        ]
       },
       {
         "attr": "red"
@@ -155,7 +167,11 @@
       },
       {
         "attr": "strobe_advanced",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          128,
+          250
+        ]
       },
       {
         "attr": "red",
@@ -308,7 +324,11 @@
       },
       {
         "attr": "strobe_advanced",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          128,
+          250
+        ]
       },
       {
         "attr": "red",
@@ -477,7 +497,11 @@
       },
       {
         "attr": "strobe_advanced",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          128,
+          250
+        ]
       },
       {
         "attr": "red",
@@ -774,7 +798,11 @@
       },
       {
         "attr": "strobe_advanced",
-        "default": 0
+        "default": 0,
+        "strobe_range": [
+          128,
+          250
+        ]
       },
       {
         "attr": "red",

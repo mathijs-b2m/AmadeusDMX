@@ -657,8 +657,9 @@ class ShowArc:
             if s is None:
                 continue
             g = self.gain[self.member_of[eid]] if eid in self.member_of else 1.0
-            if s.strobe > 0 and flashes < HEAD_STROBE_FROM:  # a strobing head: its flashes held as a steady beam
-                s.dimmer = s.strobe
+            if s.strobe_hz > 0 and flashes < HEAD_STROBE_FROM:  # a strobing head: its flashes held as a steady beam
+                s.strobe_hz = 0.0  # (a strobe light keeps its flash, on the dimmer: it is never a steady light)
+                s.gate = 1.0 if eid in self.heads else s.gate
             if eid in self.specials:
                 g = self.special_gain if self.special_gain > 0.02 else 0.0  # (a laser off is off)
                 if eid in self.strobes:
@@ -689,7 +690,7 @@ class ShowArc:
         k = 1 - math.exp(-dt / tau) if dt else 1.0
         for eid in self.lights:
             s = states.get(eid)
-            if s is None or eid in self.specials or s.strobe > 0:  # (a strobe stays crisp, or holds steady)
+            if s is None or eid in self.specials or s.strobe_hz > 0:  # (a strobe stays crisp, or holds steady)
                 self.smooth.pop(eid, None)
                 continue
             fields = ("dimmer", "white") if eid in self.heads else ("dimmer", "white", "r", "g", "b")

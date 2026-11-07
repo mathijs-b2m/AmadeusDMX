@@ -47,7 +47,7 @@ plan, the rig and the engine's code.
 
 1. **Flashes:** one rate-limited timeline (`safety.max_flash_hz`); a snare roll's flashes keep to the same limit
    unless `safety.allow_fast_strobe` (then every hit, at most 10 Hz per light);
-   `safety.strobe_free` leaves them all out. Fixture strobe channels are never driven.
+   `safety.strobe_free` leaves them all out. A steady strobe plays on the fixture's own strobe channel, at a rate within the limit (`library/strobe.py`).
 2. **Zones:** keep-out zones stop the head motors before a beam reaches them.
 3. **Laser guard** (`engine/lasers.py`), last in every frame: raises or shrinks a pattern, or blanks the
    laser, so no modelled beam enters a laser zone; with real lights and no laser zone, lasers stay dark.

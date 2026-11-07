@@ -21,11 +21,12 @@ from pathlib import Path
 
 from amadeus import paths
 from amadeus.library import fixtures as fxlib
+from amadeus.library import strobe
 
 OFL_DIR = paths.CACHE / "ofl"
 OFL_TARBALL = "https://codeload.github.com/OpenLightingProject/open-fixture-library/tar.gz/refs/heads/master"
 INDEX = OFL_DIR / "index.json"
-CONVERTER_VERSION = 5
+CONVERTER_VERSION = 6
 
 COLOR_ATTR = {
     "Red": "red",
@@ -175,6 +176,20 @@ def _rotation(caps: list[dict]) -> dict:
         lo, hi = c["dmxRange"]
         spin.setdefault(key, [hi, lo] if a.startswith("fast") else [lo, hi])
     return spin
+
+
+def _strobe_ranges(ch: dict) -> list[tuple]:
+    """A channel's strobes for strobe.pick: the steady ones, their speeds when given in Hz."""
+    out = []
+    for c in _caps(ch):
+        steady = c["type"] == "StrobeSpeed" or (c["type"] == "ShutterStrobe" and c.get("shutterEffect") == "Strobe")
+        if not steady or c.get("randomTiming"):
+            continue
+        a, b = (str(c.get(k, c.get("speed", ""))).lower() for k in ("speedStart", "speedEnd"))
+        ends = [float(v[:-2]) if re.fullmatch(r"[\d.]+hz", v) else None for v in (a, b)]
+        order = "fast to slow" if a.startswith("fast") or b.startswith("slow") else "slow to fast"
+        out.append((*c["dmxRange"], f"strobe {order} {c.get('comment', '')}", *ends))
+    return out
 
 
 def _classify(d: dict, key: str, ch: dict | None, fine_of: str | None) -> dict:
@@ -363,6 +378,8 @@ def convert(manufacturer_key: str, fixture_key: str) -> dict:
                 continue
             _, ch, fine_of = _resolve_channel(d, key)
             spec = _classify(d, key, ch, fine_of)
+            if ch is not None and not fine_of:
+                strobe.mark(spec, _strobe_ranges(ch))
             if dark and ch is not None:
                 spec = {"attr": spec["attr"]}  # held at its off value
                 spec["default"], safe = fxlib.off_value(key, [(c["dmxRange"][0], _cap_text(c)) for c in _caps(ch)])

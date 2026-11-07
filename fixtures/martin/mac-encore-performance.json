@@ -6,7 +6,7 @@
   "qlc": {
     "key": "Martin/Martin-MAC-Encore-Performance.qxf",
     "type": "Moving Head",
-    "converter": 8
+    "converter": 10
   },
   "physical": {
     "pan_deg": 540,
@@ -25,7 +25,15 @@
     "CLD": [
       {
         "attr": "shutter",
-        "default": 34
+        "default": 34,
+        "strobe_range": [
+          50,
+          200
+        ],
+        "strobe_hz": [
+          1.0,
+          25.0
+        ]
       },
       {
         "attr": "dimmer"
@@ -170,7 +178,15 @@
     "WRM": [
       {
         "attr": "shutter",
-        "default": 34
+        "default": 34,
+        "strobe_range": [
+          50,
+          200
+        ],
+        "strobe_hz": [
+          1.0,
+          25.0
+        ]
       },
       {
         "attr": "dimmer"

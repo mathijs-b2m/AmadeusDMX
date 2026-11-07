@@ -18,6 +18,7 @@ from pathlib import Path
 
 from amadeus import paths
 from amadeus.dmx import limiter
+from amadeus.library import shadow, strobe
 
 LIB_DIR = paths.FIXTURES
 # Your fixtures, when they live apart from the shipped library (the Mac app): they win over LIB_DIR, and additions
@@ -129,8 +130,22 @@ def library() -> dict[str, dict]:
         for path in sorted(folder.glob("*/*.json")):
             d = json.loads(path.read_text(encoding="utf-8"))
             d["key"] = f"{path.parent.name}/{path.stem}"
+            _strobes_from_catalogue(d)
             lib[d["key"]] = d
     return lib
+
+
+def _strobes_from_catalogue(d: dict):
+    """A fixture added before the converters read strobe ranges gets them from the catalogue, its own calibration
+    left alone."""
+    for source, at in (("qlc", 10), ("ofl", 6)):
+        if source in d and d[source].get("converter", 0) < at:
+            fresh = shadow.get(f"{source}:{d[source].get('key', '')}") or {}
+            for mode, chans in d.get("modes", {}).items():
+                new = fresh.get("modes", {}).get(mode, [])
+                for c, n in zip(chans, new if len(new) == len(chans) else [], strict=False):
+                    if c["attr"] == n["attr"] and "default" in c and "strobe_range" in n:
+                        c.update({k: n[k] for k in ("strobe_range", "strobe_hz") if k in n})
 
 
 def path_of(key: str) -> Path:
@@ -486,6 +501,24 @@ def patched(fx: dict) -> bool:
     return isinstance(fx.get("address"), int) and not isinstance(fx.get("address"), bool)
 
 
+def _strobing(chans: list[dict], els: dict) -> dict:
+    """Which strobe channels flash this frame: {"values": {channel offset: DMX value}, "held": the states they
+    flash, whose dimmers stay open}. A channel shared by the cells flashes only when every lit cell strobes; one
+    that can't strobe that slowly stays quiet. The lights it doesn't reach flash on their dimmer."""
+    values, held = {}, set()
+    for off, c in enumerate(chans):
+        if "strobe_range" not in c:
+            continue
+        cells = [els[c["head"]]] if c.get("head") in els else list(els.values())
+        lit = [s for s in cells if s.dimmer > 0]
+        hz = min((getattr(s, "strobe_hz", 0.0) for s in lit), default=0.0)
+        v = strobe.value(c, hz) if hz > 0 else None
+        if v is not None:
+            values[off] = v
+            held.update(id(s) for s in lit)
+    return {"values": values, "held": held}
+
+
 def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) -> None:
     """Write one rig fixture's channels into a 512-byte universe buffer (nothing without a start address).
 
@@ -509,13 +542,18 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
     head_dimmers = any(c["attr"] == "dimmer" and "head" in c for c in chans)  # a dimmer per cell (Sunstrip)
     blacklight = uv_only(defn)
     rgb_level = (per_head_colour and not head_dimmers) or not has_dimmer  # the RGB carries the level, not a dimmer
+    strobing = _strobing(chans, els)
+
+    def dimmed(s) -> float:
+        """The level of an element's light: open while its strobe channel flashes it, else with the flash."""
+        return s.dimmer if id(s) in strobing["held"] else s.dimmer * getattr(s, "gate", 1.0)
 
     def ceiled(s) -> float:
         """How much the limiter turns this element's emitters down (1: not at all), the same for all of them so
         the colour keeps its hue. Only where they carry the level; a dimmer channel is limited on its own."""
         if ceiling >= 1.0 or not rgb_level:
             return 1.0
-        peak = min((max(s.r, s.g, s.b, 0.0) + max(s.white, 0.0)) * s.dimmer, 1.0)
+        peak = min((max(s.r, s.g, s.b, 0.0) + max(s.white, 0.0)) * dimmed(s), 1.0)
         return ceiling / peak if peak > ceiling else 1.0
 
     pan_l, tilt_l = fx.get("pan_limits", [0, 1]), fx.get("tilt_limits", [0, 1])  # optional hard limits
@@ -551,11 +589,13 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         a = c["attr"]
         s = els.get(c.get("head", 0), first)
         # Per-head colour without per-head dimmers: master dimmer full, intensity goes into RGB.
-        scale = s.dimmer if rgb_level else 1.0
-        level = min(max(max(s.dimmer, s.white), 0), 1, ceiling)  # a dimmer channel's level, under the limiter
+        scale = dimmed(s) if rgb_level else 1.0
+        level = min(max(max(dimmed(s), s.white), 0), 1, ceiling)  # a dimmer channel's level, under the limiter
         if 0 <= px[off] < len(shares):  # a bee eye's lens: its share of the pattern
             scale *= shares[px[off]]
-        if a in overrides:
+        if off in strobing["values"]:  # the fixture's own strobe, at the rate the show asks
+            v = strobing["values"][off]
+        elif a in overrides:
             v = overrides[a]
         elif a == "lens_roll":  # a bee eye's barrel roll
             v = roll_value(c, turns)
@@ -565,7 +605,7 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         elif a == "fog_fan":  # a hazer's fan: spreads what it makes; resting when it makes nothing
             v = round((0.4 + 0.6 * min(s.dimmer, 1.0)) * 255) if s.dimmer > 0 else c.get("default", 0)
         elif a == "uv" and blacklight:  # its only colour: the level, as a dimmer-only lamp shows it
-            lvl = max(s.dimmer, s.white) if rgb_level else 1.0
+            lvl = max(dimmed(s), s.white) if rgb_level else 1.0
             v = round(min(max(lvl, 0), 1, ceiling) * 255)
         elif "default" in c:
             v = c["default"]

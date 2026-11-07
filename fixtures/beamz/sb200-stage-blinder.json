@@ -6,7 +6,7 @@
   "qlc": {
     "key": "beamZ/beamZ-SB200-Stage-Blinder-2x50w.qxf",
     "type": "Color Changer",
-    "converter": 3
+    "converter": 10
   },
   "physical": {
     "beam_deg": 60.0,
@@ -33,7 +33,11 @@
       {
         "attr": "shutter",
         "default": 0,
-        "_note": "0-1 no strobe"
+        "_note": "0-1 no strobe",
+        "strobe_range": [
+          2,
+          255
+        ]
       },
       {
         "attr": "macro",

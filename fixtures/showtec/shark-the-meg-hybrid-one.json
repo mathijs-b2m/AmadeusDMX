@@ -9,7 +9,7 @@
       "Moving Head",
       "Color Changer"
     ],
-    "converter": 5
+    "converter": 6
   },
   "physical": {
     "pan_deg": 540,
@@ -40,7 +40,11 @@
       },
       {
         "attr": "shutter_strobe",
-        "default": 47
+        "default": 47,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "focus",
@@ -78,7 +82,11 @@
       },
       {
         "attr": "shutter_strobe",
-        "default": 47
+        "default": 47,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "color_wheel"
@@ -139,7 +147,11 @@
       },
       {
         "attr": "shutter_strobe",
-        "default": 47
+        "default": 47,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "color_wheel"

@@ -137,7 +137,11 @@
       {
         "attr": "shutter",
         "default": 40,
-        "_note": "032-063 open; strobe is never driven"
+        "_note": "032-063 open; 064-095 strobe, slow to fast",
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"
@@ -183,7 +187,11 @@
       },
       {
         "attr": "shutter",
-        "default": 40
+        "default": 40,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"

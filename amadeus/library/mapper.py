@@ -16,6 +16,7 @@ import json
 import re
 
 from amadeus.library import fixtures as fxlib
+from amadeus.library import strobe
 
 # The roles the show plays (patch in fixtures.py), in the order the mapper offers them. "cell": per bar cell;
 # "light": it carries light (kept under the brightness limiter when tried); "check": its value while another
@@ -148,6 +149,8 @@ def apply(
     if refusal(defn):
         return [refusal(defn)]
     old = fxlib.channels(defn, mode)
+    names = source_channels(defn, mode) or []
+    names += [None] * (len(old) - len(names))
     problems = []
     if len(channels) != len(old):
         problems.append(f"The mode has {len(old)} channels, not {len(channels)}")
@@ -171,7 +174,9 @@ def apply(
         else:
             problems.append(f"Channel {n + 1}: unknown role '{role}'")
             continue
-        for k in ("range", "tight", "wide", "on_from", "_note"):  # what the converter knew about the channel
+        if role == HOLD and names[n] and "strobe_range" not in o:  # a strobe channel, by the chart's own words
+            strobe.mark(spec, [tuple(r) for r in names[n].get("ranges", [])])
+        for k in ("range", "tight", "wide", "on_from", "strobe_range", "strobe_hz", "_note"):  # what the converter knew
             if k in o and o["attr"] == spec["attr"]:
                 spec[k] = o[k]
         new.append(spec)

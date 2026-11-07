@@ -6,7 +6,11 @@
   "physical": {
     "lumens": 1500,
     "_lumens_note": "estimated: 75 W LED at ~20 lm/W",
-    "size_mm": [250, 350, 150],
+    "size_mm": [
+      250,
+      350,
+      150
+    ],
     "pan_deg": 540,
     "tilt_deg": 225,
     "beam_deg": 2,
@@ -18,8 +22,8 @@
     "pan_speed_dps": 700,
     "tilt_speed_dps": 700,
     "accel_dps2": 450,
-    "_measured_tilt": "reversing on every beat at 125 BPM it covers about half of a 60\u00b0 swing, and doesn't finish 37\u00b0 either; a 90\u00b0 move every two beats it does in full (tools/twin.py, 2026-10-30). At 600 \u00b0/s\u00b2 the engine plans two-beat tilt moves of ~90\u00b0 at 125 BPM; at 1300 it planned one-beat 61\u00b0 moves that landed late",
-    "_measured_pan": "90\u00b0 swing on the beat covers ~25\u00b0 at 128 BPM, ~75\u00b0 at 90 BPM, all of it at 60 BPM (tools/twin.py, 2026-10-16)",
+    "_measured_tilt": "reversing on every beat at 125 BPM it covers about half of a 60° swing, and doesn't finish 37° either; a 90° move every two beats it does in full (tools/twin.py, 2026-10-30). At 600 °/s² the engine plans two-beat tilt moves of ~90° at 125 BPM; at 1300 it planned one-beat 61° moves that landed late",
+    "_measured_pan": "90° swing on the beat covers ~25° at 128 BPM, ~75° at 90 BPM, all of it at 60 BPM (tools/twin.py, 2026-10-16)",
     "tilt_accel_dps2": 600,
     "pan_accel_dps2": 450,
     "_twin": "speed and acceleration from the calibrated twin (tools/twin.py)"
@@ -198,7 +202,11 @@
       {
         "attr": "shutter",
         "default": 40,
-        "_note": "032-063 open; strobe is never driven"
+        "_note": "032-063 open; 064-095 strobe, slow to fast",
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"
@@ -240,7 +248,11 @@
       },
       {
         "attr": "shutter",
-        "default": 40
+        "default": 40,
+        "strobe_range": [
+          64,
+          95
+        ]
       },
       {
         "attr": "dimmer"

@@ -5,6 +5,8 @@ from __future__ import annotations
 import bisect
 import math
 
+import numpy as np
+
 from amadeus.director import Decision
 from amadeus.director.vocabulary import PALETTES
 from amadeus.engine.state import State
@@ -59,7 +61,8 @@ MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 
 # The heads' strobe (head light "strobe"): white flashes on the beat grid, as fine as the section asks (notes per
 # beat) and the set's flash limit allows (max_flash_hz; allow_fast_strobe: up to FAST_STROBE_HZ; strobe_free: the
-# heads pulse on the kick instead). Every head with a dimmer strobes this way, in time with the music.
+# heads pulse on the kick instead). A head with a strobe channel strobes on it at the grid's rate, its dimmer open
+# (library/fixtures.py patch); the others flash on their dimmer.
 HEAD_STROBE_DIV = {"drop": 4, "groove": 2, "chorus": 2, "buildup": 2}  # elsewhere: on the beat
 HEAD_STROBE_ON_S = 0.05  # a flash: two DMX frames
 FAST_STROBE_HZ = 10.0
@@ -167,7 +170,7 @@ class LooksMixin:
         i = d.phrase  # this look's own phrase (during a crossfade the previous look is rendered too)
         nxt = self.plan[i + 1] if i + 1 < len(self.plan) else None
         max_hz = float(self.rig["safety"].get("max_flash_hz", 4.0))
-        dim = 0.0
+        dim, gate, hz = 0.0, 1.0, 0.0
         if self.rig["safety"].get("strobe_free"):
             pass  # strobe-free: the strobes stay dark
         elif nxt is not None and nxt.section == "drop" and d.section != "drop":
@@ -178,11 +181,18 @@ class LooksMixin:
                 while every * period < 1.0 / max_hz:  # photosensitivity: the set's flash limit
                     every *= 2
                 since = ((beat + phase) % every) * period
-                dim = math.exp(-since / 0.06) * (0.6 + 0.4 * (1 - left / max(span * 0.25, 4 * period)))
+                dim = 0.6 + 0.4 * (1 - left / max(span * 0.25, 4 * period))
+                gate, hz = math.exp(-since / 0.06), min(1.0 / (every * self._beat_s()), max_hz)
         elif d.section == "drop" and d.intensity >= 2:  # the big hits, on the kick (the flash timeline)
             dim = _decay(self.flash_t, self.flash_s, t, 0.06)
         for e in strobes:
-            out[e["id"]] = State(dimmer=dim, r=1.0, g=1.0, b=1.0)
+            out[e["id"]] = State(dimmer=dim, r=1.0, g=1.0, b=1.0, strobe_hz=hz, gate=gate)
+
+    def _beat_s(self) -> float:
+        """The track's beat: a strobe channel gets one steady rate, not every beat's own length."""
+        if getattr(self, "_median_beat", None) is None:
+            self._median_beat = float(np.median(np.diff(self.beats))) if len(self.beats) > 2 else 0.47
+        return self._median_beat
 
     def _head_strobe_hz(self) -> float:
         """How often a head may flash (0: strobe-free)."""
@@ -198,14 +208,25 @@ class LooksMixin:
         if hz <= 0:
             return None
         beat, phase, period = self.beat_info(t)
-        div = float(HEAD_STROBE_DIV.get(d.section, 1))
-        while div > 0.25 and div / max(period, 1e-3) > hz + 1e-6:
-            div /= 2
+        div = self._strobe_notes(d, period, hz)
         # the flash opens half a frame before the grid line: the frame nearest the beat is the first one lit (from
         # the line on, the first lit frame came up to a whole frame after the beat, the strobe sounded late)
         half = 0.5 / float(self.rig["artnet"].get("fps", 40))
         since = ((beat + phase + half / period) * div % 1.0) / div * period
         return 1.0 if since < HEAD_STROBE_ON_S else 0.0
+
+    @staticmethod
+    def _strobe_notes(d: Decision, period: float, hz: float) -> float:
+        """Flashes per beat: what the section asks, halved until the flash limit is kept."""
+        div = float(HEAD_STROBE_DIV.get(d.section, 1))
+        while div > 0.25 and div / max(period, 1e-3) > hz + 1e-6:
+            div /= 2
+        return div
+
+    def head_strobe_rate(self, d: Decision) -> float:
+        """How fast the heads strobe in this look, flashes a second (0: strobe-free)."""
+        hz = self._head_strobe_hz()
+        return self._strobe_notes(d, self._beat_s(), hz) / self._beat_s() if hz > 0 else 0.0
 
     def _layer(self, d: Decision, j: int) -> str | None:
         """Layering: 'base' (holds a soft glow) or 'accent' (plays the hits); None when not layered."""
@@ -649,11 +670,11 @@ class LooksMixin:
                     col = base
             if rise:
                 dim *= 0.4 + 0.6 * progress
-            strobe = 0.0
-            if gate is not None and layer != "base" and not voice:
-                strobe, dim = dim, dim * gate
-            st = State(dimmer=dim, r=col[0], g=col[1], b=col[2], strobe=strobe)
-            if d.dynamics == "impact" and d.head_light != "off" and voice != "tac" and not strobe:  # (the boom's)
+            strobing = gate is not None and layer != "base" and not voice
+            st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
+            if strobing:
+                st.strobe_hz, st.gate = self.head_strobe_rate(d), gate
+            if d.dynamics == "impact" and d.head_light != "off" and voice != "tac" and not strobing:  # (the boom's)
                 st.white = flash * (dim if role["movement"] == "pour" else 1.0)  # (a pour waits dark at the floor)
             st.fx = d.beam_fx
             featured = self._featured(d, j) if grouping in ("split", "solo") else None
@@ -674,7 +695,6 @@ class LooksMixin:
         master = INTENSITY_MASTER[max(0, min(3, level))] * self.rig["safety"]["master"]
         for st in out.values():
             st.dimmer *= master
-            st.strobe *= master
         return out
 
     def _star_lights(self) -> list[str]:

@@ -127,7 +127,7 @@ class Realism:
             r, g, b, white = s.r, s.g, s.b, s.white
             if info["fixed"]:
                 r, g, b = info["fixed"]
-                out[eid] = (max(s.dimmer, s.white), r, g, b, 0.0)
+                out[eid] = (max(s.lit, s.white), r, g, b, 0.0)
                 continue
             if info["wheel"] or info["kind"] == "laser":
                 slots = info["defn"]["color_wheel"]["slots"]
@@ -137,7 +137,7 @@ class Realism:
                 else:
                     r, g, b = self._wheel(eid, slots, target, dt / slot_seconds(info["defn"]))
                 white = 0.0  # a wheel/macro can't add white on top of a colour: the slot is what you get
-            out[eid] = (s.dimmer, r, g, b, white)
+            out[eid] = (s.lit, r, g, b, white)
         return out
 
     def beams(self, states: dict, dt: float) -> dict[str, tuple[str, list | None, float | None]]:

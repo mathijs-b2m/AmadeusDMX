@@ -517,10 +517,10 @@ def test_a_strobing_head_is_never_smoothed_and_holds_steady_without_flashes(tmp_
     head = next(e["id"] for e in rig["elements"] if e["kind"] == "head")
     arc.control({"knob": {"response": 0.0, "flashes": 1.0, "intensity": 1.0, "groups": 1.0}}, now=0.0)
     for on in (1, 0, 1, 0):
-        states = {head: State(dimmer=float(on), strobe=1.0)}
+        states = {head: State(dimmer=1.0, strobe_hz=4.0, gate=float(on))}
         arc.apply(states, None, 0.0, 0.025)
-        assert states[head].dimmer == pytest.approx(float(on) * arc.gain[arc.member_of[head]], abs=1e-6)
+        assert states[head].lit == pytest.approx(float(on) * arc.gain[arc.member_of[head]], abs=1e-6)
     arc.control({"knob": {"flashes": 0.0}}, now=0.0)
-    states = {head: State(dimmer=0.0, strobe=1.0)}
+    states = {head: State(dimmer=1.0, strobe_hz=4.0, gate=0.0)}
     arc.apply(states, None, 0.0, 0.025)
-    assert states[head].dimmer > 0  # flashes down: a steady beam instead of the strobe
+    assert states[head].lit > 0 and states[head].strobe_hz == 0  # flashes down: a steady beam instead of the strobe
