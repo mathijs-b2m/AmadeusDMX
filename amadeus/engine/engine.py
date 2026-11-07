@@ -25,7 +25,7 @@ from amadeus.engine.fog import FogMixin
 from amadeus.engine.lasers import LasersMixin
 from amadeus.engine.lightshow import LightshowMixin
 from amadeus.engine.looks import DROP_DARK_FROM, XFADE, LooksMixin
-from amadeus.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin
+from amadeus.engine.motion import DMX_LEAD_S, MOTION_FPS, MotionMixin, camera_heads
 from amadeus.engine.rings import RingsMixin
 from amadeus.engine.rolls import RollsMixin
 from amadeus.engine.state import State
@@ -138,6 +138,7 @@ class Engine(
         self.head_pos = [np.array(geometry.position(rig, e, fixtures[e["fixture"]])) for e in self.heads]
         rows = [geometry.position(rig, e, fixtures[e["fixture"]])[1] for e in rig["elements"]]
         self.dj_head = geometry.dj_head(rig, rows, len(self.heads))
+        self.camera, self.camera_heads = camera_heads(self.stage, len(self.heads))
         self.zones = zones.Zones(rig)  # where beams may (not) go: drawn in the rig editor
         self.head_fx = [(fixtures[e["fixture"]], fxlib.get(fixtures[e["fixture"]]["fixture"])) for e in self.heads]
         self._init_high_risk(rig, fixtures)

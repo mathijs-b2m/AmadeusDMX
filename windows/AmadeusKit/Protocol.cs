@@ -209,6 +209,12 @@ public sealed record Stage
     public bool DjFloor { get; set; }
     /// Where the front of the DJ's booth stands (0 the stage's front edge, back negative); null: it follows the stage.
     public double? DjYM { get; set; }
+    /// A camera filming the show (x across the stage in metres, y towards the audience, z its height): CameraShare of
+    /// the heads play towards it (null: 0.7). No CameraXM: no camera.
+    public double? CameraXM { get; set; }
+    public double? CameraYM { get; set; }
+    public double? CameraZM { get; set; }
+    public double? CameraShare { get; set; }
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public bool CeilingGuard { get; set; } = true;
     public bool BackGuard { get; set; } = true;
@@ -237,6 +243,10 @@ public sealed record Stage
         DeckScaffold = J.Val(c, "deck_scaffold", J.Bool) ?? false,
         DjFloor = J.Val(c, "dj_floor", J.Bool) ?? false,
         DjYM = J.Val(c, "dj_y_m", J.Double),
+        CameraXM = J.Val(c, "camera_x_m", J.Double),
+        CameraYM = J.Val(c, "camera_y_m", J.Double),
+        CameraZM = J.Val(c, "camera_z_m", J.Double),
+        CameraShare = J.Val(c, "camera_share", J.Double),
         CeilingGuard = J.Val(c, "ceiling_guard", J.Bool) ?? true,
         BackGuard = J.Val(c, "back_guard", J.Bool) ?? true,
         Outdoor = J.Val(c, "outdoor", J.Bool) ?? false,
@@ -252,6 +262,10 @@ public sealed record Stage
         if (RoomWidthM is { } w) o["room_width_m"] = w;
         if (RoomBackM is { } b) o["room_back_m"] = b;
         if (DjYM is { } dj) o["dj_y_m"] = dj;
+        if (CameraXM is { } cx) o["camera_x_m"] = cx;
+        if (CameraYM is { } cy) o["camera_y_m"] = cy;
+        if (CameraZM is { } cz) o["camera_z_m"] = cz;
+        if (CameraShare is { } cs) o["camera_share"] = cs;
         return JSONValue.Of(o);
     }
 }

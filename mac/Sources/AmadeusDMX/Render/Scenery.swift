@@ -64,6 +64,11 @@ struct Scenery {
         cutaways.append((wallAt..<vertices.count, back))
         roomShell()
 
+        if let x = stage.cameraXM.map({ Float($0) }), let y = stage.cameraYM.map({ Float($0) }) {  // the camera on its tripod
+            let z = Float(stage.cameraZM ?? 1.6)
+            box(x - 0.1, x + 0.1, y - 0.14, y + 0.14, z - 0.08, z + 0.08, [0.1, 0.1, 0.12])
+            box(x - 0.02, x + 0.02, y - 0.02, y + 0.02, 0, z - 0.08, [0.1, 0.1, 0.12])
+        }
         // stage, DJ riser and booth
         // a raised stage (stage.deck_m): a solid platform that high up to the stage's front edge, its face to the
         // audience; else a big rig's deck stands 15 cm high. A DJ on the floor (stage.dj_floor) has no riser, no such

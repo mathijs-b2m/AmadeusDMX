@@ -63,6 +63,24 @@ def clear_of_dj(head_pos: np.ndarray, d: np.ndarray, dj: np.ndarray) -> np.ndarr
     return np.where(hits[:, None], turned, d)
 
 
+def camera_heads(stage: dict, heads: int) -> tuple[np.ndarray | None, set[int]]:
+    """The camera the rig is filmed by (stage.camera_*) and which heads play towards it: `camera_share` of them, spread
+    evenly over the rig, so the others keep the look around it. None: no camera."""
+    if stage.get("camera_x_m") is None or stage.get("camera_y_m") is None:
+        return None, set()
+    camera = np.array([stage["camera_x_m"], stage["camera_y_m"], stage.get("camera_z_m", CAMERA_HEIGHT_M)], dtype=float)
+    share = min(max(float(stage.get("camera_share", CAMERA_SHARE)), 0.0), 1.0)
+    return camera, {j for j in range(heads) if int((j + 1) * share) > int(j * share)}
+
+
+def towards_camera(head_pos: np.ndarray, d: np.ndarray, camera: np.ndarray) -> np.ndarray:
+    """A head's beams (a direction, or rows of them) pulled towards the camera: the look's movement stays, smaller."""
+    to = camera - head_pos
+    to = to / (np.linalg.norm(to) + 1e-9)
+    out = d * (1 - CAMERA_PULL) + to * CAMERA_PULL
+    return out / (np.linalg.norm(out, axis=-1, keepdims=True) + 1e-9)
+
+
 def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np.ndarray:
     """Each head's own spot around a shared point (rows of `point`/`d`): across the beam by where the head
     is in the rig (left to the left), up or down a little by its height, so the beams never meet in one spot."""
@@ -76,6 +94,9 @@ def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np
     return point + across * side * r + up * float(np.clip(dz, -1, 1)) * r / 2
 
 
+CAMERA_SHARE = 0.7  # the heads that play towards the camera, unless the rig says otherwise
+CAMERA_PULL = 0.75  # how far their beams are pulled there: what is left of the look still moves them
+CAMERA_HEIGHT_M = 1.6
 DRIFT_U, DRIFT_V = 0.35, 0.4  # "still": a slow drift (share of the aim's swing, ~±20° / ±7°): never frozen
 DRIFT_BEATS_U, DRIFT_BEATS_V = 16.0, 12.0  # …sideways and back in 16 beats, up and down in 12 (not in step)
 
@@ -341,6 +362,8 @@ class MotionMixin:
                     el += CURVE_DEG * (2 * cp * cp - 1)
             out = geometry.direction(az, el)
 
+        if j in self.camera_heads:
+            out = towards_camera(head_pos, out, self.camera)
         if d.dynamics == "rise":  # swing up towards the drop
             progress = min(max((t - d.start) / max(d.end - d.start, 1e-6), 0), 1)
             up = geometry.direction(0, 75)
@@ -692,6 +715,8 @@ class MotionMixin:
             elif f == "wave" and role["vside"]:
                 el = el + role["vside"] * 6
             out = self._direction_v(az, el)
+        if j in self.camera_heads:
+            out = towards_camera(head_pos, out, self.camera)
         if d.dynamics == "rise":
             progress = np.clip((ts - d.start) / max(d.end - d.start, 1e-6), 0, 1)[:, None]
             up = geometry.direction(0, 75)

@@ -62,6 +62,12 @@ public struct Stage: Codable, Sendable, Equatable {
     public var djFloor = false
     /// Where the front of the DJ's booth stands (0 the stage's front edge, back negative); nil: it follows the stage.
     public var djYM: Double?
+    /// A camera filming the show (x across the stage in metres, y towards the audience, z its height): `cameraShare` of
+    /// the heads play towards it (nil: 0.7). No cameraXM: no camera.
+    public var cameraXM: Double?
+    public var cameraYM: Double?
+    public var cameraZM: Double?
+    public var cameraShare: Double?
     /// Moving-head beams stay off the ceiling / never shine back at the stage and the DJ (on unless switched off).
     public var ceilingGuard = true
     public var backGuard = true
@@ -70,7 +76,7 @@ public struct Stage: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case widthM = "width_m", ceilingM = "ceiling_m", roomDepthM = "room_depth_m", ceilingGuard = "ceiling_guard"
-        case deckM = "deck_m", deckScaffold = "deck_scaffold", djFloor = "dj_floor", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m", roomBackM = "room_back_m", djYM = "dj_y_m"
+        case deckM = "deck_m", deckScaffold = "deck_scaffold", djFloor = "dj_floor", backGuard = "back_guard", outdoor, roomWidthM = "room_width_m", roomBackM = "room_back_m", djYM = "dj_y_m", cameraXM = "camera_x_m", cameraYM = "camera_y_m", cameraZM = "camera_z_m", cameraShare = "camera_share"
     }
 
     /// The room either side of the stage when the rig doesn't give the hall's width (amadeus/rig/geometry.py).
@@ -103,6 +109,10 @@ public struct Stage: Codable, Sendable, Equatable {
         roomWidthM = try c.decodeIfPresent(Double.self, forKey: .roomWidthM)
         roomBackM = try c.decodeIfPresent(Double.self, forKey: .roomBackM)
         djYM = try c.decodeIfPresent(Double.self, forKey: .djYM)
+        cameraXM = try c.decodeIfPresent(Double.self, forKey: .cameraXM)
+        cameraYM = try c.decodeIfPresent(Double.self, forKey: .cameraYM)
+        cameraZM = try c.decodeIfPresent(Double.self, forKey: .cameraZM)
+        cameraShare = try c.decodeIfPresent(Double.self, forKey: .cameraShare)
     }
 }
 

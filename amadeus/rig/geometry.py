@@ -32,6 +32,8 @@ DEFAULT_STAGE = {
     # "room_back_m": how far the room's back wall stands behind the stage's front edge; when it isn't there, 1.5 m
     # behind the rig (drawing only: the apps and the visualiser)
     "dj_floor": False,  # the DJ stands on the floor at a lower console, no riser under them (drawing only)
+    # "camera_x_m", "camera_y_m", "camera_z_m": a camera filming the show (x across the stage in metres, y towards the
+    # audience, z its height): most of the heads play towards it. "camera_share": how many of them (0..1, default 0.7)
     # "dj_y_m": where the front of the DJ's booth stands (0 the stage's front edge, back is negative); when it isn't
     # there, it follows the stage and the rig
     "eye_safety": False,  # on: keep beams out of the audience's eye height (lasers, very bright beams)
