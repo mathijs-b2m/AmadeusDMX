@@ -4,7 +4,7 @@ Every hit the analysis found (amadeus/audio/hits.py) is played at its exact time
 
 - **the orchestra**: fixtures of one kind form a **section** (the four Sharpys, the pixel bars on the floor,
   the two washes…; a big uniform rig is split by where its fixtures hang). Each section is suited to some
-  parts: beams to the stabs and cymbals, floor lights and blinders to the booms, pixel bars to the ticks
+  parts: beams to the stabs and cymbals, floor lights to the booms (not the blinders), pixel bars to the ticks
   and the melody, washes to a held pad;
 - **the score**: per phrase the program orchestrates. Every voice of the music (booms, stabs, ticks…) gets
   a *lead* section and, when the music is big enough, an *answer* section, and the parts move to other
@@ -189,7 +189,7 @@ class CinematicMixin:
         units (one fixture: its elements, left to right) and of segments (its pixels in a few blocks)."""
         by_fixture: dict[str, list[dict]] = {}
         for e in rig["elements"]:
-            if e["kind"] not in ("laser", "strobe"):
+            if e["kind"] not in ("laser", "strobe", "blinder"):  # (blinders: engine/blinders.py)
                 by_fixture.setdefault(e["fixture"], []).append(e)
         groups: dict[tuple, list[dict]] = {}
         for f in rig["fixtures"]:
@@ -230,7 +230,7 @@ class CinematicMixin:
         """How well a section suits a part of the score (higher is better)."""
         head, wash = s["kind"] == "head", s["kind"] == "head" and not s["beam"]
         score = {
-            "low": 3 * (s["kind"] == "blinder") + 2 * s["floor"] + (s["kind"] == "par") - 2 * s["beam"],
+            "low": 2 * s["floor"] + (s["kind"] == "par") - 2 * s["beam"],
             "mid": 2 * wash + s["pixel"] + s["floor"],
             "cymbal": 3 * s["beam"] + head,
             "tick": 2 * s["pixel"] - 3 * s["big"] + s["beam"],
