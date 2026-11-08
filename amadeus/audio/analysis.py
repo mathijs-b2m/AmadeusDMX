@@ -42,7 +42,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 46
+ANALYSIS_VERSION = 47
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -121,6 +121,14 @@ def _no_window() -> dict:
     return {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
 
 
+def twice_as_fast(low_rise: np.ndarray, fps: float, bpm: float, score: float, facts: dict) -> bool:
+    """Is the track twice as fast as the comb counted? By the kick only without the style model; with it, the
+    sound says hardcore (and `analyze` searches hardcore's tempo). A band's bass in eighths rises on the lines
+    between as clearly as a hardcore kick (a steady 100 BPM pop-rock song 0.965, hardcore 0.96–0.98): on 210
+    cached tracks, every track rightly doubled sounded like hardcore."""
+    return not facts and kick_double(low_rise, fps, bpm, score)
+
+
 def analyze(
     path: str | Path, cache_dir: str | Path = paths.CACHE, verbose: bool = True, tempo: str | None = None
 ) -> Analysis:
@@ -155,10 +163,11 @@ def analyze(
     if not tempo:  # a tempo the whole track agrees on much more than the tracker's: track again from it
         tracked = 60 * fps / float(np.median(np.diff(beat_frames)))
         bpm, score = strongest_tempo(low_rise, fps)
-        doubled = kick_double(low_rise, fps, bpm, score)
+        facts = sound.facts(path)
+        doubled = twice_as_fast(low_rise, fps, bpm, score, facts)
         bpm *= 2 if doubled else 1
         # the kick's tempo where the sound says hardcore (a pumping bass can count it at a half, or two thirds)
-        fast = bpm < hardcore.BPM[0] and hardcore.heard(sound.facts(path))
+        fast = bpm < hardcore.BPM[0] and hardcore.heard(facts)
         if fast:
             bpm, score = strongest_tempo(low_rise, fps, *hardcore.BPM)
         if abs(bpm / tracked - 1) > 0.03 and (doubled or fast or comb_score(low_rise, fps, tracked) < 0.8 * score):
