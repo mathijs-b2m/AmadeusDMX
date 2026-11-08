@@ -97,8 +97,12 @@ public sealed class Resolver
         if (wantTitle.Count == 0) return Remember(key, "");
         var hits = all.Select(f =>
         {
-            var have = Words(Path.GetFileNameWithoutExtension(f)).Concat(Words(Path.GetFileName(Path.GetDirectoryName(f) ?? ""))).ToHashSet();
-            return wantTitle.IsSubsetOf(have) ? (Score: wantArtist.Intersect(have).Count(), File: f) : (Score: -1, File: f);
+            var stem = Words(Path.GetFileNameWithoutExtension(f)).ToHashSet();
+            var folder = Path.GetDirectoryName(f) ?? "";
+            var have = stem.Concat(Words(Path.GetFileName(folder))).ToHashSet();
+            if (!wantTitle.IsSubsetOf(have)) return (Score: -1, File: f);
+            var by = wantArtist.Intersect(have.Concat(Words(Path.GetFileName(Path.GetDirectoryName(folder) ?? "")))).Count();
+            return by > 0 || wantArtist.Count == 0 || Named(stem, wantTitle, wantArtist) ? (Score: by, File: f) : (Score: -1, File: f);
         }).Where(h => h.Score >= 0).ToList();
         if (hits.Count == 0) return Remember(key, "");
         var best = hits.Max(h => h.Score);
@@ -117,6 +121,12 @@ public sealed class Resolver
         var best = files.Select(f => (D: Math.Abs((LengthOf(f) ?? 0) - length), F: f)).MinBy(x => x.D);
         return best.D < LengthTolerance ? best.F : files[0];
     }
+
+    /// A file's name (its words) that is the title alone ("03 My My My"): no word beyond the title's, the artist's
+    /// and a track number. Another artist's file only holds a short title's words among its own ("Voices In My
+    /// Head" holds all of "My My My"), so a file that names none of the artist must be named this.
+    public static bool Named(HashSet<string> name, HashSet<string> title, HashSet<string> artist) =>
+        name.Except(title).Except(artist).All(w => w.All(char.IsAsciiDigit));
 
     /// Lower-case words without accents: "Café del Mar" → ["cafe", "del", "mar"].
     public static List<string> Words(string s)
