@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import re
 
-NOTE = "_filled"
-MOVING = ("moving_head", "scanner")  # the lights with gobo wheels and prisms (an LED bar's "pattern" is no gobo)  # in beam_fx: the effects read here (not in the file)
+NOTE = "_filled"  # in beam_fx: the effects read here (not in the file)
+MOVING = ("moving_head", "scanner")  # the lights with gobo wheels and prisms (an LED bar's "pattern" is no gobo)
 
 # which channel is which, by its attr or its chart name (the first of each in a mode; a fine or timing channel,
 # a rotation channel or a combined colour/gobo wheel is not the wheel itself)
@@ -186,7 +186,7 @@ def missing(defn: dict) -> bool:
 def fill(defn: dict, sources=None, guess: bool = True) -> list[str]:
     """Fill in the beam effects a fixture's file lacks, from its channels' ranges (`sources(defn, mode)`: the
     chart's [{"name", "ranges"}] per channel, None when unknown). `guess`: a channel without ranges gets the usual
-cheap layout (never for a library's fixture whose file isn't at hand). Returns the effects filled in."""
+    cheap layout (never for a library's fixture whose file isn't at hand). Returns the effects filled in."""
     if defn.get("kind") not in MOVING or defn.get("inert") or not missing(defn):
         return []
     table = defn.setdefault("beam_fx", {"open": {}})

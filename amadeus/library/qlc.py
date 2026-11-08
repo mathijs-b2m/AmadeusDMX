@@ -19,8 +19,8 @@ from functools import cache
 from pathlib import Path
 
 from amadeus import paths
-from amadeus.library import fixtures as fxlib
 from amadeus.library import beam_ranges, strobe
+from amadeus.library import fixtures as fxlib
 
 QLC_DIR = paths.CACHE / "qlc"
 REPO_DIR = paths.CACHE / "qlcplus"

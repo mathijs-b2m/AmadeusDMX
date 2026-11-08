@@ -168,9 +168,12 @@ def _wheels_from_catalogue(d: dict):
         if len(new) != len(chans):
             continue
         for c, n in zip(chans, new, strict=False):
-            if c["attr"] != n["attr"] and n["attr"] in WHEELS and "default" in c and n["attr"] not in {
-                x["attr"] for x in chans
-            }:
+            if (
+                c["attr"] != n["attr"]
+                and n["attr"] in WHEELS
+                and "default" in c
+                and n["attr"] not in {x["attr"] for x in chans}
+            ):
                 c["attr"] = n["attr"]  # (a wheel it held open, now played)
     own = d.setdefault("beam_fx", {"open": {}})
     for fx, entry in table.items():

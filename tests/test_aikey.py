@@ -1,4 +1,5 @@
-"""A key OpenAI refuses: the show goes on with the rules, the apps get a warning, and no rule plan passes as an AI plan."""
+"""A key OpenAI refuses: the show goes on with the rules, the apps get a warning, and no rule plan passes as an AI
+plan."""
 
 from pathlib import Path
 from types import SimpleNamespace
