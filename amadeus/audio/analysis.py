@@ -40,7 +40,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 43
+ANALYSIS_VERSION = 45
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -182,7 +182,7 @@ def analyze(
     accent_env = normalize(feats["flux_all"]) + normalize(
         np.maximum(0, np.diff(feats["bass"], prepend=feats["bass"][0]))
     )
-    downbeat_idx = downbeats(beat_frames, accent_env, low)
+    downbeat_idx = downbeats(beat_frames, accent_env, low, feats["chroma"])
     phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets)
     # the snare rolls into the drops (looked for from the drop before) and the pauses before them, on the
     # audio's own clock (not dated as heard)
