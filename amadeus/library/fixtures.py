@@ -131,6 +131,8 @@ def library() -> dict[str, dict]:
             d = json.loads(path.read_text(encoding="utf-8"))
             d["key"] = f"{path.parent.name}/{path.stem}"
             _strobes_from_catalogue(d)
+            _wheels_from_catalogue(d)
+            _beam_fx_from_ranges(d)
             lib[d["key"]] = d
     return lib
 
@@ -148,6 +150,48 @@ def _strobes_from_catalogue(d: dict):
                         c.update({k: n[k] for k in ("strobe_range", "strobe_hz") if k in n})
 
 
+WHEELS = ("gobo", "prism", "frost")
+
+
+def _wheels_from_catalogue(d: dict):
+    """A QLC+ fixture added before its converter read gobos, prisms and frost from their names (converter 11)
+    gets them from the catalogue: the wheel channels the catalogue now plays, the beam effects it lacks; its own
+    values and calibration left alone."""
+    if "qlc" not in d or d["qlc"].get("converter", 0) >= 11:
+        return
+    fresh = shadow.get(f"qlc:{d['qlc'].get('key', '')}") or {}
+    table = fresh.get("beam_fx", {})
+    if not table:
+        return
+    for mode, chans in d.get("modes", {}).items():
+        new = fresh.get("modes", {}).get(mode, [])
+        if len(new) != len(chans):
+            continue
+        for c, n in zip(chans, new, strict=False):
+            if c["attr"] != n["attr"] and n["attr"] in WHEELS and "default" in c and n["attr"] not in {
+                x["attr"] for x in chans
+            }:
+                c["attr"] = n["attr"]  # (a wheel it held open, now played)
+    own = d.setdefault("beam_fx", {"open": {}})
+    for fx, entry in table.items():
+        if fx not in own:
+            own[fx] = entry
+    if fresh.get("gobo_names") and not d.get("gobo_names"):
+        d["gobo_names"] = fresh["gobo_names"]
+
+
+def _beam_fx_from_ranges(d: dict):
+    """The gobos, prism and frost a fixture made from a chart or mapped by hand has channels for but no values:
+    read from the chart's ranges in its file (beam_ranges.py), so its wheels play like a converted fixture's. A
+    converted fixture's come from its converter (the same reading, where the library has no preset)."""
+    from amadeus.library import beam_ranges
+
+    if any(k in d for k in ("qlc", "ofl", "gdtf", "ddf")) and "made" not in d:
+        return
+    if beam_ranges.missing(d):
+        beam_ranges.fill(d, lambda d, mode: d.get("made", {}).get("channels", {}).get(mode))
+
+
 def path_of(key: str) -> Path:
     """The file a definition comes from: yours if you have one, else the shipped one."""
     mine = (USER_DIR or LIB_DIR) / f"{key}.json"
@@ -156,9 +200,11 @@ def path_of(key: str) -> Path:
 
 def save(key: str, data: dict) -> Path:
     """Writes a definition to your fixtures (the shipped library stays as it came)."""
+    from amadeus.library import beam_ranges
+
     path = (USER_DIR or LIB_DIR) / f"{key}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(beam_ranges.unfilled(data), indent=2), encoding="utf-8")
     library.cache_clear()
     return path
 

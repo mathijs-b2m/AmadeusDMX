@@ -20,7 +20,7 @@ from pathlib import Path
 
 from amadeus import paths
 from amadeus.library import fixtures as fxlib
-from amadeus.library import strobe
+from amadeus.library import beam_ranges, strobe
 
 QLC_DIR = paths.CACHE / "qlc"
 REPO_DIR = paths.CACHE / "qlcplus"
@@ -28,7 +28,7 @@ FIXTURES_DIR = REPO_DIR / "resources" / "fixtures"
 REPO_URL = "https://github.com/mcallegari/qlcplus.git"
 RAW_URL = "https://raw.githubusercontent.com/mcallegari/qlcplus/master/resources/fixtures/{path}"
 NS = {"q": "http://www.qlcplus.org/FixtureDefinition"}
-CONVERTER_VERSION = 10
+CONVERTER_VERSION = 11
 
 PRESET_ATTR = {
     "IntensityMasterDimmer": "dimmer",
@@ -187,6 +187,10 @@ def _caps(ch) -> list[dict]:
     return out
 
 
+def _ranges(caps: list[dict]) -> list[tuple[int, int, str]]:
+    return [(c["min"], c["max"], c["name"]) for c in caps]
+
+
 def _quiet_default(caps: list[dict], default: int) -> int:
     for c in caps:
         if c["preset"] in QUIET_PRESETS or "open" in c["name"].lower() and "close" not in c["name"].lower():
@@ -312,6 +316,20 @@ def _classify(ch) -> dict:
                 "default": stop["min"] if stop else _quiet_default(caps, default),
                 "_rot": _rotation(caps),
             }
+        words = beam_ranges.gobo_words(_ranges(caps)) if not gobos else {}
+        if not gobos and words.get("gobo"):  # gobos named without the preset ("Gobo 1"): read from the names
+            return {
+                "attr": "gobo",
+                "default": open_c["min"] if open_c else 0,
+                "_gobos": words["gobo"]["gobo"],
+                "_gobo_names": [],
+                "_gobo_images": [],
+                "_shake": words.get("gobo_shake", {}).get("gobo", []),
+                "_shake_images": [],
+                "_spin": [words["gobo_spin"]["gobo"]["range"]] if "gobo_spin" in words else [],
+                "_rotating": "rot" in name.lower(),
+                "_words": True,
+            }
         if not gobos:  # a wheel the library names no gobos for: left open
             return {"attr": "gobo_wheel", "default": open_c["min"] if open_c else _quiet_default(caps, default)}
         spin = [c for c in caps if "Rotation" in c["preset"] and "Stop" not in c["preset"]]
@@ -331,22 +349,30 @@ def _classify(ch) -> dict:
         on = next((c for c in caps if c["preset"] == "PrismEffectOn"), None)
         off = next((c for c in caps if c["preset"] == "PrismEffectOff"), None)
         spin = _rotation(caps)
+        words = beam_ranges.prism_words(_ranges(caps)) if on is None else {}  # no preset: the ranges' names
         return {
             "attr": "prism",
             "default": (off["min"] + off["max"]) // 2 if off else _quiet_default(caps, default),
-            "_on": (on["min"] + on["max"]) // 2 if on else None,
-            "_spin": spin,
+            "_on": (on["min"] + on["max"]) // 2 if on else words.get("prism", {}).get("prism"),
+            "_spin": spin or words.get("prism_spin", {}).get("prism") or {},
+            "_words": on is None,
         }
     if group == "Speed":  # pan/tilt speed: run the motors at full speed, the engine times the moves itself
         fast = next((c for c in caps if "fast" in c["name"].lower()), None)
         v = default if fast is None else fast["min"] if "fast to slow" in fast["name"].lower() else fast["max"]
         return {"attr": re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "speed", "default": v}
-    if group == "Beam" and "frost" in name.lower():
+    if (
+        group in ("Beam", "Effect")
+        and "frost" in name.lower()
+        and not re.search(r"time|fine|speed|priority|mode|audio|focus|zoom|correct|macro|uv|lsb|bit", name, re.I)
+    ):  # a frost of its own, not a timing or fine channel or one it shares with something else
         inn = [c for c in caps if "in" in c["name"].lower().split()]
+        words = beam_ranges.frost_words(_ranges(caps)) if not inn else {}  # no "in": the ranges' names
         return {
             "attr": "frost",
             "default": _quiet_default(caps, default),
-            "_on": (inn[-1]["min"] + inn[-1]["max"]) // 2 if inn else None,
+            "_on": (inn[-1]["min"] + inn[-1]["max"]) // 2 if inn else words.get("frost", {}).get("frost"),
+            "_words": not inn,
         }
     if group == "Shutter":
         return {"attr": "shutter", "default": _quiet_default(caps, default)}
@@ -360,6 +386,7 @@ def _gobo_wheels(specs: list[dict]) -> dict | None:
     """The gobo wheel the show drives, of a mode's channels: the rotating one when the gobos can be turned (a
     gobo rotation channel), else the first. The others stay open."""
     wheels = [s for s in specs if s["attr"] == "gobo" and s.get("_gobos")]
+    wheels = [s for s in wheels if not s.get("_words")] or wheels  # a wheel the library presets wins over names
     if any(s["attr"] == "gobo_rotation" and s.get("_rot") for s in specs):
         return next((w for w in wheels if w["_rotating"]), wheels[0] if wheels else None)
     return wheels[0] if wheels else None
@@ -458,13 +485,13 @@ def convert(rel: str) -> dict:
                     images.setdefault("gobo_rotate", spec["_gobo_images"])
             elif spec["attr"] == "gobo":  # another wheel: left open
                 spec = {"attr": "gobo_wheel", "default": spec["default"]}
-            if spec["attr"] == "prism" and spec.get("_on") is not None:
+            if spec["attr"] == "prism" and spec.get("_on") is not None and not (spec["_words"] and "prism" in beam_fx):
                 beam_fx["prism"] = {"prism": spec["_on"]}
                 if spec.get("_spin"):
                     beam_fx["prism_spin"] = {
                         "prism": spec["_spin"] if "range" in spec["_spin"] else {"range": spec["_spin"]["reverse"]}
                     }
-            if spec["attr"] == "frost" and spec.get("_on") is not None:
+            if spec["attr"] == "frost" and spec.get("_on") is not None and not (spec["_words"] and "frost" in beam_fx):
                 beam_fx["frost"] = {"frost": spec["_on"]}
             spec = {k: v for k, v in spec.items() if not k.startswith("_")}
             if n in head_of and spec["attr"] in ("red", "green", "blue", "white", "dimmer", *fxlib.DARK_EMITTERS):
