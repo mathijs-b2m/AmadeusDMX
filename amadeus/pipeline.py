@@ -106,7 +106,7 @@ def get_plan(
         director = CINEMATIC
     programmed = director in (CINEMATIC, LIGHTSHOW)
     genre = style_genre(a) if callable(style_genre) else (style_genre or a.genre)
-    style = style_for(genre, a.genre_facts) if not programmed else None
+    style = style_for(genre, getattr(a, "genre_facts", None)) if not programmed else None
     a.style = style.genre if style else ""
     theme = theme_of(wav) if not programmed else None
     groups = head_groups(rig) if rig else []
