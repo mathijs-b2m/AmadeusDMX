@@ -278,7 +278,7 @@ class RuleDirector:
             section = "intro"
         elif pos > 0.95 and p.loudness_slope_db < 0:
             section = "outro"
-        elif p.kick_ratio < 0.5 or (p.low_pct < 25 and p.loudness_pct < 30):
+        elif p.kick_ratio < (self.style.break_kick if self.style else 0.5) or (p.low_pct < 25 and p.loudness_pct < 30):
             section = "breakdown"
         elif p.drop_score >= DROP_THRESHOLD or (
             p.low_pct > 70 and p.loudness_pct > 65 and (low_jump > 20 or (last and last.section == "drop"))

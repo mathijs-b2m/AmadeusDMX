@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from amadeus.audio import disco, genre
+from amadeus.audio import sound as sounds
 from amadeus.director import RuleDirector, direct
 from amadeus.director.style import MIRROR_BALL, check, style_for
 from amadeus.engine import Engine
@@ -59,7 +60,7 @@ def test_a_house_or_funk_call_on_clear_disco_is_disco(monkeypatch):
     calls = [("house", DIRTY_TALK, "disco"), ("funk", CHEMISE, "disco"), ("house", SABATO, "house"),
              ("house", KUNGS, "house"), ("pop", CHEMISE, "pop"), ("disco", HOUSE, "disco")]  # fmt: skip
     for called, sound, out in calls:
-        monkeypatch.setattr(genre.disco, "facts", lambda path, s=sound: s)
+        monkeypatch.setattr(sounds, "facts", lambda path, s=sound: s)
         monkeypatch.setattr(genre, "from_model", lambda artist, title, g=called: (g, 0.9))
         assert genre.detect(a).genre == out, (called, sound)
 
@@ -70,7 +71,7 @@ def test_no_model_no_disco_facts(monkeypatch, tmp_path):
     f = tmp_path / "track.wav"
     f.write_bytes(b"")
     monkeypatch.setattr(instruments, "available", lambda: False)
-    assert disco.facts(f) == {} and disco.facts(tmp_path / "missing.wav") == {}
+    assert sounds.facts(f) == {} and sounds.facts(tmp_path / "missing.wav") == {}
 
 
 def test_tags():

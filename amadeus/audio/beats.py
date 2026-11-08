@@ -125,6 +125,17 @@ def comb_score(env: np.ndarray, fps: float, bpm: float) -> float:
     return comb(env, fps, 60.0 / bpm, spread=0.003, steps=13)[2]
 
 
+KICK_DOUBLE = 0.93  # the low end rises this much as clearly on the lines between: the kick runs twice as fast
+KICK_DOUBLE_MAX = 200.0  # (measured: hardcore 0.96–0.98; Maluma, Chemise and other real 90–100 BPM tracks ≤ 0.89)
+
+
+def kick_double(env: np.ndarray, fps: float, bpm: float, score: float, share: float = KICK_DOUBLE) -> bool:
+    """Is the music twice as fast as `bpm`? A kick on every beat also scores on every other beat, so the comb
+    can't tell 168 BPM hardcore from 84 BPM. Twice as many lines tell: every one of them lands on a kick only
+    when the kick really runs at that tempo. Beyond KICK_DOUBLE_MAX it is a band's double-time (Metallica)."""
+    return 2 * bpm <= KICK_DOUBLE_MAX and comb_score(env, fps, 2 * bpm) >= share * score
+
+
 def constant_grid(beat_times: np.ndarray, low_rise: np.ndarray, fps: float, agree: float = 0.7):
     """One straight grid for a track made at one tempo (most club music), or None.
 

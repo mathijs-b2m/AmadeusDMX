@@ -106,7 +106,7 @@ def get_plan(
         director = CINEMATIC
     programmed = director in (CINEMATIC, LIGHTSHOW)
     genre = style_genre(a) if callable(style_genre) else (style_genre or a.genre)
-    style = style_for(genre) if not programmed else None
+    style = style_for(genre, getattr(a, "genre_facts", None)) if not programmed else None
     a.style = style.genre if style else ""
     theme = theme_of(wav) if not programmed else None
     groups = head_groups(rig) if rig else []
@@ -122,7 +122,9 @@ def get_plan(
             "scr" if screen else None,
             "fog" if fog else None,
             "out" if outdoor else None,
-            f"s{style.genre}" + (f"-{style.beat}" if style.beat else "") if style else None,  # (a new beat: replan)
+            "-".join(x for x in (f"s{style.genre}", style.flavour, style.beat) if x)
+            if style
+            else None,  # (new beat: replan)
             f"t{theme}" if theme else None,
             _sections_key(a),
         )

@@ -363,6 +363,7 @@ public static class Genre
         "jazz" or "funk" => "music.note.list",
         "disco" => "sparkles",
         "hardstyle" => "bolt.fill",
+        "hardcore" => "figure.run",
         "pop" or "latin" or "reggaeton" => "music.note",
         _ => "waveform",
     };

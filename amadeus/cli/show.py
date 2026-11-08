@@ -177,8 +177,12 @@ def genre_command(args):
         genre.set_override(a, None if args.genre == "auto" else args.genre)
         a = run(args.wav, paths.CACHE, verbose=False)
     program = genre.PROGRAMS.get(a.genre)
-    sources = {"you": "your choice", "ai": "Decisions API, from the artist and title", "tag": "the file's tag",
-               "sound": "its sound (EffNet-Discogs)"}
+    sources = {
+        "you": "your choice",
+        "ai": "Decisions API, from the artist and title",
+        "tag": "the file's tag",
+        "sound": "its sound (EffNet-Discogs)",
+    }
     print(f"{a.genre}  (from {sources.get(a.genre_source, 'the audio')})")
     print(f"  measured: {a.genre_facts}")
     if program:

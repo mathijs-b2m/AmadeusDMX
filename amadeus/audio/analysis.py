@@ -15,12 +15,14 @@ import numpy as np
 import soundfile as sf
 
 from amadeus import paths, system
+from amadeus.audio import hardcore, sound
 from amadeus.audio.beats import (
     attack_offset,
     beat_kicks,
     comb_score,
     constant_grid,
     downbeats,
+    kick_double,
     local_tempo,
     refine_beats,
     set_bpm,
@@ -40,7 +42,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 45
+ANALYSIS_VERSION = 46
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -153,7 +155,13 @@ def analyze(
     if not tempo:  # a tempo the whole track agrees on much more than the tracker's: track again from it
         tracked = 60 * fps / float(np.median(np.diff(beat_frames)))
         bpm, score = strongest_tempo(low_rise, fps)
-        if abs(bpm / tracked - 1) > 0.03 and comb_score(low_rise, fps, tracked) < 0.8 * score:
+        doubled = kick_double(low_rise, fps, bpm, score)
+        bpm *= 2 if doubled else 1
+        # the kick's tempo where the sound says hardcore (a pumping bass can count it at a half, or two thirds)
+        fast = bpm < hardcore.BPM[0] and hardcore.heard(sound.facts(path))
+        if fast:
+            bpm, score = strongest_tempo(low_rise, fps, *hardcore.BPM)
+        if abs(bpm / tracked - 1) > 0.03 and (doubled or fast or comb_score(low_rise, fps, tracked) < 0.8 * score):
             log(f"  tempo: {tracked:.1f} BPM tracked, {bpm:.2f} BPM fits the whole track better: tracking again")
             beat_frames = track_beats(onset_env, np.full_like(bpm_curve, bpm), fps)
     if tempo == "half":  # manual: the song is half as fast as counted (e.g. hip-hop counted double)
