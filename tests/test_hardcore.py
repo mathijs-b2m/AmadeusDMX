@@ -167,3 +167,12 @@ def test_no_more_flicker_than_edm(path, bpm):
     base = flicker(Engine(a, _plan(a, rig, STYLES["edm"]), rig), rig, a)
     for style in (STYLES["hardcore"], HAPPY_HARDCORE):
         assert flicker(Engine(a, _plan(a, rig, style), rig), rig, a) <= base
+
+
+def test_with_the_style_model_the_sound_doubles_not_the_bass():
+    from amadeus.audio.analysis import twice_as_fast
+
+    eighths = _kicks(200.0)  # a band's bass in eighths under a 100 BPM song rises like a kick at 200
+    bpm, score = strongest_tempo(eighths, FPS)
+    assert twice_as_fast(eighths, FPS, bpm, score, {})  # no models: the kick is all there is to go by
+    assert not twice_as_fast(eighths, FPS, bpm, score, {"hardcore": 0.02, "hardcore_lead": 0.0})
