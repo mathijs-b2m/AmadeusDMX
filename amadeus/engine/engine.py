@@ -21,6 +21,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director import Decision
 from amadeus.director.style import style_for
 from amadeus.engine import zones
+from amadeus.engine.blinders import BlindersMixin
 from amadeus.engine.cinematic import CinematicMixin
 from amadeus.engine.fog import FogMixin
 from amadeus.engine.lasers import LasersMixin
@@ -53,6 +54,7 @@ def program_of(analysis: Analysis, plan: list[Decision]) -> str:
 class Engine(
     TimingMixin,
     LooksMixin,
+    BlindersMixin,
     MotionMixin,
     RingsMixin,
     LasersMixin,
@@ -181,6 +183,7 @@ class Engine(
         self._move_travel = (0.9, 0.9)
         # a program of its own: for the genre (cinematic: every hit played by its own fixtures), or switched on by
         # hand (lightshow: the cinematic program as a show piece, building up layer by layer)
+        self._init_blinders(rig)
         self.program = program_of(analysis, plan)
         if self.program:
             self._init_cinematic(rig)
@@ -228,7 +231,11 @@ class Engine(
         """The look at time t, as the show wants it. `peek`: only to see what's coming (wheels.py), not played."""
         i, d = self.decision_at(t)
         if self.program:
-            return i, self._finish(self._cinematic_scene(t), t, peek)
+            states = self._cinematic_scene(t)
+            self._blinders(t, states)
+            for eid in self.blinder_ids:
+                states[eid].dimmer *= self.rig["safety"]["master"]
+            return i, self._finish(states, t, peek)
         states = self._scene(d, t)
         big = self.drop_strength is None or self.drop_strength >= DROP_DARK_FROM  # (small drops: no moving in black)
         ahead = self._drop_ahead(i, t) if big else None

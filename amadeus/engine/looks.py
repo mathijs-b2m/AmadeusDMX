@@ -140,25 +140,8 @@ class LooksMixin:
     """Per-phrase looks: which fixtures light, in which colours, on which hits."""
 
     def _blinder_states(self, d: Decision, t: float, out: dict, acc_env: float):
-        """Blinders: the punch for the biggest moments only. Dark by default; on a main drop (intensity 3) the
-        drop moment slams them in, then they flash on the big accents; a build into such a drop swells them up
-        over its last two beats. Gentle drops leave them dark."""
-        blinders = [e for e in self.rig["elements"] if e["kind"] == "blinder"]
-        if not blinders:
-            return
-        _, _, period = self.beat_info(t)
-        dim = 0.0
-        i = d.phrase  # this look's own phrase (during a crossfade the previous look is rendered too)
-        nxt = self.plan[i + 1] if i + 1 < len(self.plan) else None
-        if d.section == "drop" and d.intensity >= 3:
-            dim = max(0.0, (acc_env - 0.45) / 0.55)  # the big hits only
-        elif d.dynamics == "rise" and nxt is not None and nxt.section == "drop" and nxt.intensity >= 3:
-            left = d.end - t
-            if left < 2 * period:
-                dim = (1.0 - left / (2 * period)) ** 2 * 0.8  # swell into the drop
-        for e in blinders:
-            out[e["id"]] = State(dimmer=dim, r=1.0, g=0.72, b=0.42)
-        self._blinder_ids = {e["id"] for e in blinders}
+        """Blinders: dark but for the song's heaviest moments (engine/blinders.py)."""
+        self._blinders(t, out)
 
     def _strobe_states(self, d: Decision, t: float, out: dict, acc_env: float):
         """Strobes: flashes, never a steady light. Dark by default. A build-up into a drop flashes on the beat
@@ -475,7 +458,10 @@ class LooksMixin:
             since = t - end
             if 0 <= since < period:
                 boost, flash = 1.0 - since / period, math.exp(-since / 0.15)
-                for s in states.values():
+                blinders = set(self.blinder_ids)  # (they keep to the heaviest moments: engine/blinders.py)
+                for eid, s in states.items():
+                    if eid in blinders:
+                        continue
                     s.dimmer = max(s.dimmer, boost)
                     s.white = max(s.white, flash)
                 return
@@ -831,10 +817,9 @@ class LooksMixin:
         if since < bar:
             boost = (1.0 - since / bar) * size  # full → the drop's own level over one bar
             flash = math.exp(-since / 0.18) * size  # one white hit on the downbeat
-            main = self.decision_at(self.drops[k - 1])[1].intensity >= 3
-            blinders = getattr(self, "_blinder_ids", set())
+            blinders = set(self.blinder_ids)
             for eid, s in states.items():
-                if eid in blinders and not main:
-                    continue  # blinders punch on main drops only
+                if eid in blinders:
+                    continue  # blinders slam in at the heaviest drops only (blinder_level)
                 s.dimmer = max(s.dimmer, boost)
                 s.white = max(s.white, flash)

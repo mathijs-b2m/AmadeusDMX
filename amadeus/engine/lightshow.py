@@ -5,7 +5,7 @@ hit at its exact time, played by its own fixtures), turned all the way up:
 - **every light gets its turn**: the rig is played in **families**, one per fixture model however many trusses
   it hangs on (all the PARs, all the Auras…), each split into a few blocks left to right for its gestures; a rig
   of one or two models splits them into interleaved halves or thirds, so it has groups to vary too. Every family
-  gets an instrument of the music (booms on the floor lights and blinders, cymbals on the beams…; with more
+  gets an instrument of the music (booms on the floor lights, cymbals on the beams…; with more
   families than instruments, an instrument gets several, and they play it together);
 - **a build-up**: one family starts with every hit, and every loud phrase brings the next one in
   (amadeus/director/lightshow.py, `layers`). A quiet part takes families away. An instrument whose family isn't
@@ -113,7 +113,7 @@ class LightshowMixin(CinematicMixin):
             return super()._cine_sections(rig)
         by_fixture: dict[str, list[dict]] = {}
         for e in rig["elements"]:
-            if e["kind"] not in ("laser", "strobe", "smoke", "inert"):
+            if e["kind"] not in ("laser", "strobe", "blinder", "smoke", "inert"):
                 by_fixture.setdefault(e["fixture"], []).append(e)
         models: dict[str, list[dict]] = {}
         for f in rig["fixtures"]:
