@@ -41,6 +41,14 @@ POINT_DISTANCE_M = 3.0  # focus/cross: how far in front of the rig the shared po
 FOCUS_SPREAD_M = 1.5  # …and how wide the heads spread around it: never every beam into one single spot
 
 
+# The twister: every head circles a shared point in front of the rig, each a step further round than its neighbour.
+TWIST_BEATS = (16, 16, 8, 4)  # beats per turn, per intensity level (the same speed for all, or the shape falls apart)
+TWIST_MAX_BEATS = 32  # motors too slow for a turn: it takes twice as long, it never gets smaller
+TWIST_REACH_M = 4.0  # how far out the shape's waist floats (a wide rig: half its width)
+TWIST_DEG = 25.0  # the circle's size, seen from the rig
+TWIST_SIZE = {"fan": 1.5, "focus": 0.5}  # wide, a tight rope
+TWIST_RING_DEG = 45.0  # on a ring: how far round its beams reach past straight across, like rings.py's twister
+
 DJ_CLEAR_M = 0.8  # focus/cross: every beam passes the DJ's head at least this far off (other looks may sweep over them)
 DJ_WAY_OUT = np.array([0.0, 0.6, 0.8])  # …on the side up and towards the audience when it would hit them square on
 
@@ -315,10 +323,60 @@ class MotionMixin:
             aim = {**aim, "el": top - amp, "el_amp": amp}
         return aim
 
+    def _twist_beats(self, intensity: int) -> float:
+        """Beats per turn of the twister: the level's, doubled until the slowest head can make the circle."""
+        beats = float(TWIST_BEATS[max(0, min(3, intensity))])
+        motions = [defn.get("motion", DEFAULT_MOTION) for _, defn in self.head_fx]
+        speed = min((min(m["pan_speed_dps"], m["tilt_speed_dps"]) for m in motions), default=1e9)
+        accel = min(
+            (min(m.get(f"{a}_accel_dps2", m["accel_dps2"]) for a in ("pan", "tilt")) for m in motions), default=1e9
+        )
+        while beats < TWIST_MAX_BEATS:
+            w = 2 * math.pi / (beats * self._beat_s())
+            if w * TWIST_DEG <= speed and w * w * TWIST_DEG <= accel:
+                break
+            beats *= 2
+        return beats
+
+    def _twister_v(self, d: Decision, pos: np.ndarray, role: dict, j: int) -> np.ndarray:
+        """Head j's beam in the twister, at `pos` (beats). Every head aims at its own place on a circle round the
+        shared point, the places spread once round the circle over the row (on a ring: over the ring, past straight
+        across), the whole circle turning: seen together a twisted hourglass. Mirror: the right half is the left
+        half's mirror image, two twisters turning against each other. A head that plays towards the camera turns
+        round the lens, at full size (pulled there, it would keep a quarter of its circle)."""
+        head_pos = self.head_pos[j]
+        f, side = role["formation"], role["side"]
+        aim = self._fit_aim(self._aim_name(d.aim, j), head_pos)
+        axis = np.asarray(geometry.direction(aim["az"], aim["el"]), dtype=float).reshape(3)
+        centre = np.mean(self.head_pos, axis=0) if role["centre"] is None else role["centre"]
+        reach = max(TWIST_REACH_M, 0.5 * role["width"])
+        middle = centre + axis * reach
+        if j in self.camera_heads:
+            middle = self.camera
+            reach = float(np.linalg.norm(middle - head_pos))
+            axis = (middle - head_pos) / max(reach, 1e-6)
+        radius = reach * math.tan(math.radians(TWIST_DEG)) * TWIST_SIZE.get(f, 1.0)
+        e1 = np.cross(axis, (0.0, 0.0, 1.0))
+        e1 = e1 / n if (n := np.linalg.norm(e1)) > 1e-6 else np.array([1.0, 0.0, 0.0])
+        e2 = np.cross(e1, axis)
+        ring = self.rings[j] if self.rings else None
+        if ring:
+            place = ring["angle"] + math.pi + math.radians(TWIST_RING_DEG)
+        elif f == "mirror":
+            place = abs(side) * math.pi
+        else:
+            place = 2 * math.pi * role["idx"] / max(role["count"], 1)
+        turn = place + 2 * math.pi * (pos + role["phase"]) / self._twist_beats(d.intensity)
+        flip = -1.0 if f == "mirror" and side > 0 and not ring else 1.0
+        point = middle + radius * (flip * np.cos(turn)[:, None] * e1 + np.sin(turn)[:, None] * e2)
+        vec = point - head_pos
+        return vec / (np.linalg.norm(vec, axis=1, keepdims=True) + 1e-9)
+
     def _head_dir(self, d: Decision, t: float, j: int) -> np.ndarray:
         """World direction head j should point in: shape × formation × aim."""
         beat, phase, _ = self.beat_info(t)
         pos = beat + phase
+        at = pos
         n = len(self.heads)
         side = (j / max(n - 1, 1)) * 2 - 1 if n > 1 else 0.0  # -1 left .. +1 right
         f = d.formation
@@ -345,7 +403,9 @@ class MotionMixin:
 
         az = aim["az"] + u * aim["az_amp"]
         el = aim["el"] + v * aim["el_amp"]
-        if f in ("focus", "cross"):
+        if d.movement == "twister":
+            out = self._twister_v(d, np.array([at]), self._role(d, j), j)[0]
+        elif f in ("focus", "cross"):
             # A shared point that moves with the same angles as the other formations, at a fixed distance in
             # front of the middle of the rig; every head aims at it (cross: at a point shifted to the other side).
             centre = np.mean(self.head_pos, axis=0)
@@ -364,7 +424,7 @@ class MotionMixin:
                     el += CURVE_DEG * (2 * cp * cp - 1)
             out = geometry.direction(az, el)
 
-        if j in self.camera_heads:
+        if j in self.camera_heads and d.movement != "twister":  # (the twister turns round the lens by itself)
             out = towards_camera(head_pos, out, self.camera)
         if d.dynamics == "rise":  # swing up towards the drop
             progress = min(max((t - d.start) / max(d.end - d.start, 1e-6), 0), 1)
@@ -374,7 +434,8 @@ class MotionMixin:
         if self.zones.heads:  # artistic zones: off the walls/set, inside the keep-in area
             out = self.zones.filter(head_pos, out[None])[0]
         out = self._room_safe_v(out[None], j)
-        if f in ("focus", "cross"):  # (last: the limits above can turn a beam back onto the DJ)
+        # (last: the limits above can turn a beam back onto the DJ)
+        if f in ("focus", "cross") or d.movement == "twister":
             out = clear_of_dj(head_pos, out, self.dj_head)
         return geometry.eye_safe(out[0], head_pos[2], self.stage)
 
@@ -675,6 +736,8 @@ class MotionMixin:
         cp = self._cell_place(j)  # a cell of a bar whose cells tilt on their own: its waves roll along the bar
         if movement == "pour":
             out = self._pour_dir_v(d, beat + phase, j, role, aim_name)
+        elif movement == "twister":
+            out = self._twister_v(d, beat + phase, role, j)
         elif movement == "tilt_wave" or (f == "wave" and cp is not None and not ring):
             # A row of heads tilting up and down in a wave that rolls over the row: each head a step behind its
             # neighbour by where it hangs (left to right; mirrored: from the centre out). One wave per bar, every
@@ -717,7 +780,7 @@ class MotionMixin:
             elif f == "wave" and role["vside"]:
                 el = el + role["vside"] * 6
             out = self._direction_v(az, el)
-        if j in self.camera_heads:
+        if j in self.camera_heads and movement != "twister":  # (the twister turns round the lens by itself)
             out = towards_camera(head_pos, out, self.camera)
         if d.dynamics == "rise":
             progress = np.clip((ts - d.start) / max(d.end - d.start, 1e-6), 0, 1)[:, None]
@@ -727,7 +790,8 @@ class MotionMixin:
         if self.zones.heads:
             out = self.zones.filter(head_pos, out)
         out = self._room_safe_v(out, j)  # off the ceiling, not back at the DJ, not into the rig
-        if f in ("focus", "cross"):  # (last: the limits above can turn a beam back onto the DJ)
+        # (last: the limits above can turn a beam back onto the DJ)
+        if f in ("focus", "cross") or movement == "twister":
             out = clear_of_dj(head_pos, out, self.dj_head)
         return self._eye_safe_v(out, head_pos[2])
 

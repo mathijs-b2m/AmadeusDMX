@@ -77,9 +77,11 @@ Every track gets a **genre**, one word (cinematic, classical, ambient, edm, hous
 3. a **genre tag** in the file;
 4. the **audio**, as the fallback. Reggaeton first, by its **dembow**: the snare on the 16th before the second beat and on its "and" (3+3+2), where house and pop put theirs on the beat. Then **disco**, by its sound: its beat is house's, but the style model of the instrument recognition (EffNet-Discogs, with the models installed) hears the band, the strings and the bass guitar's octaves. Disco sounds like disco to it 0.39–0.76 on average and more like disco than like funk or house for most of the track; house stays under 0.33. Then how much of the track grooves (the same rhythm bar after bar, in the low end or the highs). Club tracks groove for 55–100% of their length, film scores for ~15%; the tempo names the family.
 
-A Latin call from the Decisions API or a tag, on a track whose audio plays the dembow, becomes reggaeton. A funk or house call on a track that unmistakably sounds like disco becomes disco, and a hard dance call on a track that unmistakably sounds like hardcore becomes hardcore.
+**Hardcore** (gabber, happy hardcore, speedcore) is found by its sound too, sung or not: the same style model hears it apart from hardstyle and drum and bass. Without the models a kick on nearly every beat at drum and bass's tempo tells it from a broken beat.
 
-**Hardcore** (gabber, happy hardcore, speedcore) is found by its sound too, sung or not: the same style model hears it apart from hardstyle and drum and bass, and it is no guess, so such a track keeps its own style in a set. Without the models a kick on nearly every beat at drum and bass's tempo tells it from a broken beat.
+**Hardstyle** is heard by its sound as well: the same style model recognises the distorted kick (hardstyle, jumpstyle, gabber, hardcore against happy hardcore, hard trance, donk and the like), which its 150 BPM can't tell from psytrance and its vocals from pop. Hardcore is asked first: a track that sounds more like gabber or happy hardcore than like hardstyle is hardcore. A track heard either way keeps its own style in a set of another genre, like a track whose genre is known.
+
+A Latin call from the Decisions API or a tag, on a track whose audio plays the dembow, becomes reggaeton. A funk or house call on a track that unmistakably sounds like disco becomes disco. A hard dance call on a track that unmistakably sounds like hardcore becomes hardcore, and an EDM, techno or trance call on a track that sounds like hardstyle becomes hardstyle.
 
 ### A house style per genre
 
@@ -88,8 +90,9 @@ Every genre has a **style sheet** ([amadeus/director/style.py](../amadeus/direct
 - which looks don't fit it (no spinning prisms or colour cycling in techno, no strobing light in jazz or ambient, no soft fades in hardstyle);
 - what to use instead;
 - a few lines describing the style;
-- for a few genres, a beat or a look of its own: reggaeton's boom-tac, rock and metal's drum kit (kick and snare, see [Songs and club tracks](#songs-and-club-tracks)), disco's four-to-the-floor kick and its **mirror ball** in the break (the heads fanned over the crowd, circling slowly, their dots gobos turning), hardcore's kick with the heads strobing on it where it returns after a break.
-- hardcore has two faces, told by its sound: Thunderdome's red and white, dark between the hits, or **happy hardcore's** rave colours that stay on, with the pars playing the piano and the singer note by note in the break.
+- for hardstyle, a whole show of its own: a form read from its two levels (the climax, what builds into it, and the breaks; the distorted kick fools the usual section rules), the kick on the beat grid where the onsets lose it, a climax that **hammers** in red and white at full size every time (four bars of beams punching on the kick, four bars of strobe, while the heads twist and throw), and breaks where everything goes dark and one effect plays alone, slowly: a **twister** of white beams, one group of heads in a single cold colour, a spinning prism;
+- for a few genres, a beat or a look of its own: reggaeton's boom-tac, rock and metal's drum kit (kick and snare, see [Songs and club tracks](#songs-and-club-tracks)), disco's four-to-the-floor kick and its **mirror ball** in the break (the heads fanned over the crowd, circling slowly, their dots gobos turning), hardcore's kick with the heads strobing on it where it returns after a break;
+- hardcore has two faces, told by its sound: Thunderdome's red and white, the hits over a red wash that stays on, or **happy hardcore's** rave colours that stay on, with the pars playing the piano and the singer note by note in the break.
 
 A style is a **lean, not a rule**: the genre sets the colours, and the music of each part decides the moves, because a song is not one genre all the way through (a piano ballad part, then a mainstage drop).
 - The **rule director** uses the genre's palettes everywhere. It swaps a look's misfits only in the grooves, the body of a genre; intros, breakdowns, buildups and drops follow their own music.
@@ -183,7 +186,7 @@ Choose the decision model on the **setup page** (saved on selection, also in a r
 | `trigger`: what a hit is | kick · backbeat · dembow · drums · hats · accents · bars · eighths · sixteenths · roll · lead · synth |
 | `head_trigger`: the heads' own hit | same · kick · … · synth (layering: e.g. heads on the kick, pars on a 1/8 synth riff) |
 | `head_light` | steady · pulse · flick · beat · alternate · random (each head its own random kicks) · accents · breathe · off |
-| `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) · pour (lit high at the ceiling, a fast fall to the floor, let go there, back up in the dark for the next beat; sync: a curtain, wave: a cascade, individual: each head on its own beat) |
+| `movement`: path | still · sweep · nod · circle · figure8 · step_on_beat · bounce · swing · ballyhoo · tilt_wave (a row tilting in a rolling wave; mirrored: from the centre out) · twister (every head circling a shared point, each a step further round: the rig turns as one twisted shape, on any truss; mirrored: two twisters turning against each other) · pour (lit high at the ceiling, a fast fall to the floor, let go there, back up in the dark for the next beat; sync: a curtain, wave: a cascade, individual: each head on its own beat) |
 | `formation` | sync · mirror · wave · fan (a bar whose cells tilt on their own, like the COLORado PXL Curve, bends into a curve) · focus (shared point) · cross |
 | `aim` | crowd · stage · sky |
 | `head_color` | base · accent · white · cycle |

@@ -10,7 +10,8 @@ From strong to weak:
    on the 16th before the second beat and on the "and" of it, every two beats (3+3+2), where house and pop
    put theirs on the beat. Then disco, by its sound (amadeus/audio/disco.py): its beat is house's, but
    EffNet-Discogs hears the band, the strings and the bass guitar's octaves. Then hardcore, by its sound too
-   (amadeus/audio/hardcore.py), song or not: this is no guess, so the track keeps its own style in a set (source
+   (amadeus/audio/hardcore.py), song or not. Then hardstyle, by its sound as well (amadeus/audio/hardstyle.py):
+   the distorted kick, at psytrance's tempo. Neither is a guess, so the track keeps its own style in a set (source
    "sound"). Then its form
    (amadeus/audio/form.py): a song, with a voice singing through its loud parts, is rock when guitars lead it,
    hip-hop when it is slow and they don't, else pop; never a beat-less genre, however loose its groove.
@@ -21,7 +22,8 @@ From strong to weak:
 A Latin call (from the model or a tag) on a track with a dembow is reggaeton: the model knows Karol G sings
 Latin music, the audio hears which kind. Likewise a funk or house call on a track that unmistakably sounds like
 disco is disco (with no disco to choose, the model called Klein & M.B.O.'s Italo-Disco "Dirty Talk" house), and
-a hard dance call on a track that unmistakably sounds like hardcore is hardcore.
+a club call on a track that unmistakably sounds like hardcore is hardcore, and one on a track that sounds like
+hardstyle is hardstyle.
 
 The music facts behind the call are kept (`GenreCall.facts`) so the choice can be shown and checked.
 """
@@ -51,7 +53,8 @@ GENRES = {
     "techno": "techno, minimal, melodic techno, high-tech minimal, industrial techno",
     "trance": "trance, uplifting, progressive trance: euphoric leads and long breakdowns",
     "psytrance": "psytrance, goa, full-on: rolling basslines, psychedelic",
-    "hardstyle": "hardstyle, rawstyle, jumpstyle, hard dance: reverse bass and distorted kicks, 145–160 BPM",
+    "hardstyle": "hardstyle, rawstyle, jumpstyle: Headhunterz, Wildstylez, Brennan Heart; distorted kicks at "
+    "150 BPM and up, reverse bass, big melodic breaks",
     "hardcore": "hardcore, gabber, happy hardcore, frenchcore, speedcore: Paul Elstak, Thunderdome, Angerfist, Party "
     "Animals; a distorted kick on every beat at 160–200 BPM, with hoovers or piano and a singer",
     "dnb": "drum and bass, jungle, liquid: breakbeats around 170 BPM",
@@ -83,6 +86,10 @@ DISCO, DISCO_LEAD = 0.35, 0.5  # a track that sounds like disco this much on ave
 # like funk or house for this share of it, is disco (measured: disco 0.39–0.76 leading ≥ 0.64, house ≤ 0.33
 # leading ≤ 0.18, afrobeat-funk 0.44 leading 0.14)
 CLEARLY_DISCO, CLEARLY_DISCO_LEAD = 0.55, 0.65  # this much: a funk or house call is disco after all
+HARDSTYLE, HARDSTYLE_LEAD = 0.55, 0.5  # a track this much in the hardstyle family, leading its rivals for this share
+# of it, is hardstyle (measured: hardstyle 0.65–0.89 leading ≥ 0.59; the nearest others 0.48 at 0.18, 0.43 at 0.37)
+HARDSTYLE_BPM = (135, 200)  # euphoric ~150, raw ~155, gabber up to 190
+HARD_CLUB = ("edm", "techno", "trance", "psytrance")  # what a hardstyle track gets called by a tag or the model
 DISCO_BPM = (95, 136)  # disco's tempo (boogie and Chemise ~100, Chic 110, Donna Summer 120–130, Italo ~130)
 CLEARLY_HARDCORE = 0.8  # this much, leading as much: a hard dance call is hardcore after all
 HARDCORE_KICK = 0.85  # no sound to go by: a kick on this share of the beats of the loud parts, at drum and bass's
@@ -191,13 +198,20 @@ def is_hardcore(f: dict, clearly: bool = False) -> bool:
     return fast and hardcore.heard(f) and f.get("hardcore", 0.0) >= lo and (not clearly or f["hardcore_lead"] >= lo)
 
 
+def is_hardstyle(f: dict) -> bool:
+    sound = f.get("hardstyle", 0.0) >= HARDSTYLE and f.get("hardstyle_lead", 0.0) >= HARDSTYLE_LEAD
+    return sound and HARDSTYLE_BPM[0] <= f["bpm"] <= HARDSTYLE_BPM[1]
+
+
 def from_audio(f: dict) -> str:
     if is_dembow(f):  # the rhythm says reggaeton, song or not (it is sung, and slow: it would be hip-hop)
         return "reggaeton"
     if is_disco(f):  # the sound says disco, song or club track (Donna Summer sings, Italo is synth-led)
         return "disco"
-    if is_hardcore(f):  # the sound says hardcore, sung or not ("Rainbow in the Sky" has a singer and a piano)
-        return "hardcore"
+    if is_hardcore(f):  # the sound says hardcore, sung or not ("Rainbow in the Sky" has a singer and a piano);
+        return "hardcore"  # before hardstyle, whose family counts gabber's sound too
+    if is_hardstyle(f):  # the sound says hardstyle, sung or not (Headhunterz with a vocal isn't pop)
+        return "hardstyle"
     if f.get("song"):  # a song: by what leads it, never by its tempo (Olivia Rodrigo at 144 BPM isn't psytrance)
         if f.get("guitar_led", 0.0) >= ROCK_GUITAR:
             return "rock"
@@ -329,16 +343,20 @@ def detect(a: Analysis, ask_model: bool = True, song: dict | None = None) -> Gen
     tagged = from_tag(meta)
     if tagged:
         return GenreCall(_kind_of(tagged, f), "tag", f)
-    return GenreCall(from_audio(f), "sound" if is_hardcore(f) else "audio", f)
+    if is_hardcore(f) or is_hardstyle(f):  # heard, not guessed from a tempo: the track keeps its own style in any set
+        return GenreCall(from_audio(f), "sound", f)
+    return GenreCall(from_audio(f), "audio", f)
 
 
 def _kind_of(genre: str, f: dict) -> str:
-    """Latin, and the audio hears a dembow: reggaeton. Funk or house that unmistakably sounds like disco: disco.
-    Hard dance that unmistakably sounds like hardcore: hardcore."""
+    """Latin, and the audio hears a dembow: reggaeton. Funk or house that unmistakably sounds like disco: disco. A
+    club genre that unmistakably sounds like hardcore: hardcore; one that sounds like hardstyle: hardstyle."""
     if genre == "latin" and is_dembow(f):
         return "reggaeton"
     if genre in ("funk", "house") and is_disco(f, clearly=True):
         return "disco"
-    if genre in ("hardstyle", "edm", "dnb", "techno", "trance") and is_hardcore(f, clearly=True):
+    if genre in ("hardstyle", "dnb", *HARD_CLUB) and is_hardcore(f, clearly=True):
         return "hardcore"
+    if genre in HARD_CLUB and is_hardstyle(f):
+        return "hardstyle"
     return genre

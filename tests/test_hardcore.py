@@ -161,8 +161,9 @@ def test_a_kick_on_half_the_beats_is_a_break_in_hardcore():
 
 @pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
 @pytest.mark.parametrize("bpm", [170.0, 195.0])
-def test_no_more_flicker_than_hardstyle(path, bpm):
+def test_no_more_flicker_than_edm(path, bpm):
+    """Hardcore used to be lit as edm: its own faces hit the kick harder, yet chop no more."""
     a, rig = synthetic_analysis(bpm=bpm), load_rig(path)
-    base = flicker(Engine(a, _plan(a, rig, STYLES["hardstyle"]), rig), rig, a)
+    base = flicker(Engine(a, _plan(a, rig, STYLES["edm"]), rig), rig, a)
     for style in (STYLES["hardcore"], HAPPY_HARDCORE):
         assert flicker(Engine(a, _plan(a, rig, style), rig), rig, a) <= base

@@ -1,5 +1,6 @@
 """What a track sounds like to EffNet-Discogs (amadeus/audio/instruments.py), for the genre call: about two seconds
-of the mix at a time against 400 Discogs styles, boiled down to what disco.py and hardcore.py need to know.
+of the mix at a time against 400 Discogs styles, boiled down to what disco.py, hardstyle.py and hardcore.py need to
+know.
 
 Judged once per file (~1 s) and cached; nothing without the models (`amadeus instruments --download`).
 """
@@ -11,10 +12,10 @@ import json
 from pathlib import Path
 
 from amadeus import paths
-from amadeus.audio import disco, hardcore
+from amadeus.audio import disco, hardcore, hardstyle
 
 CACHE = paths.CACHE / "styles"
-VERSION = 2
+VERSION = 3  # (3: hardstyle and hardcore, heard in the same pass)
 
 
 def _cached(path: Path) -> Path:
@@ -24,7 +25,7 @@ def _cached(path: Path) -> Path:
 
 
 def facts(path: str | Path) -> dict:
-    """The sound's facts for the audio file ({"disco", "disco_lead", "hardcore", …}), or {} without the models or
+    """The sound's facts for the audio file ({"disco", "hardstyle", "hardcore", …}), or {} without the models or
     the file."""
     from amadeus.audio import instruments
 
@@ -44,7 +45,7 @@ def facts(path: str | Path) -> dict:
     except Exception:  # noqa: BLE001 - an unreadable file: no facts
         return {}
     styles, names = instruments.judge(y.mean(axis=1), sr)["styles"], instruments.classes("effnet")
-    out = {**disco.judge(styles, names), **hardcore.judge(styles, names)}
+    out = {**disco.judge(styles, names), **hardstyle.judge(styles, names), **hardcore.judge(styles, names)}
     CACHE.mkdir(parents=True, exist_ok=True)
     cached.write_text(json.dumps(out), encoding="utf-8")
     return out

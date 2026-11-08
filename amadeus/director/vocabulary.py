@@ -151,6 +151,11 @@ HEAD_LIGHT = [
         "sweep or ballyhoo; never in calm parts, and not for long stretches.",
     ),
     (
+        "hammer",
+        "Four bars of beams punching on every kick, so the movement shows, then four bars of strobe, in turn: a "
+        "long climax played hard. For drops and the top of a build, with a big movement like the twister.",
+    ),
+    (
         "random",
         "Every head lights on its own random kicks: a restless rig, each head its own rhythm. Great while "
         "the heads do a tilt wave; for energetic parts, not for calm ones.",
@@ -174,6 +179,13 @@ MOVEMENTS = [  # the path; how heads relate to each other is the formation
     ("bounce", "Snap up and down on every beat: fast and punchy."),
     ("swing", "Snap left and right on every beat: fast and punchy."),
     ("ballyhoo", "Fast, wide, unpredictable movement. Peaks only."),
+    (
+        "twister",
+        "The beams twist round each other like a tornado: every head circles a shared point, each a step further "
+        "round than its neighbour, so the whole rig turns as one twisted shape. One turn per bar at the peaks, slow "
+        "and huge in a break. Sync: one twister; mirror: two turning against each other; fan: wide; focus: a tight "
+        "rope; each group its own when the groups act apart. Stunning alone in haze, and it spirals up in a build.",
+    ),
     (
         "tilt_wave",
         "A row of heads tilting up and down in a wave that rolls over the row, each head a step behind its "

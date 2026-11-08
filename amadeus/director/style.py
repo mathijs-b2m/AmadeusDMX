@@ -21,8 +21,10 @@ choice, the Decisions API from its artist and title, its tag) is lit in its own 
 techno set is still pop. A genre with a program of its own (cinematic) plays that program and leaves the
 set's genre alone.
 
-A genre can have two faces, told by the track's sound (`style_for`): hardcore is Thunderdome's red and white, or
-happy hardcore's rave colours and piano.
+A genre can say more where the usual rules miss it: hardstyle has a form of its own (`form`), a kick on the grid
+(`kick_grid`) and a show (`always`), the climax and the isolated break being what the genre is. And a genre can
+have two faces, told by the track's sound (`style_for`): hardcore is Thunderdome's red and white, or happy
+hardcore's rave colours and piano.
 
 A **named show** is a style sheet of its own within a genre ("Prydz Tomorrow", a techno show): the DJ picks it for
 their set, and every track is lit in it, whatever its genre, until it is switched off. Besides its colours and
@@ -33,12 +35,14 @@ and move. Those are not leans but the show, in every phrase, for both directors.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
+from amadeus.audio import hardstyle
 from amadeus.director.vocabulary import DEFAULT_PALETTES, PALETTES
 
 SWITCH_AFTER = 2  # a different genre this many tracks in a row becomes the set's genre
-KNOWN = {"you", "ai", "tag", "sound"}  # where a genre is known, not guessed from the audio: its own style
+KNOWN = {"you", "ai", "tag", "sound"}  # where a genre is known, not guessed from a tempo: the track keeps its own style
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,13 @@ class Style:
     of: str = ""
     always: dict[str, dict] = field(default_factory=dict)  # a named show: per section ("*": all), per layer,
     # what it always plays (a tuple: taken in turn per phrase of the section)
+    form: Callable | None = None  # a genre whose sections the usual rules misjudge: (analysis, i, section) → section
+    kick_grid: tuple = ()  # the sections where the kick is every beat, whatever the onsets say (engine: the kick)
+    no_arc: bool = False  # its show keeps its size all through: every climax hits, the first as hard as the last
+
+    def section(self, a, i: int, section: str) -> str:
+        """The section of phrase i, by the genre's own form if it has one."""
+        return self.form(a, i, section) if self.form else section
 
     def enforce(self, d, k: int) -> bool:
         """A named show's own layers for decision `d` (k: the phrases of its section so far), after everything else
@@ -155,11 +166,63 @@ PIANO_BREAK = {"trigger": "lead", "par_base": "dim", "par_accent": "melody", "he
                "beam_fx": "open"}  # fmt: skip
 
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
-_CALM_AVOID = {"head_light": {"flick", "beat", "random", "strobe"},
+_CALM_AVOID = {"head_light": {"flick", "beat", "random", "strobe", "hammer"},
                "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave", "pour"},
                "par_accent": {"chase"}, "beam_fx": {"prism_spin", "gobo_spin", "gobo_shake"}}  # fmt: skip
 _CALM_PREFER = {"head_light": ("breathe", "steady"), "movement": ("sweep", "still", "circle"),
                 "par_accent": ("none", "pulse"), "beam_fx": ("open", "gobo_rotate")}  # fmt: skip
+
+# Hardstyle's show, per section. A climax hits with everything; a break is everything else switched off, so one
+# effect can play alone: the looks of the break are taken in turn, and each is whole (the tuples go together).
+_HARD_HIT = {"par_base": "off", "par_accent": "pulse", "head_color": "white", "beam_fx": "open", "layer_split": "none"}
+HARD_SHOW = {
+    "drop": {
+        **_HARD_HIT,
+        "palette": ("fire", "fire", "ice", "fire"),
+        "head_light": "hammer",
+        "movement": ("twister", "ballyhoo", "twister", "swing"),
+        "formation": ("mirror", "fan", "sync", "mirror"),
+        "grouping": ("unison", "split", "per_group", "unison"),
+        "aim": "crowd",
+        "dynamics": "impact",
+        "intensity": 3,
+    },
+    "groove": {  # the reverse bass under the kick: hard and snapping, the strobe saved for the climax
+        **_HARD_HIT,
+        "palette": "fire",
+        "head_light": ("beat", "flick", "alternate", "beat"),
+        "movement": ("swing", "bounce", "twister", "tilt_wave"),
+        "formation": ("mirror", "sync", "mirror", "wave"),
+        "aim": "crowd",
+    },
+    "buildup": {  # spirals up (the rise lifts the twister into the air), strobing at the top
+        "par_base": "off",
+        "head_color": "white",
+        "beam_fx": "open",
+        "head_light": ("pulse", "hammer"),
+        "movement": "twister",
+        "formation": ("sync", "mirror"),
+        "dynamics": "rise",
+        "intensity": 2,
+    },
+    "breakdown": {
+        "palette": ("ice", "cool", "ice"),
+        "par_base": "off",
+        "par_accent": "none",
+        "trigger": "bars",
+        "head_light": "steady",
+        "layer_split": "none",
+        "dynamics": "steady",
+        "screen": "off",
+        "intensity": 1,
+        "movement": ("twister", "sweep", "twister"),
+        "formation": ("sync", "fan", "mirror"),
+        "grouping": ("unison", "solo", "unison"),
+        "aim": ("sky", "sky", "crowd"),
+        "head_color": ("white", "base", "white"),
+        "beam_fx": ("open", "open", "prism_spin"),
+    },
+}
 
 STYLES: dict[str, Style] = {
     s.genre: s
@@ -223,27 +286,38 @@ STYLES: dict[str, Style] = {
         ),  # fmt: skip
         _style(
             "hardstyle",
-            "Hardstyle: hard and aggressive. Red, white and ice; hard flicks and pulses on the distorted kick, "
-            "fast punchy moves, dark between the hits. No soft fades.",
-            ["fire", "ice", "neon"],
-            {"par_base": {"fade", "full"}, "movement": {"figure8", "swing", "still"}, "head_light": {"breathe"}},
+            "Hardstyle: two worlds. The climax is intense, stroboscopic and aggressive: the distorted kick on every "
+            "beat, pars dark between the kicks, heads hammering white while they twist and throw (four bars on the "
+            "kick, four bars of strobe), red and white, the whole rig. Between the kicks of the reverse-bass parts "
+            "the heads hit and snap. The break is the opposite and the heart of the show: "
+            "everything goes dark and ONE beautiful effect plays alone, slowly, "
+            "taking its time: a twister of white beams turning in the air, one group of heads in a single cold "
+            "colour, a spinning prism. No pulsing, no strobing, nothing competes with it. The build spirals up "
+            "into the climax. No soft fades in the climax, no busy looks in the break.",
+            ["fire", "ice", "cool"],
+            {"par_base": {"fade", "full"}, "movement": {"figure8", "still"}, "head_light": {"breathe"}},
             {
                 "par_base": ("off", "dim"),
-                "movement": ("bounce", "step_on_beat", "ballyhoo"),
-                "head_light": ("flick", "beat", "pulse"),
+                "movement": ("twister", "swing", "tilt_wave", "bounce"),
+                "head_light": ("beat", "flick", "pulse"),
             },
+            beat="kick",
+            always=HARD_SHOW,
+            form=hardstyle.form,
+            kick_grid=("drop", "groove"),
+            no_arc=True,
         ),  # fmt: skip
         _style(
             "hardcore",
             "Hardcore: Rotterdam, Thunderdome. Black, red and white, and the kick is everything: 170 BPM, distorted, "
-            "on every beat, and the crowd stamps along. Lights on the kick, dark between the hits, the groups "
-            "taking turns so no light has to hit every kick. Big, hard, punchy moves that land with it, straight "
-            "open beams, no decoration, no soft fades. Where the kick returns after a break the whole rig goes: "
-            "the heads strobe on the kick and swing over the crowd. A kick on only "
-            "some of the beats is a break.",
+            "on every beat, and the crowd stamps along. Lights on the kick over a red wash that stays on (a dark "
+            "room chopped on every kick is flicker), the groups taking turns so no light has to hit every kick. "
+            "Big, hard, punchy moves that land with it, straight open beams, no decoration, no soft fades. Where "
+            "the kick returns after a break the whole rig goes: the heads strobe on the kick and swing over the "
+            "crowd. A kick on only some of the beats is a break.",
             ["fire", "ice"],
             {
-                "par_base": {"fade", "full"},
+                "par_base": {"fade"},
                 "par_accent": {"none", "sparkle", "melody"},
                 "movement": {"still", "figure8", "circle"},
                 "head_light": {"breathe", "flick"},
@@ -251,7 +325,7 @@ STYLES: dict[str, Style] = {
                 "beam_fx": {"prism_spin", "prism", "gobo_spin", "gobo_rotate", "frost"},
             },
             {
-                "par_base": ("off", "dim"),
+                "par_base": ("full", "dim"),
                 "par_accent": ("alternate", "pulse", "chase"),
                 "movement": ("swing", "step_on_beat", "tilt_wave", "bounce"),
                 "head_light": ("beat", "alternate", "pulse"),
@@ -290,7 +364,11 @@ STYLES: dict[str, Style] = {
             "rnb",
             "R&B and soul: smooth and warm. Gold and warm colours, soft fades, slow sweeping movement; nothing harsh.",
             ["gold", "warm", "cool"],
-            {"head_light": {"flick", "strobe"}, "par_accent": {"sparkle"}, "movement": {"ballyhoo"}},
+            {
+                "head_light": {"flick", "strobe", "hammer"},
+                "par_accent": {"sparkle"},
+                "movement": {"ballyhoo"},
+            },
             {"head_light": ("breathe", "steady"), "par_accent": ("pulse", "color_pop"), "movement": ("sweep", "swing")},
         ),  # fmt: skip
         _style(
@@ -310,7 +388,7 @@ STYLES: dict[str, Style] = {
             ["stage", "fire", "ice"],
             {
                 "par_accent": {"sparkle", "melody"},
-                "movement": {"figure8", "ballyhoo", "circle"},
+                "movement": {"figure8", "ballyhoo", "circle", "twister"},
                 "head_color": {"cycle"},
                 "beam_fx": {"gobo_spin", "prism_spin", "frost"},
             },
@@ -330,7 +408,7 @@ STYLES: dict[str, Style] = {
             {
                 "par_base": {"fade"},
                 "par_accent": {"sparkle", "melody"},
-                "movement": {"figure8", "swing"},
+                "movement": {"figure8", "swing", "twister"},
                 "head_color": {"cycle"},
                 "beam_fx": {"gobo_spin", "prism_spin", "frost"},
             },
@@ -375,7 +453,7 @@ STYLES: dict[str, Style] = {
                 "par_base": {"off"},
                 "par_accent": {"none", "melody"},
                 "movement": {"nod", "bounce", "ballyhoo", "step_on_beat"},
-                "head_light": {"flick", "random", "beat", "strobe"},
+                "head_light": {"flick", "random", "beat", "strobe", "hammer"},
                 "beam_fx": {"gobo_shake", "gobo_spin", "frost"},
                 "gobo_style": {"shapes", "curves"},
             },

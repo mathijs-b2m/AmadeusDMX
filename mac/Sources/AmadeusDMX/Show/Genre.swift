@@ -14,7 +14,8 @@ enum Genre {
         case "hiphop", "rnb": "music.mic"
         case "jazz", "funk": "music.note.list"
         case "disco": "sparkles"
-        case "hardcore": "bolt.fill"
+        case "hardstyle": "bolt.fill"
+        case "hardcore": "figure.run"
         case "pop", "latin", "reggaeton": "music.note"
         default: "waveform"
         }
@@ -25,7 +26,7 @@ enum Genre {
         case "you": "Your choice"
         case "ai": "From the artist and title (Decisions API)"
         case "tag": "From the file's genre tag"
-        case "sound": "From its sound (the style model)"
+        case "sound": "From its sound (EffNet-Discogs)"
         default: "From the audio: groove, bass and tempo"
         }
     }

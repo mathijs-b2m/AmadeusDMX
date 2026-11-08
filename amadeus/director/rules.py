@@ -291,6 +291,8 @@ class RuleDirector:
             section = "buildup"
         else:
             section = "groove"
+        if self.style:
+            section = self.style.section(a, i, section)
 
         palettes = list(self.style.palettes) if self.style else DEFAULT_PALETTES
         palette = last.palette if last and last.palette in palettes else palettes[0 if self.style else 1]
@@ -338,4 +340,6 @@ class RuleDirector:
         arc = song_arc(a)[i]
         laser_star(d, arc, self.lasers)
         apply_arc(d, arc, self.lasers, self.groups)
+        if self.style and self.style.no_arc:
+            self.style.enforce(d, n_before)
         return d
