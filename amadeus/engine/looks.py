@@ -23,6 +23,7 @@ from amadeus.engine.timing import (
     ring_env,
     stab_env,
 )
+from amadeus.rig import sections
 
 XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
 
@@ -57,6 +58,7 @@ KIT_HOLD = 0.6  # no drum around (a drumless verse, a break): both voices hold t
 ACCENT_SHARE = 3  # one light in this many plays the accents (the synth's stabs); the others keep the rhythm
 ACCENT_SECTIONS = ("groove", "drop", "buildup", "verse", "chorus")
 BLOCK_BARS = 4  # in energetic parts the group's kick pattern and the accent roles change this often
+CAMERA_UNITS = 4  # the heads playing the camera go by sections if the rig has this many, else by mirrored pairs
 MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 
 # The heads' strobe (head light "strobe"): white flashes on the beat grid, as fine as the section asks (notes per
@@ -241,8 +243,8 @@ class LooksMixin:
             return None
         hg = self.hgroup[j]
         k, m = hg["k"], hg["m"]
-        if split == "alternate":
-            return "base" if k % 2 else "accent"
+        if split == "alternate":  # every other section (or pair), so left and right stay alike
+            return "base" if self.layer_base.get(self.heads[j]["id"], k % 2) else "accent"
         if split == "inner_outer":
             own = (k / max(m - 1, 1)) * 2 - 1 if m > 1 else 0.0
             return "base" if abs(own) > 0.5 else "accent"
@@ -487,9 +489,10 @@ class LooksMixin:
         return max(0, int((t - d.start) / (BLOCK_BARS * 4 * period)))
 
     def _accent_players(self, d: Decision, t: float | None = None) -> set[str]:
-        """The lights that play the accents in this phrase: one in ACCENT_SHARE (heads and pars together, left
-        to right, so they're spread over the rig; of two lights one), shifting per phrase. None in calm parts or
-        where the synth has no stabs; a single light plays both (_scene layers the stabs over its rhythm)."""
+        """The lights that play the accents in this phrase: one in ACCENT_SHARE (heads and pars together, by whole
+        sections or mirrored pairs, so a model plays as one and left and right stay alike; of two lights one),
+        shifting per phrase. None in calm parts or where the synth has no stabs; a single light plays both (_scene
+        layers the stabs over its rhythm)."""
         if d.section not in ACCENT_SECTIONS or d.trigger == "dembow":  # boom-tac: the tac is the accent
             return set()
         if d.intensity < 1 and d.trigger != "drums":  # (a band's guitar is followed in a calm verse too)
@@ -513,16 +516,46 @@ class LooksMixin:
         if len(lights) < 2:
             return set()
         share = 2 if len(lights) < 4 else ACCENT_SHARE
+        shares = self.__dict__.get("_accent_shares")
+        if shares is None:
+            units = sections.parts(self.sections, share, lights)
+            if len(units) < 2:  # one pair and nothing else: the two lights share the part
+                units = [[eid] for eid in lights]
+            shares = self._accent_shares = sections.share_out(units, min(share, len(units)))
+        share = len(shares)
         shift = (d.phrase + self._block(d, t)) % share  # the roles move on every 4 bars in energetic parts
         if d.trigger == "drums":  # a band: the guitar's lights keep their part, like the kit's groups (a swap
             shift = 0  # lands a light in the middle of the other part's note: a blink)
-        return {eid for k, eid in enumerate(lights) if (k + shift) % share == share // 2}
+        return set(shares[(share // 2 - shift) % share])
 
     def _kick_pattern(self, d: Decision, t: float | None = None) -> str:
         """How the group plays the kicks: varied per phrase, and every 4 bars where the music moves fast; mostly
         tutti in the big drops."""
         options = DROP_PATTERNS if d.section == "drop" and d.intensity >= 3 else KICK_PATTERNS
         return options[int(_hash(d.phrase, self._block(d, t), 5) * len(options))]
+
+    def _init_sections(self, rig: dict):
+        """The rig's sections (rig/sections.py) and what the show hands out by them: per light its slot among the
+        heads' or the pars' sections, for whoever takes turns; per par its place among the mirrored pairs."""
+        self.sections = sections.rig_sections(rig)
+        heads, pars = [e["id"] for e in self.heads], [e["id"] for e in self.pars]
+        self.turn: dict[str, tuple[int, int]] = {}
+        for ids in (heads, pars):
+            units = sections.parts(self.sections, 2, ids)
+            if len(units) >= 2:  # (one pair and nothing else: its lights take turns with each other)
+                self.turn |= {eid: (k, len(units)) for k, u in enumerate(units) for eid in u}
+        pairs = sections.parts(self.sections, math.inf, pars)
+        self.par_pair = {eid: (k, len(pairs)) for k, u in enumerate(pairs) for eid in u}
+        units = sections.parts(self.sections, 2, heads)
+        base = sections.share_out(units, 2)[1] if len(units) >= 2 else []
+        self.layer_base = {eid: eid in base for eid in heads} if base else {}
+        at = {eid: j for j, eid in enumerate(heads)}
+        self.camera_parts = [[at[eid] for eid in u] for u in sections.parts(self.sections, CAMERA_UNITS, heads)]
+
+    def _turn(self, pattern: str, eid: str, k: int, n: int) -> tuple[int, int]:
+        """A light's place in a kick pattern: its section's or pair's slot, so a pattern splits the rig by sections
+        with left and right alike; `sides` plays left against right, by where it stands."""
+        return (k, n) if pattern == "sides" else self.turn.get(eid, (k, n))
 
     def _x_rank(self, elements: list[dict]) -> dict[str, int]:
         """Elements ranked left to right (cached per list)."""
@@ -562,10 +595,13 @@ class LooksMixin:
         loop = getattr(self, "par_loop", False) and n > 2  # pars round a full ring: the chase runs round it
         if loop:
             chase_pos = hits % n
-        sparkle = (hits * 7 + 3) % max(n, 1)
+        pairs = next(iter(self.par_pair.values()))[1] if self.par_pair else 1
+        sparkle = (hits * 7 + 3) % max(pairs, 1)
         for f in self.pars:
             k = self.order[f["id"]]
-            col = _mix(cols, ((beat + phase) / 32 + k / n) % 1.0) if d.par_base == "fade" else base
+            pair = self.par_pair.get(f["id"], (k, n))[0]  # mirrored pars play as one
+            slot = self.turn.get(f["id"], (k, n))[0]
+            col = _mix(cols, ((beat + phase) / 32 + pair / pairs) % 1.0) if d.par_base == "fade" else base
             dim = base_level
             a = d.par_accent
             tac_voice = False
@@ -579,20 +615,21 @@ class LooksMixin:
                 else:
                     col, dim, tac_voice = accent, low + (1 - low) * tac, True
             elif a in ("pulse", "stutter"):  # on its turn in the phrase's pattern ("stutter": older plans)
-                dim = base_level + (1 - base_level) * (env if kick_turn(pattern, k, n, hit) else 0.0)
+                on = kick_turn(pattern, *self._turn(pattern, f["id"], k, n), hit)
+                dim = base_level + (1 - base_level) * (env if on else 0.0)
             elif a == "color_pop":
                 col, dim = _lerp(col, accent, env), max(base_level, env)
             elif a == "chase":
                 gap = abs(k - chase_pos)
                 if loop:
                     gap = min(gap, n - gap)
-                hit = env * max(0.0, 1.0 - gap * 0.7)  # lit par plus a short tail
-                col, dim = _lerp(col, accent, min(1.0, hit * 1.5)), max(base_level, hit)
+                lit = env * max(0.0, 1.0 - gap * 0.7)  # lit par plus a short tail
+                col, dim = _lerp(col, accent, min(1.0, lit * 1.5)), max(base_level, lit)
             elif a == "alternate":
-                if k % 2 == hits % 2:
+                if slot % 2 == hits % 2:
                     col, dim = accent, max(base_level, 0.45 + 0.55 * env)
             elif a == "sparkle":
-                if k == sparkle:
+                if pair == sparkle:
                     col, dim = _lerp(col, accent, env), max(base_level, env)
             elif a == "melody":  # recent notes, each on the par of its pitch, coloured by its pitch class
                 i = bisect.bisect_right(self.lead_t, t)
@@ -629,11 +666,14 @@ class LooksMixin:
                 hc = {"base": "accent", "white": "accent", "accent": "base"}.get(hc, hc)
             cv = self.colour_variety
             step = bar // 4 if cv is not None and cv < 0.5 else bar  # little colour variety: a slower cycle
-            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cols[(j + step) % len(cols)]}[hc]
+            slot = self.turn.get(f["id"], (j, nh))[0]  # a section plays as one, left and right alike
+            cycle = cols[(slot + step) % len(cols)]
+            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cycle}[hc]
             hl = d.head_light
             if hl == "hammer":
                 hl = "strobe" if self._hammering(d, t) else "pulse"
-            mine = env if kick_turn(head_pattern, rank[f["id"]], nh, hit) else 0.0  # this head's kick
+            on = kick_turn(head_pattern, *self._turn(head_pattern, f["id"], rank[f["id"]], nh), hit)
+            mine = env if on else 0.0  # this head's kick
             gate = None  # strobing: the flash, applied last (the beam's level is worked out first)
             if role["movement"] == "pour" and hl != "off":  # the pour plays its own light: lit falling, dark rising
                 dim = self.pour_light(d, t, j, role)
@@ -644,8 +684,8 @@ class LooksMixin:
                 dim = 1.0 if (phase < 0.22 or phase > 0.85) else 0.0
             elif hl == "beat":  # on with the kick, held, let go: on/off (the phrase's pattern splits the group)
                 dim = mine
-            elif hl == "alternate":  # heads take turns per kick (within their group when the groups act apart)
-                dim = env if (hit + role["idx"]) % 2 == 0 else 0.0
+            elif hl == "alternate":  # sections take turns per kick (one section: its pairs)
+                dim = env if (hit + self.turn.get(f["id"], (role["idx"], 0))[0]) % 2 == 0 else 0.0
             elif hl == "random":  # each head on its own random kicks: hit, held, let go
                 dim = env if _chance(j, hit) and not _chance(j, hit - 1) else 0.0
             else:

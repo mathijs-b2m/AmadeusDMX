@@ -16,7 +16,7 @@ from amadeus.engine.looks import PREDROP_BEATS, XFADE
 from amadeus.engine.rings import RING_FORMATIONS
 from amadeus.engine.timing import _ease
 from amadeus.library import fixtures as fxlib
-from amadeus.rig import geometry
+from amadeus.rig import geometry, sections
 from amadeus.rig import trusses as T
 
 MOTION_FPS = 50
@@ -71,14 +71,16 @@ def clear_of_dj(head_pos: np.ndarray, d: np.ndarray, dj: np.ndarray) -> np.ndarr
     return np.where(hits[:, None], turned, d)
 
 
-def camera_heads(stage: dict, heads: int) -> tuple[np.ndarray | None, set[int]]:
+def camera_heads(stage: dict, heads: int, parts: list[list[int]] | None = None) -> tuple[np.ndarray | None, set[int]]:
     """The camera the rig is filmed by (stage.camera_*) and which heads play towards it: `camera_share` of them, spread
-    evenly over the rig, so the others keep the look around it. None: no camera."""
+    evenly over the rig, so the others keep the look around it. `parts`: heads that go together (a section, a mirrored
+    pair), so left and right stay alike; without them head by head. None: no camera."""
     if stage.get("camera_x_m") is None or stage.get("camera_y_m") is None:
         return None, set()
     camera = np.array([stage["camera_x_m"], stage["camera_y_m"], stage.get("camera_z_m", CAMERA_HEIGHT_M)], dtype=float)
     share = min(max(float(stage.get("camera_share", CAMERA_SHARE)), 0.0), 1.0)
-    return camera, {j for j in range(heads) if int((j + 1) * share) > int(j * share)}
+    units = parts if parts is not None else [[j] for j in range(heads)]
+    return camera, {j for k, u in enumerate(units) if int((k + 1) * share) > int(k * share) for j in u}
 
 
 def towards_camera(head_pos: np.ndarray, d: np.ndarray, camera: np.ndarray) -> np.ndarray:
@@ -576,7 +578,7 @@ class MotionMixin:
         if not self.heads:
             return {}
         h = hashlib.sha1()
-        for src in sorted(Path(__file__).parent.glob("*.py")) + [Path(geometry.__file__)]:
+        for src in sorted(Path(__file__).parent.glob("*.py")) + [Path(geometry.__file__), Path(sections.__file__)]:
             h.update(src.read_bytes())
         h.update(
             json.dumps(

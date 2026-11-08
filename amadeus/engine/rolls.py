@@ -26,6 +26,7 @@ import numpy as np
 
 from amadeus.engine.state import State
 from amadeus.engine.timing import _release
+from amadeus.rig import sections
 
 STEP = {1: 0, 2: 1, 4: 2, 8: 3}  # hits per beat → the roll's step
 LEVEL = (0.55, 0.7, 0.85, 1.0)  # per step: how bright a flash is…
@@ -81,10 +82,12 @@ class RollsMixin:
         self.strobe_free = bool(safety.get("strobe_free", False))
         self.fast_strobe = bool(safety.get("allow_fast_strobe", False)) and not self.strobe_free
         self.roll_hz = float(safety.get("max_flash_hz", 4.0))
-        # who flashes first: the strobes (made for it), then the rest spread over the stage, left to right
+        # who flashes first: the strobes (made for it), then the rest spread over the rig, mirrored pairs as one
         strobes = [e["id"] for e in rig["elements"] if e["kind"] == "strobe"]
-        lights = [e["id"] for e in sorted(self.pars + self.heads, key=self._x_of)]
-        self.roll_order = strobes + [lights[k] for k in _spread(len(lights))] if lights else strobes
+        pairs = sections.parts(self.sections, math.inf, [e["id"] for e in self.pars + self.heads])
+        units = [[eid] for eid in strobes] + [pairs[k] for k in _spread(len(pairs))]
+        self.roll_order = [eid for u in units for eid in u]
+        self.roll_unit = {eid: k for k, u in enumerate(units) for eid in u}
         self.roll_strobes, self.roll_lights = set(strobes), set(self.roll_order)
         self.rolls: list[Roll] = []
         if self.roll_div is None or not self.roll_div.any():
@@ -120,7 +123,6 @@ class RollsMixin:
 
     def _schedule(self, r: Roll, times: np.ndarray) -> None:
         """Which light flashes on which of the roll's hits, how bright and how long (see the module's description)."""
-        n = len(self.roll_order)
         master = float(self.rig["safety"]["master"])
         if self.fast_strobe:
             played = times
@@ -141,12 +143,12 @@ class RollsMixin:
         limit = 1.0 / (FAST_FLASH_HZ if self.fast_strobe else self.roll_hz) - 1e-6
         for k, x in enumerate(played):
             step = self._step_at(float(x))
-            players = self.roll_order[: max(1, math.ceil(SHARE[step] * n))]
+            players = self._roll_players(step)
             gap = min(float(x - played[k - 1]) if k else 1.0, float(nxt[k]))  # (to the hit before and after)
             turns = max(1, math.ceil((limit + 0.002) / max(gap, 1e-3))) if self.fast_strobe else 1
             on = min(max(DUTY[step] * float(nxt[k]), FLASH_S[0]), FLASH_S[1])
             free = [eid for eid in players if not per[eid] or x - per[eid][-1][0] >= limit]  # (never faster)
-            mine = [eid for i, eid in enumerate(players) if i % turns == k % turns and eid in free]
+            mine = [eid for eid in players if self.roll_unit[eid] % turns == k % turns and eid in free]
             for eid in mine or free:  # its turn, or any light free to flash
                 per[eid].append((float(x), LEVEL[step] * master, on))
                 r.joins.setdefault(eid, float(x))
@@ -154,12 +156,11 @@ class RollsMixin:
             if fl:
                 r.flashes[eid] = tuple(np.array(c) for c in zip(*fl))
 
-    def _x_of(self, e: dict) -> float:
-        """Where a par or head is across the stage (pars by their order, heads by where they hang)."""
-        if e["kind"] == "head":
-            return float(self.head_pos[self.heads.index(e)][0])
-        n = max(len(self.pars) - 1, 1)
-        return self.order.get(e["id"], 0) / n * float(self.stage.get("width_m", 8.0))
+    def _roll_players(self, step: int) -> list[str]:
+        """The lights playing at this step of the roll: the first ones in the order, whole pairs."""
+        n = len(self.roll_order)
+        last = self.roll_unit[self.roll_order[max(1, math.ceil(SHARE[step] * n)) - 1]]
+        return [eid for eid in self.roll_order if self.roll_unit[eid] <= last]
 
     def _period_at(self, t: float) -> float:
         return self.beat_info(t)[2]
@@ -175,9 +176,8 @@ class RollsMixin:
             return None
         if self.strobe_free:
             step = self._step_at(t)
-            n = len(self.roll_order)
             v = STEADY * LEVEL[step] * float(self.rig["safety"]["master"])
-            players = self.roll_order[: max(1, math.ceil(SHARE[step] * n))]
+            players = self._roll_players(step)
             return {eid: v for eid in players if eid not in self.roll_strobes}
         out = {}
         for eid, (ts, levels, ons) in r.flashes.items():
