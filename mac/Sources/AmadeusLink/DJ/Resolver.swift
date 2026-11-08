@@ -63,8 +63,12 @@ final class Resolver: @unchecked Sendable {
         let wantTitle = Set(Self.words(title)), wantArtist = Set(Self.words(artist))
         guard !wantTitle.isEmpty else { return remember(key, "") }
         let hits: [(Int, URL)] = all.compactMap { f in
-            let have = Set(Self.words(f.deletingPathExtension().lastPathComponent) + Self.words(f.deletingLastPathComponent().lastPathComponent))
-            return wantTitle.isSubset(of: have) ? (wantArtist.intersection(have).count, f) : nil
+            let stem = Set(Self.words(f.deletingPathExtension().lastPathComponent))
+            let folder = f.deletingLastPathComponent()
+            let have = stem.union(Self.words(folder.lastPathComponent))
+            guard wantTitle.isSubset(of: have) else { return nil }
+            let by = wantArtist.intersection(have.union(Self.words(folder.deletingLastPathComponent().lastPathComponent))).count
+            return by > 0 || wantArtist.isEmpty || Self.named(stem, as: wantTitle, by: wantArtist) ? (by, f) : nil
         }
         guard let best = hits.map(\.0).max() else { return remember(key, "") }
         return remember(key, closest(hits.filter { $0.0 == best }.map(\.1), length).path)
@@ -88,6 +92,13 @@ final class Resolver: @unchecked Sendable {
     static func length(of file: URL) -> Double? {
         guard let f = try? AVAudioFile(forReading: file), f.processingFormat.sampleRate > 0 else { return nil }
         return Double(f.length) / f.processingFormat.sampleRate
+    }
+
+    /// A file's name (its words) that is the title alone ("03 My My My"): no word beyond the title's, the artist's
+    /// and a track number. Another artist's file only holds a short title's words among its own ("Voices In My
+    /// Head" holds all of "My My My"), so a file that names none of the artist must be named this.
+    static func named(_ name: Set<String>, as title: Set<String>, by artist: Set<String>) -> Bool {
+        name.subtracting(title).subtracting(artist).allSatisfy { $0.allSatisfy(\.isNumber) }
     }
 
     /// Lower-case words without accents: "Café del Mar" → ["cafe", "del", "mar"].

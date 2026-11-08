@@ -135,6 +135,21 @@ def test_resolver_finds_a_track_by_artist_and_title(tmp_path):
     assert r.find(title="Missing", wait=5) == ""
 
 
+def test_resolver_wants_the_artist_when_the_title_is_short(tmp_path):
+    """'My My My' by Promise Land is only the word 'my': another artist's 'Voices In My Head' holds it, and was taken
+    for it. A file of another artist is no hit; one named as the title alone (any artist), or in the artist's folder,
+    is."""
+    album = tmp_path / "Anyma" / "The End Of Genesys"
+    album.mkdir(parents=True)
+    sf.write(album / "02 Voices In My Head.wav", np.zeros(800), 8000)
+    r = Resolver([tmp_path])
+    assert r.find(artist="Promise Land, Skullwell", title="My My My", wait=5) == ""
+    assert r.find(artist="Anyma", title="Voices In My Head", wait=5).endswith("02 Voices In My Head.wav")  # its folder
+    sf.write(tmp_path / "07 My My My.wav", np.zeros(800), 8000)
+    r = Resolver([tmp_path])
+    assert r.find(artist="Promise Land, Skullwell", title="My My My", wait=5).endswith("07 My My My.wav")
+
+
 def test_a_reported_rate_beats_the_tempo_ratio():
     d = Deck(1, "a", 10.0, 300.0, True, 0.0, 0.0, 1.0, 0.0, rate=0.92)  # no beatgrid: no tempo
     assert abs(d.now(1.0) - 10.92) < 1e-9

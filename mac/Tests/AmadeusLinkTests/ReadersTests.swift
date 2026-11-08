@@ -38,6 +38,9 @@ private func near(_ a: Double, _ b: Double, _ eps: Double = 1e-9) -> Bool { abs(
 
 @Test func titleWords() {
     #expect(Resolver.words("Café del Mar – Energy 52 (Original_Mix)") == ["cafe", "del", "mar", "energy", "52", "original", "mix"])
+    // "My My My" by Promise Land: "07 My My My" is it, Anyma's "02 Voices In My Head" is not
+    #expect(Resolver.named(["07", "my"], as: ["my"], by: ["promise", "land"]))
+    #expect(!Resolver.named(["02", "voices", "in", "my", "head"], as: ["my"], by: ["promise", "land"]))
 }
 
 @Test func mixxxDeckMessage() throws {
