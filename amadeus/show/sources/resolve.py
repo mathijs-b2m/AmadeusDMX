@@ -33,6 +33,13 @@ def words(s: str) -> list[str]:
     return [w for w in re.split(r"[^a-z0-9]+", s) if w]
 
 
+def named_as(name: set[str], title: set[str], artist: set[str]) -> bool:
+    """A file's name (its words) that is the title alone ("03 My My My"): no word in it beyond the title's, the
+    artist's and a track number. A file of another artist only holds the title's words among others of its own
+    ("Voices In My Head" holds all of "My My My"), so a file that names none of the artist must be named this."""
+    return not {w for w in name - title - artist if not w.isdigit()}
+
+
 def length_of(path: Path) -> float | None:
     try:
         import soundfile as sf
@@ -104,9 +111,12 @@ class Resolver:
             return None
         hits = []
         for f in self.files:
-            have = set(words(f.stem)) | set(words(f.parent.name))
-            if want_title <= have:
-                hits.append((len(want_artist & have), f))
+            stem = set(words(f.stem))
+            if not want_title <= stem | set(words(f.parent.name)):
+                continue
+            by = len(want_artist & (stem | set(words(f.parent.name)) | set(words(f.parent.parent.name))))
+            if by or not want_artist or named_as(stem, want_title, want_artist):
+                hits.append((by, f))
         if not hits:
             return None
         best = max(n for n, _ in hits)

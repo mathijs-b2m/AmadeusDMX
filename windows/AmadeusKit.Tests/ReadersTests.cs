@@ -91,6 +91,14 @@ public class ReadersTests
     public void TitleWords() =>
         Assert.Equal(["cafe", "del", "mar", "energy", "52", "original", "mix"], Resolver.Words("Café del Mar – Energy 52 (Original_Mix)"));
 
+    [Fact]
+    public void AShortTitleWantsTheArtist()
+    {
+        // "My My My" by Promise Land: "07 My My My" is it, Anyma's "02 Voices In My Head" is not
+        Assert.True(Resolver.Named(["07", "my"], ["my"], ["promise", "land"]));
+        Assert.False(Resolver.Named(["02", "voices", "in", "my", "head"], ["my"], ["promise", "land"]));
+    }
+
     static readonly byte[] DeckMessage = [240, 125, 68, 76, 1, 1, 2, 15, 4, 0, 4, 12, 51, 0, 8, 74, 81, 0, 2, 88, 68, 64, 62, 71, 104, 0, 7, 92,
                                           36, 102, 50, 0, 77, 247];
 
