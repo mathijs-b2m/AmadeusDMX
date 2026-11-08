@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from amadeus import aikey
 from amadeus.director.lightshow import NAME as LIGHTSHOW
 from amadeus.director.style import SetGenre
 from amadeus.engine import Engine
@@ -191,8 +192,11 @@ class TrackShows:
                     print(f"  ✗ {Path(file).name}: stopped {director} (decision model or named show switched)")
                     continue
                 if director == self.wanted():
-                    self._install(file, a, plan, director)
-                    if director not in ("rules", LIGHTSHOW):
+                    refused = director == "openai" and aikey.stood_in(plan)
+                    self._install(file, a, plan, "rules" if refused else director)
+                    if refused:
+                        self._step(file, ai="failed")
+                    elif director not in ("rules", LIGHTSHOW):
                         self._step(file, ai="done", ai_done=len(plan), ai_total=len(plan))
                 done = director
         except BaseException as e:  # noqa: BLE001 - a bad track must never stop the show

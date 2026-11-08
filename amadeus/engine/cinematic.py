@@ -310,7 +310,8 @@ class CinematicMixin:
                 opts.append(sorted({a, n - 1 - a}))
             return opts
         if gesture == "alternate":
-            return [[m for m in range(n) if m % 2 == (k + j) % 2] for j in range(2)]
+            place = [min(m, n - 1 - m) if n > 2 else m for m in range(n)]  # from the outside in: left and right alike
+            return [[m for m in range(n) if place[m] % 2 == (k + j) % 2] for j in range(2)]
         if gesture == "keys":  # the pitch picks the place: low in the centre, high out to the sides
             half = (n + 1) // 2
             j = int(round(pitch * (half - 1)))

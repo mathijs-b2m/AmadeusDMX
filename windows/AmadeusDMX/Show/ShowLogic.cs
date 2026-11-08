@@ -325,6 +325,7 @@ public static class Director
         if (st?.Ai == "running")
             return $"Quick plan for now: the AI is still deciding this track ({st.AiDone ?? 0}/{st.AiTotal?.ToString(CultureInfo.InvariantCulture) ?? "…"} phrases). It takes over when it is done.";
         if (st?.Stems == "running") return "Quick plan for now: the instruments are separated first, then the AI decides.";
+        if (st?.Ai == "failed") return "OpenAI refused the API key: the rule-based director lights this track.";
         return "The rule-based director has no probabilities. Choose an AI director in the set's settings to see how sure it is.";
     }
 

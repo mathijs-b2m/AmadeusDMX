@@ -149,6 +149,10 @@ public sealed class ImportSheet(AppModel model)
             rows.Add(UI.HStack(10,
                 AmadeusDMX.Form.Note("key", "There is no OpenAI API key in the app: PDFs can't be read without one.", Tint.Orange).Grow(),
                 UI.Button("Open Settings…", OpenSettings).Tooltip("Settings › Director: enter your OpenAI API key (the same key the AI director uses)")));
+        else if (HasPDF && model.AiKeyWarning is { } warning)
+            rows.Add(UI.HStack(10,
+                AmadeusDMX.Form.Note("key", warning, Tint.Orange).Grow(),
+                UI.Button("Open Settings…", OpenSettings).Tooltip("Settings › Director: enter a new OpenAI API key")));
         if (_busy) rows.Add(UI.HStack(8, UI.Spinner(), UI.Text("Sending the files…", Font.Callout).Secondary()));
         if (_error is { } e) rows.Add(UI.Text("⚠ " + e, Font.Callout).Foreground(Tint.Red).Wrap());
         return UI.VStack(14, [.. rows]);
