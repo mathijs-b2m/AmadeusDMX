@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from amadeus.audio import drums
+from amadeus.audio import drums, hardstyle
 from amadeus.audio.dembow import boom, breathers, tac
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director import Decision
+from amadeus.director.style import style_for
 from amadeus.engine import zones
 from amadeus.engine.cinematic import CinematicMixin
 from amadeus.engine.fog import FogMixin
@@ -104,6 +105,9 @@ class Engine(
         else:
             self.synth_t, self.synth_s = np.zeros(0), np.zeros(0, np.float32)
         self.kick_t, self.kick_s = analysis.onsets["kick"]
+        style = style_for(getattr(analysis, "style", ""))
+        if style and style.kick_grid:  # a kick the onsets lose (hardstyle's distorted tail): the grid plays it
+            self.kick_t, self.kick_s = hardstyle.grid_kicks(analysis, plan, style.kick_grid)
         self.snare_t, self.snare_s = analysis.onsets["snare"]
         # boom-tac (the dembow trigger): the snare on its pattern, the kick with its 1/8 runs, and the breathers
         self.tac_t, self.tac_s = tac(analysis)

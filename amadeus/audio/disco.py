@@ -26,7 +26,7 @@ import numpy as np
 from amadeus import paths
 
 CACHE = paths.CACHE / "styles"
-VERSION = 1
+VERSION = 2  # (2: the hardstyle facts, heard in the same pass)
 FAMILIES = {
     "disco": ("Electronic---Disco", "Electronic---Euro-Disco", "Electronic---Italo-Disco", "Electronic---Nu-Disco",
               "Funk / Soul---Disco", "Funk / Soul---Boogie"),
@@ -50,8 +50,9 @@ def _cached(path: Path) -> Path:
 
 
 def facts(path: str | Path) -> dict:
-    """{"disco", "disco_lead"} for the audio file, or {} without the models or the file."""
-    from amadeus.audio import instruments
+    """{"disco", "disco_lead", "hardstyle", "hardstyle_lead"} for the audio file, or {} without the models or the
+    file."""
+    from amadeus.audio import hardstyle, instruments
 
     path = Path(path)
     if not path.is_file() or not instruments.available():
@@ -68,7 +69,8 @@ def facts(path: str | Path) -> dict:
         y, sr = sf.read(str(path), dtype="float32", always_2d=True)
     except Exception:  # noqa: BLE001 - an unreadable file: no disco facts
         return {}
-    out = judge(instruments.judge(y.mean(axis=1), sr)["styles"], instruments.classes("effnet"))
+    styles, names = instruments.judge(y.mean(axis=1), sr)["styles"], instruments.classes("effnet")
+    out = {**judge(styles, names), **hardstyle.judge(styles, names)}
     CACHE.mkdir(parents=True, exist_ok=True)
     cached.write_text(json.dumps(out), encoding="utf-8")
     return out
