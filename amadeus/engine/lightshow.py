@@ -113,7 +113,7 @@ class LightshowMixin(CinematicMixin):
             return super()._cine_sections(rig)
         by_fixture: dict[str, list[dict]] = {}
         for e in rig["elements"]:
-            if e["kind"] not in ("laser", "strobe", "blinder", "smoke", "inert"):
+            if e["kind"] not in ("laser", "strobe", "blinder", "smoke", "inert") and not e.get("uplight"):
                 by_fixture.setdefault(e["fixture"], []).append(e)
         models: dict[str, list[dict]] = {}
         for f in rig["fixtures"]:

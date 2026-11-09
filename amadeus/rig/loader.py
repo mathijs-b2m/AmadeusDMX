@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from amadeus.library import fixtures as fxlib
-from amadeus.rig import geometry
+from amadeus.rig import geometry, uplights
 
 
 def load_rig(source) -> dict:
@@ -33,4 +33,8 @@ def load_rig_dict(rig: dict) -> dict:
         print(f"⚠ no start address yet (visualiser only): {', '.join(unpatched)}")
     w = geometry.stage(rig)["width_m"]
     rig["elements"] = [e for f in rig["fixtures"] for e in fxlib.expand(f, w)]
+    up = uplights.uplight_fixtures(rig)  # tilting bars on the floor by a wall: they light up, not with the heads
+    for e in rig["elements"]:
+        if e["fixture"] in up and e["kind"] == "head":
+            e["uplight"] = True
     return rig

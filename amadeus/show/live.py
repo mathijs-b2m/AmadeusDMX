@@ -356,6 +356,7 @@ async def run(
                         showing = key
                         title = feedlib.track_title(deck.file, deck.deck)
                         cd = None if used == STANDIN else arc.countdown(deck.file, a, plan, time.time())
+                        engine.surprise = cd  # the night's surprise: the wall uplighters lean in (engine/uplights.py)
                         feed.set_hello(feedlib.hello(a, plan, rig, real, title=title, director=used, countdown=cd))
                         print(f"  ▶ heads follow deck {deck.deck}: {Path(deck.file).name}")
                 else:

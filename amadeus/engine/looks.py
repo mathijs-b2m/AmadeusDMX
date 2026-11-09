@@ -725,6 +725,7 @@ class LooksMixin:
         if getattr(d, "special", "off") == "stars":
             self._stars(d, t, out)
         self._accents(d, t, out, accent)
+        self._uplight_states(d, t, out)  # (engine/uplights.py: their level is the phrase's, set just below)
         level = d.intensity if getattr(d, "brightness", -1) < 0 else d.brightness
         master = INTENSITY_MASTER[max(0, min(3, level))] * self.rig["safety"]["master"]
         for st in out.values():
@@ -739,7 +740,7 @@ class LooksMixin:
             model = {f["id"]: f["fixture"] for f in self.rig["fixtures"]}
             kinds: dict[str, list[str]] = {}
             for e in self.rig["elements"]:
-                if "offset_m" in e and e["kind"] in ("par", "head"):
+                if "offset_m" in e and e["kind"] in ("par", "head") and not e.get("uplight"):
                     kinds.setdefault(model.get(e["fixture"], e["fixture"]), []).append(e["id"])
             cells: list[str] = []
             for ids in sorted(kinds.values(), key=len, reverse=True):

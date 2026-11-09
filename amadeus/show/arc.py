@@ -395,7 +395,7 @@ class ShowArc:
         groups: list[list[str]] = []
         washes: dict[str, list[str]] = {}
         for e in els:  # pars, bars and other washes: per the rig's group, else per kind of fixture
-            if e["kind"] not in ("head", "laser", "strobe", "blinder", "smoke", "inert"):
+            if e["kind"] not in ("head", "laser", "strobe", "blinder", "smoke", "inert") or e.get("uplight"):
                 fx = by_fixture[e["fixture"]]
                 washes.setdefault(fx.get("group") or fx["fixture"], []).append(e["id"])
         groups += sorted(washes.values(), key=len, reverse=True)  # the washes light the room first

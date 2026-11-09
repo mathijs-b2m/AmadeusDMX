@@ -40,7 +40,8 @@ async def play(
     real = Realism(rig)
     feed = feedlib.Feed(rig, real, period)
     title = feedlib.track_title(a.path)  # one track on its own: its main drop is the moment (no night to save it for)
-    feed.set_hello(feedlib.hello(a, plan, rig, real, title=title, director=director, countdown=countdown_drop(a, plan)))
+    engine.surprise = countdown_drop(a, plan)  # the wall uplighters lean in where the wall counts (engine/uplights.py)
+    feed.set_hello(feedlib.hello(a, plan, rig, real, title=title, director=director, countdown=engine.surprise))
     bands = [a.band_norm(k) for k in a.bands_db]
 
     httpd = serve_http(http_port)
