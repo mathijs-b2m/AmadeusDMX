@@ -13,6 +13,8 @@ levels, hits), `motion` (where heads point and how their motors get there) and
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 
 from amadeus.audio import drums, hardstyle
@@ -257,9 +259,11 @@ class Engine(
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = self._wheel_colours({fid: prev[fid].blend(s, k) for fid, s in states.items()}, states)
+        up = {eid: dataclasses.replace(states[eid]) for eid in self.uplight_ids}
         self._roll(t, states, skip={e["id"] for e in self.heads} if ahead is not None else frozenset())
         self._kick_return(t, states)
         self._drop_moment(t, states)
+        states.update(up)  # the wall uplighters keep to their run: no roll, kick return or drop flash lights them
         return i, self._finish(states, t, peek)
 
     def _pickup_of(self, i: int):

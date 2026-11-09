@@ -99,8 +99,8 @@ def test_the_run_steps_on_the_beat_from_the_stage_back(show):
     d = plan[i]
     beats = e.beats[(e.beats >= d.start - 0.02) & (e.beats < d.end - 1)]
     order = []
-    for b in beats[:6]:
-        states = e.render(float(b) + 0.03)[1]  # just after the beat: the step it hit is the brightest
+    for b, nb in zip(beats[:6], beats[1:7]):
+        states = e.render(float(b + (nb - b) / 4))[1]  # early in the beat: the step it hit is the brightest
         lv = [max(states[x].dimmer for x in s) for s in e.up_steps]
         order.append(int(np.argmax(lv)))
     assert order == [0, 1, 2, 0, 1, 2]
@@ -111,8 +111,9 @@ def test_their_level_follows_the_phrase_not_the_loudness(show):
     i = next(k for k, d in enumerate(plan) if d.section == "drop")
     d = plan[i]
     peaks = []
-    for b in e.beats[(e.beats >= d.start + 1) & (e.beats < d.end - 1)]:
-        states = e.render(float(b) + 0.03)[1]
+    bs = e.beats[(e.beats >= d.start + 1) & (e.beats < d.end - 1)]
+    for b, nb in zip(bs, bs[1:]):
+        states = e.render(float(b + (nb - b) / 4))[1]
         peaks.append(max(states[x].dimmer for s in e.up_steps for x in s))
     assert max(peaks) - min(peaks) < 0.02  # every beat's step lands at the same level
 
@@ -136,3 +137,29 @@ def test_they_lean_in_at_the_surprise_only_and_stand_back_up(show):
             assert _beam(e, eid, e.render(after)[1][eid])[2] > 0.999
     finally:
         e.surprise = None
+
+
+def test_in_driving_phrases_the_cells_play_a_waterfall_along_the_bar(show):
+    e, plan = show
+    d = next(d for d in plan if e._uplight_pattern(d) == "fall")
+    b = float(e.beats[np.searchsorted(e.beats, d.start - 0.02) + 4])
+    length = float(e.beats[np.searchsorted(e.beats, b) + 1]) - b
+    states = e.render(b + length / 4)[1]
+    first = max((x for x in e.uplight_ids if e.up_rank[x] == 0), key=lambda x: states[x].dimmer)  # the step it hit
+    bar = sorted((x for x in e.uplight_ids if x.split(".")[0] == first.split(".")[0]), key=lambda x: e.up_rank[x])
+    firsts = []
+    for x in bar:  # the moment each cell comes on: stage end first, back end last
+        ts = np.arange(b, b + length, length / 60)
+        firsts.append(next(t for t in ts if e.render(float(t))[1][x].dimmer > 0.05))
+    assert firsts == sorted(firsts) and firsts[-1] - firsts[0] > length * 0.5
+    mid = e.render(b + length * 0.5)[1]
+    assert 0 < sum(mid[x].dimmer > 0.05 for x in bar) < len(bar)  # only part of the bar lit: it travels
+
+
+def test_they_stay_under_the_heads_but_at_the_surprise(show):
+    e, plan = show
+    from amadeus.engine.uplights import RUN_LEVEL
+
+    for t in np.arange(0.5, e.a.duration - 0.5, 0.29):
+        states = e.render(t)[1]
+        assert max(states[x].dimmer for x in e.uplight_ids) <= RUN_LEVEL + 1e-6, t
