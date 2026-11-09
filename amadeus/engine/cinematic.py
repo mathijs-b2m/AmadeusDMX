@@ -189,7 +189,8 @@ class CinematicMixin:
         units (one fixture: its elements, left to right) and of segments (its pixels in a few blocks)."""
         by_fixture: dict[str, list[dict]] = {}
         for e in rig["elements"]:
-            if e["kind"] not in ("laser", "strobe", "blinder"):  # (blinders: engine/blinders.py)
+            # (blinders: engine/blinders.py; wall uplighters: engine/uplights.py)
+            if e["kind"] not in ("laser", "strobe", "blinder") and not e.get("uplight"):
                 by_fixture.setdefault(e["fixture"], []).append(e)
         groups: dict[tuple, list[dict]] = {}
         for f in rig["fixtures"]:

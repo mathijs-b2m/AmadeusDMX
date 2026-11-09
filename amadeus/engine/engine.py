@@ -32,6 +32,7 @@ from amadeus.engine.rings import RingsMixin
 from amadeus.engine.rolls import RollsMixin
 from amadeus.engine.state import State
 from amadeus.engine.timing import TimingMixin, _ease, note_env, pick_stabs
+from amadeus.engine.uplights import UplightsMixin
 from amadeus.engine.wheels import WheelsMixin
 from amadeus.engine.zoom import ZoomMixin
 from amadeus.library import fixtures as fxlib
@@ -64,6 +65,7 @@ class Engine(
     RollsMixin,
     ZoomMixin,
     WheelsMixin,
+    UplightsMixin,
 ):
     def __init__(
         self, analysis: Analysis, plan: list[Decision], rig: dict, real_output: bool = False, fog_carry: bool = False
@@ -79,7 +81,10 @@ class Engine(
         self.rig = rig
         self.starts = [d.start for d in plan]
         self.pars = sorted([e for e in rig["elements"] if e["kind"] == "par"], key=lambda e: e["x"])
-        self.heads = sorted([e for e in rig["elements"] if e["kind"] == "head"], key=lambda e: e["x"])
+        # (a tilting bar on the floor by a wall is no head: it lights up the wall, engine/uplights.py)
+        self.heads = sorted(
+            [e for e in rig["elements"] if e["kind"] == "head" and not e.get("uplight")], key=lambda e: e["x"]
+        )
         defs = {f["id"]: fxlib.get(f["fixture"]) for f in rig["fixtures"]}
         self.wheels = {e["id"]: defs[e["fixture"]] for e in rig["elements"] if fxlib.has_wheel(defs[e["fixture"]])}
         self.order = {f["id"]: i for i, f in enumerate(self.pars)}
@@ -184,6 +189,7 @@ class Engine(
         # a program of its own: for the genre (cinematic: every hit played by its own fixtures), or switched on by
         # hand (lightshow: the cinematic program as a show piece, building up layer by layer)
         self._init_blinders(rig)
+        self._init_uplights(rig, fixtures)
         self.program = program_of(analysis, plan)
         if self.program:
             self._init_cinematic(rig)
@@ -233,7 +239,8 @@ class Engine(
         if self.program:
             states = self._cinematic_scene(t)
             self._blinders(t, states)
-            for eid in self.blinder_ids:
+            self._uplight_states(d, t, states)
+            for eid in (*self.blinder_ids, *self.uplight_ids):
                 states[eid].dimmer *= self.rig["safety"]["master"]
             return i, self._finish(states, t, peek)
         states = self._scene(d, t)

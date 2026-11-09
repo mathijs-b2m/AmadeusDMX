@@ -1,0 +1,142 @@
+"""Wall uplighters (rig/uplights.py): tilting bars on the floor by the walls, for depth in the room and on camera.
+
+- **aim**: straight up, along the wall onto the ceiling, all night. They are no moving heads: the heads' motion
+  never drives them.
+- **light**: a run along the walls on the beat grid, one step a beat from the stage to the back of the room (bars
+  at the same depth, a mirrored pair across the room, are one step). Each step is a note: on at the beat, held,
+  let go gently while the next one comes, so the run flows instead of blinking. The level is the phrase's (the
+  look's intensity), not the loudness from moment to moment. Where the beat doesn't drive the music (a breakdown,
+  an intro, the kick gone), the run steps once a bar.
+- **move**: only at the night's surprise (`surprise`: a phrase the show arc grants once or twice a night, the
+  moment the LED wall counts into; show/arc.py). On its downbeat the steps lean in towards the room, one a beat,
+  lit full; four bars later they stand back up, one a beat. Never more: a move seen every drop is no surprise.
+"""
+
+from __future__ import annotations
+
+import bisect
+import math
+
+import numpy as np
+
+from amadeus.director.style import BEAT_SECTIONS
+from amadeus.engine.motion import DEFAULT_MOTION, DMX_LEAD_S
+from amadeus.engine.state import State
+from amadeus.engine.timing import _ease, _release
+from amadeus.library import fixtures as fxlib
+from amadeus.rig import geometry
+
+STEP_GAP_M = 0.75  # bars this close in depth are one step of the run (a mirrored pair across the room)
+HOLD_STEPS, RELEASE_STEPS = 0.5, 1.5  # a step's note: held this many steps, let go over this many
+QUIET_LEVEL = 0.6  # a run once a bar (no beat to lock on) is softer
+LEAN_DEG = 35.0  # the surprise: leaning in this far from straight up …
+EYE_MARGIN_DEG = 3.0  # … never under the eye rule for low heads (audience_min_up_deg) plus this
+SURPRISE_HOLD_BEATS = 16  # leaning for four bars, then back up
+
+
+class UplightsMixin:
+    """Wall uplighters: light and aim, worked out once per track."""
+
+    def _init_uplights(self, rig: dict, fixtures: dict):
+        self.surprise: int | None = None  # the phrase they lean in at (set by the show arc, or the player)
+        els = [e for e in rig["elements"] if e.get("uplight")]
+        self.uplight_ids = [e["id"] for e in els]
+        self.up_steps: list[list[str]] = []
+        self.up_aim: dict[str, tuple[float, float, float, float]] = {}  # element → (pan, up, lean, travel s)
+        if not els:
+            return
+        st = self.stage
+        units: dict[str, list[dict]] = {}
+        for e in els:
+            units.setdefault(e["fixture"], []).append(e)
+        placed = []
+        for fid, cells in units.items():
+            fx = fixtures[fid]
+            defn = fxlib.get(fx["fixture"])
+            pos = np.mean([geometry.position(rig, e, fx) for e in cells], axis=0)
+            placed.append((float(pos[1]), [e["id"] for e in cells]))
+            pan, up = geometry.to_dmx(fx, defn, *geometry.ik(fx, defn, np.array([0.0, 0.0, 1.0]), None))
+            lean_deg = LEAN_DEG
+            if st.get("eye_safety"):
+                lean_deg = min(lean_deg, 90.0 - st["audience_min_up_deg"] - EYE_MARGIN_DEG)
+            r = math.radians(fx.get("rot_deg", 0.0))
+            front = np.array([-math.sin(r), math.cos(r)])  # the way the bar tilts (its front, seen from above)
+            middle = np.array([st["width_m"] / 2, float(st.get("room_depth_m") or 6.0) / 2]) - pos[:2]
+            if front @ middle < 0:
+                front = -front
+            a = math.radians(lean_deg)
+            d = np.array([front[0] * math.sin(a), front[1] * math.sin(a), math.cos(a)])
+            _, lean = geometry.to_dmx(fx, defn, *geometry.ik(fx, defn, d, None))
+            speed = float(defn.get("motion", DEFAULT_MOTION)["tilt_speed_dps"])
+            for e in cells:
+                self.up_aim[e["id"]] = (pan, up, lean, max(0.15, lean_deg / max(speed, 1.0)))
+        placed.sort(key=lambda p: p[0])  # from the stage to the back of the room
+        for y, ids in placed:
+            if self.up_steps and y - self._up_step_y < STEP_GAP_M:
+                self.up_steps[-1] += ids
+            else:
+                self.up_steps.append(list(ids))
+                self._up_step_y = y
+
+    def _uplight_quiet(self, d, t: float) -> bool:
+        """No beat to lock on: a calm section, or the kick gone for a while inside one."""
+        if d.section not in BEAT_SECTIONS:
+            return True
+        return any(s <= t < e for s, e, _ in self.kick_breaks)
+
+    def _uplight_run(self, d, t: float) -> list[float]:
+        """Each step's level (0..1): the run along the walls, a step a beat (a bar when quiet)."""
+        n = len(self.up_steps)
+        quiet = self._uplight_quiet(d, t)
+        grid = self.downbeat_times if quiet else self.beats
+        k = bisect.bisect_right(grid, t) - 1
+        if k < 0 or not n:
+            return [0.0] * n
+        k0 = min(bisect.bisect_left(grid, d.start - 0.02), k)  # the phrase's first step: the run starts at the stage
+        length = float(grid[k + 1] - grid[k]) if k + 1 < len(grid) else self.beat_info(t)[2] * (4 if quiet else 1)
+        top = QUIET_LEVEL if quiet else 1.0
+        out = [0.0] * n
+        for j in range(max(k0, k - math.ceil(HOLD_STEPS + RELEASE_STEPS)), k + 1):
+            s = (j - k0) % n
+            v = _release(t - float(grid[j]), top, HOLD_STEPS * length, RELEASE_STEPS * length)
+            out[s] = max(out[s], v)
+        return out
+
+    def _uplight_lean(self, t: float) -> list[float]:
+        """How far each step leans in (0 up .. 1 leaning): only in the surprise phrase."""
+        n = len(self.up_steps)
+        if self.surprise is None or not 0 <= self.surprise < len(self.plan) or not n:
+            return [0.0] * n
+        b = self.beats
+        k = bisect.bisect_left(b, self.plan[self.surprise].start - 0.02)
+        out = []
+        for s in range(n):
+            if k + s + SURPRISE_HOLD_BEATS >= len(b):
+                out.append(0.0)
+                continue
+            t_in, t_out = float(b[k + s]), float(b[k + s + SURPRISE_HOLD_BEATS])
+            travel = next(iter(self.up_aim.values()))[3]
+            out.append(_ease(min(max((t - t_in) / travel, 0.0), 1.0)) - _ease(min(max((t - t_out) / travel, 0.0), 1.0)))
+        return out
+
+    def _uplight_states(self, d, t: float, out: dict[str, State]) -> None:
+        """The uplighters' states in a look (before its intensity: the phrase sets their level)."""
+        if not self.uplight_ids:
+            return
+        col = self._colours(d)[0]
+        run = self._uplight_run(d, t)
+        lean_now, lean_dmx = self._uplight_lean(t), self._uplight_lean(t + DMX_LEAD_S)
+        for s, ids in enumerate(self.up_steps):
+            level = max(run[s], lean_now[s])  # leaning in: lit full, the whole move
+            for eid in ids:
+                pan, up, lean, _ = self.up_aim[eid]
+                out[eid] = State(
+                    dimmer=level,
+                    r=col[0],
+                    g=col[1],
+                    b=col[2],
+                    pan=pan,
+                    tilt=up + (lean - up) * lean_now[s],
+                    dmx_pan=pan,
+                    dmx_tilt=up + (lean - up) * lean_dmx[s],
+                )

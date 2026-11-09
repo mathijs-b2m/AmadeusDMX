@@ -24,6 +24,7 @@ import numpy as np
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
 from amadeus.rig import trusses as T
+from amadeus.rig.uplights import is_uplight
 
 CLASSES = {
     "overhead": "the heads hung overhead on the truss: they scan down onto the crowd",
@@ -40,7 +41,7 @@ def head_groups(rig: dict) -> list[dict]:
     its front middle), centre (x, y, z)}]."""
     heads = []
     for f in rig["fixtures"]:
-        if not fxlib.is_moving(fxlib.get(f["fixture"])):
+        if not fxlib.is_moving(fxlib.get(f["fixture"])) or is_uplight(rig, f):  # (wall uplighters: rig/uplights.py)
             continue
         for e in fxlib.expand(f, geometry.stage(rig)["width_m"]):
             if e["kind"] == "head":

@@ -73,7 +73,7 @@ def rig_sections(rig: dict) -> list[dict]:
     width = geometry.stage(rig)["width_m"]
     by_light: dict[tuple, list] = {}
     for e in rig["elements"]:
-        if e["kind"] in KINDS:
+        if e["kind"] in KINDS and not e.get("uplight"):  # (wall uplighters play their own part: rig/uplights.py)
             f = fixtures[e["fixture"]]
             by_light.setdefault((f["id"], e["kind"]), []).append((e["id"], geometry.position(rig, e, f)))
     models: dict[tuple, list[dict]] = {}
