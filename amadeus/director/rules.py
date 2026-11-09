@@ -188,6 +188,48 @@ RULE_FOG = {  # smoke lingers: long arcs. Clear air at the edges, a burst only a
 }
 
 
+# Wall uplighters' cells (engine/uplights.py): how the cells of a bar play the run along the walls. Calm phrases
+# play a bar as one light; phrases that drive pick a pattern, rotated so the wall keeps changing. Heavy phrases
+# (intensity 2+) get the travelling ones, lighter phrases the quieter ones.
+# "dark": the wall gives the heads the room. When the heads strobe or hammer, and on the second phrase in a row of
+# the heads playing hard, the uplighters black out (the phrase after, they come back).
+WALL_CELLS = ["whole", "fall", "rise", "bounce", "out", "in", "split", "halves", "comet", "scatter", "dark"]
+HEAVY_HEAD_LIGHT = {"strobe", "hammer", "flick", "random", "beat"}
+HEAVY_MOVES = {"ballyhoo", "twister", "pour", "tilt_wave", "step_on_beat", "bounce", "swing"}
+RULE_WALL_CELLS = {
+    "groove": ["whole", "halves", "fall", "split"],
+    "verse": ["whole", "halves", "whole", "fall"],
+    "buildup": ["in", "comet", "fall"],
+    "chorus": ["fall", "split", "out", "bounce"],
+    "drop": ["fall", "out", "bounce", "comet", "split", "rise", "scatter", "in"],
+}
+GENTLE_WALL_CELLS = ["whole", "halves", "fall", "whole", "split"]
+
+
+def heads_heavy(d: Decision) -> bool:
+    """The moving heads play hard this phrase: a peak (a drop, or intensity 3) with a hard light or a big move."""
+    if d.head_light == "off" or not (d.section == "drop" or d.intensity >= 3):
+        return False
+    return d.head_light in HEAVY_HEAD_LIGHT or d.movement in HEAVY_MOVES
+
+
+def wall_cells_for(d: Decision, n_before: int, last: Decision | None = None) -> str:
+    """The wall uplighters' cell pattern for a phrase: dark to make room for the heads on a heavy streak, whole in
+    calm sections, one of the section's patterns (round-robin) where the music drives; gentler ones under
+    intensity 2. `last`: the phrase before (with its own pick)."""
+    if heads_heavy(d):
+        if d.head_light in ("strobe", "hammer"):
+            return "dark"
+        if last is not None and heads_heavy(last) and last.wall_cells != "dark":
+            return "dark"
+    options = RULE_WALL_CELLS.get(d.section)
+    if not options:
+        return "whole"
+    if d.intensity < 2 and d.section != "buildup":
+        options = GENTLE_WALL_CELLS
+    return options[n_before % len(options)]  # the section's phrases so far: each one the next pattern
+
+
 def apply_open_sky(d: Decision, n_before: int):
     """Outdoors the sky is the canvas: calm and building parts always aim up, grooves and drops every other time
     (the others still come down over the crowd, for contrast)."""
@@ -342,4 +384,5 @@ class RuleDirector:
         apply_arc(d, arc, self.lasers, self.groups)
         if self.style and self.style.no_arc:
             self.style.enforce(d, n_before)
+        d.wall_cells = wall_cells_for(d, n_before, last)  # after the arc: it sets the intensity
         return d
