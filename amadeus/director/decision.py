@@ -73,6 +73,7 @@ class Decision:
     laser_color: str = "base"  # base | accent | white | cycle (palette colours)
     screen: str = "off"  # LED wall: off | ambient | figure | words | equalizer | psychedelic
     special: str = "off"  # a theme's own look, switched on at key moments: off | stars
+    wall_cells: str = "auto"  # wall uplighters' cells (engine/uplights.py PATTERNS); auto: the rule's pick
     fog: str = "none"  # smoke machines: none | light | medium | heavy | burst (engine/fog.py plays it)
     # The show arc calms a plan's effects by lowering its intensity; the brightness stays the director's (0..3,
     # -1: the intensity's own). The arc's intensity knob dims the lights, nothing else.
@@ -96,6 +97,8 @@ class Decision:
             grp += f" wall:{self.screen}"
         if self.special != "off":
             grp += f" ✦{self.special}"
+        if self.wall_cells not in ("auto", "whole"):
+            grp += f" uplights:{self.wall_cells}"
         if self.grouping != "unison":
             grp = (
                 f" [{self.grouping}"

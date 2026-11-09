@@ -141,7 +141,13 @@ def test_they_lean_in_at_the_surprise_only_and_stand_back_up(show):
 
 def test_in_driving_phrases_the_cells_play_a_waterfall_along_the_bar(show):
     e, plan = show
-    d = next(d for d in plan if e._uplight_pattern(d) == "fall")
+    d = next(d for d in plan if d.section == "drop")
+    was, d.wall_cells = d.wall_cells, "fall"
+    _waterfall(e, d)
+    d.wall_cells = was
+
+
+def _waterfall(e, d):
     b = float(e.beats[np.searchsorted(e.beats, d.start - 0.02) + 4])
     length = float(e.beats[np.searchsorted(e.beats, b) + 1]) - b
     states = e.render(b + length / 4)[1]
@@ -163,3 +169,65 @@ def test_they_stay_under_the_heads_but_at_the_surprise(show):
     for t in np.arange(0.5, e.a.duration - 0.5, 0.29):
         states = e.render(t)[1]
         assert max(states[x].dimmer for x in e.uplight_ids) <= RUN_LEVEL + 1e-6, t
+
+
+def test_the_director_picks_from_every_pattern_and_keeps_calm_phrases_whole():
+    from amadeus.director.decision import Decision
+    from amadeus.director.rules import WALL_CELLS, wall_cells_for
+    from amadeus.engine.uplights import PATTERNS
+
+    assert set(WALL_CELLS) == set(PATTERNS)
+    base = dict(start=0, end=8, palette="", par_base="", par_accent="", trigger="", head_light="", movement="")
+    base |= dict(formation="", aim="", head_color="", dynamics="", beam_fx="", gobo_style="", source="rules")
+    seen = {wall_cells_for(Decision(phrase=i, section="drop", intensity=3, **base), i) for i in range(16)}
+    assert seen == {"fall", "out", "bounce", "comet", "split", "rise", "scatter", "in"}
+    assert {wall_cells_for(Decision(phrase=i, section="breakdown", intensity=1, **base), 0) for i in range(8)} == {
+        "whole"
+    }
+
+
+@pytest.mark.parametrize("pattern", ["fall", "rise", "bounce", "out", "in", "split", "halves", "comet", "scatter"])
+def test_every_pattern_plays_each_cell_once_a_step_on_the_grid(show, pattern):
+    e, plan = show
+    d = next(d for d in plan if d.section == "drop")
+    was, d.wall_cells = d.wall_cells, pattern
+    try:
+        k = int(np.searchsorted(e.beats, d.start - 0.02)) + 2
+        n = len(e.up_steps)
+        t0, t1 = float(e.beats[k]), float(e.beats[k + n])  # one round of the run: each step once
+        bar = [x for x in e.uplight_ids if x.split(".")[0] == "up1"]
+        ts = np.linspace(t0, t1, 400)
+        lv = np.array([[e.render(float(t))[1][x].dimmer for x in bar] for t in ts])
+        rises = ((lv[1:] > 0.3) & (lv[:-1] <= 0.3)).sum(axis=0)
+        assert (rises <= 1).all(), pattern  # a note per cell, no flicker
+        assert lv.max() > 0.3
+        starts = sorted({float(ts[i + 1]) for i, c in zip(*np.nonzero((lv[1:] > 0.3) & (lv[:-1] <= 0.3)))})
+        assert len(starts) >= (1 if pattern in ("split", "halves") else 3) or pattern == "whole"
+    finally:
+        d.wall_cells = was
+
+
+def test_they_black_out_to_make_room_on_a_heavy_streak_of_the_heads(show):
+    from amadeus.director.decision import Decision
+    from amadeus.director.rules import wall_cells_for
+
+    base = dict(start=0, end=8, palette="", par_base="", par_accent="", trigger="", formation="", aim="")
+    base |= dict(head_color="", dynamics="", beam_fx="", gobo_style="", source="rules", section="drop", intensity=3)
+    assert wall_cells_for(Decision(phrase=3, head_light="strobe", movement="sweep", **base), 0) == "dark"
+    hard = [Decision(phrase=i, head_light="pulse", movement="ballyhoo", **base) for i in range(4)]
+    last = None
+    for d in hard:
+        d.wall_cells = wall_cells_for(d, 0, last)
+        last = d
+    assert [d.wall_cells == "dark" for d in hard] == [False, True, False, True]  # every other phrase: room
+    calm = Decision(phrase=1, head_light="steady", movement="sweep", **base)
+    assert wall_cells_for(calm, 0, hard[0]) != "dark"
+
+    e, plan = show
+    d = next(d for d in plan if d.section == "drop")
+    was, d.wall_cells = d.wall_cells, "dark"
+    try:
+        for t in np.arange(d.start, d.end, 0.2):
+            assert max(e.render(float(t))[1][x].dimmer for x in e.uplight_ids) == 0.0
+    finally:
+        d.wall_cells = was

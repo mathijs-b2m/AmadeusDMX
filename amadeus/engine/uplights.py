@@ -8,10 +8,10 @@
   look's intensity), not the loudness from moment to moment, and well under the heads' (a layer behind the show,
   never the brightest thing in the room: they leave the heads their headroom). Where the beat doesn't drive the
   music (a breakdown, an intro, the kick gone), the run steps once a bar, softer.
-- **cells**: a bar of cells plays as one light in calm phrases. In phrases that drive, at times its cells play a
-  pattern along the bar: a waterfall from the stage end to the back (continuing the run: the next step's bars take
-  it over), or out from the middle. Each cell is its own short note started on the grid, so only part of the bar is
-  lit at a time: it moves, and stays dimmer.
+- **cells**: how a bar's cells play each step is the director's pick per phrase (`Decision.wall_cells`,
+  director/rules.py; PATTERNS below): one light in calm phrases; in phrases that drive, a pattern along the bar. Each
+  cell is its own short note started on the grid (never off it), so only part of the bar is lit at a time: it
+  moves, and stays dimmer.
 - **move**: only at the night's surprise (`surprise`: a phrase the show arc grants once or twice a night, the
   moment the LED wall counts into; show/arc.py). On its downbeat the steps lean in towards the room, one a beat,
   lit full; four bars later they stand back up, one a beat. Never more: a move seen every drop is no surprise.
@@ -24,6 +24,7 @@ import math
 
 import numpy as np
 
+from amadeus.director.rules import wall_cells_for
 from amadeus.director.style import BEAT_SECTIONS
 from amadeus.engine.motion import DEFAULT_MOTION, DMX_LEAD_S
 from amadeus.engine.state import State
@@ -40,6 +41,23 @@ CELL_SPREAD = 0.8  # the pattern runs over the bar in this much of a step (the l
 LEAN_DEG = 35.0  # the surprise: leaning in this far from straight up …
 EYE_MARGIN_DEG = 3.0  # … never under the eye rule for low heads (audience_min_up_deg) plus this
 SURPRISE_HOLD_BEATS = 16  # leaning for four bars, then back up
+COMET_RELEASE = 1.2  # a comet's cells let go this slowly: a long tail behind the head
+
+# A cell's start in a step (in steps after its beat), by pattern: rank is its place along the bar (0 at the stage
+# end, 1 at the back end), j the step's number in the run, k the cell's number along the bar.
+PATTERNS = {
+    "whole": lambda rank, j, k: 0.0,  # one light
+    "fall": lambda rank, j, k: rank * CELL_SPREAD,  # a waterfall from the stage end to the back: on with the run
+    "rise": lambda rank, j, k: (1 - rank) * CELL_SPREAD,  # against the run: the wall zigzags
+    "bounce": lambda rank, j, k: (rank if j % 2 == 0 else 1 - rank) * CELL_SPREAD,  # there and back, step by step
+    "out": lambda rank, j, k: abs(rank - 0.5) * 2 * CELL_SPREAD,  # from the middle to the ends
+    "in": lambda rank, j, k: (1 - abs(rank - 0.5) * 2) * CELL_SPREAD,  # from the ends to the middle: gathering
+    "split": lambda rank, j, k: 0.5 * (k % 2),  # every other cell on the beat, the rest on its "and"
+    "halves": lambda rank, j, k: 0.5 * (rank >= 0.5),  # the stage half on the beat, the back half on its "and"
+    "comet": lambda rank, j, k: rank * CELL_SPREAD,  # a waterfall with a long tail (COMET_RELEASE)
+    "scatter": lambda rank, j, k: ((k * 7 + 3) % 11) / 10 * CELL_SPREAD,  # the cells in a fixed scattered order
+    "dark": None,  # blacked out: room for the heads on a heavy streak
+}
 
 
 class UplightsMixin:
@@ -52,6 +70,7 @@ class UplightsMixin:
         self.up_steps: list[list[str]] = []
         self.up_aim: dict[str, tuple[float, float, float, float]] = {}  # element → (pan, up, lean, travel s)
         self.up_rank: dict[str, float] = {}  # a cell's place along its bar: 0 the stage end .. 1 the back end
+        self.up_index: dict[str, int] = {}  # … and its number along the bar, from the stage end
         if not els:
             return
         st = self.stage
@@ -67,6 +86,7 @@ class UplightsMixin:
             order = sorted(range(len(cells)), key=lambda i: (round(float(at[i][1]), 3), float(at[i][0])))
             for r, i in enumerate(order):
                 self.up_rank[cells[i]["id"]] = r / max(len(cells) - 1, 1)
+                self.up_index[cells[i]["id"]] = r
             placed.append((float(pos[1]), [e["id"] for e in cells]))
             pan, up = geometry.to_dmx(fx, defn, *geometry.ik(fx, defn, np.array([0.0, 0.0, 1.0]), None))
             lean_deg = LEAN_DEG
@@ -98,17 +118,22 @@ class UplightsMixin:
         return any(s <= t < e for s, e, _ in self.kick_breaks)
 
     def _uplight_pattern(self, d) -> str:
-        """How a bar's cells play this phrase: "whole" (one light), "fall" (a waterfall from the stage end to the
-        back) or "out" (from the middle out). Calm phrases play whole; phrases that drive, at times a pattern."""
-        if d.section not in BEAT_SECTIONS:
+        """How a bar's cells play this phrase: the director's pick (`wall_cells`), or the rule's for plans without
+        one. Calm phrases always play a bar as one light."""
+        if d.wall_cells in PATTERNS:
+            name = d.wall_cells
+        else:
+            i = d.phrase if 0 <= d.phrase < len(self.plan) and self.plan[d.phrase] is d else None
+            last = self.plan[i - 1] if i else None
+            n = sum(1 for p in self.plan[: i or 0] if p.section == d.section)
+            name = wall_cells_for(d, n, last)
+        if name != "dark" and d.section not in BEAT_SECTIONS and d.section != "buildup":
             return "whole"
-        if d.intensity >= 2:
-            return ("fall", "out")[d.phrase % 2]
-        return ("whole", "fall")[d.phrase % 2]
+        return name if name in PATTERNS else "whole"
 
-    def _uplight_run(self, d, t: float, s: int, lag: float, pattern: str) -> float:
-        """A cell's level (0..1) in the run along the walls, a step a beat (a bar when quiet): the cell of step
-        `s` whose note starts `lag` (a fraction of a step) after the step's beat."""
+    def _uplight_run(self, d, t: float, s: int, eid: str, pattern: str) -> float:
+        """A cell's level (0..1) in the run along the walls, a step a beat (a bar when quiet): cell `eid` of
+        step `s`, its note started by the pattern."""
         n = len(self.up_steps)
         quiet = self._uplight_quiet(d, t)
         grid = self.downbeat_times if quiet else self.beats
@@ -117,13 +142,18 @@ class UplightsMixin:
             return 0.0
         k0 = min(bisect.bisect_left(grid, d.start - 0.02), k)  # the phrase's first step: the run starts at the stage
         top = QUIET_LEVEL if quiet else RUN_LEVEL
+        if pattern == "dark":
+            return 0.0
         hold, release = (HOLD_STEPS, RELEASE_STEPS) if pattern == "whole" else (CELL_HOLD, CELL_RELEASE)
+        if pattern == "comet":
+            release = COMET_RELEASE
+        lag_of, rank, idx = PATTERNS[pattern], self.up_rank.get(eid, 0.0), self.up_index.get(eid, 0)
         v = 0.0
         for j in range(max(k0, k - math.ceil(hold + release + 1)), k + 1):
             if (j - k0) % n != s:
                 continue
             length = float(grid[j + 1] - grid[j]) if j + 1 < len(grid) else self.beat_info(t)[2] * (4 if quiet else 1)
-            dt = t - float(grid[j]) - lag * length
+            dt = t - float(grid[j]) - lag_of(rank, j - k0, idx) * length
             if dt >= 0:
                 v = max(v, _release(dt, top, hold * length, release * length))
         return v
@@ -154,9 +184,7 @@ class UplightsMixin:
         lean_now, lean_dmx = self._uplight_lean(t), self._uplight_lean(t + DMX_LEAD_S)
         for s, ids in enumerate(self.up_steps):
             for eid in ids:
-                rank = self.up_rank.get(eid, 0.0)
-                lag = {"whole": 0.0, "fall": rank, "out": abs(rank - 0.5) * 2}[pattern] * CELL_SPREAD
-                level = max(self._uplight_run(d, t, s, lag, pattern), lean_now[s])  # leaning in: lit full
+                level = max(self._uplight_run(d, t, s, eid, pattern), lean_now[s])  # leaning in: lit full
                 pan, up, lean, _ = self.up_aim[eid]
                 out[eid] = State(
                     dimmer=level,
