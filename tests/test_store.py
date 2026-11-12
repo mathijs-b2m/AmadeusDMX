@@ -116,14 +116,13 @@ def test_automount_hangs_everything_sensibly(config, template, set_name):
         if kind in ("moving_head", "moving_bar") and f.get("truss"):
             assert f["z_m"] > 0.5, f"head {f['id']} on the floor"
     for (tid, side), spots in on_side.items():
-        us = sorted(u for u, _ in spots)
-        if T.is_stand(trusses[tid]):  # a stand's short bar: side by side, housings a hand apart
-            least = (
-                max(automount._housing({"fixture": m}) for _, m in spots) + automount.STAND_GAP - 2e-3
-            )  # positions are kept to the mm
-        else:
-            least = 0.39
-        assert all(b - a >= least for a, b in zip(us, us[1:])), f"crowded on {tid}/{side}: {sorted(spots)}"
+        row = sorted(spots)
+        for (a, ma), (b, mb) in zip(row, row[1:]):  # housings never closer than a hand apart; on a box truss 39 cm
+            wide = (automount._housing({"fixture": ma}) + automount._housing({"fixture": mb})) / 2
+            least = wide + automount.STAND_GAP - 2e-3  # positions are kept to the mm
+            if not T.is_stand(trusses[tid]):
+                least = max(least, 0.39)
+            assert b - a >= least, f"crowded on {tid}/{side}: {row}"
         if not trusses[tid].get("vertical"):  # every model mirrored around the middle (up to an odd one out)
             for model in {m for _, m in spots}:
                 pos = sorted(round(u, 2) for u, m in spots if m == model)

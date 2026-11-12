@@ -43,18 +43,42 @@ def test_the_mobile_dj_templates_use_light_stands(template):
     assert rig["trusses"] and all(T.is_stand(t) for t in rig["trusses"])
 
 
-def test_four_small_heads_go_side_by_side_on_a_tbar():
-    """A light stand's bar is short: heads go a hand apart, by their housing, not a box truss's 60 cm."""
-    from collections import defaultdict
+def tbar_rig(fixture: str, n: int) -> dict:
+    """Two 1.2 m T-bars left and right of the booth, and `n` fixtures of one model to mount."""
+    rig = templates.rig("stands", width=5.0, height=2.5)
+    for t in rig["trusses"]:
+        t["length_m"] = 1.2
+    rig["fixtures"] = [{"id": f"f{k}", "fixture": fixture, "universe": 1, "address": 1 + 20 * k} for k in range(n)]
+    return rig
 
+
+def test_a_tbar_carries_two_small_heads_with_room_to_swing():
+    """A light stand's bar is short: its heads hang closer than under a box truss, but never housing to housing,
+    and both stands carry the same, mirrored. What they have no room for stands on the floor."""
     from amadeus.rig import automount
 
-    m = automount._Mounter(5.0, defaultdict(list))
-    t = T.stand("s", "tbar", 1.2, 1.0, -0.8, 3.0)
-    us = m._free(t, "under", 4, "head", automount.USE, width=0.25)
-    assert len(us) == 4 and us == sorted(us) and us[0] == pytest.approx(-us[-1])
-    assert all(b - a >= 0.25 + automount.STAND_GAP - 1e-9 for a, b in zip(us, us[1:]))
-    assert len(m._free(t, "under", 4, "head", automount.USE, width=0.4)) == 3  # bigger heads: fewer
+    rig = tbar_rig("beamz/fuze75b-beam", 8)
+    spots = automount.automount(rig)
+    width = automount._housing(rig["fixtures"][0])
+    on = {
+        t["id"]: sorted(s["truss_pos_m"] for s in spots.values() if s.get("truss") == t["id"]) for t in rig["trusses"]
+    }
+    a, b = on.values()
+    assert len(a) == len(b) == 2 and a == pytest.approx([-u for u in reversed(b)])  # mirrored
+    assert a[0] == pytest.approx(-a[1]) and a[1] - a[0] >= width + 0.3  # room to swing
+    assert sum(1 for s in spots.values() if not s.get("truss")) == 4  # the rest: on the floor, not squeezed in
+
+
+def test_pars_go_side_by_side_on_the_stands():
+    from amadeus.rig import automount
+
+    rig = tbar_rig("cameo/flat-pro-18", 6)
+    spots = automount.automount(rig)
+    width = automount._housing(rig["fixtures"][0])
+    for t in rig["trusses"]:
+        us = sorted(s["truss_pos_m"] for s in spots.values() if s.get("truss") == t["id"])
+        assert len(us) == 3 and us == pytest.approx([-u for u in reversed(us)])
+        assert all(q - p >= width + automount.STAND_GAP for p, q in zip(us, us[1:]))
 
 
 def test_a_stand_with_deco_truss_holds_its_fixtures_further_out_than_a_tube():
