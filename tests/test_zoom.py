@@ -13,6 +13,7 @@ from amadeus.engine.looks import XFADE
 from amadeus.engine.realism import Realism
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import automount, templates
+from amadeus.rig import trusses as T
 from amadeus.rig.groups import head_groups
 from amadeus.rig.loader import load_rig_dict
 from tests.synthetic import synthetic_analysis
@@ -32,6 +33,10 @@ def club_rig() -> dict:
                             for k in range(4)]  # fmt: skip
     for fid, spot in automount.automount(rig).items():
         next(f for f in rig["fixtures"] if f["id"] == fid).update(spot)
+    front, back = rig["trusses"]
+    for f in rig["fixtures"]:  # the heads close together, a row of each: the beams at the front, the washes behind
+        if f["id"][0] in "da":
+            T.place(f, front if f["id"][0] == "d" else back, (int(f["id"][1]) - 1.5) * 1.912, 10.0, "under")
     return load_rig_dict(rig)
 
 

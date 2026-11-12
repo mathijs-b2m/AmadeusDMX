@@ -203,21 +203,36 @@ of the same name the first time the engine or the Mac app runs.
 
 ## Auto-mount
 
-`amadeus/rig/automount.py`, in this order:
+`amadeus/rig/automount.py` hangs a set the way a lighting tech would start. It reads the rig first: which
+trusses mirror each other left and right of the stage (two bridges, two towers, two side trusses: **twins**,
+also when they are turned in or stand a little out of line), and which hang over the stage or over the crowd.
 
-1. **Lasers** on top of the back-most high truss, in the middle; else high on the towers (never below 2 m);
-   else on stands at the back.
-2. **Moving heads** under the overhead trusses (front first, in proportion to their length) or on top of low
-   trusses; a fifth on the towers when there are any (the same number on each), stacked from the top; what
-   doesn't fit goes on tripods behind the booth.
-3. **Strobes** on the front face of the front truss, in the middle; **blinders** on its outer ends.
-4. **Bars** on the floor along the front edge; **pars** on the floor at the back, uplighting.
+1. **Lasers** on top of the back-most high truss over the stage, in the middle; else high on the towers (never
+   below 2 m); else on stands at the back.
+2. **Moving heads** under the overhead trusses (on top of a low one), each truss filled as far as the others
+   by its length (a truss over the crowd half as far). A head takes the width of its housing plus 45 cm
+   (75 cm at least; 50 cm on a T-bar), so a 3 m bridge carries four small heads, not seven. A model stays
+   together on one truss when it fits there: beams at the back, washes at the front. Pairs go on the towers:
+   one head on top (a short totem carries only that), more down its front face, never below 1.2 m. A set of 16
+   heads or more keeps a quarter (beams) for the stage floor, and what the trusses have no room for stands there
+   too: a row at the back of the stage, then one at its front edge. Only when the floor is full as well do the
+   heads on the trusses move closer together (their housing plus 20 cm).
+3. **Tilting bars** in a room whose side walls are within a metre of the stage: on the floor along those walls,
+   the same number left and right (wall uplighters); anywhere else they hang with the heads.
+4. **Strobes** on the front face of the front truss over the stage, in the middle; **blinders** spread over the
+   rest of it.
+5. **Pars** on the light stands that have room for them (a T-bar of pars; between the heads only where they
+   clear them), else on the floor at the back, uplighting. **Bars** on the floor along the front edge. **Smoke
+   machines** on the floor at the sides of the stage, near the back.
 
-Every row is symmetric and each model is mirrored around the middle. Each model's fixtures take its spots in name
+Everything is mirrored. Twins carry the same fixtures at mirrored places, every row is even and symmetric, and
+each model sits in mirrored pairs round the middle of the stage (an odd one out in the middle); a pair is never
+split over two trusses. Rows on the floor stay clear of the DJ's booth and in front of the back wall
+(`room_back_m`). Each model's fixtures take its spots in name
 order along the rig, the hang sheet's order (top1 at the first place from stage left, top2 at the next), so names
 count along a truss like the places do; *Auto-Mount › Put in Name Order* does the same for a rig mounted before,
 on the spots its fixtures already take. Fixtures that are already mounted keep
-their place, and their room on a truss is left free.
+their place, and new ones go between them, clear of their housings.
 
 ## Import from a venue's documents
 
