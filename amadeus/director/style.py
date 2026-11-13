@@ -38,7 +38,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
-from amadeus.audio import hardstyle
+from amadeus.audio import hardcore, hardstyle
 from amadeus.director.vocabulary import DEFAULT_PALETTES, PALETTES
 
 SWITCH_AFTER = 2  # a different genre this many tracks in a row becomes the set's genre
@@ -65,6 +65,7 @@ class Style:
     form: Callable | None = None  # a genre whose sections the usual rules misjudge: (analysis, i, section) → section
     kick_grid: tuple = ()  # the sections where the kick is every beat, whatever the onsets say (engine: the kick)
     no_arc: bool = False  # its show keeps its size all through: every climax hits, the first as hard as the last
+    short_hits: bool = False  # its hits are short shots, not notes held until the next kick (engine: the hits)
 
     def section(self, a, i: int, section: str) -> str:
         """The section of phrase i, by the genre's own form if it has one."""
@@ -159,6 +160,53 @@ MIRROR_BALL = {"beam_fx": "gobo_rotate", "gobo_style": "dots", "movement": "circ
 HARDCORE_DROP = {"head_light": "strobe", "movement": "swing", "formation": "mirror", "aim": "crowd",
                  "head_color": "white", "beam_fx": "open", "par_base": "off", "par_accent": "pulse"}  # fmt: skip
 HAPPY_DROP = {**HARDCORE_DROP, "par_base": "full", "par_accent": "color_pop"}  # …and happy: the colour stays on
+# Hardcore's show, per section (the Thunderdome face): loud from its first synth to its last kick, so never soft.
+# Every climax as above; between them short white shots run across the rig at 1/8 (1/16 at the top of a build),
+# and where the kick is out the shots run on the hard synth's notes, the heads stepping with them.
+_HC_SHOT = {
+    "par_base": "off",
+    "par_accent": "run",
+    "head_color": "white",
+    "beam_fx": "open",
+    "layer_split": "none",
+    "aim": "crowd",
+    "grouping": "unison",
+}  # fmt: skip  (the run is the turns: all groups play it)
+HARDCORE_SHOW = {
+    "drop": {**HARDCORE_DROP, "dynamics": "impact", "intensity": 3, "layer_split": "none"},
+    "groove": {
+        **_HC_SHOT,
+        "par_base": "dim",
+        "trigger": "kick",
+        "head_light": ("run", "beat"),
+        "movement": ("bounce", "swing", "tilt_wave"),
+        "formation": ("mirror", "sync", "wave"),
+        "dynamics": "steady",
+        "intensity": 2,
+    },
+    "buildup": {
+        **_HC_SHOT,
+        "trigger": "kick",
+        "head_light": ("run", "pulse"),
+        "movement": ("tilt_wave", "swing"),
+        "formation": ("wave", "mirror"),
+        "dynamics": "rise",
+        "intensity": 2,
+    },
+    "breakdown": {  # the hard synths without the kick: shots on their notes, over a red glow
+        **_HC_SHOT,
+        "par_base": "dim",
+        "trigger": "lead",
+        "head_light": ("run", "accents"),
+        "movement": ("step_on_beat", "sweep", "step_on_beat"),
+        "formation": ("mirror", "fan", "wave"),
+        "head_color": ("white", "base", "white"),
+        "dynamics": "steady",
+        "intensity": 2,
+    },
+}
+HARDCORE_SHOW["intro"] = {**HARDCORE_SHOW["breakdown"], "intensity": 1}
+
 # Happy hardcore's break: the kick rests, and the pars play the piano and the singer note by note under a fan of
 # coloured beams turning slowly up in the air.
 PIANO_BREAK = {"trigger": "lead", "par_base": "dim", "par_accent": "melody", "head_light": "breathe",
@@ -314,7 +362,9 @@ STYLES: dict[str, Style] = {
             "room chopped on every kick is flicker), the groups taking turns so no light has to hit every kick. "
             "Big, hard, punchy moves that land with it, straight open beams, no decoration, no soft fades. Where "
             "the kick returns after a break the whole rig goes: the heads strobe on the kick and swing over the "
-            "crowd. A kick on only some of the beats is a break.",
+            "crowd. Never soft in between: the track is loud from its first synth, so short white shots run across "
+            "the rig in 1/8 and 1/16, and where the kick is out they follow the hard synths' notes. Hits are short "
+            "shots, not held notes. A kick on only some of the beats is a break.",
             ["fire", "ice"],
             {
                 "par_base": {"fade"},
@@ -334,7 +384,12 @@ STYLES: dict[str, Style] = {
             },
             beat="kick",
             looks={"drop": HARDCORE_DROP},
-            break_kick=0.7,
+            break_kick=hardcore.BREAK_KICK,
+            form=hardcore.form,
+            always=HARDCORE_SHOW,
+            kick_grid=("drop",),
+            no_arc=True,
+            short_hits=True,
         ),  # fmt: skip
         _style(
             "dnb",
@@ -533,6 +588,7 @@ HAPPY_HARDCORE = replace(
         "beam_fx": ("open", "prism"),
     },
     looks={"drop": HAPPY_DROP, "breakdown": PIANO_BREAK},
+    always={},  # (the party plays its own looks, not Thunderdome's show)
 )
 HAPPY_SHARE = 0.4  # Happy Hardcore's share of the hardcore the style model hears (measured: Paul Elstak 0.54, Party
 # Animals 0.58, Dune 0.76; a hard remix 0.07)

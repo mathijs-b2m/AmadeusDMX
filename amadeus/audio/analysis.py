@@ -15,7 +15,7 @@ import numpy as np
 import soundfile as sf
 
 from amadeus import paths, system
-from amadeus.audio import hardcore, sound
+from amadeus.audio import hardcore, hardstyle, sound
 from amadeus.audio.beats import (
     attack_offset,
     beat_kicks,
@@ -24,6 +24,8 @@ from amadeus.audio.beats import (
     downbeats,
     kick_double,
     local_tempo,
+    merge_kicks,
+    pumping_kicks,
     refine_beats,
     set_bpm,
     strongest_tempo,
@@ -42,7 +44,8 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 47
+ANALYSIS_VERSION = 48
+HARD_AGREE = 0.5  # a hard track takes the one-tempo grid when this share of the tracker's beats is on it
 
 
 def cache_paths(path: Path, cache_dir: Path, tempo: str | None = None):
@@ -160,10 +163,10 @@ def analyze(
     beat_frames = track_beats(onset_env, bpm_curve, fps)
     low = 10 * np.log10(10 ** (feats["sub"] / 10) + 10 ** (feats["bass"] / 10))  # the low end, sub included
     low_rise = normalize(np.maximum(0, np.diff(low, prepend=low[0])))
+    facts = sound.facts(path)
     if not tempo:  # a tempo the whole track agrees on much more than the tracker's: track again from it
         tracked = 60 * fps / float(np.median(np.diff(beat_frames)))
         bpm, score = strongest_tempo(low_rise, fps)
-        facts = sound.facts(path)
         doubled = twice_as_fast(low_rise, fps, bpm, score, facts)
         bpm *= 2 if doubled else 1
         # the kick's tempo where the sound says hardcore (a pumping bass can count it at a half, or two thirds)
@@ -183,24 +186,31 @@ def analyze(
         beat_frames = np.sort(np.concatenate([beat_frames, mids]))
         log(f"  tempo doubled on request: {60 * fps / np.median(np.diff(beat_frames)):.1f} BPM")
     beat_times = refine_beats(beat_frames, onset_env, fps)
-    grid = constant_grid(beat_times, low_rise, fps)
+    hard = hardcore.heard(facts) or hardstyle.heard(facts)  # a distorted kick that IS the low end
+    # (the tracker drifts in a hard track's breaks, where the low end swells and stabs: its drops decide the grid)
+    grid = constant_grid(
+        beat_times, low_rise, fps, agree=HARD_AGREE if hard else 0.7, sub=feats["sub"] if hard else None
+    )
     if grid is not None:  # a track at one tempo: one grid, on the kick
         beat_times = grid
         beat_frames = np.round(beat_times * fps).astype(int)
     log(f"  beat grid: {'one tempo' if grid is not None else 'following the tempo'}")
     audio, audio_sr = sf.read(str(path), dtype="float32", always_2d=True)
-    heard = attack_offset(audio.mean(axis=1), audio_sr, beat_times)
+    # (a hard grid is on the kick's click already: the low end's gap before it would read as an early attack)
+    heard = 0.0 if hard and grid is not None else attack_offset(audio.mean(axis=1), audio_sr, beat_times)
     fine_snare, fine_db, fine_fps, fine_bands = fine_envelopes(audio.mean(axis=1), audio_sr)
     del audio
     beat_times = beat_times + heard  # onsets are noticed a little before they are loud: date them as heard
     onsets = {k: (t + heard, s) for k, (t, s) in onsets.items()}
     log(f"  beats on the attack: {heard * 1000:+.0f} ms")
     onsets["kick"] = beat_kicks(feats["flux_kick"], beat_frames, fps, beat_times)
+    if hard:  # heard by the gap it leaves in the low end
+        onsets["kick"] = merge_kicks(onsets["kick"], pumping_kicks(feats["sub"], beat_frames, beat_times))
     accent_env = normalize(feats["flux_all"]) + normalize(
         np.maximum(0, np.diff(feats["bass"], prepend=feats["bass"][0]))
     )
-    downbeat_idx = downbeats(beat_frames, accent_env, low, feats["chroma"])
-    phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets)
+    downbeat_idx = downbeats(beat_frames, accent_env, low, feats["chroma"], one_phase=hard and grid is not None)
+    phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets, full_kick=hard)
     # the snare rolls into the drops (looked for from the drop before) and the pauses before them, on the
     # audio's own clock (not dated as heard)
     at = [i for i, p in enumerate(phrases) if i and p.drop_score >= DROP_THRESHOLD]

@@ -28,11 +28,18 @@ RIVALS = ("Electronic---Happy Hardcore", "Electronic---Makina", "Electronic---Ha
           "Electronic---Goa Trance", "Electronic---Techno", "Electronic---Hard Techno", "Electronic---Schranz",
           "Electronic---Trance")  # fmt: skip
 
+SOUND, LEAD = 0.55, 0.5  # a track this much in the family, leading its rivals for this share of it, sounds like
+# hardstyle (measured: hardstyle 0.65–0.89 leading ≥ 0.59; the nearest others 0.48 at 0.18, 0.43 at 0.37)
 CLIMAX_LOUD, CLIMAX_LOW = 65, 70  # a climax: at least this loud and this low, in percentiles of the track
 BREAK_LOUD = 40  # quieter than this: a break, whatever the kick detector says
 BREAK_KICK = 0.5  # or this little kick
 KICK_GAP_DB = 10.0  # a beat is a kick when the low end comes this close to its level in the phrase
 KICK_LOOK_S = 0.1  # …just after the beat
+
+
+def heard(f: dict) -> bool:
+    """Does the track sound like hardstyle (whatever tempo was counted)?"""
+    return f.get("hardstyle", 0.0) >= SOUND and f.get("hardstyle_lead", 0.0) >= LEAD
 
 
 def judge(styles: np.ndarray, names: list[str]) -> dict:
@@ -42,18 +49,19 @@ def judge(styles: np.ndarray, names: list[str]) -> dict:
     return {"hardstyle": round(float(mass.mean()), 2), "hardstyle_lead": round(float((mass > rivals).mean()), 2)}
 
 
-def _climax(p) -> bool:
+def climax(p) -> bool:
+    """A climax: a drop, or the track at its loudest with its low end."""
     return p.drop_score >= DROP_THRESHOLD or (p.loudness_pct >= CLIMAX_LOUD and p.low_pct >= CLIMAX_LOW)
 
 
 def form(a: Analysis, i: int, section: str) -> str:
     """The section of phrase `i` of a hardstyle track (`section`: what the usual rules made of it)."""
     p = a.phrases[i]
-    if _climax(p):
+    if climax(p):
         return "drop"
     if section in ("intro", "outro"):
         return section
-    if i + 1 < len(a.phrases) and _climax(a.phrases[i + 1]):
+    if i + 1 < len(a.phrases) and climax(a.phrases[i + 1]):
         return "buildup"
     if p.loudness_pct < BREAK_LOUD or p.kick_ratio < BREAK_KICK:
         return "breakdown"

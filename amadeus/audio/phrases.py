@@ -76,7 +76,7 @@ def drop_score(p: Phrase, prev: Phrase | None) -> float:
     return round(score, 2)
 
 
-def _drop_bar(feats, fps, db_times, kicks, k0: int) -> int:
+def _drop_bar(feats, fps, db_times, kicks, k0: int, full_kick: bool = False) -> int:
     """The bar a drop really lands on, searched around a 4-bar-grid boundary k0.
 
     That's the bar where the kick is running and the low end jumps compared with the two
@@ -99,6 +99,8 @@ def _drop_bar(feats, fps, db_times, kicks, k0: int) -> int:
         k_next = count(db_times[k + 1], db_times[k + 2]) if k + 2 < len(db_times) else 0
         if k_after < 3 and not (k_after >= 2 and k_next >= 3):
             continue  # a drop has a running kick in its first bar (the first kick can hide under the bass)
+        if full_kick and k_after < 4:
+            continue
         # the low end coming in decides; the kicks only a little (capped): the detector often misses the first
         # kicks of a drop under the returning bass, and counting them in full picks the bar after the drop
         jump = low_mean(db_times[k], db_times[k + 1]) - low_mean(db_times[k - 2], db_times[k])
@@ -291,7 +293,7 @@ def _slam_end(b0: int, b1: int, on, lv) -> int | None:
     return None
 
 
-def build_phrases(feats, fps, beat_times, downbeat_idx, onsets):
+def build_phrases(feats, fps, beat_times, downbeat_idx, onsets, full_kick: bool = False):
     db_times = beat_times[downbeat_idx]
     if len(db_times) < 3:
         db_times = beat_times[::4]
@@ -319,7 +321,7 @@ def build_phrases(feats, fps, beat_times, downbeat_idx, onsets):
     for i in range(1, len(segments)):
         if phrases[i].drop_score < DROP_THRESHOLD:
             continue
-        k = _drop_bar(feats, fps, db_times, onsets["kick"][0], segments[i][0])
+        k = _drop_bar(feats, fps, db_times, onsets["kick"][0], segments[i][0], full_kick)
         if k != segments[i][0] and segments[i - 1][0] + 1 < k < segments[i][1] - 1:
             segments[i - 1] = (segments[i - 1][0], k)
             segments[i] = (k, segments[i][1])
@@ -345,6 +347,8 @@ def build_phrases(feats, fps, beat_times, downbeat_idx, onsets):
         if phrases[i].drop_score < DROP_THRESHOLD:
             continue
         t = _drop_beat(feats, fps, beat_times, phrases[i].start)
+        if full_kick:  # a hard track: where its bass comes in, a beat or three off the bar line
+            t = _bass_entry(feats, fps, beat_times, t)
         if t != phrases[i].start and phrases[i - 1].start < t < phrases[i].end:
             phrases[i - 1].end = t
             phrases[i].start = t
@@ -467,6 +471,34 @@ def vocal_pickups(phrases, beat_times, downbeat_times, env: np.ndarray, env_fps:
             continue  # both sections keep two bars at least
         prev.end = p.start = down
         p.pickup_beats, p.pickup_kind, p.pickup_start = m, "early", float(beat_times[k])
+
+
+ENTRY_BEATS = 3  # a hard drop's bass comes in at most this many beats off its bar line
+ENTRY_FULL_DB, ENTRY_FROM_DB = 6.0, 12.0  # in: within this of the drop's sub, from this far under it the beat before
+
+
+def _bass_entry(feats, fps, beat_times, t_bar: float) -> float:
+    """Where a hard track's drop comes in: the beat its sub goes from far under the drop's level to full and stays
+    there (a stuttering bass before it is no entry), within ENTRY_BEATS of the bar line: its bass is a wall,
+    unmistakable. The usual rule moves a drop only half a bar, a beat before a drop being mostly risers; in
+    hardcore the bass slams in on a beat of its own, often a beat before the bar line the bar phase found ("Kind
+    van de Duivel", Dune) or after it ("Hardcore Feelings")."""
+    sub = feats["sub"]
+    k0 = int(np.argmin(np.abs(beat_times - t_bar)))
+    period = float(np.median(np.diff(beat_times)))
+
+    def body(k):  # the sub over beat k, without its first and last frames
+        a = int(beat_times[k] * fps)
+        return float(np.median(sub[a + 3 : max(a + int(period * fps) - 2, a + 4)]))
+
+    if k0 + 8 >= len(beat_times) or k0 - ENTRY_BEATS < 1:
+        return t_bar
+    level = float(np.median([body(k) for k in range(k0 + 1, k0 + 8)]))
+    for k in range(k0 - ENTRY_BEATS, k0 + ENTRY_BEATS + 1):
+        full = body(k) >= level - ENTRY_FULL_DB and body(k + 1) >= level - ENTRY_FULL_DB  # (not a stutter)
+        if full and body(k - 1) < level - ENTRY_FROM_DB:
+            return float(beat_times[k])
+    return t_bar
 
 
 def _drop_beat(feats, fps, beat_times, t_bar: float) -> float:

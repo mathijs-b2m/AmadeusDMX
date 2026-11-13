@@ -21,6 +21,7 @@ def _decay(times: np.ndarray, strengths: np.ndarray, t: float, tau: float) -> fl
 
 FLASH_SNAP_S = 0.1  # a big accent this close to a kick flashes with it (further off: no flash)
 MIN_GAP_S = 0.3  # hits closer together than this are held through: a light never flickers faster
+SHORT_HOLD_S, SHORT_RELEASE_S = 0.06, 0.12  # a hard style's hits: short shots, not notes held to the next kick
 NO_KICK_S = 2.0  # no kick for this long (a breakdown): kick-led light holds a steady middle level
 STAB_GAP_S = 0.35  # accent lights: stabs at least this far apart (no flicker)
 STAB_STANDOUT = 1.4  # a stab: a synth note this much stronger than the notes around it…
@@ -42,9 +43,12 @@ def _release(dt: float, level: float, hold: float, release: float) -> float:
     return 0.0
 
 
-def note_env(times: np.ndarray, strengths: np.ndarray, t: float) -> tuple[float, int]:
+def note_env(
+    times: np.ndarray, strengths: np.ndarray, t: float, hold: float = 0.6, release: float = 0.8
+) -> tuple[float, int]:
     """A light played like a note on each hit: on at once (to a clear, quantised level), held, then released
-    gently before the next hit. Hits closer than MIN_GAP_S are held through instead of flickering.
+    gently before the next hit. Hits closer than MIN_GAP_S are held through instead of flickering. `hold` and
+    `release`: at most this long (a hard style's short shots: SHORT_HOLD_S, SHORT_RELEASE_S).
     Returns (level 0..1, index of the hit it plays: -1 before the first)."""
     i = bisect.bisect_right(times, t)
     if i == 0:
@@ -54,7 +58,7 @@ def note_env(times: np.ndarray, strengths: np.ndarray, t: float) -> tuple[float,
     level = round((0.6 + 0.4 * min(1.0, float(strengths[i - 1]))) * 5) / 5
     if gap < MIN_GAP_S:
         return level, i - 1
-    return _release(t - last, level, min(0.4 * gap, 0.6), min(0.5 * gap, 0.8)), i - 1
+    return _release(t - last, level, min(0.4 * gap, hold), min(0.5 * gap, release)), i - 1
 
 
 def stab_env(
