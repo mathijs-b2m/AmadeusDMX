@@ -480,7 +480,8 @@ STYLES: dict[str, Style] = {
             "reggaeton",
             "Reggaeton: hot and sensual, and always the dembow: boom-tac, boom-tac. The lights play kick and "
             "snare as two voices, whole groups each (the dembow trigger), all through the body of the track; a "
-            "breath of darkness where the beat drops out, every light on its return. Warm, neon and gold "
+            "breath of darkness where the beat drops out, every light on its return; the kick's runs fall across the "
+            "rig like a waterfall. Warm, neon and gold "
             "colours, rounded swinging movement with a bounce; the voice leads, the light dances.",
             ["warm", "neon", "gold"],
             {"movement": {"nod", "ballyhoo"}, "par_base": {"off"}},
