@@ -114,8 +114,10 @@ TRIGGERS = [
     (
         "dembow",
         "Boom-tac, for reggaeton: the rig plays kick and snare as two voices, whole groups each: some on the "
-        "kick (boom, its 1/8 runs too) in the base colour, the others on the snare's dembow (tac) in the accent "
-        "colour. Where the beat drops out for a moment the light pauses, and the beat's return hits on all.",
+        "kick (boom) in the base colour, the others on the snare's dembow (tac) in the accent colour. Where the "
+        "beat drops out for a moment the light pauses, and the beat's return hits on all; where the kick leaves "
+        "the dembow for a run (boom boom boom boom) the rig plays it as a waterfall, group by group, and lands "
+        "on all.",
     ),
     (
         "drums",

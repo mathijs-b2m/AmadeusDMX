@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from amadeus.audio import dembow, genre
+from amadeus.audio import dembow, genre, kickruns
 from amadeus.director import RuleDirector, direct
 from amadeus.director.style import style_for
 from amadeus.engine import Engine
@@ -160,3 +160,54 @@ def test_a_run_of_eighth_kicks_is_played_kick_by_kick(dembow_track):
     gap = run[1] - run[0]
     for x in run:
         assert level(x + 0.05) > 0.5 and level(x + gap - 0.03) < 0.35  # boom, and let go before the next
+
+
+def _kick_band(times: np.ndarray, fps: float, length: float) -> np.ndarray:
+    """A kick band's level (dB) with an 808 on these times: a jump to 0 dB, ringing down to -16 dB."""
+    db = np.full(int(length * fps), -60.0)
+    for x in times:
+        f = int(x * fps)
+        n = min(len(db) - f, int(0.6 * fps))
+        db[f : f + n] = np.maximum(db[f : f + n], -16.0 * np.minimum(1.0, np.arange(n) / (0.05 * fps)))
+    return db
+
+
+def test_the_kick_runs_are_heard_through_the_808_ring():
+    beat, fps = 0.625, 2205 / 16
+    beats = np.arange(0.0, 40.0, beat)
+    run = beats[32] + beat * np.array([0.0, 0.5, 0.75, 1.0, 1.5, 2.0])  # boom . boom boom | boom . boom
+    kt = np.sort(np.concatenate([beats[beats < run[0] - 0.01], run, beats[beats > run[-1] + beat - 0.01]]))
+    found, _ = kickruns.kicks(_kick_band(kt, fps, 41.0), fps, beats)
+    assert len(found) == len(kt) and np.allclose(found, kt, atol=0.02)  # every kick, the run's too
+    runs = kickruns.find_runs(found, np.ones(len(found)), beat)
+    assert len(runs) == 1 and len(runs[0].t) == len(run) and abs(runs[0].land - (run[-1] + beat)) < 0.02
+
+
+def test_a_kick_figure_every_bar_is_the_groove_not_a_run():
+    beat = 0.625
+    bars = np.arange(0.0, 40.0, 4 * beat)
+    figure = beat * np.array([0.0, 1.0, 1.5, 1.75, 2.0, 3.0])  # the same syncopated kick in every bar
+    kt = np.sort((bars[:, None] + figure[None, :]).ravel())
+    assert kickruns.find_runs(kt, np.ones(len(kt)), beat) == []
+
+
+def test_a_kick_run_falls_across_the_rig_like_a_waterfall_and_lands_on_all(dembow_track):
+    e, d, _ = _boom_tac_engine(dembow_track)
+    beats = e.beats[(e.beats > d.start + 4) & (e.beats < d.end - 4)]
+    beat = float(beats[1] - beats[0])
+    t = float(beats[4]) + beat * np.array([0.0, 0.5, 1.0, 1.25, 1.5, 1.75])  # slow to fast
+    land = float(beats[4]) + 2 * beat
+    e.kick_runs = kickruns.KickRuns([kickruns.KickRun(t, np.ones(len(t), np.float32), land)])
+    xs = e._light_xs()
+    frames = {}  # (played frame by frame, as a show is: the engine eases from the frame before)
+    for x in np.arange(t[0] - 1.0, land + 0.1, 1 / FPS):
+        frames[round(float(x) * FPS)] = e.render(float(x))[1]
+    at = lambda x: frames[round((x + 0.03) * FPS)]  # noqa: E731  (just after a kick)
+    lit = []
+    for x in t:
+        st = at(x)
+        on = [i for i in e._voices if st[i].dimmer > 0.5]
+        assert on and len(on) < len(e._voices) / 2  # one group on each kick …
+        lit.append(np.mean([xs[i] for i in on]))
+    assert all(np.diff(lit) > 0)  # … stepping across the stage
+    assert min(at(land)[i].dimmer for i in e._voices) > 0.5  # the landing: everything together

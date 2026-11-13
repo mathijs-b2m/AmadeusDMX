@@ -52,6 +52,15 @@ BOOM_TAC_HEAD_BASE = 0.08  # the heads' beams, between their hits
 BOOM_TAC_HANDOVER_S = 0.12  # a voice lets go this quickly when the other one hits
 BREATHER_FADE_S = 0.15  # a breather: the light pauses this quickly (down to a glow) …
 BREATHER_GLOW = 0.3  # … of its glow between hits
+# A kick run (the kick leaving the dembow, "boom boom boom boom", audio/kickruns.py): the whole rig plays it as a
+# waterfall, one group across the stage per kick, every kick of the run, then all of it together on the landing.
+KICK_RUN_STEPS = 6  # at most this many groups across the rig (fewer kicks or places: fewer)
+KICK_RUN_HOLD = 0.6  # a group holds this share of the time to the next kick …
+KICK_RUN_RELEASE_S = 0.25  # … and lets go over this: the groups before it still falling, a waterfall
+KICK_RUN_GLOW = 0.05  # the groups waiting for their kick
+KICK_RUN_LAND_HOLD_S, KICK_RUN_LAND_RELEASE_S = 0.2, 0.45  # the landing: everything, held a moment, let go
+KICK_RUN_WAIT_S = 2.5  # after it, the glow waits at most this long for the beat's next hit
+KICK_RUN_LEAD_S = 0.03
 
 # The kit (the drums trigger, rock): the same two voices by whole groups, the kick and the snare, the snare's light
 # ringing out with its reverb; the guitar's strums on the accent lights.
@@ -452,6 +461,61 @@ class LooksMixin:
             tac = max(tac, boom)
         return boom, tac, pause
 
+    def _kick_run(self, t: float) -> tuple[dict[str, float], bool] | None:
+        """In a kick run: every boom-tac light's level (0..1), and whether the run has landed (then the lights
+        are all hit together, each in its own voice's colour; before, the waterfall plays in the accent colour).
+        Left to right and back again, a run each way in turn. None outside the runs."""
+        runs = getattr(self, "kick_runs", None)
+        lead = KICK_RUN_LEAD_S  # (a frame early: the boom's own hit on the first kick never shows)
+        hit = runs.at(t + lead, KICK_RUN_WAIT_S + lead) if runs else None
+        if hit is None:
+            return None
+        i, r = hit
+        steps = self._run_steps(min(len(r.t), KICK_RUN_STEPS))
+        over = (r.land if r.land is not None else r.end) + KICK_RUN_LAND_HOLD_S + KICK_RUN_LAND_RELEASE_S
+        if t >= over:  # let go: the glow waits for the beat's next hit (boom-tac taking over mid-note pops on)
+            nxt_hit = min(
+                (float(x[j]) for x in (self.boom_t, self.tac_t) if (j := bisect.bisect_left(x, over)) < len(x)),
+                default=over,
+            )
+            return ({eid: KICK_RUN_GLOW for eid in steps}, True) if t < nxt_hit - 0.005 else None
+        n = max(steps.values(), default=0) + 1
+        k = bisect.bisect_right(r.t, t + lead) - 1
+        level = [0.0] * n
+        nxt = [*r.t[1:], r.land if r.land is not None else r.end + 0.5]
+        for j in range(max(0, k - n + 1), k + 1):  # the last few kicks: the lit group and the ones falling
+            step = j % n if i % 2 == 0 else n - 1 - j % n
+            hold = KICK_RUN_HOLD * (float(nxt[j]) - float(r.t[j]))
+            level[step] = max(level[step], _release(max(0.0, t - float(r.t[j])), 1.0, hold, KICK_RUN_RELEASE_S))
+        landed = r.land is not None and t >= r.land
+        if landed:
+            land = _release(t - r.land, 1.0, KICK_RUN_LAND_HOLD_S, KICK_RUN_LAND_RELEASE_S)
+            level = [max(v, land) for v in level]
+        return {eid: max(KICK_RUN_GLOW, level[s]) for eid, s in steps.items()}, landed
+
+    def _run_steps(self, n: int) -> dict[str, int]:
+        """The boom-tac lights in n groups across the rig, left to right: lights at one place (a tower, a pair
+        of pars side by side) in one group."""
+        cache = self.__dict__.setdefault("_run_steps_cache", {})
+        if n not in cache:
+            xs = self._light_xs()
+            places = sorted({round(x / 0.3) for x in xs.values()})  # 30 cm apart: one place
+            m = max(1, min(n, len(places)))
+            at = {p: k * m // len(places) for k, p in enumerate(places)}
+            cache[n] = {eid: at[round(x / 0.3)] for eid, x in xs.items()}
+        return cache[n]
+
+    def _light_xs(self) -> dict[str, float]:
+        """Every par and head and where it stands across the stage (m): pars by their order, heads by where they
+        hang."""
+        if "_light_x" not in self.__dict__:
+            n = max(len(self.pars) - 1, 1)
+            width = float(self.stage.get("width_m", 8.0))
+            xs = {e["id"]: self.order.get(e["id"], k) / n * width for k, e in enumerate(self.pars)}
+            xs.update({e["id"]: float(self.head_pos[k][0]) for k, e in enumerate(self.heads)})
+            self._light_x = xs
+        return self._light_x
+
     def _kit_voices(self, t: float) -> tuple[float, float, float]:
         """The kit's two voices, (kick, snare, 0): each drum as notes, the kick held as long as it sounds, the
         snare released over its ring (its reverb). Where neither drum plays for a while both hold KIT_HOLD."""
@@ -662,6 +726,7 @@ class LooksMixin:
             boom, tac, pause = self._kit_voices(t)
         else:
             boom, tac, pause = self._boom_tac(t) if dembow else (env, 0.0, 0.0)
+        run = self._kick_run(t) if d.trigger == "dembow" else None  # the kick leaves the dembow: a waterfall
         hits = hit + 1  # hits so far: steps chases, alternation, sparkles
         pattern = self._kick_pattern(d, t)
         flash = _decay(self.flash_t, self.flash_s, t, 0.07)
@@ -687,7 +752,11 @@ class LooksMixin:
             if dembow and a not in ("none", "melody"):  # boom-tac: this par's voice
                 low = min(base_level, BOOM_TAC_BASE) * (1 - (1 - BREATHER_GLOW) * pause)
                 voice = self._voice(d, f["id"])
-                if voice == "both":  # one light plays both: the boom, and the tac in the accent colour
+                if run is not None and f["id"] in run[0]:  # a kick run: the waterfall, then the landing
+                    v = run[0][f["id"]]
+                    col = (base if voice == "boom" else accent) if run[1] else accent
+                    dim = low + (1 - low) * v
+                elif voice == "both":  # one light plays both: the boom, and the tac in the accent colour
                     col, dim = _lerp(col, accent, tac), low + (1 - low) * max(boom, tac)
                 elif voice == "boom":
                     dim = low + (1 - low) * boom
@@ -733,6 +802,8 @@ class LooksMixin:
                 st.zoom = zoom
             if (d.dynamics == "impact" or rise) and not tac_voice and a != "run":  # (the flash is on the kick: the
                 st.white = flash  # boom's; a run's shots are its hits, a flash on the kick a second rhythm)
+            if run is not None and f["id"] in run[0]:  # a kick run: only the group on its kick flashes
+                st.white *= run[0][f["id"]]
             out[f["id"]] = st
 
         acc_env = note_env(self.acc_t, self.acc_s, t)[0]  # big hits as notes: close ones held through
@@ -804,6 +875,9 @@ class LooksMixin:
                     col = accent
                 elif voice == "boom" and col == accent:
                     col = base
+                if run is not None and f["id"] in run[0]:  # a kick run: the waterfall (accent), then the landing
+                    dim = low + (1 - low) * run[0][f["id"]]
+                    col = accent if not run[1] or voice == "tac" else base
             if rise:
                 dim *= 0.4 + 0.6 * progress
             strobing = gate is not None and layer != "base" and not voice
@@ -812,6 +886,8 @@ class LooksMixin:
                 st.strobe_hz, st.gate = self.head_strobe_rate(d), gate
             if d.dynamics == "impact" and d.head_light != "off" and voice != "tac" and not strobing:  # (the boom's)
                 st.white = flash * (dim if role["movement"] == "pour" else 1.0)  # (a pour waits dark at the floor)
+                if run is not None and f["id"] in run[0]:  # a kick run: only the group on its kick flashes
+                    st.white *= run[0][f["id"]]
             st.fx = d.beam_fx
             featured = self._featured(d, j) if grouping in ("split", "solo") else None
             st.zoom = self._head_zoom(d, f["id"], role, layer, featured, progress)
