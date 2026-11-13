@@ -119,6 +119,24 @@ def test_groups_specials_and_off(tmp_path):
     assert all(s.dimmer == 1.0 for s in states.values())  # off: the show as the engine plays it
 
 
+@pytest.mark.parametrize("rig_path", sorted(__import__("glob").glob("tests/sets/*.json")))
+def test_groups_share_counts_fixtures_not_cells(tmp_path, rig_path):
+    """A bar of ten cells is one light to the groups knob: cells once outweighed the heads (four 10-cell wall bars
+    against 12 heads), and at a peak the biggest group of heads stayed in the box all night."""
+    rig = load_rig(rig_path)
+    arc = ShowArc(rig, tmp_path / "arc.json", now=0.0)
+    fixture_of = {e["id"]: e["fixture"] for e in rig["elements"]}
+    sizes = [len({fixture_of[eid] for eid in g}) for g in arc.groups]
+    assert arc.cumulative == [sum(sizes[: k + 1]) for k in range(len(sizes))]
+    lit = lambda: {e["id"]: State(dimmer=1.0, white=1.0) for e in rig["elements"]}  # noqa: E731
+    arc.control({"knob": {"groups": 0.9, "intensity": 1.0, "response": 1.0}}, now=0.0)
+    for _ in range(400):
+        states = lit()
+        arc.apply(states, None, 0.0, 0.025)
+    dark = [n for g, n in zip(arc.groups, sizes) if states[g[0]].dimmer == 0]
+    assert sum(dark) <= 0.1 * sum(sizes) + 0.5  # at 0.9 at most a tenth of the fixtures wait
+
+
 def test_smoke_goes_out_in_a_share_of_the_bursts(tmp_path):
     rig = load_rig(RIG)
     arc = ShowArc(rig, tmp_path / "arc.json", now=0.0)
@@ -390,7 +408,7 @@ def test_warmup_ambience_plays_gobo_heads(tmp_path):
     """Few lights in the warm-up (the washes), but a group of heads with gobos plays: the gobos on the floor."""
     rig = load_rig(RIG)
     arc = ShowArc(rig, tmp_path / "arc.json", now=0.0)
-    arc.control({"stage": "warmup", "lock": True, "knob": {"movement": 0.1, "groups": 0.4}}, now=0.0)
+    arc.control({"stage": "warmup", "lock": True, "knob": {"movement": 0.1, "groups": 0.2}}, now=0.0)  # the washes
     gobo = set(arc.groups[arc.ambient_group])
     assert arc.ambient_group >= 2 and arc.ambient()  # (past the groups the knob plays)
 

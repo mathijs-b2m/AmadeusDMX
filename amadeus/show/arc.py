@@ -411,7 +411,11 @@ class ShowArc:
         heads = [k for k, g in enumerate(self.groups) if all(eid in model for eid in g)]
         # the warm-up's heads: the smallest group with gobos (their patterns on the floor), else the smallest
         self.ambient_group = gobos[0] if gobos else heads[0] if heads else None
-        self.cumulative = [sum(len(g) for g in self.groups[: k + 1]) for k in range(len(self.groups))]
+        # the share counts fixtures, not their cells: a bar of ten cells is one light (four 10-cell wall bars once
+        # weighed 40 against 12 heads, and the biggest group of heads never came out of the box at a peak)
+        fixture_of = {e["id"]: e["fixture"] for e in els}
+        sizes = [len({fixture_of.get(eid, eid) for eid in g}) for g in self.groups]
+        self.cumulative = [sum(sizes[: k + 1]) for k in range(len(sizes))]
         self.gain = [1.0] * len(self.groups)
         self.playing_groups = len(self.groups)
         self.bar, self.phrase_at, self.waited, self.reveal_now = -1, None, 0, False
