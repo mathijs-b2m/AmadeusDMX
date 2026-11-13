@@ -127,6 +127,7 @@ CALM_PATH = {  # per-beat and wild paths → smooth ones
 MODERATE_PATH = {"ballyhoo": "circle", "bounce": "nod", "swing": "sweep"}
 CALM_LIGHT = {
     "hammer": "pulse",
+    "run": "pulse",
     "flick": "steady",
     "beat": "breathe",
     "alternate": "breathe",

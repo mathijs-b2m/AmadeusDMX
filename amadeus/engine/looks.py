@@ -13,7 +13,10 @@ from amadeus.engine.state import State
 from amadeus.engine.timing import (
     BREAK_FROM,
     BREAK_TO,
+    MIN_GAP_S,
     NO_KICK_S,
+    SHORT_HOLD_S,
+    SHORT_RELEASE_S,
     STRUM_HOLD_S,
     STRUM_RELEASE_S,
     _decay,
@@ -82,6 +85,17 @@ def kick_turn(pattern: str, k: int, n: int, hit: int) -> bool:
         return (k * 2 // n) == hit % 2
     m = min(4, n) if n > 4 else min(3, n)  # rotate
     return (k * m // n) == hit % m
+
+
+# The run (par accent and head light "run"): a short shot stepping across the rig's mirrored pairs, from the middle
+# out, on the beat grid where the kick runs (notes per beat by section, halved until every light keeps the flash
+# limit: a light flashes once a lap), on the synth's notes where it doesn't. Hard styles' fast sequences.
+RUN_DIV = {"drop": 4, "buildup": 2, "groove": 2}  # 1/16 in a drop, 1/8 in a groove or build (1/16 in its last half)
+RUN_HOLD_S, RUN_RELEASE_S = 0.05, 0.1
+RUN_STAB_S = 1.0  # no note for this long: the run rests
+RUN_NOTE_S = 0.15  # where it runs on the synth's notes: a step at most this often
+RUN_GLOW = 0.12  # …and the heads glow this much between their shots, so the beams' moves show
+RUN_STEPS = 4  # a lap has at most this many steps: the pairs, middle out, in as many shares
 
 
 MELODY_TAU = 0.7  # how long a melody note keeps its par lit
@@ -334,12 +348,88 @@ class LooksMixin:
             start, end, _ = brk
             return BREAK_FROM + (BREAK_TO - BREAK_FROM) * _ease((t - start) / max(end - start, 1e-6)), -1
         times, strengths = self._trigger(name)
-        env, hit = note_env(times, strengths, t)
+        env, hit = note_env(times, strengths, t, *self._hit_shape())
         if name == "kick" and (hit < 0 or t - float(times[hit]) > NO_KICK_S):
             nxt = bisect.bisect_right(times, t)
             if nxt >= len(times) or float(times[nxt]) - t > 0.5 * NO_KICK_S:  # no kick around: hold, don't blink
                 return 0.6, -1
         return env, hit
+
+    def _hit_shape(self) -> tuple[float, float]:
+        """How long a hit holds and lets go at most: short shots in a hard style, else notes."""
+        return (SHORT_HOLD_S, SHORT_RELEASE_S) if getattr(self, "short_hits", False) else (0.6, 0.8)
+
+    def _run_units(self, kind: str) -> dict[str, tuple[int, int]]:
+        """Per light (pars or heads) its place in a run, (k, n): the mirrored pairs from the middle out, in at most
+        RUN_STEPS shares."""
+        cache = self.__dict__.setdefault("_run_cache", {})
+        if kind not in cache:
+            items = self.pars if kind == "par" else self.heads
+            ids = [e["id"] for e in items]
+            units = sections.parts(self.sections, math.inf, ids)
+            if kind == "par":
+                n = max(len(self.pars) - 1, 1)
+                x = {e["id"]: self.order.get(e["id"], k) / n for k, e in enumerate(self.pars)}
+            else:
+                xs = [float(p[0]) for p in self.head_pos] or [0.0]
+                lo, hi = min(xs), max(xs)
+                x = {e["id"]: (float(self.head_pos[k][0]) - lo) / max(hi - lo, 1e-6) for k, e in enumerate(items)}
+            units.sort(key=lambda u: float(np.mean([abs(x[e] - 0.5) for e in u])))
+            steps = min(len(units), RUN_STEPS)  # small groups: a share of the rig per step, never a lone pair
+            cache[kind] = {e: (k * steps // len(units), steps) for k, u in enumerate(units) for e in u}
+        return cache[kind]
+
+    def _run_notes(self, n: int) -> np.ndarray:
+        """The synth's notes a run of n steps steps on: at least RUN_NOTE_S apart, and so far apart that a light
+        (lit every n steps) never flashes within MIN_GAP_S."""
+        cache = self.__dict__.setdefault("_run_note_cache", {})
+        if n not in cache:
+            gap, keep, last = max(RUN_NOTE_S, MIN_GAP_S / n), [], -1e9
+            for x in self.lead_t:
+                if x - last >= gap:
+                    keep.append(float(x))
+                    last = x
+            cache[n] = np.asarray(keep)
+        return cache[n]
+
+    def run(self, d: Decision, t: float, eid: str, kind: str) -> float | None:
+        """The run's light for one light at t (0..1), or None where it can't run (one unit: play the kick)."""
+        k, n = self._run_units(kind).get(eid, (0, 1))
+        if n < 2:
+            return None
+        prev = self.plan[d.phrase - 1] if 0 < d.phrase <= len(self.plan) else None
+        if prev is not None and t - d.start < MIN_GAP_S and "run" in (prev.par_accent, prev.head_light):
+            return 0.0  # a run after a run: a breath first (the other count could hit a light twice)
+        div = RUN_DIV.get(d.section)
+        if div is None:  # no kick to run on: a step per note of the synth
+            notes = self._run_notes(n)
+            i = bisect.bisect_right(notes, t) - 1
+            if i < 0 or t - float(notes[i]) > RUN_STAB_S:
+                return 0.0
+            lit, dt = i % n == k, t - float(notes[i])
+        else:
+            beat, phase, period = self.beat_info(t)
+            nxt = self.plan[d.phrase + 1] if d.phrase + 1 < len(self.plan) else None
+            if nxt is not None and nxt.section == "drop" and d.end - t < period:
+                return 0.0  # the beat before a drop is dark: then the bang (a shot there would be a blink)
+            hz = self._head_strobe_hz() or float(self.rig["safety"].get("max_flash_hz", 4.0))
+            hz = min(hz, 1.0 / MIN_GAP_S)  # a light flashes once a lap: never faster than this
+
+            def notes(div: int) -> int:  # halved until each light keeps the limit
+                while div > 1 and div / period / n > hz:
+                    div //= 2
+                return div
+
+            div = notes(div)
+            step = beat * div + int(phase * div)
+            if d.section == "buildup":  # twice as fast from halfway, the count going on (no light hit twice)
+                half = self.beat_info(d.start + 0.5 * (d.end - d.start))[0] + 1
+                fast = notes(2 * div)
+                if beat >= half and fast > div:
+                    step = half * div + (beat - half) * fast + int(phase * fast)
+                    div = fast
+            lit, dt = step % n == k, (phase * div - int(phase * div)) * period / div
+        return envelope_release(dt, 1.0, RUN_HOLD_S, RUN_RELEASE_S) if lit else 0.0
 
     def _boom_tac(self, t: float) -> tuple[float, float, float]:
         """Reggaeton's two voices, (boom, tac, pause): the boom (the kick, its 1/8 runs too) and the tac (the
@@ -444,8 +534,9 @@ class LooksMixin:
         """The kick comes back after a break: a breath of darkness just before (after a break of two bars or
         more), then everything hits on the downbeat: full, with a white flash, settling over one beat. A real
         drop has its own, bigger moment (_drop_moment), and inside a snare roll the lights play the roll."""
-        if not self.kick_breaks or self._roll_at(t) is not None or self.decision_at(t)[1].trigger in TWO_VOICES:
-            return  # (boom-tac has its own breathers; the kit plays the drums' break and return itself)
+        d = self.decision_at(t)[1]
+        if not self.kick_breaks or self._roll_at(t) is not None or d.trigger in TWO_VOICES or d.par_accent == "run":
+            return  # (boom-tac has its own breathers; the kit plays the drums' break and return itself; a run: shots)
         _, _, period = self.beat_info(t)
         k = bisect.bisect_right(self._break_starts, t)  # breaks that started before t
         for start, end, returns in self.kick_breaks[max(0, k - 1) : k + 1]:
@@ -481,6 +572,8 @@ class LooksMixin:
         layers the stabs over its rhythm)."""
         if d.section not in ACCENT_SECTIONS or d.trigger == "dembow":  # boom-tac: the tac is the accent
             return set()
+        if d.par_accent == "run" or d.head_light == "run":  # the run plays the accents (two rhythms on a light:
+            return set()  # flicker)
         if d.intensity < 1 and d.trigger != "drums":  # (a band's guitar is followed in a calm verse too)
             return set()
         a, b = bisect.bisect_left(self.stab_t, d.start), bisect.bisect_left(self.stab_t, d.end)
@@ -605,6 +698,10 @@ class LooksMixin:
                 dim = base_level + (1 - base_level) * (env if on else 0.0)
             elif a == "color_pop":
                 col, dim = _lerp(col, accent, env), max(base_level, env)
+            elif a == "run":  # a short shot stepping across the pairs (one pair: the kick)
+                v = self.run(d, t, f["id"], "par")
+                v = env if v is None else v
+                col, dim = _lerp(col, accent, v), max(base_level, v)
             elif a == "chase":
                 gap = abs(k - chase_pos)
                 if loop:
@@ -634,8 +731,8 @@ class LooksMixin:
             zoom = self._fixed_zoom(d, f["id"], progress)
             if zoom is not None:
                 st.zoom = zoom
-            if (d.dynamics == "impact" or rise) and not tac_voice:  # (the flash is on the kick: the boom's)
-                st.white = flash
+            if (d.dynamics == "impact" or rise) and not tac_voice and a != "run":  # (the flash is on the kick: the
+                st.white = flash  # boom's; a run's shots are its hits, a flash on the kick a second rhythm)
             out[f["id"]] = st
 
         acc_env = note_env(self.acc_t, self.acc_s, t)[0]  # big hits as notes: close ones held through
@@ -670,6 +767,11 @@ class LooksMixin:
                 dim = 1.0 if (phase < 0.22 or phase > 0.85) else 0.0
             elif hl == "beat":  # on with the kick, held, let go: on/off (the phrase's pattern splits the group)
                 dim = mine
+            elif hl == "run":  # a short shot stepping across the heads' pairs (one pair: the kick)
+                v = self.run(d, t, f["id"], "head")
+                dim = env if v is None else v
+                if d.section not in RUN_DIV:  # on the synth's notes: a glow between, the beams' moves show
+                    dim = RUN_GLOW + (1 - RUN_GLOW) * dim
             elif hl == "alternate":  # sections take turns per kick (one section: its pairs)
                 dim = env if (hit + self.turn.get(f["id"], (role["idx"], 0))[0]) % 2 == 0 else 0.0
             elif hl == "random":  # each head on its own random kicks: hit, held, let go

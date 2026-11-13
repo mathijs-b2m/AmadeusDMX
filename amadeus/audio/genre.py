@@ -40,7 +40,7 @@ from pathlib import Path
 import numpy as np
 
 from amadeus import aikey, paths
-from amadeus.audio import hardcore, sound
+from amadeus.audio import hardcore, hardstyle, sound
 from amadeus.audio.dembow import dembow
 from amadeus.audio.model import Analysis
 
@@ -86,8 +86,6 @@ DISCO, DISCO_LEAD = 0.35, 0.5  # a track that sounds like disco this much on ave
 # like funk or house for this share of it, is disco (measured: disco 0.39–0.76 leading ≥ 0.64, house ≤ 0.33
 # leading ≤ 0.18, afrobeat-funk 0.44 leading 0.14)
 CLEARLY_DISCO, CLEARLY_DISCO_LEAD = 0.55, 0.65  # this much: a funk or house call is disco after all
-HARDSTYLE, HARDSTYLE_LEAD = 0.55, 0.5  # a track this much in the hardstyle family, leading its rivals for this share
-# of it, is hardstyle (measured: hardstyle 0.65–0.89 leading ≥ 0.59; the nearest others 0.48 at 0.18, 0.43 at 0.37)
 HARDSTYLE_BPM = (135, 200)  # euphoric ~150, raw ~155, gabber up to 190
 HARD_CLUB = ("edm", "techno", "trance", "psytrance")  # what a hardstyle track gets called by a tag or the model
 DISCO_BPM = (95, 136)  # disco's tempo (boogie and Chemise ~100, Chic 110, Donna Summer 120–130, Italo ~130)
@@ -199,8 +197,7 @@ def is_hardcore(f: dict, clearly: bool = False) -> bool:
 
 
 def is_hardstyle(f: dict) -> bool:
-    sound = f.get("hardstyle", 0.0) >= HARDSTYLE and f.get("hardstyle_lead", 0.0) >= HARDSTYLE_LEAD
-    return sound and HARDSTYLE_BPM[0] <= f["bpm"] <= HARDSTYLE_BPM[1]
+    return hardstyle.heard(f) and HARDSTYLE_BPM[0] <= f["bpm"] <= HARDSTYLE_BPM[1]
 
 
 def from_audio(f: dict) -> str:

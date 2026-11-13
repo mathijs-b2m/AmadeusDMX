@@ -115,6 +115,7 @@ class Engine(
             self.synth_t, self.synth_s = np.zeros(0), np.zeros(0, np.float32)
         self.kick_t, self.kick_s = analysis.onsets["kick"]
         style = style_for(getattr(analysis, "style", ""))
+        self.short_hits = bool(style and style.short_hits)  # a hard style: hits are short shots
         if style and style.kick_grid:  # a kick the onsets lose (hardstyle's distorted tail): the grid plays it
             self.kick_t, self.kick_s = hardstyle.grid_kicks(analysis, plan, style.kick_grid)
         self.snare_t, self.snare_s = analysis.onsets["snare"]
@@ -255,7 +256,9 @@ class Engine(
                 s.dimmer, s.white = 0.0, 0.0
                 states[e["id"]] = s
         states = self._pickup(i, t, states)
-        if i > 0 and t - d.start < XFADE and i not in self.drop_idx and not self._led_in(i):  # drops: a hard cut
+        runs = i > 0 and "run" in {x for p in (self.plan[i - 1], d) for x in (p.par_accent, p.head_light)}
+        # drops: a hard cut; and a run's shots (two runs blended play two rhythms on a light: flicker)
+        if i > 0 and t - d.start < XFADE and i not in self.drop_idx and not self._led_in(i) and not runs:
             prev = self._scene(self.plan[i - 1], t)
             k = _ease((t - d.start) / XFADE)
             states = self._wheel_colours({fid: prev[fid].blend(s, k) for fid, s in states.items()}, states)

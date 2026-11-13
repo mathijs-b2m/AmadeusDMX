@@ -1,5 +1,6 @@
 """Hardcore: its tempo, its sound, and its two faces (Thunderdome's red and white, happy hardcore's rave colours)."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -176,3 +177,120 @@ def test_with_the_style_model_the_sound_doubles_not_the_bass():
     bpm, score = strongest_tempo(eighths, FPS)
     assert twice_as_fast(eighths, FPS, bpm, score, {})  # no models: the kick is all there is to go by
     assert not twice_as_fast(eighths, FPS, bpm, score, {"hardcore": 0.02, "hardcore_lead": 0.0})
+
+
+# "Kind van de Duivel" (Jebroer, Paul Elstak): a hard track whose kick is its low end, loud from its first synth. Its
+# kick was heard on a third of the beats in its drops, so two of its three drops played as soft breakdowns.
+
+
+def _pumping_sub(period: float = 0.387, beats: int = 64, fps: float = FPS):
+    """A sub at 40 dB that drops 22 dB right at every beat: the gap a hardcore kick leaves."""
+    frames = (np.arange(beats) * period * fps + 10).astype(int)
+    sub = np.full(frames[-1] + 40, 40.0)
+    for b in frames:
+        sub[b - 1 : b + 2] = 18.0
+    return sub, frames
+
+
+def test_a_kick_that_is_the_low_end_is_heard_by_its_gap():
+    from amadeus.audio.beats import pumping_kicks
+
+    sub, frames = _pumping_sub()
+    t, s = pumping_kicks(sub, frames, frames / FPS)
+    assert len(t) == len(frames) - 1 and (s > 0.9).all()  # every beat but the last (no beat after it)
+    flat = np.full_like(sub, 40.0)  # a held bass: no gaps, no kicks
+    assert len(pumping_kicks(flat, frames, frames / FPS)[0]) == 0
+    quiet = sub.copy()
+    quiet[: len(sub) // 3] -= 40  # the gaps in a quiet third are no kick (the sub there is under the median)
+    t, _ = pumping_kicks(quiet, frames, frames / FPS)
+    assert len(t) and t.min() >= len(sub) // 3 / FPS - 0.387  # (a beat counts by the sub after it)
+
+
+def test_a_hard_grid_runs_through_the_kicks_gaps():
+    from amadeus.audio.beats import constant_grid
+    from amadeus.audio.features import normalize
+
+    sub, frames = _pumping_sub(beats=200)
+    rise = normalize(np.maximum(0, np.diff(sub, prepend=sub[0])))
+    true = frames / FPS
+    tracked = true[0] + np.arange(len(true)) * 0.388  # the tracker a little slow: a beat off after a minute
+    grid = constant_grid(tracked, rise, FPS, agree=0.5, sub=sub)
+    assert grid is not None
+    assert abs(float(np.median(np.diff(grid))) - 0.387) < 0.0005
+
+
+def test_a_hard_track_keeps_one_bar_phase():
+    from amadeus.audio.beats import downbeats
+
+    n, period = 128, 16
+    frames = np.arange(n) * period + 8
+    low = np.full(frames[-1] + period, 30.0)
+    for start in (17, 49, 81, 113):  # the low end comes in on beat 2 of 4 (index 1) four times
+        low[frames[start] : frames[min(start + 8, n - 1)]] = 45.0
+    low[frames[64] : frames[66]] = 10.0  # one dropout on another phase
+    accent = np.random.default_rng(1).random(len(low))
+    idx = downbeats(frames, accent, low, one_phase=True)
+    assert set(idx % 4) == {1} and len(idx) == n // 4
+
+
+def test_hardcore_reads_its_own_form():
+    a = synthetic_analysis(bpm=155.0)
+    levels = [
+        (9, 7, 0.6),
+        (37, 35, 0.12),
+        (47, 40, 0.69),
+        (80, 73, 0.95),
+        (43, 35, 0.38),
+        (54, 48, 0.4),
+        (76, 80, 1.0),
+        (70, 70, 1.0),
+        (25, 68, 0.75),
+    ]  # fmt: skip  (Kind van de Duivel, measured)
+    span = a.duration / len(levels)
+    a.phrases = [
+        replace(a.phrases[0], index=k, start=k * span, end=(k + 1) * span, loudness_pct=lo, low_pct=low,
+                kick_ratio=kick, drop_score=0.8 if k in (3, 6) else 0.0, part="", loudness_slope_db=1.0)
+        for k, (lo, low, kick) in enumerate(levels)
+    ]  # fmt: skip
+    plan = direct(a, RuleDirector(style=STYLES["hardcore"]), verbose=False)
+    assert [d.section for d in plan] == ["intro", "breakdown", "buildup", "drop", "breakdown", "buildup", "drop",
+                                         "drop", "groove"]  # fmt: skip
+    assert all(d.intensity == 3 and d.head_light == "strobe" for d in plan if d.section == "drop")  # each one
+    between = [d for d in plan if d.section in ("breakdown", "buildup", "groove")]
+    assert all(d.intensity >= 2 and d.par_accent == "run" and d.head_light != "breathe" for d in between)
+
+
+@pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
+def test_a_run_hits_each_light_once_a_lap_in_small_groups(path):
+    from amadeus.engine.looks import RUN_STEPS
+    from amadeus.engine.timing import MIN_GAP_S
+
+    a, rig = synthetic_analysis(bpm=170.0), load_rig(path)
+    plan = [replace(d, par_accent="run", head_light="run", trigger="kick", grouping="unison", layer_split="none")
+            for d in _plan(a, rig, STYLES["hardcore"])]  # fmt: skip
+    e = Engine(a, plan, rig)
+    for kind in ("par", "head"):
+        steps = {n for _, n in e._run_units(kind).values()}
+        assert steps <= set(range(1, RUN_STEPS + 1))
+    ids = [x["id"] for x in rig["elements"] if x["kind"] in ("head", "par")]
+    ts = np.arange(0.05, a.duration - 0.1, 1 / 100)
+    for d in plan:
+        for eid, kind in [(x["id"], x["kind"]) for x in rig["elements"] if x["id"] in ids][:12]:
+            shots = [t for t in ts[(ts >= d.start) & (ts < d.end)] if (e.run(d, float(t), eid, kind) or 0) >= 0.999]
+            starts = [t for k, t in enumerate(shots) if k == 0 or t - shots[k - 1] > 0.02]
+            assert all(b - x >= MIN_GAP_S - 0.02 for x, b in zip(starts, starts[1:])), (d.section, eid)
+
+
+def test_a_hard_drop_lands_where_its_bass_comes_in():
+    from amadeus.audio.phrases import _bass_entry
+
+    fps, period = 43.0, 0.387
+    beats = np.arange(40) * period + 1.0
+    sub = np.full(int(beats[-1] * fps) + 40, -25.0)
+    bar = 20  # the bar line the phase found; the bass comes in a beat before it
+    sub[int(beats[bar - 1] * fps) :] = 40.0
+    assert _bass_entry({"sub": sub}, fps, beats, float(beats[bar])) == pytest.approx(beats[bar - 1])
+    stutter = sub.copy()  # on and off every other beat first: the entry is where it stays
+    for k in (bar - 3, bar - 1):
+        stutter[int(beats[k] * fps) : int(beats[k + 1] * fps)] = -25.0
+    assert _bass_entry({"sub": stutter}, fps, beats, float(beats[bar])) == pytest.approx(beats[bar])

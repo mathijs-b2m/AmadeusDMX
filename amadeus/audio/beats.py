@@ -31,6 +31,49 @@ def beat_kicks(flux_kick: np.ndarray, beat_frames: np.ndarray, fps: float, beat_
     return times[hit], np.clip(pulse[hit] / ref, 0, 1).astype(np.float32)
 
 
+PUMP_DB = 12.0  # the sub this much under the rest of its beat, right at the beat: the gap a kick leaves
+KICK_TOP_DB = 12.0  # …where the sub's beat is this close to its top (a quiet build's gaps are no kick)
+
+
+def kick_floor(sub: np.ndarray) -> float:
+    """How loud a hard track's sub is where its kick runs: within KICK_TOP_DB of its top (90th percentile)."""
+    return float(np.percentile(sub, 90)) - KICK_TOP_DB
+
+
+def pumping_kicks(sub: np.ndarray, beat_frames: np.ndarray, beat_times: np.ndarray):
+    """Kicks heard as the gap they leave in the low end, for a kick that IS the low end (hardcore).
+
+    Hardcore's distorted kick rings until the next one, so its 100–200 Hz attack barely stands out of its own tail
+    (`beat_kicks` hears 0.3 of the beats in a drop where every beat has one). What stands out is the gap: the sub
+    is loud all through the beat and drops ~20 dB just before each kick. A beat counts where the sub's body (the
+    beat without its first and last frames) is near the sub's top (`kick_floor`) and dips PUMP_DB under it
+    within ±3 frames of the beat."""
+    floor = kick_floor(sub)
+    times, strengths = [], []
+    for i, b in enumerate(beat_frames[:-1]):
+        nxt = beat_frames[i + 1]
+        if nxt - b < 10:
+            continue
+        body = float(np.median(sub[b + 4 : nxt - 3]))
+        gap = body - float(sub[max(b - 3, 0) : b + 4].min())
+        if gap >= PUMP_DB and body >= floor:
+            times.append(beat_times[i])
+            strengths.append(min(1.0, gap / 20))
+    return np.asarray(times, dtype=float), np.asarray(strengths, dtype=np.float32)
+
+
+def merge_kicks(a, b):
+    """Two kick lists (times, strengths) as one, a beat in both kept once at its stronger strength."""
+    t = np.concatenate([a[0], b[0]])
+    s = np.concatenate([a[1], b[1]]).astype(np.float32)
+    if not len(t):
+        return t, s
+    order = np.lexsort((-s, t))
+    t, s = t[order], s[order]
+    keep = np.concatenate([[True], np.diff(t) > 0.02])
+    return t[keep], s[keep]
+
+
 def local_tempo(onset_env: np.ndarray, fps: float) -> np.ndarray:
     """BPM per frame from windowed autocorrelation with a prior around 125 BPM."""
     win, hop = int(fps * 12), int(fps * 3)
@@ -136,7 +179,9 @@ def kick_double(env: np.ndarray, fps: float, bpm: float, score: float, share: fl
     return 2 * bpm <= KICK_DOUBLE_MAX and comb_score(env, fps, 2 * bpm) >= share * score
 
 
-def constant_grid(beat_times: np.ndarray, low_rise: np.ndarray, fps: float, agree: float = 0.7):
+def constant_grid(
+    beat_times: np.ndarray, low_rise: np.ndarray, fps: float, agree: float = 0.7, sub: np.ndarray | None = None
+):
     """One straight grid for a track made at one tempo (most club music), or None.
 
     The tracker follows the music beat by beat; its tempo wobbles a little in breaks, and where the off-beats
@@ -145,6 +190,10 @@ def constant_grid(beat_times: np.ndarray, low_rise: np.ndarray, fps: float, agre
     spaced lines over the whole track, so on the kicks (`comb`). It is used when the tracker's own beats agree
     with it (`agree` of them on it, or half a beat off), then fitted to them exactly; else None (a mix, live
     drums, a tempo change).
+
+    `sub`: a hard track's sub band, the grid then fitted to the gaps its kicks leave there instead of the tracker's
+    beats (the tracker drifts in its breaks and pulls the line a fraction of a percent slow: in "Kind van de
+    Duivel" 100 ms behind the kick two minutes in).
     """
     if len(beat_times) < 64:
         return None
@@ -158,13 +207,52 @@ def constant_grid(beat_times: np.ndarray, low_rise: np.ndarray, fps: float, agre
         return None
     n = np.round((beat_times - phase) / period)
     on = np.abs(beat_times - (phase + n * period)) < 0.15 * period
-    if on.sum() >= 16:  # the comb is as fine as a frame: the beats on it place it exactly
+    if sub is not None:
+        period, phase, kicks = _fit_on_gaps(sub, fps, period, phase)
+        # the phase from the tracker's beats where the kick runs: they sit on its click, its gap ~50 ms later
+        near = np.abs(beat_times[:, None] - kicks[None, :]).min(1) < 0.15 * period if len(kicks) else []
+        if np.sum(near) >= 16:
+            n = np.round((beat_times[near] - phase) / period)
+            phase += float(np.median(beat_times[near] - (phase + n * period)))
+    elif on.sum() >= 16:  # the comb is as fine as a frame: the beats on it place it exactly
         period, phase = np.polyfit(n[on], beat_times[on], 1)
     first = int(np.ceil((beat_times[0] - phase) / period - 0.5))
     last = int(np.floor((beat_times[-1] - phase) / period + 0.5))
     grid = phase + period * np.arange(first, last + 1)
     # a grid continued back to before the track starts, or on past its last frame
     return grid[(grid >= 0.0) & (grid <= (len(low_rise) - 1) / fps)]
+
+
+def _fit_on_gaps(sub: np.ndarray, fps: float, period: float, phase: float):
+    """A hard track's straight grid (period, phase) through the gaps its kicks leave in the sub: the lowest frame
+    near each line where a loud sub dips PUMP_DB under its beat, each finer than a frame (phase: on the gaps).
+    Also the lines with a gap (the kicks), as times."""
+    reach = max(int(0.2 * period * fps), 1)
+    floor = kick_floor(sub)  # where the kick runs
+    for _ in range(2):  # the first fit moves the lines
+        n, t = [], []
+        for k in range(int(np.ceil(-phase / period)), int(((len(sub) - 1) / fps - phase) / period)):
+            c = int(round((phase + k * period) * fps))
+            lo, hi = max(c - reach, 1), min(c + reach + 1, len(sub) - 1)
+            nxt = int(round((phase + (k + 1) * period) * fps))
+            if hi - lo < 3 or nxt + 1 >= len(sub):
+                continue
+            j = lo + int(np.argmin(sub[lo:hi]))
+            body = float(np.median(sub[j + 4 : max(nxt - 3, j + 5)]))
+            if body < floor or body - sub[j] < PUMP_DB:
+                continue
+            y0, y1, y2 = sub[j - 1], sub[j], sub[j + 1]
+            den = y0 - 2 * y1 + y2
+            n.append(k)
+            t.append((j + (float(np.clip(0.5 * (y0 - y2) / den, -1.0, 1.0)) if den > 0 else 0.0)) / fps)
+        if len(n) < 32:
+            return period, phase, np.zeros(0)
+        n, t = np.asarray(n), np.asarray(t)
+        period, gap = np.polyfit(n, t, 1)
+        keep = np.abs(t - (gap + period * n)) < 0.1 * period  # not a fill or a stop
+        period, gap = np.polyfit(n[keep], t[keep], 1)
+        phase = gap
+    return float(period), float(phase), phase + period * n[keep]
 
 
 def refine_beats(beat_frames: np.ndarray, onset_env: np.ndarray, fps: float, span: int = 8) -> np.ndarray:
@@ -341,7 +429,11 @@ def _settled(phases: list[int], n: int, changes: np.ndarray, chords: np.ndarray,
 
 
 def downbeats(
-    beat_frames: np.ndarray, accent_env: np.ndarray, low: np.ndarray | None = None, chroma: np.ndarray | None = None
+    beat_frames: np.ndarray,
+    accent_env: np.ndarray,
+    low: np.ndarray | None = None,
+    chroma: np.ndarray | None = None,
+    one_phase: bool = False,
 ) -> np.ndarray:
     """Pick the bar phase (0..3) per 64-beat window; assumes 4/4 like nearly all DJ music.
 
@@ -350,13 +442,21 @@ def downbeats(
     lines. With a steady four-on-the-floor kick the beats' own accents are nearly equal and pick a phase
     almost by chance; they decide only where the structure says nothing clear (fewer than STRUCTURE_SHARE of
     the change on one phase, looking a few windows around). With the track's chroma, a flip of the phase then has to
-    be backed by the music where it happens (`_settled`)."""
+    be backed by the music where it happens (`_settled`).
+
+    `one_phase`: one bar phase for the whole track, the one where the low end changes most over all of it. For a
+    hard track on one tempo grid (hardcore, hardstyle: made in a box, the kick on every beat): between its drops
+    the low end stabs and swells off the bar line, and windows there flipped "Kind van de Duivel" by a beat twice,
+    while its three drops and its first kick all land on one phase."""
     strength = accent_env[beat_frames]
     n = len(beat_frames)
     nov = np.zeros(n)
     if low is not None and n > 8:
         lb = _per_beat(low, beat_frames)
         nov = _first_sound_overruled(lb, _low_changes(lb))
+    if one_phase and nov.sum() > 0:
+        p = int(np.argmax([nov[np.arange(n) % 4 == q].sum() for q in range(4)]))
+        return np.arange(p, n, 4, dtype=int)
     phases = []
     for s in range(0, n, 64):
         seg = strength[s : s + 64]

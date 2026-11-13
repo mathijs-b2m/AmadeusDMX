@@ -194,7 +194,7 @@ RULE_FOG = {  # smoke lingers: long arcs. Clear air at the edges, a burst only a
 # "dark": the wall gives the heads the room. When the heads strobe or hammer, and on the second phrase in a row of
 # the heads playing hard, the uplighters black out (the phrase after, they come back).
 WALL_CELLS = ["whole", "fall", "rise", "bounce", "out", "in", "split", "halves", "comet", "scatter", "dark"]
-HEAVY_HEAD_LIGHT = {"strobe", "hammer", "flick", "random", "beat"}
+HEAVY_HEAD_LIGHT = {"strobe", "hammer", "flick", "random", "beat", "run"}
 HEAVY_MOVES = {"ballyhoo", "twister", "pour", "tilt_wave", "step_on_beat", "bounce", "swing"}
 RULE_WALL_CELLS = {
     "groove": ["whole", "halves", "fall", "split"],

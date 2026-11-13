@@ -1,4 +1,4 @@
-"""Hardcore's sound, for the genre call: how much the track sounds like hardcore to EffNet-Discogs.
+"""Hardcore's sound, for the genre call: how much the track sounds like hardcore to EffNet-Discogs; and its form.
 
 Hardcore (Rotterdam gabber, happy hardcore, speedcore: 160–200+ BPM) has a distorted kick on every beat. The tempo
 alone doesn't tell it: it overlaps drum and bass, and hardstyle (150–160) has the same hard kick. The sound does.
@@ -13,11 +13,19 @@ a punk band). Three facts:
 Measured over 244 cached tracks: hardcore 0.67–1.65 leading ≥ 0.83 (Paul Elstak, Party Animals, Dune, Music Instructor,
 a Dimitri Vegas hardcore remix), the nearest other 0.45 leading 0.42 (a track called GABBER that is hardstyle), then
 everything ≤ 0.16: real hardstyle (Headhunterz, Max Enforcer) 0.11–0.16 leading ≤ 0.11.
+
+**Form.** A hardcore track is loud from its first synth to its last kick: "Kind van de Duivel" (Jebroer, Paul Elstak)
+is never under 80% of its climax, so loudness against the track's own climax (the usual rules) made everything
+between its three climaxes a soft breakdown. `form` reads it like hardstyle's: a climax is a drop, what leads into
+one its build, a running kick a groove, and what has no kick is a break of hard synths, not a rest.
 """
 
 from __future__ import annotations
 
 import numpy as np
+
+from amadeus.audio import hardstyle
+from amadeus.audio.model import Analysis
 
 SOUND, LEAD = 0.5, 0.6  # a track that sounds like hardcore this much, and leads this share of it, is hardcore
 BPM = (150.0, 230.0)  # its tempo: the old Rotterdam sound and Elstak's first records to fast gabber and frenchcore
@@ -27,6 +35,21 @@ RIVALS = {
     "hardstyle": ("Electronic---Hardstyle", "Electronic---Jumpstyle"),
     "dnb": ("Electronic---Drum n Bass", "Electronic---Jungle", "Electronic---Breakcore"),
 }
+
+
+BREAK_KICK = 0.7  # a phrase with the kick on fewer of its beats than this is a break: the kick is on all of them
+
+
+def form(a: Analysis, i: int, section: str) -> str:
+    """The section of phrase `i` of a hardcore track (`section`: what the usual rules made of it)."""
+    p = a.phrases[i]
+    if hardstyle.climax(p):
+        return "drop"
+    if section in ("intro", "outro"):
+        return section
+    if i + 1 < len(a.phrases) and hardstyle.climax(a.phrases[i + 1]):
+        return "buildup"
+    return "groove" if p.kick_ratio >= BREAK_KICK else "breakdown"
 
 
 def heard(f: dict) -> bool:

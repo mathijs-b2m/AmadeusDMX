@@ -96,6 +96,11 @@ PAR_ACCENT = [
     ("alternate", "Odd and even pars swap on each hit: ping-pong."),
     ("sparkle", "Each hit flashes one random par in the accent colour: sparse, glittery."),
     (
+        "run",
+        "A short shot runs across the pars from the middle out, pair after pair: 1/8 or 1/16 notes where the kick "
+        "runs, a step per synth note where it doesn't. Fast and aggressive: for hard genres (hardcore).",
+    ),
+    (
         "melody",
         "Pars play the melody: each lead note lights the par matching its pitch (low notes left, high "
         "notes right) in a colour for that note, fading out slowly. Best with the 'lead' trigger in "
@@ -159,6 +164,11 @@ HEAD_LIGHT = [
         "random",
         "Every head lights on its own random kicks: a restless rig, each head its own rhythm. Great while "
         "the heads do a tilt wave; for energetic parts, not for calm ones.",
+    ),
+    (
+        "run",
+        "A short shot runs across the heads from the middle out, pair after pair: 1/8 or 1/16 notes where the "
+        "kick runs, a step per synth note where it doesn't. Fast and aggressive: for hard genres (hardcore).",
     ),
     ("accents", "Beams mostly dim, flaring up on big hits."),
     (
