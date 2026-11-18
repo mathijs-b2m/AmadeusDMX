@@ -116,7 +116,7 @@ RULE_GROUPING = {  # rotated per section, like RULE_LOOKS (rigs with several hea
 }
 
 
-PER_BEAT = {"step_on_beat", "bounce", "swing", "ballyhoo", "tilt_wave", "pour"}
+PER_BEAT = {"step_on_beat", "bounce", "swing", "sway", "ballyhoo", "tilt_wave", "pour"}
 
 
 RULE_LAYERS = {  # (layer_split, base_glow), rotated per section

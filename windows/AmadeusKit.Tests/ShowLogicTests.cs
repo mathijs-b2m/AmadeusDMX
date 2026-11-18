@@ -263,6 +263,7 @@ public class ShowLogicTests
         Assert.Equal("Genre: pop. From the file's genre tag. Lit in the set's house style, so the set looks like one show.", Genre.ChipHelp("pop", "tag", "house"));
         Assert.Equal("guitars", Genre.Symbol("metal"));
         Assert.Equal("waveform", Genre.Symbol("techno"));
+        Assert.Equal("figure.dance", Genre.Symbol("cumbia"));
     }
 
     static EngineProcess.LogLine L(int id, string text, bool error = false) => new(id, DateTime.Now, text, error);

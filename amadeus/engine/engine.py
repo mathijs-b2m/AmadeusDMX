@@ -17,7 +17,7 @@ import dataclasses
 
 import numpy as np
 
-from amadeus.audio import drums, hardstyle, kickruns
+from amadeus.audio import cumbia, drums, hardstyle, kickruns
 from amadeus.audio.dembow import boom, breathers, tac
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director import Decision
@@ -126,6 +126,12 @@ class Engine(
         # the kick's runs out of the dembow ("boom boom boom boom"): a waterfall over the rig (looks.py)
         dembow = any(d.trigger == "dembow" for d in plan)
         self.kick_runs = kickruns.kick_runs(analysis) if dembow else kickruns.KickRuns()
+        # cumbia's swing (the cumbia trigger): the bass on the beat, and the güiro and the llamador on its "and"
+        if any(d.trigger == "cumbia" for d in plan):
+            bt, bs, ct, cs = cumbia.voices(analysis)
+            self.dance_boom, self.dance_cha = (bt, bs), (ct, cs)
+        else:
+            self.dance_boom = self.dance_cha = (np.zeros(0), np.zeros(0, np.float32))
         # the drum kit (the drums trigger, rock): kick and snare from the separated drums when there are some
         self.kit = drums.kit(analysis) if any(d.trigger == "drums" for d in plan) else drums.Kit.empty()
         self.hat_t, self.hat_s = analysis.onsets["hat"]

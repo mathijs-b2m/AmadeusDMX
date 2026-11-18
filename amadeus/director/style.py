@@ -213,6 +213,13 @@ PIANO_BREAK = {"trigger": "lead", "par_base": "dim", "par_accent": "melody", "he
                "movement": "circle", "formation": "fan", "aim": "sky", "head_color": "cycle",
                "beam_fx": "open"}  # fmt: skip
 
+# Cumbia's fiesta: the whole rig dancing the basic step over the crowd in all the palette's colours at once (each
+# section its own, the next on every bar), the pars dancing the boom and the cha with them.
+FIESTA = {"movement": "sway", "formation": "mirror", "aim": "crowd", "head_color": "cycle", "par_base": "dim",
+          "par_accent": "pulse", "beam_fx": "open", "layer_split": "none"}  # fmt: skip
+CUMBIA_BREAK_KICK = 0.15  # cumbia's kick is light (an old recording's barely registers): its percussion carries the
+# beat, so only a phrase almost without one is a break
+
 # Calm genres share their restraint: no strobing light, no per-beat head moves.
 _CALM_AVOID = {"head_light": {"flick", "beat", "random", "strobe", "hammer"},
                "movement": {"bounce", "ballyhoo", "step_on_beat", "tilt_wave", "pour"},
@@ -487,6 +494,37 @@ STYLES: dict[str, Style] = {
             {"movement": {"nod", "ballyhoo"}, "par_base": {"off"}},
             {"movement": ("swing", "bounce", "figure8"), "par_base": ("dim", "full")},
             beat="dembow",
+        ),  # fmt: skip
+        _style(
+            "cumbia",
+            "Cumbia: a Mexican fiesta. The music is light, the dancing is intense: everybody moves, all night, and so "
+            "does the light. The rig dances the cumbia's swing as two voices, whole groups each, call and response on "
+            "every beat: the bass on the beat, the güiro and the llamador on its 'and' (the cumbia trigger). It never "
+            "stands still and never goes dark: the heads dance the basic step (sway), swing, bounce and roll in waves "
+            "over the crowd, landing on the beat. Colour is the party: the papel picado's rosa mexicano, turquoise, "
+            "yellow, lime, orange and violet, many at once, each section its own, changing with the music, the heads "
+            "cycling through them. Bright and joyful, never menacing: no strobing, no cold white looks, no hard fades "
+            "to black.",
+            ["fiesta", "tropical", "rave", "warm", "neon"],
+            {
+                "par_base": {"off"},
+                "par_accent": {"none", "melody", "run"},
+                "movement": {"still", "nod", "sweep", "figure8", "twister", "pour"},
+                "head_light": {"strobe", "hammer", "flick", "run", "breathe"},
+                "head_color": {"white"},
+                "beam_fx": {"gobo_shake", "frost"},
+            },
+            {
+                "par_base": ("dim", "full"),
+                "par_accent": ("pulse", "color_pop", "alternate", "chase"),
+                "movement": ("sway", "swing", "sway", "tilt_wave", "bounce", "step_on_beat"),
+                "head_light": ("pulse", "beat", "alternate"),
+                "head_color": ("cycle", "accent", "cycle", "base"),
+                "beam_fx": ("open", "prism"),
+            },
+            beat="cumbia",
+            looks={"chorus": FIESTA, "drop": FIESTA},
+            break_kick=CUMBIA_BREAK_KICK,
         ),  # fmt: skip
         _style(
             "latin",

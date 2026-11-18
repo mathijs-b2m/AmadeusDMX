@@ -107,6 +107,11 @@ def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np
 CAMERA_SHARE = 0.7  # the heads that play towards the camera, unless the rig says otherwise
 CAMERA_PULL = 0.75  # how far their beams are pulled there: what is left of the look still moves them
 CAMERA_HEIGHT_M = 1.6
+# The sway (cumbia's basic step), one spot per move: out to the left and down, up in the middle, out to the right and
+# down, up in the middle (u in SWAY_U of the reach: each move out or in three quarters of a full swing's move).
+SWAY_SPOTS = ((-1.0, -0.6), (0.0, 0.6), (1.0, -0.6), (0.0, 0.6))
+SWAY_U, SWAY_V = 0.75, 0.5
+KEEP_SIZE = ("bounce", "swing", "sway", "step_on_beat", "follow_lead", "still")  # beat moves sized by the reach
 DRIFT_U, DRIFT_V = 0.35, 0.4  # "still": a slow drift (share of the aim's swing, ~±20° / ±7°): never frozen
 DRIFT_BEATS_U, DRIFT_BEATS_V = 16.0, 12.0  # …sideways and back in 16 beats, up and down in 12 (not in step)
 
@@ -273,6 +278,10 @@ class MotionMixin:
             k, ld = step(nb_pan, tr_pan)
             u0, u1 = (1, -1) if k % 2 == 0 else (-1, 1)
             return 0.5 * ru * (u0 + (u1 - u0) * ld), 0.0
+        if m == "sway":  # the basic step: out and down, up in the middle, out the other way and down, up again
+            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))
+            (u0, v0), (u1, v1) = SWAY_SPOTS[k % 4], SWAY_SPOTS[(k + 1) % 4]
+            return SWAY_U * ru * (u0 + (u1 - u0) * ld), SWAY_V * rv * (v0 + (v1 - v0) * ld)
         if m == "ballyhoo":  # new pseudo-random spot every two beats
 
             def rnd(k):
@@ -394,7 +403,7 @@ class MotionMixin:
             u, v = self._shape(d.movement, pos, seed, tempo)
         if d.movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)  # faster loops, a bit smaller: speed stays reachable
-        if d.movement not in ("bounce", "swing", "step_on_beat", "follow_lead", "still"):  # these keep their size
+        if d.movement not in KEEP_SIZE:  # these keep their size
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
@@ -663,6 +672,14 @@ class MotionMixin:
             k, ld = step(nb_pan, tr_pan)
             u0 = np.where(np.mod(k, 2) == 0, 1.0, -1.0)
             return 0.5 * ru * (u0 + (-u0 - u0) * ld), z
+        if m == "sway":
+            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))
+            spots = np.array(SWAY_SPOTS)
+            s0, s1 = spots[np.mod(k, 4)], spots[np.mod(k + 1, 4)]
+            return (
+                SWAY_U * ru * (s0[:, 0] + (s1[:, 0] - s0[:, 0]) * ld),
+                SWAY_V * rv * (s0[:, 1] + (s1[:, 1] - s0[:, 1]) * ld),
+            )
         if m == "ballyhoo":
 
             def rnd(k):
@@ -725,7 +742,7 @@ class MotionMixin:
         u, v = self._shape_v(movement, pos, seed, tempo, j)
         if movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)
-        if movement not in ("bounce", "swing", "step_on_beat", "follow_lead", "still"):  # (the drift: as is)
+        if movement not in KEEP_SIZE:  # (the drift: as is)
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]

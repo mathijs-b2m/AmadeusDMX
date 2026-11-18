@@ -364,6 +364,7 @@ public static class Genre
         "disco" => "sparkles",
         "hardstyle" => "bolt.fill",
         "hardcore" => "figure.run",
+        "cumbia" => "figure.dance",
         "pop" or "latin" or "reggaeton" => "music.note",
         _ => "waveform",
     };
