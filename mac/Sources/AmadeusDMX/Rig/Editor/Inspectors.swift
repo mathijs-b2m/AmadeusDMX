@@ -303,17 +303,39 @@ struct HeadGroupSection: View {
     let editor: RigEditorModel
     let ids: Set<String>
     @State private var draft = ""
+    @State private var draftFor: Set<String> = []  // the heads the name being typed is for
+    @FocusState private var typing: Bool
+
+    /// The group these heads share ("" automatic), nil when they differ.
+    private func shared(_ ids: Set<String>) -> String? {
+        let names = Set(ids.map { editor.doc.group($0) ?? "" })
+        return names.count == 1 ? names.first! : nil
+    }
+
+    /// What was typed, into the heads it was typed for: on Return, and also when the field is left or another
+    /// fixture is picked (a name typed without Return was lost before). A blank over mixed groups changes nothing.
+    private func commit() {
+        let typed = draft.trimmingCharacters(in: .whitespaces)
+        let now = shared(draftFor)
+        guard !draftFor.isEmpty, typed != (now ?? ""), !(now == nil && typed.isEmpty) else { return }
+        editor.setGroup(draftFor, typed)
+    }
+
+    private func load() {
+        draftFor = ids
+        draft = shared(ids) ?? ""
+    }
 
     var body: some View {
-        let names = Set(ids.map { editor.doc.group($0) ?? "" })
-        let current = names.count == 1 ? names.first! : nil
+        let current = shared(ids)
         SwiftUI.Section {
             LabeledContent("Group") {
                 HStack(spacing: 4) {
                     TextField("Group", text: $draft, prompt: Text(current == nil ? "Mixed" : "Automatic"))
                         .labelsHidden()
                         .multilineTextAlignment(.trailing)
-                        .onSubmit { editor.setGroup(ids, draft) }
+                        .focused($typing)
+                        .onSubmit { commit() }
                     Menu {
                         Button("Automatic") { editor.setGroup(ids, nil) }
                         let groups = editor.doc.groupNames
@@ -328,9 +350,11 @@ struct HeadGroupSection: View {
                     .help("Put them in a group already on this rig, or back to Automatic")
                 }
             }
-            .onAppear { draft = current ?? "" }
-            .onChange(of: current) { _, v in draft = v ?? "" }
-            .onChange(of: ids) { draft = current ?? "" }
+            .onAppear { load() }
+            .onDisappear { commit() }
+            .onChange(of: typing) { was, now in if was && !now { commit() } }
+            .onChange(of: current) { _, v in if !typing { draft = v ?? "" } }
+            .onChange(of: ids) { commit(); load() }
             if let current, !current.isEmpty {
                 let count = editor.doc.fixtures.filter { !$0.waiting && editor.doc.group($0.id) == current }.count
                 LabeledContent("Heads in it", value: "\(count)")

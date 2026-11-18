@@ -335,6 +335,16 @@ public static class HeadGroupSection
         void Set(string? name) => editor.SetGroup(ids, name is null || name.Trim() == Automatic ? null : name);
         box.SelectionChanged += (_, _) => { if (!following && box.SelectedItem is string s) Set(s); };
         box.TextSubmitted += (_, e) => { e.Handled = true; if (!following) Set(e.Text); };
+        // a name typed without Enter is kept too, when the box is left (picking another fixture leaves it)
+        box.LostFocus += (_, _) =>
+        {
+            if (following) return;
+            var typed = (box.Text ?? "").Trim();
+            var now = Current();
+            var shown = now is { Length: > 0 } ? now : Automatic;
+            if (typed == shown || (now is null && typed.Length == 0)) return;
+            Set(typed.Length == 0 ? null : typed);
+        };
         var count = UI.Text("", Font.Caption).Secondary();
         var rows = UI.VStack(10, UI.Row("Group", box), count).Bind(editor, [nameof(RigEditorModel.Version)], _ =>
         {
