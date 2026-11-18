@@ -171,7 +171,7 @@ def test_a_light_changes_colour_as_it_hits_never_while_it_glows(track):
 def test_the_sway_dances_the_basic_step_landing_on_the_beat(track):
     a, rig = track, load_rig(SETS[0])
     e = Engine(a, _plan(a, rig, "cumbia"), rig)
-    e._reach_uv, e._move_beats, e._move_travel = (1.0, 1.0), (1, 1), (0.5, 0.5)
+    e._reach_uv, e.move_beats[0], e.move_travel[0] = (1.0, 1.0), (1, 1), (0.5, 0.5)
     spots = [e._shape("sway", k + 0.4, 0) for k in range(5)]  # just after each landing: held there
     want = [(0.75 * u, 0.5 * v) for u, v in SWAY_SPOTS]
     assert np.allclose(spots[:4], want) and np.allclose(spots[4], want[0])

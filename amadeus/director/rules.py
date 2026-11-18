@@ -16,6 +16,7 @@ RULE_LOOKS = {
         ("dim", "sparkle", "accents", "breathe", "sweep", "mirror", "sky", "base", "steady"),
         ("fade", "none", "bars", "steady", "nod", "sync", "sky", "base", "steady"),
         ("dim", "sparkle", "accents", "accents", "sweep", "mirror", "sky", "white", "steady"),
+        ("dim", "none", "bars", "breathe", "pendulum", "mirror", "sky", "base", "steady"),
     ],
     "groove": [
         ("dim", "pulse", "kick", "steady", "figure8", "mirror", "crowd", "accent", "steady"),
@@ -31,10 +32,16 @@ RULE_LOOKS = {
         ("off", "pulse", "kick", "steady", "tilt_wave", "wave", "crowd", "white", "steady"),
         ("dim", "chase", "hats", "random", "tilt_wave", "mirror", "crowd", "accent", "steady"),
         ("off", "pulse", "kick", "steady", "pour", "wave", "crowd", "white", "steady"),
+        ("dim", "pulse", "kick", "steady", "scissor", "sync", "crowd", "accent", "steady"),
+        ("off", "chase", "hats", "steady", "knot", "mirror", "crowd", "base", "steady"),
+        ("full", "none", "kick", "flick", "zigzag", "mirror", "crowd", "white", "steady"),
+        ("dim", "alternate", "backbeat", "steady", "pendulum", "mirror", "crowd", "accent", "steady"),
+        ("off", "pulse", "synth", "pulse", "rose", "fan", "crowd", "white", "steady"),
     ],
     "buildup": [
         ("dim", "pulse", "roll", "pulse", "nod", "fan", "sky", "white", "rise"),
         ("off", "chase", "hats", "steady", "circle", "focus", "sky", "white", "rise"),
+        ("dim", "pulse", "roll", "pulse", "spiral", "fan", "sky", "white", "rise"),
     ],
     "drop": [
         ("off", "pulse", "kick", "steady", "ballyhoo", "mirror", "crowd", "white", "impact"),
@@ -44,11 +51,16 @@ RULE_LOOKS = {
         ("full", "color_pop", "kick", "steady", "tilt_wave", "mirror", "sky", "accent", "impact"),
         ("off", "pulse", "kick", "steady", "pour", "sync", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "strobe", "swing", "mirror", "crowd", "white", "impact"),
+        ("off", "pulse", "kick", "flick", "zigzag", "wave", "crowd", "white", "impact"),
+        ("full", "color_pop", "kick", "pulse", "scissor", "mirror", "crowd", "accent", "impact"),
     ],
     "breakdown": [
         ("dim", "none", "accents", "breathe", "circle", "wave", "sky", "base", "steady"),
         ("fade", "sparkle", "accents", "accents", "sweep", "wave", "sky", "white", "steady"),
         ("dim", "none", "bars", "steady", "circle", "focus", "stage", "base", "steady"),
+        ("dim", "none", "accents", "breathe", "spiral", "sync", "sky", "base", "steady"),
+        ("fade", "sparkle", "accents", "steady", "rose", "fan", "sky", "white", "steady"),
+        ("dim", "none", "bars", "breathe", "pendulum", "mirror", "sky", "accent", "steady"),
     ],
     "outro": [("fade", "none", "bars", "steady", "sweep", "mirror", "sky", "base", "steady")],
     # a song: the verse lights the band and leaves room, the chorus opens everything up, the bridge turns the page
@@ -57,16 +69,21 @@ RULE_LOOKS = {
         ("dim", "none", "bars", "breathe", "circle", "fan", "stage", "accent", "steady"),
         ("dim", "alternate", "backbeat", "steady", "nod", "sync", "stage", "base", "steady"),
         ("fade", "pulse", "kick", "steady", "sweep", "wave", "stage", "white", "steady"),
+        ("dim", "pulse", "backbeat", "steady", "pendulum", "mirror", "stage", "accent", "steady"),
+        ("dim", "none", "bars", "breathe", "knot", "fan", "stage", "base", "steady"),
     ],
     "chorus": [
         ("full", "color_pop", "backbeat", "steady", "swing", "fan", "crowd", "white", "steady"),
         ("full", "pulse", "kick", "pulse", "sweep", "mirror", "crowd", "accent", "steady"),
         ("full", "color_pop", "kick", "steady", "circle", "cross", "sky", "white", "steady"),
         ("full", "alternate", "backbeat", "pulse", "step_on_beat", "fan", "crowd", "accent", "steady"),
+        ("full", "pulse", "kick", "steady", "scissor", "sync", "crowd", "white", "steady"),
+        ("full", "color_pop", "backbeat", "pulse", "rose", "mirror", "sky", "accent", "steady"),
     ],
     "bridge": [
         ("dim", "none", "bars", "breathe", "circle", "focus", "sky", "accent", "steady"),
         ("fade", "sparkle", "accents", "steady", "sweep", "wave", "sky", "white", "steady"),
+        ("dim", "none", "bars", "breathe", "spiral", "focus", "sky", "base", "steady"),
     ],
 }
 
@@ -116,7 +133,7 @@ RULE_GROUPING = {  # rotated per section, like RULE_LOOKS (rigs with several hea
 }
 
 
-PER_BEAT = {"step_on_beat", "bounce", "swing", "sway", "ballyhoo", "tilt_wave", "pour"}
+PER_BEAT = {"step_on_beat", "bounce", "swing", "sway", "ballyhoo", "tilt_wave", "pour", "zigzag"}
 
 
 RULE_LAYERS = {  # (layer_split, base_glow), rotated per section
@@ -195,7 +212,7 @@ RULE_FOG = {  # smoke lingers: long arcs. Clear air at the edges, a burst only a
 # the heads playing hard, the uplighters black out (the phrase after, they come back).
 WALL_CELLS = ["whole", "fall", "rise", "bounce", "out", "in", "split", "halves", "comet", "scatter", "dark"]
 HEAVY_HEAD_LIGHT = {"strobe", "hammer", "flick", "random", "beat", "run"}
-HEAVY_MOVES = {"ballyhoo", "twister", "pour", "tilt_wave", "step_on_beat", "bounce", "swing"}
+HEAVY_MOVES = {"ballyhoo", "twister", "pour", "tilt_wave", "step_on_beat", "bounce", "swing", "zigzag"}
 RULE_WALL_CELLS = {
     "groove": ["whole", "halves", "fall", "split"],
     "verse": ["whole", "halves", "whole", "fall"],

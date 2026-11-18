@@ -229,6 +229,25 @@ MOVEMENTS = [  # the path; how heads relate to each other is the formation
         "grooves and drops, with the light steady or pulsing at random; not for calm parts.",
     ),
     (
+        "pendulum",
+        "One side to the other per bar: the beam hangs at the end, swings through and lands on the one, dipping "
+        "through the middle like a bob. Mirror: two pendulums swinging against each other. Unhurried, for grooves, "
+        "verses, intros and breaks.",
+    ),
+    ("spiral", "A circle that opens wide and closes again every four bars: hypnotic; good in builds and breaks."),
+    ("rose", "A flower of three or four petals drawn in the air, through the middle and out again; for flowing parts."),
+    ("knot", "A Lissajous knot: loops across and up at once, never quite the same twice in a row; for flowing parts."),
+    (
+        "scissor",
+        "Every other head moves the other way, so the beams keep crossing like scissors (across, up and down, or "
+        "both). Lively without being per beat: grooves and choruses.",
+    ),
+    (
+        "zigzag",
+        "Steps across the room on the beat, up and down on every step, and back again: sharp and rhythmic like "
+        "step_on_beat, but it travels. For energetic grooves and drops; not for calm parts.",
+    ),
+    (
         "pour",
         "Beams pour down: lit high up at the ceiling, they fall fast to the floor, let go there and fly back up "
         "in the dark, landing on the beat for the next fall (the pour plays its own light). Sync: a curtain "

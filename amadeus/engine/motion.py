@@ -6,6 +6,7 @@ import bisect
 import json
 import math
 import zipfile
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -107,13 +108,56 @@ def focus_spread(point: np.ndarray, d: np.ndarray, side: float, dz: float) -> np
 CAMERA_SHARE = 0.7  # the heads that play towards the camera, unless the rig says otherwise
 CAMERA_PULL = 0.75  # how far their beams are pulled there: what is left of the look still moves them
 CAMERA_HEIGHT_M = 1.6
+DRIFT_U, DRIFT_V = 0.35, 0.4  # "still": a slow drift (share of the aim's swing, ~±20° / ±7°): never frozen
+DRIFT_BEATS_U, DRIFT_BEATS_V = 16.0, 12.0  # …sideways and back in 16 beats, up and down in 12 (not in step)
+
+
+# Paths come back many times a night: each time a path returns in a track it is drawn another way (path_variants).
+PATH_LEVELS = (0.0, 0.4, -0.3)  # a sweep or a pendulum on a middle, a high or a low line (share of the aim's swing)
+STEP_SPOTS = (  # step_on_beat: the spots it steps round, one per move
+    ((-1, -0.6), (1, 0.4), (-0.4, 1), (0.6, -0.8)),  # the classic four
+    ((-0.8, -0.8), (0.8, -0.8), (0.8, 0.8), (-0.8, 0.8)),  # a square
+    ((0, 1), (0.9, -0.7), (-0.9, -0.7)),  # a triangle
+    ((0, 1), (0, -1), (1, 0), (-1, 0)),  # a cross
+)
 # The sway (cumbia's basic step), one spot per move: out to the left and down, up in the middle, out to the right and
 # down, up in the middle (u in SWAY_U of the reach: each move out or in three quarters of a full swing's move).
 SWAY_SPOTS = ((-1.0, -0.6), (0.0, 0.6), (1.0, -0.6), (0.0, 0.6))
 SWAY_U, SWAY_V = 0.75, 0.5
-KEEP_SIZE = ("bounce", "swing", "sway", "step_on_beat", "follow_lead", "still")  # beat moves sized by the reach
-DRIFT_U, DRIFT_V = 0.35, 0.4  # "still": a slow drift (share of the aim's swing, ~±20° / ±7°): never frozen
-DRIFT_BEATS_U, DRIFT_BEATS_V = 16.0, 12.0  # …sideways and back in 16 beats, up and down in 12 (not in step)
+ZIGZAG = (-1.0, -0.5, 0.0, 0.5, 1.0, 0.5, 0.0, -0.5)  # zigzag: across and back, a step per move
+WALK = (-0.6, -0.2, 0.2, 0.6, 0.2, -0.2)  # a bounce walking across (a swing climbing): a new place every two moves
+ROSE_X = 1 / 0.769693  # the four-petal rose turned an eighth reaches only this far on either axis
+PENDULUM_BEATS = 4.0  # pendulum: one side to the other per bar…
+PENDULUM_HANG = 0.2  # …hanging at the end for this share of it, then swinging through to land on the one
+SMOOTH_PATHS = {"sweep", "nod", "circle", "figure8", "spiral", "rose", "knot", "scissor"}  # loops: faster, a bit
+# smaller at the peaks (the speed stays reachable)
+# sized by the motors (or a drift)
+FIXED_SIZE = {"bounce", "swing", "sway", "step_on_beat", "zigzag", "follow_lead", "still"}
+LOOK_OWN = {  # a decision's fields that are not its look (show/arc.py OWN_FIELDS): a held phrase differs only in these
+    "phrase", "start", "end", "section", "dynamics", "intensity", "drop_score", "fog", "source", "confidence",
+    "probabilities", "prompt", "brightness",
+}  # fmt: skip
+
+
+def path_variants(plan: list, track: str) -> dict[tuple[int, str], int]:
+    """Which drawing of its path each phrase plays, per (phrase, movement): a path that comes back in a track is drawn
+    the next way (MotionMixin._shape_v), starting somewhere else per track, so a night of circles is not one circle. A
+    phrase that holds the look of the phrase before (the show arc holding a look) holds its drawing too."""
+    stem = Path(track).stem
+    count: dict[str, int] = {}
+    out: dict[tuple[int, str], int] = {}
+    prev = None
+    for d in plan:
+        look = {k: v for k, v in d.__dict__.items() if k not in LOOK_OWN}
+        held = prev is not None and look == prev[1]
+        for mv in sorted({d.movement, d.movement2, "still"}):
+            if held and (prev[0].phrase, mv) in out:
+                out[(d.phrase, mv)] = out[(prev[0].phrase, mv)]
+                continue
+            count[mv] = count.get(mv, -1) + 1
+            out[(d.phrase, mv)] = count[mv] + zlib.crc32(f"{stem}:{mv}".encode()) % 12
+        prev = (d, look)
+    return out
 
 
 WAVE_BEATS = 4.0  # a wave runs over the heads (of the rig or a group) within this many beats
@@ -240,64 +284,16 @@ class MotionMixin:
         a = _ease(min((t - self.lead_t[i - 1]) / 0.35, 1.0))
         return 0.7 * (spot(i - 1) + (spot(i) - spot(i - 1)) * a), v
 
-    def _shape(self, m: str, pos: float, seed: int, tempo: float = 1.0) -> tuple[float, float]:
-        """Path in a unit square (u = sideways, v = up/down or near/far), as a function of beats.
+    def _shape(
+        self, m: str, pos: float, seed: int, tempo: float = 1.0, j: int = 0, var: int = 0
+    ) -> tuple[float, float]:
+        """_shape_v at one position.
 
         Positions depend on the musical position (beat number + fraction), never on
         t / beat-length: the beat length wobbles, and dividing time by it makes patterns jump.
         """
-        if m == "sweep":
-            return math.sin(2 * math.pi * pos * tempo / 16), 0.0
-        if m == "nod":
-            return 0.0, math.sin(2 * math.pi * pos * tempo / 8)
-        if m == "circle":
-            w = 2 * math.pi * pos * tempo / 8
-            return math.sin(w), math.cos(w)
-        if m == "figure8":
-            w = 2 * math.pi * pos * tempo / 8
-            return math.sin(w), math.sin(2 * w)
-        # per-beat moves: amplitudes in units of the aim's swing (u: az_amp, v: el_amp), set by _reach
-        ru, rv = self._reach_uv
-        nb_pan, nb_tilt = self._move_beats
-        tr_pan, tr_tilt = self._move_travel
-
-        def step(n, travel):  # hold at the landing, then jump the target so the head arrives on the next landing
-            q = pos / n
-            return int(q // 1), 1.0 if (q % 1) >= 1.0 - travel else 0.0
-
-        if m == "step_on_beat":  # four spots, one per move (diagonal steps: split the reach)
-            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt) * 0.6)  # diagonal steps are shorter
-            spots = [(-1, -0.6), (1, 0.4), (-0.4, 1), (0.6, -0.8)]
-            (u0, v0), (u1, v1) = spots[k % 4], spots[(k + 1) % 4]
-            return 0.35 * ru * (u0 + (u1 - u0) * ld), 0.35 * rv * (v0 + (v1 - v0) * ld)
-        if m == "bounce":  # up and down, landing on the beat
-            k, ld = step(nb_tilt, tr_tilt)
-            v0, v1 = (1, -1) if k % 2 == 0 else (-1, 1)
-            return 0.0, 0.5 * rv * (v0 + (v1 - v0) * ld)  # up at even landings, down at odd ones
-        if m == "swing":  # left and right, landing on the beat
-            k, ld = step(nb_pan, tr_pan)
-            u0, u1 = (1, -1) if k % 2 == 0 else (-1, 1)
-            return 0.5 * ru * (u0 + (u1 - u0) * ld), 0.0
-        if m == "sway":  # the basic step: out and down, up in the middle, out the other way and down, up again
-            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))
-            (u0, v0), (u1, v1) = SWAY_SPOTS[k % 4], SWAY_SPOTS[(k + 1) % 4]
-            return SWAY_U * ru * (u0 + (u1 - u0) * ld), SWAY_V * rv * (v0 + (v1 - v0) * ld)
-        if m == "ballyhoo":  # new pseudo-random spot every two beats
-
-            def rnd(k):
-                return (math.sin(k * 12.9898 + seed * 78.233) * 43758.5453) % 1.0 * 2 - 1
-
-            seg, a = int(pos // 2), _ease((pos % 2) / 2)
-            amp = 0.6  # jumps a real motor can make within two beats
-            return (
-                amp * (rnd(seg) + (rnd(seg + 1) - rnd(seg)) * a),
-                amp * (rnd(seg + 1000) + (rnd(seg + 1001) - rnd(seg + 1000)) * a),
-            )
-        w = seed * 1.3  # still: a slow drift, never frozen
-        return (
-            DRIFT_U * math.sin(2 * math.pi * pos / DRIFT_BEATS_U + w),
-            DRIFT_V * math.sin(2 * math.pi * pos / DRIFT_BEATS_V + 2 * w),
-        )
+        u, v = self._shape_v(m, np.array([float(pos)]), seed, tempo, j, var)
+        return float(u[0]), float(v[0])
 
     def _init_truss_aims(self, rig: dict, fixtures: dict):
         """Per head: its truss's aim ("audience", "down" or None)."""
@@ -375,7 +371,8 @@ class MotionMixin:
             place = abs(side) * math.pi
         else:
             place = 2 * math.pi * role["idx"] / max(role["count"], 1)
-        turn = place + 2 * math.pi * (pos + role["phase"]) / self._twist_beats(d.intensity)
+        way = -1.0 if self._path_var(d, "twister") % 2 else 1.0  # every other time it turns the other way
+        turn = place + way * 2 * math.pi * (pos + role["phase"]) / self._twist_beats(d.intensity)
         flip = -1.0 if f == "mirror" and side > 0 and not ring else 1.0
         point = middle + radius * (flip * np.cos(turn)[:, None] * e1 + np.sin(turn)[:, None] * e2)
         vec = point - head_pos
@@ -400,10 +397,10 @@ class MotionMixin:
         if d.movement == "follow_lead":
             u, v = self._follow_lead(t, j)
         else:
-            u, v = self._shape(d.movement, pos, seed, tempo)
-        if d.movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
+            u, v = self._shape(d.movement, pos, seed, tempo, j, self._path_var(d, d.movement))
+        if d.movement in SMOOTH_PATHS and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)  # faster loops, a bit smaller: speed stays reachable
-        if d.movement not in KEEP_SIZE:  # these keep their size
+        if d.movement not in FIXED_SIZE:  # these keep their size
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
@@ -636,54 +633,118 @@ class MotionMixin:
             pass
         return traj
 
-    def _shape_v(self, m: str, pos: np.ndarray, seed: int, tempo: float, j: int):
+    def _path_var(self, d: Decision, movement: str) -> int:
+        """Which drawing of its path phrase `d` plays (path_variants)."""
+        if getattr(self, "_path_vars_of", None) is not self.plan:
+            self._path_vars_of = self.plan
+            self._path_vars = path_variants(self.plan, str(self.a.path))
+        return self._path_vars.get((d.phrase, movement), 0)
+
+    def _shape_v(self, m: str, pos: np.ndarray, seed: int, tempo: float, j: int, var: int = 0, alt: float = 1.0):
+        """Path in a unit square (u = sideways, v = up/down or near/far) at `pos` (beats). `var`: which drawing of
+        the path this phrase plays (path_variants): another shape of it, another line, the other way round, never
+        smaller along its main axis. `alt`: the scissor's side, +1 or -1 every other head."""
         z = np.zeros_like(pos)
-        if m == "sweep":
-            return np.sin(2 * math.pi * pos * tempo / 16), z
-        if m == "nod":
-            return z, np.sin(2 * math.pi * pos * tempo / 8)
-        if m == "circle":
+        if m == "sweep":  # flat, an arch over the crowd, a smile, a slant; on a middle, a high or a low line
+            w = 2 * math.pi * pos * tempo / 16
+            u = np.sin(w)
+            v = (z, 0.6 * np.cos(2 * w), -0.6 * np.cos(2 * w), 0.5 * u)[var % 4]
+            return u, v + PATH_LEVELS[(var // 4) % len(PATH_LEVELS)]
+        if m == "nod":  # straight, on a slant, or nodding while it drifts across
             w = 2 * math.pi * pos * tempo / 8
-            return np.sin(w), np.cos(w)
-        if m == "figure8":
+            v = np.sin(w)
+            return (z, 0.5 * v, 0.6 * np.sin(w / 4))[var % 3], v
+        if m == "circle":  # a circle, a wide or a tall ellipse, a tilted one; one way round, then the other
             w = 2 * math.pi * pos * tempo / 8
-            return np.sin(w), np.sin(2 * w)
+            way = -1.0 if (var // 4) % 2 else 1.0
+            u, v = (
+                (np.sin(w), np.cos(w)),
+                (np.sin(w), 0.55 * np.cos(w)),
+                (0.6 * np.sin(w), np.cos(w)),
+                (np.sin(w), 0.75 * np.sin(w + math.pi / 3)),
+            )[var % 4]
+            return way * u, v
+        if m == "figure8":  # lying, standing, lying the other way round
+            w = 2 * math.pi * pos * tempo / 8
+            return ((np.sin(w), np.sin(2 * w)), (0.6 * np.sin(2 * w), np.sin(w)), (-np.sin(w), np.sin(2 * w)))[var % 3]
+        if m == "spiral":  # a circle that opens wide and closes again every four bars
+            w = 2 * math.pi * pos * tempo / 8
+            r = 0.6 - 0.4 * np.cos(2 * math.pi * pos / 16 + (math.pi if var % 2 else 0.0))
+            way = -1.0 if (var // 2) % 2 else 1.0
+            return way * r * np.sin(w), r * np.cos(w)
+        if m == "rose":  # a flower: four petals (a plus, an X) or three (pointing up, pointing down)
+            w = 2 * math.pi * pos * tempo / 20  # (through the middle it turns fast: as fast as a figure eight)
+            k = var % 4
+            r = np.cos((3 if k % 2 else 2) * w)
+            if k == 2:  # the X: turned an eighth, stretched back to a full swing on both axes
+                return ROSE_X * r * np.sin(w + math.pi / 4), ROSE_X * r * np.cos(w + math.pi / 4)
+            return r * np.sin(w), (-1.0 if k == 3 else 1.0) * r * np.cos(w)
+        if m == "knot":  # a Lissajous knot: three loops across and two up, two and three, three and four
+            w = 2 * math.pi * pos * tempo / 24
+            a, b = ((3, 2), (2, 3), (3, 4))[var % 3]
+            return np.sin(a * w), np.sin(b * w + math.pi / 4)
+        if m == "scissor":  # every other head the other way: the beams keep crossing; across, up and down, or both
+            w = 2 * math.pi * pos * tempo / 8
+            s = alt * np.sin(w)
+            return ((s, z), (0.25 * alt + z, s), (s, 0.6 * s))[var % 3]
+        if m == "pendulum":  # one side to the other per bar: it hangs, swings through and lands on the one
+            q = pos / PENDULUM_BEATS
+            k = np.floor(q).astype(np.int64)
+            x = np.clip((np.mod(q, 1.0) - PENDULUM_HANG) / (1 - PENDULUM_HANG), 0.0, 1.0)
+            u0 = np.where(np.mod(k, 2) == 0, -1.0, 1.0)
+            u = u0 - 2 * u0 * (0.5 - 0.5 * np.cos(math.pi * x))
+            v = (-0.5 * (1 - u * u), 0.5 * (1 - u * u), z)[var % 3]  # a bob dipping through the middle, or lifting
+            return u, v + PATH_LEVELS[(var // 3) % len(PATH_LEVELS)]
         ru, rv = self._reach_uv
         nb_pan, nb_tilt = self.move_beats.get(j, (1, 1))
         tr_pan, tr_tilt = self.move_travel.get(j, (0.9, 0.9))
 
-        def step(n, travel):
+        def step(n, travel):  # hold at the landing, then jump the target so the head arrives on the next landing
             q = pos / n
             return np.floor(q).astype(np.int64), np.where(np.mod(q, 1.0) >= 1.0 - travel, 1.0, 0.0)
 
-        if m == "step_on_beat":
-            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt) * 0.6)
-            spots = np.array([(-1, -0.6), (1, 0.4), (-0.4, 1), (0.6, -0.8)])
-            s0, s1 = spots[np.mod(k, 4)], spots[np.mod(k + 1, 4)]
-            return (
-                0.35 * ru * (s0[:, 0] + (s1[:, 0] - s0[:, 0]) * ld),
-                0.35 * rv * (s0[:, 1] + (s1[:, 1] - s0[:, 1]) * ld),
-            )
-        if m == "bounce":
+        def between(seq, k, ld):  # from spot k to spot k + 1 of a cycle
+            seq = np.asarray(seq, dtype=float)
+            a, b = seq[np.mod(k, len(seq))], seq[np.mod(k + 1, len(seq))]
+            return a + (b - a) * (ld[:, None] if seq.ndim > 1 else ld)
+
+        if m == "step_on_beat":  # a spot per move: the classic four, a square, a triangle, a cross
+            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt) * 0.6)  # diagonal steps are shorter
+            s = between(STEP_SPOTS[var % len(STEP_SPOTS)], k, ld)
+            return 0.35 * ru * s[:, 0], 0.35 * rv * s[:, 1]
+        if m == "sway":  # the basic step: out and down, up in the middle, out the other way and down, up again
+            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))
+            s = between(SWAY_SPOTS, k, ld)
+            return SWAY_U * ru * s[:, 0], SWAY_V * rv * s[:, 1]
+        if m == "zigzag":  # across the room in steps, up and down on every one, then back
+            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))  # (a full bounce or swing every move)
+            across = 0.8 * between(ZIGZAG, k, ld)
+            updown = 0.5 * between((1.0, -1.0), k, ld)
+            if var % 2:  # standing: up the room in steps, left and right on every one
+                return 0.5 * ru * updown * 2, across
+            return across, rv * updown
+        if m == "bounce":  # up and down, landing on the beat; straight, on a slant, or walking across
             k, ld = step(nb_tilt, tr_tilt)
             v0 = np.where(np.mod(k, 2) == 0, 1.0, -1.0)
-            return z, 0.5 * rv * (v0 + (-v0 - v0) * ld)
-        if m == "swing":
+            sway = v0 + (-v0 - v0) * ld
+            if var % 3 == 1:
+                return 0.25 * ru * sway, 0.5 * rv * sway
+            if var % 3 == 2:  # a new place every second landing
+                return 0.5 * ru * between(WALK, k // 2, ld * (np.mod(k, 2) == 1)), 0.5 * rv * sway
+            return z, 0.5 * rv * sway
+        if m == "swing":  # left and right, landing on the beat; flat, on a slant, or climbing
             k, ld = step(nb_pan, tr_pan)
             u0 = np.where(np.mod(k, 2) == 0, 1.0, -1.0)
-            return 0.5 * ru * (u0 + (-u0 - u0) * ld), z
-        if m == "sway":
-            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))
-            spots = np.array(SWAY_SPOTS)
-            s0, s1 = spots[np.mod(k, 4)], spots[np.mod(k + 1, 4)]
-            return (
-                SWAY_U * ru * (s0[:, 0] + (s1[:, 0] - s0[:, 0]) * ld),
-                SWAY_V * rv * (s0[:, 1] + (s1[:, 1] - s0[:, 1]) * ld),
-            )
+            sway = u0 + (-u0 - u0) * ld
+            if var % 3 == 1:
+                return 0.5 * ru * sway, 0.25 * rv * sway
+            if var % 3 == 2:
+                return 0.5 * ru * sway, 0.5 * rv * between(WALK, k // 2, ld * (np.mod(k, 2) == 1))
+            return 0.5 * ru * sway, z
         if m == "ballyhoo":
 
             def rnd(k):
-                return np.mod(np.sin(k * 12.9898 + seed * 78.233) * 43758.5453, 1.0) * 2 - 1
+                return np.mod(np.sin(k * 12.9898 + (seed + 101 * var) * 78.233) * 43758.5453, 1.0) * 2 - 1
 
             seg = np.floor(pos / 2)
             x = np.clip(np.mod(pos, 2) / 2, 0.0, 1.0)
@@ -693,7 +754,7 @@ class MotionMixin:
                 amp * (rnd(seg) + (rnd(seg + 1) - rnd(seg)) * a),
                 amp * (rnd(seg + 1000) + (rnd(seg + 1001) - rnd(seg + 1000)) * a),
             )
-        w = seed * 1.3  # still: a slow drift, never frozen
+        w = seed * 1.3 + var * 0.9  # still: a slow drift, never frozen
         return (
             DRIFT_U * np.sin(2 * math.pi * pos / DRIFT_BEATS_U + w),
             DRIFT_V * np.sin(2 * math.pi * pos / DRIFT_BEATS_V + 2 * w),
@@ -739,10 +800,15 @@ class MotionMixin:
         tempo = TEMPO[max(0, min(3, d.intensity))]
         aim_name = self._aim_name(d.aim, j)
         self._reach_uv = self.reach_uv[j].get(aim_name, (1.0, 1.0))
-        u, v = self._shape_v(movement, pos, seed, tempo, j)
-        if movement in ("sweep", "nod", "circle", "figure8") and tempo > 1:
+        var = self._path_var(d, movement)
+        alt = 1.0
+        if movement == "scissor":  # every other head the other way (mirrored: counted from the outside in)
+            k = min(idx, count - 1 - idx) if f == "mirror" else idx
+            alt = -1.0 if k % 2 else 1.0
+        u, v = self._shape_v(movement, pos, seed, tempo, j, var, alt)
+        if movement in SMOOTH_PATHS and tempo > 1:
             u, v = u / math.sqrt(tempo), v / math.sqrt(tempo)
-        if movement not in KEEP_SIZE:  # (the drift: as is)
+        if movement not in FIXED_SIZE:  # (the drift: as is)
             scale = MOVE_SCALE[max(0, min(3, d.intensity))]
             u, v = u * scale, v * scale
         head_pos = self.head_pos[j]
@@ -762,11 +828,14 @@ class MotionMixin:
             period = 2.0 if d.intensity >= 3 else 4.0
             amp = TILT_WAVE_DEG * (0.8 if period < 4 else 1.0)
             across = abs(side) if f == "mirror" else (side + 1) / 2
+            if var % 2 and f != "mirror":  # every other time it rolls the other way
+                across = 1 - across
             if cp is not None:  # the whole wave on each bar, its cells one after the other
                 across = abs(cp) if f == "mirror" else (cp + 1) / 2
             if ring:  # round the ring, the beams out of it
                 across = ring["frac"]
-            wave = np.sin(2 * math.pi * (beats / period - across * TILT_WAVE_SPAN))
+            span = TILT_WAVE_SPAN * (0.5 if (var // 2) % 2 else 1.0)  # …and half the time half a wave at once
+            wave = np.sin(2 * math.pi * (beats / period - across * span))
             centre = aim["el"] - 8 if aim["el"] < 0 else aim["el"]  # over the crowd: room for the top of the wave
             if aim_name == "down":  # straight down already: the wave rolls round it, never over it
                 centre = aim["el"]
