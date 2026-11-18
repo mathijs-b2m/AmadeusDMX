@@ -61,6 +61,15 @@ PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 
         "Hot pink, azure, sunshine yellow and lime: a 90s rave flyer, happy hardcore.",
         [(1.0, 0.0, 0.5), (0.0, 0.55, 1.0), (1.0, 0.85, 0.0), (0.3, 1.0, 0.0)],
     ),
+    "fiesta": (
+        "Papel picado: rosa mexicano, turquoise, sunshine yellow, lime green, orange and violet, all at once: a "
+        "Mexican fiesta, cumbia.",
+        [(1.0, 0.0, 0.45), (0.0, 0.8, 0.75), (1.0, 0.8, 0.0), (0.2, 0.9, 0.0), (1.0, 0.35, 0.0), (0.55, 0.0, 1.0)],
+    ),
+    "tropical": (
+        "Turquoise, coral, mango, lime and hot pink: a beach party on the Caribbean coast, cumbia and tropical.",
+        [(0.0, 0.75, 0.8), (1.0, 0.3, 0.25), (1.0, 0.6, 0.0), (0.45, 1.0, 0.1), (1.0, 0.0, 0.5)],
+    ),
     "stage": (
         "Warm white, amber and deep blue. A concert stage: rock, live bands.",
         [(1.0, 0.85, 0.65), (1.0, 0.55, 0.1), (0.1, 0.2, 0.9), (1.0, 1.0, 1.0)],
@@ -118,6 +127,14 @@ TRIGGERS = [
         "beat drops out for a moment the light pauses, and the beat's return hits on all; where the kick leaves "
         "the dembow for a run (boom boom boom boom) the rig plays it as a waterfall, group by group, and lands "
         "on all.",
+    ),
+    (
+        "cumbia",
+        "The cumbia's swing, for cumbia: the rig dances it as two voices, whole groups each, call and response on "
+        "every beat: some on the bass on the beat (the boom), the others on the güiro's scrape and the llamador on "
+        "its 'and' (the cha). Each section in its own colour of the palette, all of them on to the next every "
+        "bar, so the rig dances in all the fiesta's colours at once. Where the beat drops out for a moment the "
+        "light pauses, and the beat's return hits on all.",
     ),
     (
         "drums",
@@ -190,6 +207,13 @@ MOVEMENTS = [  # the path; how heads relate to each other is the formation
     ("step_on_beat", "Jump to a new spot on every beat: sharp and rhythmic, works well with steady light."),
     ("bounce", "Snap up and down on every beat: fast and punchy."),
     ("swing", "Snap left and right on every beat: fast and punchy."),
+    (
+        "sway",
+        "The heads dance the basic step: out to one side and down on a beat, back up in the middle on the next, "
+        "out to the other side and down, up in the middle: hips swinging with the music, landing on every beat. "
+        "Mirror: left and right dance towards each other; wave: the step rolls along the row. For latin dances "
+        "(cumbia, salsa) and anything that swings.",
+    ),
     ("ballyhoo", "Fast, wide, unpredictable movement. Peaks only."),
     (
         "twister",

@@ -16,6 +16,7 @@ enum Genre {
         case "disco": "sparkles"
         case "hardstyle": "bolt.fill"
         case "hardcore": "figure.run"
+        case "cumbia": "figure.dance"
         case "pop", "latin", "reggaeton": "music.note"
         default: "waveform"
         }

@@ -64,7 +64,11 @@ KICK_RUN_LEAD_S = 0.03
 
 # The kit (the drums trigger, rock): the same two voices by whole groups, the kick and the snare, the snare's light
 # ringing out with its reverb; the guitar's strums on the accent lights.
-TWO_VOICES = ("dembow", "drums")
+TWO_VOICES = ("dembow", "drums", "cumbia")
+# Cumbia's swing (the cumbia trigger): boom-tac's two voices on the beat and its "and" (the cha), each section in its
+# own colour of the palette, every voice a step apart, all of them moving on to the next colour every bar (with little
+# colour variety, every DANCE_SLOW_BARS): a fiesta of colours that changes as the lights hit, never while they glow.
+DANCE_SLOW_BARS = 4
 KIT_HOLD = 0.6  # no drum around (a drumless verse, a break): both voices hold this, steady, instead of going dark
 
 ACCENT_SHARE = 3  # one light in this many plays the accents (the synth's stabs); the others keep the rhythm
@@ -440,14 +444,23 @@ class LooksMixin:
             lit, dt = step % n == k, (phase * div - int(phase * div)) * period / div
         return envelope_release(dt, 1.0, RUN_HOLD_S, RUN_RELEASE_S) if lit else 0.0
 
-    def _boom_tac(self, t: float) -> tuple[float, float, float]:
+    def _voices_of(self, trigger: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """The two voices' hits (boom times, strengths, tac times, strengths): reggaeton's boom-tac, or cumbia's
+        boom and cha."""
+        if trigger == "cumbia":
+            return (*self.dance_boom, *self.dance_cha)
+        return self.boom_t, self.boom_s, self.tac_t, self.tac_s
+
+    def _boom_tac(self, t: float, trigger: str = "dembow") -> tuple[float, float, float]:
         """Reggaeton's two voices, (boom, tac, pause): the boom (the kick, its 1/8 runs too) and the tac (the
         snare on its pattern), call and response: each lets go quickly when the other one hits. In a breather
-        (the beat gone for a moment) both pause (`pause` 0..1); the beat's return hits with both voices."""
-        boom, bi = note_env(self.boom_t, self.boom_s, t)
-        tac, ti = note_env(self.tac_t, self.tac_s, t)
-        last_boom = float(self.boom_t[bi]) if bi >= 0 else -1e9
-        last_tac = float(self.tac_t[ti]) if ti >= 0 else -1e9
+        (the beat gone for a moment) both pause (`pause` 0..1); the beat's return hits with both voices. Cumbia
+        plays its boom and its cha the same way."""
+        boom_t, boom_s, tac_t, tac_s = self._voices_of(trigger)
+        boom, bi = note_env(boom_t, boom_s, t)
+        tac, ti = note_env(tac_t, tac_s, t)
+        last_boom = float(boom_t[bi]) if bi >= 0 else -1e9
+        last_tac = float(tac_t[ti]) if ti >= 0 else -1e9
         if last_tac > last_boom:
             boom *= _release(t - last_tac, 1.0, 0.0, BOOM_TAC_HANDOVER_S)
         else:
@@ -460,6 +473,19 @@ class LooksMixin:
         elif k >= 0 and abs(last_boom - self.breathers[k][1]) < 0.1:  # the beat is back: both voices, together
             tac = max(tac, boom)
         return boom, tac, pause
+
+    def _dance_colour(self, cols, voice: str, slot: int, t: float, trigger: str) -> tuple:
+        """Cumbia's colour for a light in its voice: its section's own colour of the palette (the cha a step on from
+        the boom), moving on to the next as the bar of the voice's last hit changes, so a light changes colour as it
+        hits, never while it glows."""
+        boom_t, _, tac_t, _ = self._voices_of(trigger)
+        times = tac_t if voice == "tac" else boom_t
+        i = bisect.bisect_right(times, t) - 1
+        bar = self.bar_info(float(times[i]) if i >= 0 else t)
+        cv = self.colour_variety
+        if cv is not None and cv < 0.5:  # little colour variety: a slower dance through the colours
+            bar //= DANCE_SLOW_BARS
+        return cols[(slot + bar + (1 if voice == "tac" else 0)) % len(cols)]
 
     def _kick_run(self, t: float) -> tuple[dict[str, float], bool] | None:
         """In a kick run: every boom-tac light's level (0..1), and whether the run has landed (then the lights
@@ -634,7 +660,7 @@ class LooksMixin:
         sections or mirrored pairs, so a model plays as one and left and right stay alike; of two lights one),
         shifting per phrase. None in calm parts or where the synth has no stabs; a single light plays both (_scene
         layers the stabs over its rhythm)."""
-        if d.section not in ACCENT_SECTIONS or d.trigger == "dembow":  # boom-tac: the tac is the accent
+        if d.section not in ACCENT_SECTIONS or d.trigger in ("dembow", "cumbia"):  # boom-tac: the tac is the accent
             return set()
         if d.par_accent == "run" or d.head_light == "run":  # the run plays the accents (two rhythms on a light:
             return set()  # flicker)
@@ -725,7 +751,8 @@ class LooksMixin:
         if d.trigger == "drums":
             boom, tac, pause = self._kit_voices(t)
         else:
-            boom, tac, pause = self._boom_tac(t) if dembow else (env, 0.0, 0.0)
+            boom, tac, pause = self._boom_tac(t, d.trigger) if dembow else (env, 0.0, 0.0)
+        dance = d.trigger == "cumbia"  # cumbia: each section in its own colour, on to the next every bar
         run = self._kick_run(t) if d.trigger == "dembow" else None  # the kick leaves the dembow: a waterfall
         hits = hit + 1  # hits so far: steps chases, alternation, sparkles
         pattern = self._kick_pattern(d, t)
@@ -756,6 +783,11 @@ class LooksMixin:
                     v = run[0][f["id"]]
                     col = (base if voice == "boom" else accent) if run[1] else accent
                     dim = low + (1 - low) * v
+                elif dance:  # cumbia: its section's colour of the fiesta (one light: the boom's, the cha's)
+                    one = voice if voice != "both" else ("tac" if tac > boom else "boom")
+                    col = self._dance_colour(cols, one, slot, t, d.trigger)
+                    dim = low + (1 - low) * {"boom": boom, "tac": tac}.get(voice, max(boom, tac))
+                    tac_voice = voice == "tac"
                 elif voice == "both":  # one light plays both: the boom, and the tac in the accent colour
                     col, dim = _lerp(col, accent, tac), low + (1 - low) * max(boom, tac)
                 elif voice == "boom":
@@ -871,7 +903,10 @@ class LooksMixin:
             if voice:  # boom-tac: the head's group plays its voice (the tac in the accent colour)
                 low = BOOM_TAC_HEAD_BASE * (1 - (1 - BREATHER_GLOW) * pause)
                 dim = low + (1 - low) * {"boom": boom, "tac": tac}.get(voice, max(boom, tac))
-                if voice == "tac":
+                if dance:  # cumbia: its section's colour of the fiesta
+                    one = voice if voice != "both" else ("tac" if tac > boom else "boom")
+                    col = self._dance_colour(cols, one, slot, t, d.trigger)
+                elif voice == "tac":
                     col = accent
                 elif voice == "boom" and col == accent:
                     col = base

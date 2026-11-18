@@ -118,6 +118,7 @@ CALM_PATH = {  # per-beat and wild paths → smooth ones
     "step_on_beat": "sweep",
     "bounce": "nod",
     "swing": "sweep",
+    "sway": "sweep",
     "ballyhoo": "circle",
     "tilt_wave": "sweep",
     "twister": "circle",
@@ -228,7 +229,7 @@ EVENTS = {
         "bpm": 0.2,
     },
     "latin": {
-        "title": "Latin (Salsa, Reggaeton, Bachata…)",
+        "title": "Latin (Salsa, Reggaeton, Cumbia…)",
         "names": ("Warm-Up", "Heating Up", "Fuego", "Romantic Break", "Grand Finale", "Outro"),
         "allowed": {"warmup": (0, 0.2), "finale": (0.7, 9), "outro": (0.93, 9)},
         "pull": {"warmup": (0, 0.08), "finale": (0.8, 9), "outro": (0.97, 9)},

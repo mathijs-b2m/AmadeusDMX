@@ -30,7 +30,7 @@ from amadeus.rig import geometry
 BEAM_ZOOM = {"gobo": 0.45, "gobo_shake": 0.45, "gobo_rotate": 0.45, "gobo_spin": 0.45, "frost": 1.0}
 BEAM_OPEN_ZOOM = (0.35, 0.3, 0.15, 0.0)  # an open beam's zoom by intensity 0..3
 BEAM_FLOWING_ZOOM = 0.15  # beams that sweep, circle or wave: tight enough to read as shafts
-FAST_MOVES = {"ballyhoo", "swing", "bounce", "step_on_beat", "zigzag"}  # beams that fly: pencil tight
+FAST_MOVES = {"ballyhoo", "swing", "sway", "bounce", "step_on_beat", "zigzag"}  # beams that fly: pencil tight
 FLOWING_MOVES = {
     "sweep", "nod", "circle", "figure8", "tilt_wave", "twister", "spiral", "rose", "knot", "scissor", "pendulum",
 }  # fmt: skip

@@ -120,6 +120,10 @@ STEP_SPOTS = (  # step_on_beat: the spots it steps round, one per move
     ((0, 1), (0.9, -0.7), (-0.9, -0.7)),  # a triangle
     ((0, 1), (0, -1), (1, 0), (-1, 0)),  # a cross
 )
+# The sway (cumbia's basic step), one spot per move: out to the left and down, up in the middle, out to the right and
+# down, up in the middle (u in SWAY_U of the reach: each move out or in three quarters of a full swing's move).
+SWAY_SPOTS = ((-1.0, -0.6), (0.0, 0.6), (1.0, -0.6), (0.0, 0.6))
+SWAY_U, SWAY_V = 0.75, 0.5
 ZIGZAG = (-1.0, -0.5, 0.0, 0.5, 1.0, 0.5, 0.0, -0.5)  # zigzag: across and back, a step per move
 WALK = (-0.6, -0.2, 0.2, 0.6, 0.2, -0.2)  # a bounce walking across (a swing climbing): a new place every two moves
 ROSE_X = 1 / 0.769693  # the four-petal rose turned an eighth reaches only this far on either axis
@@ -127,7 +131,8 @@ PENDULUM_BEATS = 4.0  # pendulum: one side to the other per bar…
 PENDULUM_HANG = 0.2  # …hanging at the end for this share of it, then swinging through to land on the one
 SMOOTH_PATHS = {"sweep", "nod", "circle", "figure8", "spiral", "rose", "knot", "scissor"}  # loops: faster, a bit
 # smaller at the peaks (the speed stays reachable)
-FIXED_SIZE = {"bounce", "swing", "step_on_beat", "zigzag", "follow_lead", "still"}  # sized by the motors (or a drift)
+# sized by the motors (or a drift)
+FIXED_SIZE = {"bounce", "swing", "sway", "step_on_beat", "zigzag", "follow_lead", "still"}
 LOOK_OWN = {  # a decision's fields that are not its look (show/arc.py OWN_FIELDS): a held phrase differs only in these
     "phrase", "start", "end", "section", "dynamics", "intensity", "drop_score", "fog", "source", "confidence",
     "probabilities", "prompt", "brightness",
@@ -707,6 +712,10 @@ class MotionMixin:
             k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt) * 0.6)  # diagonal steps are shorter
             s = between(STEP_SPOTS[var % len(STEP_SPOTS)], k, ld)
             return 0.35 * ru * s[:, 0], 0.35 * rv * s[:, 1]
+        if m == "sway":  # the basic step: out and down, up in the middle, out the other way and down, up again
+            k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))
+            s = between(SWAY_SPOTS, k, ld)
+            return SWAY_U * ru * s[:, 0], SWAY_V * rv * s[:, 1]
         if m == "zigzag":  # across the room in steps, up and down on every one, then back
             k, ld = step(max(nb_pan, nb_tilt), max(tr_pan, tr_tilt))  # (a full bounce or swing every move)
             across = 0.8 * between(ZIGZAG, k, ld)

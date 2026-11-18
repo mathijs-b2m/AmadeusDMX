@@ -70,7 +70,7 @@ lights, the snare's light rings as long as its reverb, and the guitar's strums p
 
 ## Genres and programs
 
-Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, hardcore, dnb, dubstep, hiphop, rnb, pop, rock, metal, reggaeton, latin, disco, funk, jazz), shown with the track in the app and the visualiser:
+Every track gets a **genre**, one word (cinematic, classical, ambient, edm, house, techno, trance, psytrance, hardstyle, hardcore, dnb, dubstep, hiphop, rnb, pop, rock, metal, reggaeton, cumbia, latin, disco, funk, jazz), shown with the track in the app and the visualiser:
 
 1. **your choice** (`amadeus genre TRACK GENRE`, kept in `config/genres.json`);
 2. the **Decisions API**, given the artist and title (from the file's tags, or its name), when there's a key and it is reasonably sure (30% with the artist known: torn between pop and edm for Coldplay is still far better than a tempo guess). A title alone ("Symphony") has to be very sure, and a beat-less genre (cinematic, classical, ambient) only counts when the audio has no groove either;
@@ -81,7 +81,9 @@ Every track gets a **genre**, one word (cinematic, classical, ambient, edm, hous
 
 **Hardstyle** is heard by its sound as well: the same style model recognises the distorted kick (hardstyle, jumpstyle, gabber, hardcore against happy hardcore, hard trance, donk and the like), which its 150 BPM can't tell from psytrance and its vocals from pop. Hardcore is asked first: a track that sounds more like gabber or happy hardcore than like hardstyle is hardcore. A track heard either way keeps its own style in a set of another genre, like a track whose genre is known.
 
-A Latin call from the Decisions API or a tag, on a track whose audio plays the dembow, becomes reggaeton. A funk or house call on a track that unmistakably sounds like disco becomes disco. A hard dance call on a track that unmistakably sounds like hardcore becomes hardcore, and an EDM, techno or trance call on a track that sounds like hardstyle becomes hardstyle.
+**Cumbia** is heard by its sound as well: the style model hears the accordion or organ, the güiro and the bass on the beat, which its hip-hop tempo and its singer can't tell (the audio alone made a classic cumbia pop and a nu-cumbia hip-hop). Like hardcore and hardstyle, a track heard as cumbia keeps its own style in a set of another genre.
+
+A Latin call from the Decisions API or a tag, on a track that sounds even a little like cumbia, becomes cumbia; on one whose audio plays the dembow, reggaeton. A funk or house call on a track that unmistakably sounds like disco becomes disco. A hard dance call on a track that unmistakably sounds like hardcore becomes hardcore, and an EDM, techno or trance call on a track that sounds like hardstyle becomes hardstyle.
 
 ### A house style per genre
 
@@ -91,6 +93,7 @@ Every genre has a **style sheet** ([amadeus/director/style.py](../amadeus/direct
 - what to use instead;
 - a few lines describing the style;
 - for hardstyle, a whole show of its own: a form read from its two levels (the climax, what builds into it, and the breaks; the distorted kick fools the usual section rules), the kick on the beat grid where the onsets lose it, a climax that **hammers** in red and white at full size every time (four bars of beams punching on the kick, four bars of strobe, while the heads twist and throw), and breaks where everything goes dark and one effect plays alone, slowly: a **twister** of white beams, one group of heads in a single cold colour, a spinning prism;
+- for cumbia, a Mexican fiesta: the rig dances the cumbia's swing as two voices by whole groups, call and response on every beat (the bass on the beat, the güiro and the llamador on its "and"), played on every beat where the swing runs even where the onset detector misses a hit; each section lights in its own colour of the papel picado palette (rosa mexicano, turquoise, yellow, lime, orange, violet), all moving on to the next colour every bar as they hit; the heads dance the basic step (**sway**: out and down on a beat, up in the middle on the next), and the chorus is the fiesta, the whole rig dancing over the crowd in all its colours;
 - for a few genres, a beat or a look of its own: reggaeton's boom-tac (and its kick runs, "boom boom boom boom", falling across the rig group by group like a waterfall), rock and metal's drum kit (kick and snare, see [Songs and club tracks](#songs-and-club-tracks)), disco's four-to-the-floor kick and its **mirror ball** in the break (the heads fanned over the crowd, circling slowly, their dots gobos turning), hardcore's kick with the heads strobing on it where it returns after a break;
 - hardcore has two faces, told by its sound: Thunderdome's red and white, the hits over a red wash that stays on, or **happy hardcore's** rave colours that stay on, with the pars playing the piano and the singer note by note in the break.
 
