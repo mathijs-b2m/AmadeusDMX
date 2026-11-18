@@ -170,11 +170,11 @@ def apply_arc(d: Decision, arc: dict, lasers, groups, next_best=None) -> bool:
     if d.section == "buildup":  # flashing, pulsing light builds better than big movement
         if d.head_light in ("steady", "breathe"):
             d.head_light, changed = "pulse", True
-        if d.movement in ("ballyhoo", "figure8", "circle"):
+        if d.movement in ("ballyhoo", "figure8", "circle", "rose", "knot"):
             d.movement, changed = "nod", True
-    # the tilt wave, the pour and randomly pulsing heads are for medium and intense moments, not for calm ones
+    # the tilt wave, the pour, the zigzag and randomly pulsing heads: for medium and intense moments, not calm ones
     calm = d.section in ("intro", "breakdown", "bridge", "outro") or d.intensity < 1
-    if calm and d.movement in ("tilt_wave", "pour"):
+    if calm and d.movement in ("tilt_wave", "pour", "zigzag"):
         d.movement, changed = "nod", True
     if calm and d.head_light == "random":
         d.head_light, changed = "breathe", True
