@@ -169,6 +169,7 @@ def test_a_head_on_camera_duty_turns_round_the_lens_at_full_size():
 
 def test_a_turn_never_outruns_the_slowest_head():
     e, _ = _twister(SETS[0])
-    for _, defn in e.head_fx:
-        defn["motion"] = {"pan_speed_dps": 40, "tilt_speed_dps": 40, "accel_dps2": 50}
+    slow = {"pan_speed_dps": 40, "tilt_speed_dps": 40, "accel_dps2": 50}
+    # copies: the definitions are the library's own, shared with every later test
+    e.head_fx = [(fx, {**defn, "motion": slow}) for fx, defn in e.head_fx]
     assert e._twist_beats(3) > 4  # slower, never smaller
