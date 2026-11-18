@@ -122,9 +122,10 @@ CALM_PATH = {  # per-beat and wild paths → smooth ones
     "tilt_wave": "sweep",
     "twister": "circle",
     "pour": "nod",
+    "zigzag": "sweep",
     "follow_lead": "sweep",
 }
-MODERATE_PATH = {"ballyhoo": "circle", "bounce": "nod", "swing": "sweep"}
+MODERATE_PATH = {"ballyhoo": "circle", "bounce": "nod", "swing": "sweep", "zigzag": "pendulum"}
 CALM_LIGHT = {
     "hammer": "pulse",
     "run": "pulse",
@@ -142,7 +143,14 @@ CALM_BEAM = {"prism": "open", "prism_spin": "open", "gobo_shake": "gobo", "gobo_
 # The warm-up with calm heads (dinner and drinks, an empty floor): a static wash of cozy colour as the base, the
 # heads very slow, projecting gobos onto the floor (on an empty floor people actually look at them).
 AMBIENT_PALETTES = ("warm", "gold")  # cozy; any other palette becomes one of them (they take turns, per 8 phrases)
-AMBIENT_PATH = {"nod": "sweep", "figure8": "circle"}  # (after CALM_PATH) the slowest, longest paths
+AMBIENT_PATH = {  # (after CALM_PATH) the slowest, longest paths
+    "nod": "sweep",
+    "figure8": "circle",
+    "rose": "circle",
+    "knot": "circle",
+    "spiral": "circle",
+    "scissor": "sweep",
+}
 
 # How each stage sounds: (its heat, the trend it likes: +1 rising, -1 falling, 0 either)
 MOODS = {
