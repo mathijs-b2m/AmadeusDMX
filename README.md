@@ -4,6 +4,8 @@
 
 # Amadeus DMX
 
+**English** · [Español](README.es.md)
+
 ### Your AI lighting director, the whole night long.
 
 Amadeus DMX listens to the music you play and runs your lights like a lighting designer would:
