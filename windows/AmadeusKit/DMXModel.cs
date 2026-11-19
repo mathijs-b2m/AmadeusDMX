@@ -2,6 +2,8 @@
 // devices (Art-Net and sACN nodes, USB interfaces), apart from the sets, and where each universe of the selected
 // set goes: which device, which of its outputs. Replace a node or play the set somewhere else: only the mapping
 // changes (amadeus/dmx/devices.py).
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit;
 
 public sealed class DMXModel : Observable
@@ -111,9 +113,9 @@ public sealed class DMXModel : Observable
         if (Device(r.Device) is not { } d) return null;
         return d.Type switch
         {
-            "enttec_pro" => "USB output",
-            "sacn" => $"sACN universe {(d.FirstUniverse ?? 1) + r.Output - 1}",
-            _ => $"Art-Net universe {(d.FirstUniverse ?? 0) + r.Output - 1}",
+            "enttec_pro" => L("USB output"),
+            "sacn" => L("sACN universe {0}", (d.FirstUniverse ?? 1) + r.Output - 1),
+            _ => L("Art-Net universe {0}", (d.FirstUniverse ?? 0) + r.Output - 1),
         };
     }
 
@@ -130,9 +132,9 @@ public sealed class DMXModel : Observable
     }
 
     /// The menu's new devices.
-    public static DMXDevice NewArtNet() => new("node", "Art-Net node", "artnet") { Ip = "2.0.0.10", FirstUniverse = 0, Outputs = 2 };
+    public static DMXDevice NewArtNet() => new("node", L("Art-Net node"), "artnet") { Ip = "2.0.0.10", FirstUniverse = 0, Outputs = 2 };
     public static DMXDevice NewSACN() => new("sacn", "sACN", "sacn") { FirstUniverse = 1, Priority = 100, Outputs = 4 };
-    public static DMXDevice NewUSB() => new("usb", "USB DMX interface", "enttec_pro") { Port = "auto" };
+    public static DMXDevice NewUSB() => new("usb", L("USB DMX interface"), "enttec_pro") { Port = "auto" };
 
     public void AddNode(ArtNetNode n) =>
         Add(new DMXDevice(Slug(n.Name), n.LongName is { Length: > 0 } l ? l : n.Name, "artnet")
@@ -141,7 +143,7 @@ public sealed class DMXModel : Observable
         });
 
     public void AddUSB(USBInterface i) =>
-        Add(new DMXDevice("usb", i.Description is { Length: > 0 } d ? d : "USB DMX interface", "enttec_pro")
+        Add(new DMXDevice("usb", i.Description is { Length: > 0 } d ? d : L("USB DMX interface"), "enttec_pro")
         {
             Port = "auto", Serial = i.WidgetSerial,
         });
@@ -179,7 +181,7 @@ public sealed class DMXModel : Observable
             catch (Exception e) when (IsApiError(e)) { Nodes = []; }
             try { Usb = (await api.DmxDevices()).Usb; }
             catch (Exception e) when (IsApiError(e)) { }
-            Message = Nodes.Count == 0 && Usb.Count == 0 ? "Nothing answered: is the node on the same network (and switched on)?" : null;
+            Message = Nodes.Count == 0 && Usb.Count == 0 ? L("Nothing answered: is the node on the same network (and switched on)?") : null;
         }
         finally { Searching = false; }
     }
@@ -209,7 +211,7 @@ public sealed class DMXModel : Observable
             if (Problems.Count > 0) return false;
             Legacy = null;
             HasChanges = false;
-            Message = showRunning ? "Saved. The show uses it from its next start." : "Saved.";
+            Message = showRunning ? L("Saved. The show uses it from its next start.") : L("Saved.");
             return true;
         }
         catch (Exception e) when (IsApiError(e))

@@ -73,7 +73,7 @@ public sealed class Updater : IUpdater
         _sparkle.DownloadFinished += (_, path) => Post(() => _download?.TrySetResult(path));
         _sparkle.DownloadHadError += (_, _, ex) => Post(() => _download?.TrySetException(ex));
         _sparkle.DownloadedFileIsCorrupt += (_, _) => Post(() => _download?.TrySetException(new InvalidDataException(
-            "The update isn’t signed with the release key: it was not installed.")));
+            L("The update isn’t signed with the release key: it was not installed."))));
         _sparkle.DownloadCanceled += (_, _) => Post(() => _download?.TrySetResult(null));
         // the installer is about to run (it waits for this app to quit): quit
         _sparkle.CloseApplicationAsync += () =>
@@ -156,9 +156,9 @@ public sealed class Updater : IUpdater
     async Task AskToCheckAutomatically()
     {
         if (_rules is null || !_rules.ShouldAskToCheckAutomatically()) return;
-        var yes = await Dialogs.Confirm(_root(), "Check for updates automatically?",
-            "Should Amadeus DMX automatically check for updates? You can always check for updates manually from the Help menu.",
-            "Check Automatically");
+        var yes = await Dialogs.Confirm(_root(), L("Check for updates automatically?"),
+            L("Should Amadeus DMX automatically check for updates? You can always check for updates manually from the Help menu."),
+            L("Check Automatically"));
         _rules.Answer(yes);
     }
 
@@ -186,14 +186,14 @@ public sealed class Updater : IUpdater
             catch (Exception e)  // whatever the network or the feed did: the app goes on
             {
                 Report(UpdateState.Failed, problem: e.Message);
-                if (!inBackground && !quiet) await Dialogs.Alert(_root(), "Update Error!", $"Amadeus DMX couldn’t check for updates: {e.Message}");
+                if (!inBackground && !quiet) await Dialogs.Alert(_root(), L("Update Error!"), L("Amadeus DMX couldn’t check for updates: {0}", e.Message));
                 return;
             }
             Defaults.Standard.Set(LastKey, (double)DateTimeOffset.Now.ToUnixTimeSeconds());
             var item = Newest(info.Updates);
             _newest = info.Status == UpdateStatus.UpdateAvailable ? item : null;
             if (_newest is { } n) Report(UpdateState.Available, Name(n));
-            else if (info.Status == UpdateStatus.CouldNotDetermine) Report(UpdateState.Failed, problem: "The update feed can't be read, or isn't signed with the release key.");
+            else if (info.Status == UpdateStatus.CouldNotDetermine) Report(UpdateState.Failed, problem: L("The update feed can't be read, or isn't signed with the release key."));
             else Report(UpdateState.UpToDate, _version);
             if (quiet) return;
             if (info.Status == UpdateStatus.UpdateAvailable && item is not null)
@@ -204,9 +204,9 @@ public sealed class Updater : IUpdater
             else if (!inBackground)
             {
                 if (info.Status == UpdateStatus.CouldNotDetermine)
-                    await Dialogs.Alert(_root(), "Update Error!", "Amadeus DMX couldn’t read the update feed (or its signature). Try again later.");
+                    await Dialogs.Alert(_root(), L("Update Error!"), L("Amadeus DMX couldn’t read the update feed (or its signature). Try again later."));
                 else
-                    await Dialogs.Alert(_root(), "You’re up to date!", $"Amadeus DMX {_version} is currently the newest version available.");
+                    await Dialogs.Alert(_root(), L("You’re up to date!"), L("Amadeus DMX {0} is currently the newest version available.", _version));
             }
         }
         finally { Busy(false); }
@@ -224,13 +224,13 @@ public sealed class Updater : IUpdater
         var d = new ContentDialog
         {
             XamlRoot = root,
-            Title = "A new version of Amadeus DMX is available!",
+            Title = L("A new version of Amadeus DMX is available!"),
             Content = UI.VStack(10,
-                UI.Text($"Amadeus DMX {item.ShortVersion ?? item.Version} is now available—you have {_version}. Would you like to download it now?").Wrap(),
-                item.ReleaseNotesLink is { Length: > 0 } notes ? UI.Link("Release Notes", () => Dialogs.OpenURL(notes)) : null),
-            PrimaryButtonText = "Install Update",
-            SecondaryButtonText = "Skip This Version",
-            CloseButtonText = "Remind Me Later",
+                UI.Text(L("Amadeus DMX {0} is now available—you have {1}. Would you like to download it now?", item.ShortVersion ?? item.Version, _version)).Wrap(),
+                item.ReleaseNotesLink is { Length: > 0 } notes ? UI.Link(L("Release Notes"), () => Dialogs.OpenURL(notes)) : null),
+            PrimaryButtonText = L("Install Update"),
+            SecondaryButtonText = L("Skip This Version"),
+            CloseButtonText = L("Remind Me Later"),
             DefaultButton = ContentDialogButton.Primary,
         };
         switch (await Dialogs.Show(d))
@@ -257,9 +257,9 @@ public sealed class Updater : IUpdater
         var bar = UI.Progress(null).MinWidth(320);
         var dialog = new ContentDialog
         {
-            XamlRoot = root, Title = "Downloading Update…",
+            XamlRoot = root, Title = L("Downloading Update…"),
             Content = UI.VStack(10, UI.Text($"Amadeus DMX {item.ShortVersion ?? item.Version}"), bar),
-            CloseButtonText = "Cancel",
+            CloseButtonText = L("Cancel"),
         };
         _progress = share => { bar.IsIndeterminate = share <= 0; bar.Value = share; };
         dialog.CloseButtonClick += (_, _) => _sparkle.CancelFileDownload();
@@ -270,7 +270,7 @@ public sealed class Updater : IUpdater
         {
             dialog.Hide();
             await shown;
-            await Dialogs.Alert(_root(), "Update Error!", $"The update couldn’t be downloaded: {e.Message}");
+            await Dialogs.Alert(_root(), L("Update Error!"), L("The update couldn’t be downloaded: {0}", e.Message));
             return;
         }
         dialog.Hide();
@@ -295,7 +295,7 @@ public sealed class Updater : IUpdater
             }
             catch (Exception e)
             {
-                Report(UpdateState.Failed, Name(item), problem: $"The update couldn’t be downloaded: {e.Message}");
+                Report(UpdateState.Failed, Name(item), problem: L("The update couldn’t be downloaded: {0}", e.Message));
                 return;
             }
             if (path is null) { Report(UpdateState.Available, Name(item)); return; }  // cancelled
@@ -322,8 +322,8 @@ public sealed class Updater : IUpdater
         if (_rules?.ShouldPostponeInstall(Now) == true)
         {
             if (quiet) return;  // the status says it waits for the show
-            _ = Dialogs.Alert(_root(), "The update installs when the show stops",
-                "Amadeus DMX never restarts during a show: the update is ready and installs as soon as you stop the show.");
+            _ = Dialogs.Alert(_root(), L("The update installs when the show stops"),
+                L("Amadeus DMX never restarts during a show: the update is ready and installs as soon as you stop the show."));
             return;
         }
         Now();

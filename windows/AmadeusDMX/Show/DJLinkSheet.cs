@@ -23,8 +23,8 @@ public sealed class DJLinkSheet(AppModel model)
         {
             XamlRoot = root,
             Content = Build(),
-            PrimaryButtonText = "Connect and Start",  // the default button: Enter
-            CloseButtonText = "Cancel",
+            PrimaryButtonText = L("Connect and Start"),  // the default button: Enter
+            CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
             IsPrimaryButtonEnabled = false,
         };
@@ -54,8 +54,8 @@ public sealed class DJLinkSheet(AppModel model)
         var header = UI.HStack(12,
             UI.Icon("laptopcomputer.and.arrow.down", Theme.Size(Font.LargeTitle) + 6).Foreground(Tint.Accent),
             UI.VStack(2,
-                UI.Text("Start with a DJ Laptop", Font.Title2).Leading(),
-                UI.Text("The DJ software runs on the DJ’s laptop with Amadeus Link switched on. The show here follows that mix.", Font.Callout)
+                UI.Text(L("Start with a DJ Laptop"), Font.Title2).Leading(),
+                UI.Text(L("The DJ software runs on the DJ’s laptop with Amadeus Link switched on. The show here follows that mix."), Font.Callout)
                     .Secondary().Wrap().Leading()).Grow());
 
         var code = UI.Field("0000", _code, _ => { });
@@ -77,11 +77,11 @@ public sealed class DJLinkSheet(AppModel model)
 
         return UI.VStack(16,
             header,
-            UI.Section("Nearby DJs", UI.Card(_list, padding: 10, corner: 8)),
+            UI.Section(L("Nearby DJs"), UI.Card(_list, padding: 10, corner: 8)),
             UI.HStack(8,
-                UI.Text("Pairing code"),
+                UI.Text(L("Pairing code")),
                 code,
-                UI.Text("as shown in Amadeus Link on the DJ laptop", Font.Caption).Secondary()).Leading()
+                UI.Text(L("as shown in Amadeus Link on the DJ laptop"), Font.Caption).Secondary()).Leading()
         ).Frame(width: 520);
     }
 
@@ -93,7 +93,7 @@ public sealed class DJLinkSheet(AppModel model)
         if (model.Djs.Found.Count == 0)
             _list.Children.Add(UI.HStack(8,
                 UI.Spinner(14),
-                UI.Text("Looking… Is Amadeus Link switched on on the DJ laptop, on the same network?", Font.Callout).Secondary().Wrap()).Margin(0, 6, 0, 6));
+                UI.Text(L("Looking… Is Amadeus Link switched on on the DJ laptop, on the same network?"), Font.Callout).Secondary().Wrap()).Margin(0, 6, 0, 6));
         foreach (var dj in model.Djs.Found)
         {
             var row = new Button

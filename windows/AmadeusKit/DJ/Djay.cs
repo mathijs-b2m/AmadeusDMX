@@ -8,6 +8,8 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit.DJ;
 
 /// djay's labels for its deck controls: VoiceOver's on macOS, Narrator's (UI Automation names) on Windows. The
@@ -139,8 +141,8 @@ public sealed class DjayReader<T> : IDJReader
         {
             lock (_lock)
             {
-                if (!_found) return _window.Note is { Length: > 0 } n ? n : "Waiting for djay Pro.";
-                if (_streamed.Count > 0) return "A track on a deck is neither a file here nor a stream djay's library knows: it stays dark.";
+                if (!_found) return _window.Note is { Length: > 0 } n ? n : L("Waiting for djay Pro.");
+                if (_streamed.Count > 0) return L("A track on a deck is neither a file here nor a stream djay's library knows: it stays dark.");
                 return "";
             }
         }

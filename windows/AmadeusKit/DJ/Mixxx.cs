@@ -9,6 +9,8 @@
 // starts: start Mixxx after the port is there.
 using Microsoft.Data.Sqlite;
 
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit.DJ;
 
 /// The MIDI port can't be opened: what to tell the DJ.
@@ -72,7 +74,7 @@ public sealed class MixxxReader : IDJReader
             {
                 if (_portError.Length > 0) return _portError;
                 if (_state.Count == 0)
-                    return $"In Mixxx: Preferences › Controllers › {Name}, mapping \"{Name}\", enabled. Start Mixxx after Amadeus Link.";
+                    return L("In Mixxx: Preferences › Controllers › {0}, mapping \"{0}\", enabled. Start Mixxx after Amadeus Link.", Name);
                 return "";
             }
         }

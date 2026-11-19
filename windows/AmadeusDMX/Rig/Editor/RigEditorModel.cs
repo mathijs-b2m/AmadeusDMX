@@ -44,8 +44,8 @@ public static class EditorTools
 {
     public static string? Hint(this EditorTool t) => t switch
     {
-        EditorTool.Truss => "Drag on the floor to draw a truss (½ m steps, 15° turns; Alt: free). Esc: done",
-        EditorTool.Tower => "Click on the floor to set a tower. Esc: done",
+        EditorTool.Truss => L("Drag on the floor to draw a truss (½ m steps, 15° turns; Alt: free). Esc: done"),
+        EditorTool.Tower => L("Click on the floor to set a tower. Esc: done"),
         _ => null,
     };
 }
@@ -289,7 +289,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// How far behind the stage's front edge the room's back wall stands: where the rig puts it, else where it follows the rig.
     public double RoomBack => Doc.Stage.RoomBackM ?? -new Room(Doc.Stage, RigElements.Elements(Doc, Definition), Doc.Trusses).Back;
 
-    public void UpdateStage(Action<Stage> body) => UpdateStage("Change Stage", body);
+    public void UpdateStage(Action<Stage> body) => UpdateStage(L("Change Stage"), body);
 
     public void UpdateStage(string name, Action<Stage> body) => Change(name, d => PutStage(d, body));
 
@@ -306,7 +306,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     /// How high the stage stands above the hall floor (stage.deck_m): what stands on its floor goes up or down with
     /// it, the trusses stay where they hang (their heights count from the hall floor).
-    public void SetDeck(double m) => Change("Change Stage Height", d =>
+    public void SetDeck(double m) => Change(L("Change Stage Height"), d =>
     {
         var was = d.Stage.DeckM;
         PutStage(d, s => s.DeckM = Math.Max(0, m));
@@ -314,7 +314,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             f.ZM += d.Stage.DeckM - was;
     });
 
-    public void SetScreen(bool on) => Change(on ? "Add LED Wall" : "Remove LED Wall", d =>
+    public void SetScreen(bool on) => Change(on ? L("Add LED Wall") : L("Remove LED Wall"), d =>
     {
         if (on) d.Raw["screen"] = JSONValue.Of(new Dictionary<string, JSONValue> { ["width_m"] = Rounded(Math.Min(10, d.Width * 0.55)) });
         else d.Raw.Remove("screen");
@@ -336,7 +336,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var t = new Truss($"truss{n}", length, W / 2, -1.5 - Doc.Trusses.Count % 4 * 1.2,
                           vertical ? length / 2 : Math.Min(Doc.Stage.CeilingM - 1, 4.5), vertical: vertical);
         if (vertical) { t.XM = Doc.Trusses.Count(x => x.Vertical) % 2 == 0 ? -0.6 : W + 0.6; t.YM = -1.5; }
-        Change(vertical ? "Add Tower" : "Add Truss", d => d.Trusses.Add(t));
+        Change(vertical ? L("Add Tower") : L("Add Truss"), d => d.Trusses.Add(t));
         Selection = EditorSelection.Truss(t.Id);
     }
 
@@ -353,7 +353,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             Type = p.Type, MaxKg = p.MaxKg, MaxHeightM = p.MaxHeightM, MinHeightM = p.MinHeightM,
         };
-        Change(p.Type == "tbar" ? "Add T-Bar Stand" : "Add Light Bridge", d => d.Trusses.Add(t));
+        Change(p.Type == "tbar" ? L("Add T-Bar Stand") : L("Add Light Bridge"), d => d.Trusses.Add(t));
         Selection = EditorSelection.Truss(t.Id);
     }
 
@@ -363,7 +363,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var W = Doc.Width;
         var t = Truss.Ring(NewTrussID(arc >= 359.5 ? "ring" : "arc"), diameter, arc, W / 2, -0.6 - diameter / 2,
                            Math.Min(Doc.Stage.CeilingM - 1, 4.5), arc >= 359.5 ? 0 : 180);
-        Change(arc >= 359.5 ? "Add Round Truss" : "Add Half Circle", d => d.Trusses.Add(t));
+        Change(arc >= 359.5 ? L("Add Round Truss") : L("Add Half Circle"), d => d.Trusses.Add(t));
         Selection = EditorSelection.Truss(t.Id);
     }
 
@@ -375,7 +375,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var n = Doc.Trusses.Count(x => x.IsCarre);
         var t = Truss.Carre(NewTrussID("carre"), width, depth, W / 2, 1 - depth / 2 + n * (depth + 1),
                             Math.Min(Truss.CarreHeightM, Doc.Stage.CeilingM - 0.5));
-        Change("Add Carré", d => d.Trusses.Add(t));
+        Change(L("Add Carré"), d => d.Trusses.Add(t));
         Selection = EditorSelection.Truss(t.Id);
     }
 
@@ -388,11 +388,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var back = Math.Min(10, Math.Max(6.5, W * 0.45)) + 0.5 + n * 2.0;
         var h = Doc.Stage.Outdoor ? height : Math.Min(height, Doc.Stage.CeilingM - 0.3);
         var t = Truss.Scaffold(NewTrussID("wall"), width, h, W / 2, -back);
-        Change("Add Scaffold", d => d.Trusses.Add(t));
+        Change(L("Add Scaffold"), d => d.Trusses.Add(t));
         Selection = EditorSelection.Truss(t.Id);
     }
 
-    public void UpdateTruss(string id, Action<Truss> body) => UpdateTruss(id, "Change Truss", body);
+    public void UpdateTruss(string id, Action<Truss> body) => UpdateTruss(id, L("Change Truss"), body);
 
     public void UpdateTruss(string id, string name, Action<Truss> body) => Change(name, d =>
     {
@@ -497,8 +497,20 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     static string Capitalized(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
+    /// The undo name of moving onto a side ("Move to Front").
+    static string MoveToName(string side) => side switch
+    {
+        "under" => L("Move to Under"),
+        "top" => L("Move to Top"),
+        "front" => L("Move to Front"),
+        "back" => L("Move to Back"),
+        "left" => L("Move to Left"),
+        "right" => L("Move to Right"),
+        _ => L("Move to {0}", Capitalized(side)),
+    };
+
     /// Every selected fixture on a scaffold: onto this ledger.
-    public void SetLift(IReadOnlySet<string> ids, int lift) => Change($"Move to Lift {lift}", d =>
+    public void SetLift(IReadOnlySet<string> ids, int lift) => Change(L("Move to Lift {0}", lift), d =>
     {
         foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
         {
@@ -508,10 +520,10 @@ public sealed class RigEditorModel : Observable, IStageEditing
         }
     });
 
-    public void SetSide(string id, string side) => UpdateFixture(id, $"Move to {Capitalized(side)}", f => f.Side = side);
+    public void SetSide(string id, string side) => UpdateFixture(id, MoveToName(side), f => f.Side = side);
 
     /// Every selected fixture on a box truss: onto this side of it.
-    public void SetSide(IReadOnlySet<string> ids, string side) => Change($"Move to {Capitalized(side)}", d =>
+    public void SetSide(IReadOnlySet<string> ids, string side) => Change(MoveToName(side), d =>
     {
         foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
         {
@@ -524,7 +536,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     // MARK: - fixtures
 
-    public void UpdateFixture(string id, Action<PlacedFixture> body) => UpdateFixture(id, "Change Fixture", body);
+    public void UpdateFixture(string id, Action<PlacedFixture> body) => UpdateFixture(id, L("Change Fixture"), body);
 
     public void UpdateFixture(string id, string name, Action<PlacedFixture> body) => Change(name, d =>
     {
@@ -538,10 +550,10 @@ public sealed class RigEditorModel : Observable, IStageEditing
     public void SetGroup(IEnumerable<string> ids, string? name)
     {
         var n = name?.Trim() ?? "";
-        Change(n.Length == 0 ? "Group Automatically" : $"Group as {n}", d => d.SetGroup(ids, n));
+        Change(n.Length == 0 ? L("Group Automatically") : L("Group as {0}", n), d => d.SetGroup(ids, n));
     }
 
-    public void Attach(string id, string? trussID) => UpdateFixture(id, trussID is null ? "Take Off Truss" : "Put on Truss", f =>
+    public void Attach(string id, string? trussID) => UpdateFixture(id, trussID is null ? L("Take Off Truss") : L("Put on Truss"), f =>
     {
         if (trussID is not null)
         {
@@ -559,7 +571,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// Back to waiting in front of the stage: not mounted on this rig any more (the set keeps them).
     public void Unmount(IReadOnlySet<string> ids)
     {
-        Change(ids.Count == 1 ? "Unmount Fixture" : $"Unmount {ids.Count} Fixtures", d =>
+        Change(ids.Count == 1 ? L("Unmount Fixture") : L("Unmount {0} Fixtures", ids.Count), d =>
         {
             foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
             {
@@ -654,7 +666,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var last = key.Split('/').LastOrDefault() ?? "";
         var letters = new string(last.TakeWhile(char.IsLetter).ToArray());
         var prefix = letters.Length == 0 ? "fx" : letters;
-        Change($"Add {count} × {def.Model}", d =>
+        Change(L("Add {0} × {1}", count, def.Model), d =>
         {
             var truss = Selection?.TrussId is { } tid ? d.Trusses.FirstOrDefault(t => t.Id == tid) : null;
             var newIDs = new List<string>();
@@ -691,13 +703,13 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             var (places, trusses) = await host.Api.AutomountPlacements(Doc.JsonObject(), ids, all);
-            Apply(places, trusses, places.Count == 1 ? "Auto-Mount Fixture" : $"Auto-Mount {places.Count} Fixtures");
+            Apply(places, trusses, places.Count == 1 ? L("Auto-Mount Fixture") : L("Auto-Mount {0} Fixtures", places.Count));
             if (trusses is { Length: > 0 } && Doc.Trusses.Count == trusses.Length)
             {
-                Message = $"The rig had no trusses: it has {trusses.Length} now (where its fixtures hung, or a standard set-up)";
+                Message = L("The rig had no trusses: it has {0} now (where its fixtures hung, or a standard set-up)", trusses.Length);
                 return;
             }
-            Message = places.Count == 0 ? "Everything is mounted already" : $"Mounted {places.Count} fixture{(places.Count == 1 ? "" : "s")}";
+            Message = places.Count == 0 ? L("Everything is mounted already") : places.Count == 1 ? L("Mounted 1 fixture") : L("Mounted {0} fixtures", places.Count);
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -715,10 +727,10 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             var page = await host.Api.HangSheet(Doc.JsonObject(), Doc.Set, Doc.Rig);
-            var path = Path.Combine(Path.GetTempPath(), FileName($"Hang Sheet – {Doc.Set} on {Doc.Rig}.html"));
+            var path = Path.Combine(Path.GetTempPath(), FileName(L("Hang Sheet – {0} on {1}", Doc.Set, Doc.Rig) + ".html"));
             await File.WriteAllBytesAsync(path, page);
             host.Open(path);
-            Message = Doc.WaitingCount > 0 ? $"{Doc.WaitingCount} fixtures aren’t mounted yet: they’re not on the sheet" : "Hang sheet opened in your browser";
+            Message = Doc.WaitingCount > 0 ? L("{0} fixtures aren’t mounted yet: they’re not on the sheet", Doc.WaitingCount) : L("Hang sheet opened in your browser");
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -807,11 +819,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
     /// Why this fixture can't be lit on the real rig now (nil: it can).
     public string? TestRefusal(IRigEditorHost host, PlacedFixture f)
     {
-        if (host.IsVirtual(SetName)) return "This set only feeds the visualiser: give it a DMX output to test the real lights";
-        if (host.EngineRunning) return "Stop the show to test the lights";
-        if (f.Address is null) return "No start address yet: give it one on the Sets page";
-        if (Definition(f.Key) is { Inert.Length: > 0 } d) return $"Not tested: {d.Inert}";
-        if (Definition(f.Key)?.Kind == "smoke") return "Smoke machines fire only in the show or the hardware test";
+        if (host.IsVirtual(SetName)) return L("This set only feeds the visualiser: give it a DMX output to test the real lights");
+        if (host.EngineRunning) return L("Stop the show to test the lights");
+        if (f.Address is null) return L("No start address yet: give it one on the Sets page");
+        if (Definition(f.Key) is { Inert.Length: > 0 } d) return L("Not tested: {0}", d.Inert);
+        if (Definition(f.Key)?.Kind == "smoke") return L("Smoke machines fire only in the show or the hardware test");
         return null;
     }
 
@@ -831,7 +843,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             Version++;
             if (on)
             {
-                Message = $"{id} on: {r.Summary}";
+                Message = L("{0} on: {1}", id, r.Summary);
                 SwitchOffLater(id, r.Seconds);
             }
         }
@@ -865,8 +877,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
         try
         {
             var fields = await host.Api.HangCheckFix(LayoutDict(), id, seen);
-            Change($"Calibrate {id}", d => d.Calibrate(id, fields));   // re-aims it (ReaimTests)
-            Message = $"{id} calibrated: its beam should come round to the audience now";
+            Change(L("Calibrate {0}", id), d => d.Calibrate(id, fields));   // re-aims it (ReaimTests)
+            Message = L("{0} calibrated: its beam should come round to the audience now", id);
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -893,7 +905,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             var steps = await host.Api.HangCheck(LayoutDict());
-            if (steps.Length == 0) { Message = "Nothing to check: no fixture is mounted yet"; return; }
+            if (steps.Length == 0) { Message = L("Nothing to check: no fixture is mounted yet"); return; }
             Check = new HangCheck(steps);
             await LightCheck(host);
         }
@@ -955,7 +967,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         try
         {
             var fields = await host.Api.HangCheckFix(LayoutDict(), step.Id, fault.Fix);
-            Change($"Fix {step.Label}", d => d.Calibrate(step.Id, fields));
+            Change(L("Fix {0}", step.Label), d => d.Calibrate(step.Id, fields));
             if (Check is { } c) c.Fixed[step.Id] = FixText.GetValueOrDefault(fault.Fix) ?? fault.Fix;
             CheckChanged();
             await RelightCheck(host);
@@ -966,9 +978,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
         }
     }
 
-    public static readonly IReadOnlyDictionary<string, string> FixText = new Dictionary<string, string>
+    public static IReadOnlyDictionary<string, string> FixText => new Dictionary<string, string>
     {
-        ["mirrored"] = "pans the other way now", ["turned"] = "turned round now", ["both"] = "turned round and pans the other way now",
+        ["mirrored"] = L("pans the other way now"), ["turned"] = L("turned round now"), ["both"] = L("turned round and pans the other way now"),
     };
 
     /// The fixture lit at another step's place: the two trade places in the layout. The step stays at its place,
@@ -976,12 +988,12 @@ public sealed class RigEditorModel : Observable, IStageEditing
     public async Task SwapCheck(IRigEditorHost host, HangCheckStep other)
     {
         if (Check?.Step is not { } step || step.Id == other.Id) return;
-        Change($"Swap {step.Label} and {other.Label}", d => d.SwapPlacements(step.Id, other.Id));
+        Change(L("Swap {0} and {1}", step.Label, other.Label), d => d.SwapPlacements(step.Id, other.Id));
         await Quietly(() => host.Api.TestLight(step.Id, false, LayoutDict(), false));
         if (Check is { } c)
         {
-            c.Fixed[other.Id] = $"swapped with {step.Id}";
-            c.Fixed[step.Id] = $"swapped with {other.Id}";
+            c.Fixed[other.Id] = L("swapped with {0}", step.Id);
+            c.Fixed[step.Id] = L("swapped with {0}", other.Id);
             CheckChanged();
         }
         await RelightCheck(host);
@@ -1014,8 +1026,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             var places = await host.Api.InOrderPlacements(Doc.JsonObject());
-            Apply(places, null, "Put in Name Order");
-            Message = places.Count == 0 ? "Already in name order" : $"{places.Count} fixtures in name order now";
+            Apply(places, null, L("Put in Name Order"));
+            Message = places.Count == 0 ? L("Already in name order") : L("{0} fixtures in name order now", places.Count);
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -1056,11 +1068,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public static string Title(ZonePreset p) => p switch
     {
-        ZonePreset.Wall => "Keep Beams Off a Wall or Set Piece",
-        ZonePreset.FloorArea => "Keep Beams Off a Floor Area",
-        ZonePreset.KeepIn => "Keep Beams Inside an Area",
-        ZonePreset.LaserAudience => "Laser Safety: Audience Box (no lasers)",
-        _ => "Laser Safety: Floating Plane",
+        ZonePreset.Wall => L("Keep Beams Off a Wall or Set Piece"),
+        ZonePreset.FloorArea => L("Keep Beams Off a Floor Area"),
+        ZonePreset.KeepIn => L("Keep Beams Inside an Area"),
+        ZonePreset.LaserAudience => L("Laser Safety: Audience Box (no lasers)"),
+        _ => L("Laser Safety: Floating Plane"),
     };
 
     public static string Symbol(ZonePreset p) => p switch
@@ -1081,19 +1093,19 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var id = $"zone{n}";
         var z = p switch
         {
-            ZonePreset.Wall => new Zone(id, "Back wall", "avoid", "rect", new Vec3(W / 2, back + 0.1, 3), [Math.Min(W, 8), 4]),
-            ZonePreset.FloorArea => new Zone(id, "VIP corner", "avoid", "rect", new Vec3(W * 0.85, D * 0.3, 0.05), [3, 3], tiltDeg: 90),
-            ZonePreset.KeepIn => new Zone(id, "Dance floor and sky", "keep_in", "box", new Vec3(W / 2, D * 0.35, Doc.Stage.CeilingM / 2),
+            ZonePreset.Wall => new Zone(id, L("Back wall"), "avoid", "rect", new Vec3(W / 2, back + 0.1, 3), [Math.Min(W, 8), 4]),
+            ZonePreset.FloorArea => new Zone(id, L("VIP corner"), "avoid", "rect", new Vec3(W * 0.85, D * 0.3, 0.05), [3, 3], tiltDeg: 90),
+            ZonePreset.KeepIn => new Zone(id, L("Dance floor and sky"), "keep_in", "box", new Vec3(W / 2, D * 0.35, Doc.Stage.CeilingM / 2),
                                           [W + 2, D * 0.7, Doc.Stage.CeilingM]),
-            ZonePreset.LaserAudience => new Zone(id, "Audience (no lasers)", "laser_out", "box", new Vec3(W / 2, D / 2 + 0.25, 1.5),
+            ZonePreset.LaserAudience => new Zone(id, L("Audience (no lasers)"), "laser_out", "box", new Vec3(W / 2, D / 2 + 0.25, 1.5),
                                                  [W + 6, D - 0.5, 3]),
-            _ => new Zone(id, "No lasers below", "laser_out", "rect", new Vec3(W / 2, D / 2, 3.0), [W + 6, D], tiltDeg: 90),
+            _ => new Zone(id, L("No lasers below"), "laser_out", "rect", new Vec3(W / 2, D / 2, 3.0), [W + 6, D], tiltDeg: 90),
         };
-        Change("Add Zone", d => d.Zones.Add(z));
+        Change(L("Add Zone"), d => d.Zones.Add(z));
         Selection = EditorSelection.Zone(z.Id);
     }
 
-    public void UpdateZone(string id, Action<Zone> body) => UpdateZone(id, "Change Zone", body);
+    public void UpdateZone(string id, Action<Zone> body) => UpdateZone(id, L("Change Zone"), body);
 
     public void UpdateZone(string id, string name, Action<Zone> body) => Change(name, d =>
     {
@@ -1107,10 +1119,10 @@ public sealed class RigEditorModel : Observable, IStageEditing
         switch (sel.Kind)
         {
             case EditorSelectionKind.Zone:
-                Change("Delete Zone", d => d.Zones.RemoveAll(z => z.Id == sel.Id));
+                Change(L("Delete Zone"), d => d.Zones.RemoveAll(z => z.Id == sel.Id));
                 break;
             case EditorSelectionKind.Truss:
-                Change("Delete Truss", d =>
+                Change(L("Delete Truss"), d =>
                 {
                     d.Trusses.RemoveAll(t => t.Id == sel.Id);
                     foreach (var f in d.Fixtures.Where(f => f.Truss == sel.Id))
@@ -1133,9 +1145,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
         {
             var n = FirstFree(i => Doc.Zones.Any(z => z.Id == $"zone{i}"));
             var c = zone.Clone();
-            c.Id = $"zone{n}"; c.Name = zone.Name + " copy";
+            c.Id = $"zone{n}"; c.Name = L("{0} copy", zone.Name);
             c.CenterV += new Vec3(1, 1, 0);
-            Change("Duplicate Zone", d => d.Zones.Add(c));
+            Change(L("Duplicate Zone"), d => d.Zones.Add(c));
             Selection = EditorSelection.Zone(c.Id);
             return;
         }
@@ -1143,7 +1155,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var m = FirstFree(i => Doc.Trusses.Any(t => t.Id == $"truss{i}"));
         var copy = truss with { Id = $"truss{m}" };
         if (truss.Vertical) copy.XM += 1.0; else copy.YM -= 1.5;
-        Change("Duplicate Truss", d => d.Trusses.Add(copy));
+        Change(L("Duplicate Truss"), d => d.Trusses.Add(copy));
         Selection = EditorSelection.Truss(copy.Id);
     }
 
@@ -1152,11 +1164,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
         switch (Selection)
         {
             case { Kind: EditorSelectionKind.Truss, Id: var id }:
-                UpdateTruss(id, "Rotate Truss", t => t.RotDeg = Wrap(t.RotDeg + by));
+                UpdateTruss(id, L("Rotate Truss"), t => t.RotDeg = Wrap(t.RotDeg + by));
                 break;
             case { Kind: EditorSelectionKind.Fixture }:
                 var ids = SelectedFixtures;
-                Change("Rotate", d =>
+                Change(L("Rotate"), d =>
                 {
                     foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
                     {
@@ -1166,7 +1178,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 });
                 break;
             case { Kind: EditorSelectionKind.Zone, Id: var zid }:
-                UpdateZone(zid, "Rotate Zone", z => z.RotDeg = Wrap(z.RotDeg + by));
+                UpdateZone(zid, L("Rotate Zone"), z => z.RotDeg = Wrap(z.RotDeg + by));
                 break;
         }
     }
@@ -1176,11 +1188,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
         switch (Selection)
         {
             case { Kind: EditorSelectionKind.Truss, Id: var id }:
-                UpdateTruss(id, "Move Truss", t => { t.XM += dx; t.YM += dy; });
+                UpdateTruss(id, L("Move Truss"), t => { t.XM += dx; t.YM += dy; });
                 break;
             case { Kind: EditorSelectionKind.Fixture }:
                 var ids = SelectedFixtures;
-                Change("Move", d =>
+                Change(L("Move"), d =>
                 {
                     foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
                     {
@@ -1197,7 +1209,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 });
                 break;
             case { Kind: EditorSelectionKind.Zone, Id: var zid }:
-                UpdateZone(zid, "Move Zone", z => z.CenterV += new Vec3(dx, dy, 0));
+                UpdateZone(zid, L("Move Zone"), z => z.CenterV += new Vec3(dx, dy, 0));
                 break;
         }
     }
@@ -1209,7 +1221,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (Selection is not { IsFixture: true }) return false;
         var ids = SelectedFixtures;
         if (!Doc.Fixtures.Any(f => ids.Contains(f.Id) && f.Truss is not null)) return false;
-        Change(step > 0 ? "Round the Truss" : "Round the Truss Back", d =>
+        Change(step > 0 ? L("Round the Truss") : L("Round the Truss Back"), d =>
         {
             foreach (var f in d.Fixtures.Where(f => ids.Contains(f.Id)))
             {
@@ -1317,7 +1329,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             Refresh();   // the drawing's new corners, also when nothing else changed
             host.ReloadSets();
             var moved = lined.Fixtures.Keys.Count(id => Doc.Fixtures.Any(f => f.Id == id));
-            Message = $"Lined up: {moved} fixture{(moved == 1 ? "" : "s")} moved";
+            Message = moved == 1 ? L("Lined up: 1 fixture moved") : L("Lined up: {0} fixtures moved", moved);
             return true;
         }
         catch (Exception e) when (e is not OutOfMemoryException)
@@ -1337,7 +1349,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             Underlays = await host.Api.RemoveUnderlay(Doc.Rig, u.Id);
             Refresh();
-            Message = $"Removed the drawing {u.Name}";
+            Message = L("Removed the drawing {0}", u.Name);
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -1361,7 +1373,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         _saved = saving;
         ChangedOnDisk = null;
         Changed(nameof(IsDirty));
-        Message = $"Saved {Doc.Rig}";
+        Message = L("Saved {0}", Doc.Rig);
         host.ReloadSets();
     }
 
@@ -1417,7 +1429,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         _saved = d.Clone();
         ChangedOnDisk = null;
         Refresh();
-        RegisterUndo("Reload", before);
+        RegisterUndo(L("Reload"), before);
     }
 
     /// Keeps the changes made here: Save puts them over what was saved elsewhere.
@@ -1434,7 +1446,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         var before = Doc;
         Doc = _saved.Clone();
         Refresh();
-        RegisterUndo("Revert", before);
+        RegisterUndo(L("Revert"), before);
     }
 
     // MARK: - picking and dragging (StageEditing)
@@ -1567,7 +1579,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 if (Plane(o, d, 0) is not { } p0) return false;
                 var p = Snapped(p0);
                 var t = new Truss(NewTrussID("tower"), TowerHeight, p.X, p.Y, TowerHeight / 2, vertical: true);
-                Change("Place Tower", x => x.Trusses.Add(t));
+                Change(L("Place Tower"), x => x.Trusses.Add(t));
                 Selection = EditorSelection.Truss(t.Id);
                 return true;
             }
@@ -1596,8 +1608,6 @@ public sealed class RigEditorModel : Observable, IStageEditing
         }
     }
 
-    static readonly CultureInfo Posix = CultureInfo.InvariantCulture;
-
     /// Dragging a build: true if one is going on.
     bool DragBuild(Vec3 o, Vec3 d, bool free)
     {
@@ -1622,7 +1632,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             t.XM = st.Fixed.X + v.X / 2;
             t.YM = st.Fixed.Y + v.Y / 2;
             FollowTruss(Doc, t);
-            Message = string.Format(Posix, "{0:0.0} m at {1:0}°", length, Wrap(angle));
+            Message = L("{0:0.0} m at {1:0}°", length, Wrap(angle));
             Refresh();
             return true;
         }
@@ -1643,7 +1653,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             t.LengthM = length;
             t.ZM = length / 2;
             FollowTruss(Doc, t);
-            Message = string.Format(Posix, "tower {0:0.0} m", length);
+            Message = L("tower {0:0.0} m", length);
             Refresh();
             return true;
         }
@@ -1889,20 +1899,20 @@ public sealed class RigEditorModel : Observable, IStageEditing
                 Doc.Trusses.RemoveAll(x => x.Id == st.Id);
                 if (st.New) Selection = null;
             }
-            if (!Same(Doc, st.Before)) RegisterUndo(st.New ? "Draw Truss" : "Stretch Truss", st.Before);
+            if (!Same(Doc, st.Before)) RegisterUndo(st.New ? L("Draw Truss") : L("Stretch Truss"), st.Before);
             Refresh();
             return;
         }
         if (_raise is { } r)
         {
             _raise = null;
-            if (!Same(Doc, r.Before)) RegisterUndo("Change Tower Height", r.Before);
+            if (!Same(Doc, r.Before)) RegisterUndo(L("Change Tower Height"), r.Before);
             return;
         }
         if (_drag is not { } g) return;
         _drag = null;
         if (!Same(Doc, g.Before))
-            RegisterUndo(g.Sel.IsFixture ? (_group.Count == 0 ? "Move Fixture" : "Move Fixtures") : g.Sel.IsZone ? "Move Zone" : "Move Truss",
+            RegisterUndo(g.Sel.IsFixture ? (_group.Count == 0 ? L("Move Fixture") : L("Move Fixtures")) : g.Sel.IsZone ? L("Move Zone") : L("Move Truss"),
                          g.Before);
         Changed(nameof(IsDirty));
     }
@@ -1948,7 +1958,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             Vec3 o = S(origin), d = S(dir);
             if (TrussNear(o, d, 0.8) is { } near)
             {
-                Change(ids.Count == 1 ? "Mount Fixture" : $"Mount {ids.Count} Fixtures", doc =>
+                Change(ids.Count == 1 ? L("Mount Fixture") : L("Mount {0} Fixtures", ids.Count), doc =>
                 {
                     if (near.Truss.IsScaffold)  // onto the ledger it was dropped on
                         foreach (var f in doc.Fixtures.Where(f => ids.Contains(f.Id))) f.TrussLift = near.Truss.NearestLift(near.Z);
@@ -1959,7 +1969,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
             else
             {
                 if (FloorHit(Doc.Stage, o, d) is not { } hit) return false;
-                Change(ids.Count == 1 ? "Place Fixture" : $"Place {ids.Count} Fixtures", doc =>
+                Change(ids.Count == 1 ? L("Place Fixture") : L("Place {0} Fixtures", ids.Count), doc =>
                 {
                     LineUp(doc, ids, hit.XY);
                     LineUpWaiting(doc);
@@ -2003,7 +2013,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (e.Alt && (e.Code is EditorKeyCode.Up or EditorKeyCode.Down) && Selection?.TrussId is { } id)
         {
             var up = e.Code == EditorKeyCode.Up ? 0.25 : -0.25;  // Alt+↑ / Alt+↓: raise or lower the truss
-            UpdateTruss(id, up > 0 ? "Raise Truss" : "Lower Truss", t =>
+            UpdateTruss(id, up > 0 ? L("Raise Truss") : L("Lower Truss"), t =>
             {
                 if (t.Vertical) { t.LengthM = Math.Max(1, t.LengthM + up); t.ZM = t.LengthM / 2; }
                 else t.ZM = Math.Max(0.5, t.ZM + up);

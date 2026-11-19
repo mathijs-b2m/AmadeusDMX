@@ -5,13 +5,13 @@ public static class DirectorStep
 {
     public static UIElement Build(WizardModel w) =>
         UI.VStack(16,
-            StepHeader.Build("wand.and.stars", "Who Directs?",
-                "Every phrase of every track gets a lighting decision. The engine always starts with a quick rules plan; an AI director then takes over."),
+            StepHeader.Build("wand.and.stars", L("Who Directs?"),
+                L("Every phrase of every track gets a lighting decision. The engine always starts with a quick rules plan; an AI director then takes over.")),
             UI.Live(w, () => Choices(w), nameof(WizardModel.Directors), nameof(WizardModel.Director)));
 
     static UIElement Choices(WizardModel w)
     {
-        if (w.Directors.Count == 0) return UI.HStack(8, UI.Spinner(), UI.Text("Asking the engine…").Secondary());
+        if (w.Directors.Count == 0) return UI.HStack(8, UI.Spinner(), UI.Text(L("Asking the engine…")).Secondary());
         return UI.VStack(8, [.. w.Directors.Select(d =>
         {
             var row = UI.HStack(12,

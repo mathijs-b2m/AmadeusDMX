@@ -10,7 +10,7 @@ namespace AmadeusDMX;
 
 public sealed class NewFixtureSheet
 {
-    public const string Title = "New Fixture";
+    public static string Title => L("New Fixture");
 
     readonly AppModel _model;
     readonly Action<string, string> _made;
@@ -34,13 +34,13 @@ public sealed class NewFixtureSheet
         _model = model;
         _made = made;
         _changed = changed;
-        _manufacturer = new TextBox { PlaceholderText = "as on the box or label, or leave empty", Text = brand, Width = 300 };
-        _name = new TextBox { PlaceholderText = "e.g. 60W LED Spot", Width = 300 };
+        _manufacturer = new TextBox { PlaceholderText = L("as on the box or label, or leave empty"), Text = brand, Width = 300 };
+        _name = new TextBox { PlaceholderText = L("e.g. 60W LED Spot"), Width = 300 };
         _name.TextChanged += (_, _) => _changed();
-        _watts = new TextBox { PlaceholderText = "optional", Width = 120 };
-        _watts.Tooltip("From the label: how bright the show thinks it is");
-        _beam = new TextBox { PlaceholderText = "optional, typical for the type", Width = 220 };
-        _beam.Tooltip("The manual's beam angle (not the field angle): the visualiser draws its beam this wide");
+        _watts = new TextBox { PlaceholderText = L("optional"), Width = 120 };
+        _watts.Tooltip(L("From the label: how bright the show thinks it is"));
+        _beam = new TextBox { PlaceholderText = L("optional, typical for the type"), Width = 220 };
+        _beam.Tooltip(L("The manual's beam angle (not the field angle): the visualiser draws its beam this wide"));
         _list.SelectionChanged += (_, _) =>
         {
             if (_quiet || _list.SelectedItem is not ListViewItem { Tag: string id }) return;
@@ -58,24 +58,24 @@ public sealed class NewFixtureSheet
 
     public FrameworkElement Build()
     {
-        var channels = Form.Stepper(_channels, 1, 64, v => $"Channels: {v}", v => { _channels = v; _ = LoadTemplates(); })
-            .Tooltip("How many DMX channels it uses in the mode you'll run it in: the manual says, and the fixture's display often shows it (\"9CH\", \"d-11\")");
+        var channels = Form.Stepper(_channels, 1, 64, v => L("Channels: {0}", v), v => { _channels = v; _ = LoadTemplates(); })
+            .Tooltip(L("How many DMX channels it uses in the mode you'll run it in: the manual says, and the fixture's display often shows it (\"9CH\", \"d-11\")"));
         Types();
         _ = LoadTemplates();
         return UI.VStack(14,
-            UI.Text("For a fixture no library knows, often sold without a real brand. Most share a few common channel layouts: pick the one closest to the DMX table in its manual, then check it channel by channel on the fixture.")
+            UI.Text(L("For a fixture no library knows, often sold without a real brand. Most share a few common channel layouts: pick the one closest to the DMX table in its manual, then check it channel by channel on the fixture."))
                 .Secondary().Wrap(),
             Form.Section(null,
             [
-                Form.Row("Brand", _manufacturer),
-                Form.Row("Name", _name),
-                Form.Row("Type", _type),
+                Form.Row(L("Brand"), _manufacturer),
+                Form.Row(L("Name"), _name),
+                Form.Row(L("Type"), _type),
                 channels,
                 _turns,
-                Form.Row("Power (W)", _watts),
-                Form.Row("Beam angle (°)", _beam),
+                Form.Row(L("Power (W)"), _watts),
+                Form.Row(L("Beam angle (°)"), _beam),
             ]),
-            UI.Text("Closest layouts", Font.Headline),
+            UI.Text(L("Closest layouts"), Font.Headline),
             _list,
             _preview,
             _problems).MinWidth(520);
@@ -89,9 +89,9 @@ public sealed class NewFixtureSheet
             : UI.Picker(types, chosen!, t => t.Label, t => { _kindType = t.Type; _ = LoadTemplates(); }).MinWidth(200);
         _turns.Content = Moving
             ? UI.HStack(12,
-                UI.Text("Pan"), UI.Picker(new[] { 360, 540, 630 }, _panDeg, v => $"{v}°", v => _panDeg = v),
-                UI.Text("Tilt"), UI.Picker(new[] { 180, 220, 270 }, _tiltDeg, v => $"{v}°", v => _tiltDeg = v))
-                .Tooltip("How far it turns and tilts (the manual says; most cheap heads: 540° and 270°)")
+                UI.Text(L("Pan")), UI.Picker(new[] { 360, 540, 630 }, _panDeg, v => $"{v}°", v => _panDeg = v),
+                UI.Text(L("Tilt")), UI.Picker(new[] { 180, 220, 270 }, _tiltDeg, v => $"{v}°", v => _tiltDeg = v))
+                .Tooltip(L("How far it turns and tilts (the manual says; most cheap heads: 540° and 270°)"))
             : null;
     }
 
@@ -134,7 +134,7 @@ public sealed class NewFixtureSheet
                             UI.Text(t.Label),
                             UI.Spacer(),
                             differs
-                                ? UI.Text(t.Count > _channels ? $"last {t.Count - _channels} left off" : $"{_channels - t.Count} more as unknown", Font.Caption).Secondary()
+                                ? UI.Text(t.Count > _channels ? L("last {0} left off", t.Count - _channels) : L("{0} more as unknown", _channels - t.Count), Font.Caption).Secondary()
                                 : null),
                         UI.Text(t.About, Font.Caption).Secondary().Wrap(2)).Padding(0, 4),
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -151,7 +151,7 @@ public sealed class NewFixtureSheet
     {
         var t = Chosen;
         _preview.Text = t is null || t.Channels.Count == 0 ? ""
-            : string.Join(" · ", Enumerable.Range(0, _channels).Select(i => $"{i + 1} {(i < t.Channels.Count ? t.Channels[i] : "unknown")}"));
+            : string.Join(" · ", Enumerable.Range(0, _channels).Select(i => $"{i + 1} {(i < t.Channels.Count ? t.Channels[i] : L("unknown"))}"));
         _preview.Visibility = _preview.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -175,7 +175,7 @@ public sealed class NewFixtureSheet
                 _made(key, mode);
                 return true;
             }
-            ShowProblems(r.Problems ?? ["Couldn’t make it"]);
+            ShowProblems(r.Problems ?? [L("Couldn’t make it")]);
         }
         catch (Exception e) when (SetView.IsApiError(e)) { ShowProblems([e.Message]); }
         finally

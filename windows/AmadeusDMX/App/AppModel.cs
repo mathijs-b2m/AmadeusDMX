@@ -50,7 +50,7 @@ public sealed class AppModel : Observable
     void Derived() => Changed(nameof(ShowLabel), nameof(Combinations), nameof(CurrentSet), nameof(CurrentRig), nameof(Mounted));
 
     /// The set on the rig, in words: "showcase on club".
-    public string ShowLabel => SelectedSet.Length == 0 ? "No Set" : $"{SelectedSet} on {SelectedRig}";
+    public string ShowLabel => SelectedSet.Length == 0 ? L("No Set") : L("{0} on {1}", SelectedSet, SelectedRig);
 
     /// Sheets: a new rig (from a template), and "mount the set on this rig?" when it isn't yet.
     bool _showNewRig;
@@ -119,7 +119,7 @@ public sealed class AppModel : Observable
     public readonly record struct Combination(string Rig, string Set)
     {
         public string Id => $"{Set}@{Rig}";
-        public string Label => $"{Set} on {Rig}";
+        public string Label => L("{0} on {1}", Set, Rig);
     }
 
     /// Every set placed on a rig (with or without fixtures mounted yet).
@@ -437,11 +437,11 @@ public sealed class AppModel : Observable
     public string DjName => RemoteDJ ?? LiveSource?.App ?? "VirtualDJ";
 
     /// What to do while the show waits for the DJ software.
-    public string DjWaiting => RemoteDJ is { } r ? $"Waiting for {r}…"
-        : LiveSource?.Waiting ?? "Load a track in VirtualDJ with AmadeusLink as master effect.";
+    public string DjWaiting => RemoteDJ is { } r ? L("Waiting for {0}…", r)
+        : LiveSource?.Waiting ?? L("Load a track in VirtualDJ with AmadeusLink as master effect.");
 
     /// The show's state for people: "Waiting for djay Pro" rather than a fixed name.
-    public string ShowTitle => ShowState.Kind == ShowStateKind.WaitingForDJ ? $"Waiting for {DjName}" : ShowState.Title;
+    public string ShowTitle => ShowState.Kind == ShowStateKind.WaitingForDJ ? L("Waiting for {0}", DjName) : ShowState.Title;
 
     /// The DJ software Start (Ctrl+R) follows: the last one chosen in the Start menu.
     public string NextSourceName => Workspace?.DJSource(Defaults.Standard.String("djSource") ?? "vdj")?.App ?? "VirtualDJ";

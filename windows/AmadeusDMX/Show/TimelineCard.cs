@@ -45,8 +45,8 @@ public sealed class TimelineCard(AppModel model, Hello hello)
             _header.Children.Add(UI.Text(Timeline.Describe(hello.Plan[i]), Font.Caption).Secondary().Lines(1));
         else
         {
-            _header.Children.Add(UI.Text("Timeline", Font.Caption).Bold().Secondary());
-            if (model.PlayingFile is not null) _header.Children.Add(UI.Text("· click to jump", Font.Caption).Foreground(ShowUI.Tertiary));
+            _header.Children.Add(UI.Text(L("Timeline"), Font.Caption).Bold().Secondary());
+            if (model.PlayingFile is not null) _header.Children.Add(UI.Text(L("· click to jump"), Font.Caption).Foreground(ShowUI.Tertiary));
         }
         _header.Children.Add(UI.Spacer());
     }

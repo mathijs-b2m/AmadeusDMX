@@ -52,21 +52,21 @@ public sealed class LineUpSheet(Underlay drawing, DrawingPicture picture, double
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, Width = 150,
         };
         _distance.ValueChanged += (_, _) => Validate();
-        _distance.Tooltip("How far apart the two points are (metres): the stage's width, or the hall's when you clicked its side walls");
+        _distance.Tooltip(L("How far apart the two points are (metres): the stage's width, or the hall's when you clicked its side walls"));
 
         _dialog = new ContentDialog
         {
-            XamlRoot = root, Title = $"Line Up “{drawing.Name}”", PrimaryButtonText = "Line Up", CloseButtonText = "Cancel",
+            XamlRoot = root, Title = L("Line Up “{0}”", drawing.Name), PrimaryButtonText = L("Line Up"), CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
             Content = UI.VStack(10,
-                UI.Text("Click the stage's front edge at stage left, then at stage right.", Font.Headline).Wrap(),
-                UI.Text("Stage left is the performers' left: on the usual plan, with the audience at the bottom, that is on the right of the page. On a hall plan without the stage, click where the hall meets the stage at its two side walls, and type the hall's width.",
+                UI.Text(L("Click the stage's front edge at stage left, then at stage right."), Font.Headline).Wrap(),
+                UI.Text(L("Stage left is the performers' left: on the usual plan, with the audience at the bottom, that is on the right of the page. On a hall plan without the stage, click where the hall meets the stage at its two side walls, and type the hall's width."),
                         Font.Callout).Secondary().Wrap(),
                 scroll,
-                UI.HStack(10, _status.Grow(), UI.Text("Distance"), _distance, UI.Text("m").Secondary())).Frame(width: MaxWidth),
+                UI.HStack(10, _status.Grow(), UI.Text(L("Distance")), _distance, UI.Text("m").Secondary())).Frame(width: MaxWidth),
         };
         _dialog.Resources["ContentDialogMaxWidth"] = MaxWidth + 80;
-        page.Tooltip("The faint marks: where the import thought the stage's front edge is");
+        page.Tooltip(L("The faint marks: where the import thought the stage's front edge is"));
         Draw();
         Validate();
         if (await Dialogs.Show(_dialog) != ContentDialogResult.Primary || _sl is not { } a || _sr is not { } b || Distance is not { } d) return null;
@@ -87,9 +87,9 @@ public sealed class LineUpSheet(Underlay drawing, DrawingPicture picture, double
     void Validate()
     {
         if (_dialog is not null) _dialog.IsPrimaryButtonEnabled = _sl is not null && _sr is not null && Distance is not null;
-        _status.Text = _sl is null ? "Click stage left (SL) on the page."
-            : _sr is null ? "Now click stage right (SR)."
-            : "Line Up moves the drawing's fixtures there. Click again to start over.";
+        _status.Text = _sl is null ? L("Click stage left (SL) on the page.")
+            : _sr is null ? L("Now click stage right (SR).")
+            : L("Line Up moves the drawing's fixtures there. Click again to start over.");
     }
 
     void Draw()

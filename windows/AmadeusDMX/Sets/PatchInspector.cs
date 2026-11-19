@@ -121,12 +121,12 @@ public sealed class PatchInspector(
         var a = Patch.Address(f);
         var none = new HashSet<string> { id };
 
-        var renameButton = Keep(UI.Button("Rename", () => { typing.Sent = ""; Commit(); }).Prominent());
+        var renameButton = Keep(UI.Button(L("Rename"), () => { typing.Sent = ""; Commit(); }).Prominent());
         void Renamed() => renameButton.Visible(typing.Name != id);
-        _name = Field("name", typing.Name, "Name", v => { typing.Name = v; Renamed(); });
-        _name.Tooltip("The fixture's name in the set (renaming keeps where it hangs on your rigs). Saved on Enter or when you leave the field.");
+        _name = Field("name", typing.Name, L("Name"), v => { typing.Name = v; Renamed(); });
+        _name.Tooltip(L("The fixture's name in the set (renaming keeps where it hangs on your rigs). Saved on Enter or when you leave the field."));
         Renamed();
-        var mode = UI.Picker(Modes(def), Patch.Mode(f), m => $"{m} · {def?.ChannelCount(m) ?? 0} ch",
+        var mode = UI.Picker(Modes(def), Patch.Mode(f), m => L("{0} · {1} ch", m, def?.ChannelCount(m) ?? 0),
                              m => Set("Change Mode", id, x => x["mode"] = m));
 
         var buttons = new ContentControl { IsTabStop = false };
@@ -138,61 +138,61 @@ public sealed class PatchInspector(
             var edited = text.Length == 0 ? a is not null : typed is not null && typed != a;
             buttons.Content = edited
                 ? UI.HStack(8,
-                    Keep(UI.Button("Save", () => { typing.Sent = ""; Commit(); }).Prominent()),
-                    Keep(UI.Button("Revert", () => SetAddress(a?.ToString() ?? ""))))
-                : Keep(UI.Button("Next Free", () =>
+                    Keep(UI.Button(L("Save"), () => { typing.Sent = ""; Commit(); }).Prominent()),
+                    Keep(UI.Button(L("Revert"), () => SetAddress(a?.ToString() ?? ""))))
+                : Keep(UI.Button(L("Next Free"), () =>
                 {
                     if (_patch.Free(u, n, none) is { } v)
                     {
                         SetAddress(v.ToString());
                         Set("Change Address", id, x => x["address"] = v);
                     }
-                })).Tooltip($"The first address in this universe where its {n} channels fit");
+                })).Tooltip(L("The first address in this universe where its {0} channels fit", n));
 
             var rows = UI.VStack(8);
             if (int.TryParse(typing.Address, out _) && typed is null)
-                rows.Children.Add(Form.Note("exclamationmark.triangle.fill", "A start address is 1 to 512.", Tint.Orange));
+                rows.Children.Add(Form.Note("exclamationmark.triangle.fill", L("A start address is 1 to 512."), Tint.Orange));
             if ((text.Length == 0 ? null : typed ?? a) is { } shown)  // what is typed, checked before it is saved
             {
-                rows.Children.Add(Form.Row("Channels", UI.Text($"{Patch.Where(u, shown)} – {Patch.Where(u, shown + n - 1)}"
-                                                               + (shown != a ? " (not saved yet)" : "")).Secondary()));
+                rows.Children.Add(Form.Row(L("Channels"), UI.Text(shown != a ? L("{0} – {1} (not saved yet)", Patch.Where(u, shown), Patch.Where(u, shown + n - 1))
+                                                               : $"{Patch.Where(u, shown)} – {Patch.Where(u, shown + n - 1)}").Secondary()));
                 if (Patch.Overflow(shown, n) is > 0 and var over)
-                    rows.Children.Add(Form.Note("exclamationmark.triangle.fill", $"It doesn't fit in the universe: {over} channels past 512.", Tint.Orange));
+                    rows.Children.Add(Form.Note("exclamationmark.triangle.fill", L("It doesn't fit in the universe: {0} channels past 512.", over), Tint.Orange));
                 var c = _patch.Clashes(u, shown, n, none);
                 if (c.Count > 0)
                     rows.Children.Add(Form.Note("exclamationmark.triangle.fill",
-                        $"Overlaps {string.Join(", ", c)}. It is saved anyway, so you can move the others next.", Tint.Orange));
+                        L("Overlaps {0}. It is saved anyway, so you can move the others next.", string.Join(", ", c)), Tint.Orange));
             }
             else
                 rows.Children.Add(Form.Note("info.circle",
-                    "No start address yet: it plays in the visualiser only until it has one. Type the address set on the fixture, or Next Free."));
+                    L("No start address yet: it plays in the visualiser only until it has one. Type the address set on the fixture, or Next Free.")));
             checks.Content = rows;
         }
-        _address = Field("address", typing.Address, "not set", v => { typing.Address = v; Typed(); });
+        _address = Field("address", typing.Address, L("not set"), v => { typing.Address = v; Typed(); });
         _address.Width = 90;
-        _address.Tooltip("The address set on the fixture itself. Saved on Enter, when you leave the field, or with Save; empty: none yet");
+        _address.Tooltip(L("The address set on the fixture itself. Saved on Enter, when you leave the field, or with Save; empty: none yet"));
         Typed();
 
         var patch = new List<UIElement?>
         {
-            Form.Stepper(u, 1, 64, v => $"Universe {v}", v => Set("Change Universe", id, x => x["universe"] = v)),
-            Form.Row("Start address", UI.HStack(8, _address, buttons)),
+            Form.Stepper(u, 1, 64, v => L("Universe {0}", v), v => Set("Change Universe", id, x => x["universe"] = v)),
+            Form.Row(L("Start address"), UI.HStack(8, _address, buttons)),
             checks,
         };
 
         var sections = new List<UIElement?>
         {
-            Form.Section(def?.Name ?? key, [Form.Row("Name", UI.HStack(8, _name.MinWidth(180), renameButton)), Form.Row("DMX mode", mode)]),
-            Form.Section("DMX patch", patch),
+            Form.Section(def?.Name ?? key, [Form.Row(L("Name"), UI.HStack(8, _name.MinWidth(180), renameButton)), Form.Row(L("DMX mode"), mode)]),
+            Form.Section(L("DMX patch"), patch),
         };
         if (def is not null && saveLens is not null && def.ElementKind is not (FixtureKind.Smoke or FixtureKind.Laser))
             sections.Add(LensSection(key, def, saveLens));
         if (def?.IsMoving == true)
-            sections.Add(Form.Section("Motion",
+            sections.Add(Form.Section(L("Motion"),
             [
-                Form.Row("Invert pan", UI.Toggle("", f.GetValueOrDefault("pan_invert")?.Bool ?? false,
+                Form.Row(L("Invert pan"), UI.Toggle("", f.GetValueOrDefault("pan_invert")?.Bool ?? false,
                     v => Set("Invert Pan", id, x => { if (v) x["pan_invert"] = true; else x.Remove("pan_invert"); }))),
-                Form.Row("Invert tilt", UI.Toggle("", f.GetValueOrDefault("tilt_invert")?.Bool ?? false,
+                Form.Row(L("Invert tilt"), UI.Toggle("", f.GetValueOrDefault("tilt_invert")?.Bool ?? false,
                     v => Set("Invert Tilt", id, x => { if (v) x["tilt_invert"] = true; else x.Remove("tilt_invert"); }))),
             ]));
         return sections;
@@ -208,17 +208,17 @@ public sealed class PatchInspector(
         string Num(double? v) => v is { } x && x > 0 ? x.ToString("0.#", inv) : "";
         double? Parse(TextBox t) => double.TryParse(t.Text.Trim(), System.Globalization.NumberStyles.Float, inv, out var v) && v > 0 ? v : null;
         var beam = new TextBox { Text = Num(def.Physical?.BeamDeg ?? 25), Width = 90 };
-        beam.Tooltip("The manual's beam angle: where the light is half the centre's (not the wider field angle)");
-        var wide = new TextBox { Text = Num(def.Physical?.BeamDegMax), PlaceholderText = "no zoom range", Width = 120 };
-        wide.Tooltip("How wide the zoom opens: the manual gives it as e.g. 4°–40°");
-        var lumens = new TextBox { Text = Num(def.Physical?.Lumens), PlaceholderText = "unknown", Width = 120 };
-        lumens.Tooltip("Lumens from the manual: the visualiser draws the beam as bright as its light over its width");
+        beam.Tooltip(L("The manual's beam angle: where the light is half the centre's (not the wider field angle)"));
+        var wide = new TextBox { Text = Num(def.Physical?.BeamDegMax), PlaceholderText = L("no zoom range"), Width = 120 };
+        wide.Tooltip(L("How wide the zoom opens: the manual gives it as e.g. 4°–40°"));
+        var lumens = new TextBox { Text = Num(def.Physical?.Lumens), PlaceholderText = L("unknown"), Width = 120 };
+        lumens.Tooltip(L("Lumens from the manual: the visualiser draws the beam as bright as its light over its width"));
         var problems = UI.VStack(6);
         var saving = false;
-        var saveButton = UI.Button("Save", async () =>
+        var saveButton = UI.Button(L("Save"), async () =>
         {
             if (saving) return;
-            if (Parse(beam) is not { } b) { problems.Children.Clear(); problems.Children.Add(Form.Note("exclamationmark.triangle.fill", "Give the beam angle in degrees.", Tint.Orange)); return; }
+            if (Parse(beam) is not { } b) { problems.Children.Clear(); problems.Children.Add(Form.Note("exclamationmark.triangle.fill", L("Give the beam angle in degrees."), Tint.Orange)); return; }
             saving = true;
             try
             {
@@ -229,14 +229,14 @@ public sealed class PatchInspector(
             catch (Exception e) { problems.Children.Clear(); problems.Children.Add(Form.Note("exclamationmark.triangle.fill", e.Message, Tint.Orange)); }
             finally { saving = false; }
         }).Prominent();
-        return Form.Section("Lens",
+        return Form.Section(L("Lens"),
         [
-            Form.Row(zoom ? "Beam angle, tightest (°)" : "Beam angle (°)", beam),
-            zoom ? Form.Row("Beam angle, widest (°)", wide) : null,
-            Form.Row("Light output (lm)", lumens),
+            Form.Row(zoom ? L("Beam angle, tightest (°)") : L("Beam angle (°)"), beam),
+            zoom ? Form.Row(L("Beam angle, widest (°)"), wide) : null,
+            Form.Row(L("Light output (lm)"), lumens),
             saveButton,
             problems,
-        ], $"For every {def.Name} in your sets. The visualiser draws its beam this wide, as bright as its light allows, dimmer the further it throws.");
+        ], L("For every {0} in your sets. The visualiser draws its beam this wide, as bright as its light allows, dimmer the further it throws.", def.Name));
     }
 
     // MARK: several
@@ -253,24 +253,24 @@ public sealed class PatchInspector(
             var choices = new List<string>();
             if (modes.Count > 1) choices.Add("");
             choices.AddRange(Modes(def));
-            rows.Add(Form.Row("DMX mode", UI.Picker(choices, modes.Count == 1 ? modes.First() : "",
-                m => m.Length == 0 ? "Mixed" : $"{m} · {def.ChannelCount(m)} ch",
+            rows.Add(Form.Row(L("DMX mode"), UI.Picker(choices, modes.Count == 1 ? modes.First() : "",
+                m => m.Length == 0 ? L("Mixed") : L("{0} · {1} ch", m, def.ChannelCount(m)),
                 m =>
                 {
                     if (m.Length == 0) return;
                     apply("Change Modes", all => { foreach (var id in selIds) SetLayout.Change(all, id, x => x["mode"] = m); });
                 })));
         }
-        rows.Add(Form.Stepper(universes.Min(), 1, 64, v => universes.Count == 1 ? $"Universe {v}" : "Universe (mixed)",
+        rows.Add(Form.Stepper(universes.Min(), 1, 64, v => universes.Count == 1 ? L("Universe {0}", v) : L("Universe (mixed)"),
             v => apply("Change Universe", all => { foreach (var id in selIds) SetLayout.Change(all, id, x => x["universe"] = v); })));
 
-        var from = new TextBox { PlaceholderText = "From address", Text = "1", MinWidth = 120 };
-        var inRow = UI.Button("Patch in a Row", () => PatchInRow(sel, int.TryParse(from.Text, out var x) ? x : 1));
+        var from = new TextBox { PlaceholderText = L("From address"), Text = "1", MinWidth = 120 };
+        var inRow = UI.Button(L("Patch in a Row"), () => PatchInRow(sel, int.TryParse(from.Text, out var x) ? x : 1));
         return
         [
-            Form.Section($"{sel.Count} fixtures", rows),
-            Form.Section("Addresses", [Form.Row(from.Grow(), inRow)],
-                "One after another from that address (in the order shown), in their universe, around the other fixtures; a fixture that doesn't fit goes on in the next universe."),
+            Form.Section(L("{0} fixtures", sel.Count), rows),
+            Form.Section(L("Addresses"), [Form.Row(from.Grow(), inRow)],
+                L("One after another from that address (in the order shown), in their universe, around the other fixtures; a fixture that doesn't fit goes on in the next universe.")),
         ];
     }
 

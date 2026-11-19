@@ -27,34 +27,34 @@ public sealed record Knob(string Id, string Title, string Symbol, string Help, b
 {
     /// The knobs as a lighting director thinks of them: what is in play tonight, the character of each track,
     /// how hard the lights react, and the master level.
-    public static readonly IReadOnlyList<(string Title, IReadOnlyList<Knob> Knobs)> Sections =
+    public static IReadOnlyList<(string Title, IReadOnlyList<Knob> Knobs)> Sections =>
     [
-        ("In Play", [
-            new("groups", "Light Groups", "square.grid.2x2",
-                "How many groups of lights play: washes first, then the heads, the biggest group last. A group that hasn't played yet tonight is a surprise: it comes out on a drop. All the way down: none"),
-            new("specials", "Special Effects", "sparkles",
-                "Lasers, strobes and blinders: in the box (off), out for the big moments only (the drops), or free (as the director plans them)"),
-            new("screen", "LED Wall", "tv",
-                "The LED wall: below half only calm colour (no characters, words or psychedelics), at zero off"),
-            new("smoke", "Smoke", "cloud.fog", "How much of the planned smoke goes out"),
+        (L("In Play"), [
+            new("groups", L("Light Groups"), "square.grid.2x2",
+                L("How many groups of lights play: washes first, then the heads, the biggest group last. A group that hasn't played yet tonight is a surprise: it comes out on a drop. All the way down: none")),
+            new("specials", L("Special Effects"), "sparkles",
+                L("Lasers, strobes and blinders: in the box (off), out for the big moments only (the drops), or free (as the director plans them)")),
+            new("screen", L("LED Wall"), "tv",
+                L("The LED wall: below half only calm colour (no characters, words or psychedelics), at zero off")),
+            new("smoke", L("Smoke"), "cloud.fog", L("How much of the planned smoke goes out")),
         ]),
-        ("Character", [
-            new("movement", "Movement", "arrow.up.and.down.and.arrow.left.and.right",
-                "How busy the heads are: calm (slow sweeps and circles, beams stay on), mid (no wild paths), full (the director's beat-locked jumps). Each change re-plans the tracks in a few seconds"),
-            new("changes", "Look Changes", "rectangle.stack",
-                "How often the look changes within a song: low holds one look for up to eight phrases, high changes with every part the analysis finds. Re-plans the tracks in a few seconds"),
-            new("colour", "Colour Variety", "paintpalette",
-                "How much colour moves: low keeps a palette for several phrases, high swaps every eight bars"),
+        (L("Character"), [
+            new("movement", L("Movement"), "arrow.up.and.down.and.arrow.left.and.right",
+                L("How busy the heads are: calm (slow sweeps and circles, beams stay on), mid (no wild paths), full (the director's beat-locked jumps). Each change re-plans the tracks in a few seconds")),
+            new("changes", L("Look Changes"), "rectangle.stack",
+                L("How often the look changes within a song: low holds one look for up to eight phrases, high changes with every part the analysis finds. Re-plans the tracks in a few seconds")),
+            new("colour", L("Colour Variety"), "paintpalette",
+                L("How much colour moves: low keeps a palette for several phrases, high swaps every eight bars")),
         ]),
-        ("Reaction", [
-            new("response", "Beat Response", "waveform.path",
-                "How hard the lights hit with the beat: low glows and breathes, high punches every kick"),
-            new("drops", "Drops", "arrow.down.to.line",
-                "How big a drop lands: low a lift and (above a quarter) its own look; from a third a breath of darkness; full: blackout, bang, flash (as the director plans it)"),
-            new("flashes", "Flashes", "bolt", "White flash accents and strobes"),
+        (L("Reaction"), [
+            new("response", L("Beat Response"), "waveform.path",
+                L("How hard the lights hit with the beat: low glows and breathes, high punches every kick")),
+            new("drops", L("Drops"), "arrow.down.to.line",
+                L("How big a drop lands: low a lift and (above a quarter) its own look; from a third a breath of darkness; full: blackout, bang, flash (as the director plans it)")),
+            new("flashes", L("Flashes"), "bolt", L("White flash accents and strobes")),
         ]),
-        ("Level", [
-            new("intensity", "Intensity", "sun.max", "The master: how bright the whole rig plays. All the way down: dark"),
+        (L("Level"), [
+            new("intensity", L("Intensity"), "sun.max", L("The master: how bright the whole rig plays. All the way down: dark")),
         ]),
     ];
 
@@ -79,23 +79,23 @@ public static class Night
 
     /// Under the stage's name: how far the night is.
     public static string Clock(ArcStatus arc) =>
-        arc.Elapsed is { } e ? $"{Hm(e)} of {Hm(arc.Length)}" : $"starts with the music · {Hm(arc.Length)}";
+        arc.Elapsed is { } e ? L("{0} of {1}", Hm(e), Hm(arc.Length)) : L("starts with the music · {0}", Hm(arc.Length));
 
     /// The countdown (nil before the night started); over the length: "+0:05:00".
     public static string? Countdown(ArcStatus arc) => arc.Remaining is { } left ? (left >= 0 ? Hms(left) : "+" + Hms(-left)) : null;
 
     public static bool Over(ArcStatus arc) => arc.Remaining is < 0;
 
-    public static string Title(ArcStatus arc) => arc.On ? arc.StageName : "Show Arc Off";
+    public static string Title(ArcStatus arc) => arc.On ? arc.StageName : L("Show Arc Off");
 
-    public static string HeldHelp(ArcStatus arc) => $"You hold {arc.Manual.Count} knob{(arc.Manual.Count == 1 ? "" : "s")}";
+    public static string HeldHelp(ArcStatus arc) => arc.Manual.Count == 1 ? L("You hold 1 knob") : L("You hold {0} knobs", arc.Manual.Count);
 
     /// What a knob's row says at its right: its level, or what the level means for that knob.
     public static string KnobValue(Knob knob, ArcStatus arc, double value) => knob.Id switch
     {
-        "movement" => new[] { "calm", "mid", "full" }[Math.Min(2, Math.Max(0, arc.MovementLevel ?? 2))],
-        "changes" => arc.Hold is { } h ? (h <= 1 ? "all" : $"÷{h}") : "",
-        "specials" => value < 0.25 ? "box" : value < 0.75 ? "drops" : "free",
+        "movement" => new[] { L("calm"), L("mid"), L("full") }[Math.Min(2, Math.Max(0, arc.MovementLevel ?? 2))],
+        "changes" => arc.Hold is { } h ? (h <= 1 ? L("all") : $"÷{h}") : "",
+        "specials" => value < 0.25 ? L("box") : value < 0.75 ? L("drops") : L("free"),
         _ => $"{Num.Round(value * 100)}",
     };
 
@@ -103,39 +103,40 @@ public static class Night
     public static double KnobLevel(Knob knob, ArcStatus arc) => arc.Values.TryGetValue(knob.Id, out var v) ? v : 1;
 
     public static string KnobHelp(Knob knob, ArcStatus arc) =>
-        knob.Id == "groups" ? $"{knob.Help} ({arc.Playing} of {arc.Groups} playing)" : knob.Help;
+        knob.Id == "groups" ? L("{0} ({1} of {2} playing)", knob.Help, arc.Playing, arc.Groups) : knob.Help;
 
     public static string HeatSymbol(ArcStatus arc) => arc.Trend > 0.02 ? "arrow.up.right" : arc.Trend < -0.02 ? "arrow.down.right" : "arrow.right";
 
     public static string HeatHelp(ArcStatus arc) =>
-        "How hot the mix runs: the tracks' energy and the tempo against tonight's warm-up tempo"
-        + (arc.BaseBpm is { } b ? $" ({Num.Round(b)} BPM)" : "") + ". The stages are detected from it.";
+        arc.BaseBpm is { } b
+            ? L("How hot the mix runs: the tracks' energy and the tempo against tonight's warm-up tempo ({0} BPM). The stages are detected from it.", Num.Round(b))
+            : L("How hot the mix runs: the tracks' energy and the tempo against tonight's warm-up tempo. The stages are detected from it.");
 
     /// The Lightshow row's line.
     public static string LightshowStatus(bool on) =>
-        on ? "Every track a show piece, until you switch it off" : "Play the tracks as a show piece";
+        on ? L("Every track a show piece, until you switch it off") : L("Play the tracks as a show piece");
 
-    public const string LightshowHelp = "Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.";
+    public static string LightshowHelp => L("Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.");
 
     /// The named show plays: one is picked and the Lightshow isn't on (it waits for it).
     public static bool NamedShowPlaying(ArcStatus arc) => arc.NamedShow is not null && arc.Lightshow != true;
 
     /// The Named Show row's line.
     public static string NamedShowStatus(ArcStatus arc) =>
-        arc.NamedShow is not { } show ? "Each track in its genre's style"
-        : arc.Lightshow == true ? "Waits while the Lightshow plays" : $"Every track in {show.Title}, until you pick None";
+        arc.NamedShow is not { } show ? L("Each track in its genre's style")
+        : arc.Lightshow == true ? L("Waits while the Lightshow plays") : L("Every track in {0}, until you pick None", show.Title);
 
     /// The named shows' genres, in the engine's order (the menu's sections).
     public static IReadOnlyList<string> NamedShowGenres(IReadOnlyList<NamedShow> shows) => shows.Select(s => s.Genre).Distinct().ToList();
 
-    public const string NamedShowHelp = "A show with a style of its own, for a DJ who wants one look all set long: its colours, how the heads light and move. Every track is lit in it, whatever its genre. Takes a few seconds per track to prepare; the show keeps playing meanwhile.";
+    public static string NamedShowHelp => L("A show with a style of its own, for a DJ who wants one look all set long: its colours, how the heads light and move. Every track is lit in it, whatever its genre. Takes a few seconds per track to prepare; the show keeps playing meanwhile.");
 
     /// The haze push's line: what the hazers do now.
     public static string HazeStatus(ArcStatus arc)
     {
-        if (arc.Haze is not { } h) return "The show hazes by itself";
-        var pct = $"{Num.Round(h.Level * 100)} %";
-        return h.Mode == "push" ? $"Pushing at {pct}: {Num.Round(h.Left)} s left" : $"Holding the haze: a burst at {pct} every {Num.Round(h.Every ?? 0)} s";
+        if (arc.Haze is not { } h) return L("The show hazes by itself");
+        var pct = Num.Round(h.Level * 100);
+        return h.Mode == "push" ? L("Pushing at {0} %: {1} s left", pct, Num.Round(h.Left)) : L("Holding the haze: a burst at {0} % every {1} s", pct, Num.Round(h.Every ?? 0));
     }
 
     /// A night is between half an hour and twelve hours, a quarter of an hour per click.
@@ -229,8 +230,8 @@ public static class Timeline
 
     /// What the header says for the phrase under the pointer.
     public static string Describe(Decision d) =>
-        $"{Formatting.TimeString(d.Start)} · {d.Section}{(d.DropScore >= DropScore ? " ⚡" : "")} · pars {d["par_base"]} + {d["par_accent"]}"
-        + $" · heads {d["movement"]} / {d["aim"]} · {d.Palette}";
+        L("{0} · {1}{2} · pars {3} + {4} · heads {5} / {6} · {7}", Formatting.TimeString(d.Start), d.Section, d.DropScore >= DropScore ? " ⚡" : "",
+          d["par_base"], d["par_accent"], d["movement"], d["aim"], d.Palette);
 }
 
 // MARK: now playing (NowPlayingCard, PerformBoard)
@@ -250,7 +251,7 @@ public static class NowPlaying
 
     /// The Perform board's line: "⚡ drop in 12 s".
     public static string NextLine(Decision next, double time) =>
-        (IsDrop(next) ? "⚡ " : "") + $"{next.Section} in {Num.Trunc(Left(next, time))} s";
+        (IsDrop(next) ? "⚡ " : "") + L("{0} in {1} s", next.Section, Num.Trunc(Left(next, time)));
 
     public static bool GuardIsSevere(string note) => note.StartsWith("blanked", StringComparison.Ordinal) || note.StartsWith("dark", StringComparison.Ordinal);
 
@@ -260,7 +261,7 @@ public static class NowPlaying
 
     /// The Perform board's output line.
     public static string Output(SetSummary? set) =>
-        set is null ? "No set" : set.IsVirtual ? "No lights in this set (visualiser only)" : set.OutputText;
+        set is null ? L("No set") : set.IsVirtual ? L("No lights in this set (visualiser only)") : set.OutputText;
 }
 
 // MARK: the decks (DecksCard)
@@ -268,9 +269,9 @@ public static class NowPlaying
 public static class Decks
 {
     public static string LinkLine(LinkStatus link) =>
-        link.Up ? $"±{link.JitterMs.ToString("F0", CultureInfo.InvariantCulture)} ms · {link.Lost} lost" : "link down";
+        link.Up ? L("±{0:F0} ms · {1} lost", link.JitterMs, link.Lost) : L("link down");
 
-    public static string Lights(string l) => l switch { "openai" => "AI plan", "rules" => "quick plan", "tempo" => "tempo groove", _ => l };
+    public static string Lights(string l) => l switch { "openai" => L("AI plan"), "rules" => L("quick plan"), "tempo" => L("tempo groove"), _ => l };
 
     /// A preparation step: its title with progress, and its state's symbol and colour.
     public sealed record Step(string Title, string? State, string? Extra = null)
@@ -293,10 +294,10 @@ public static class Decks
     public static IReadOnlyList<Step> Steps(TrackStatus s)
     {
         var steps = new List<Step>();
-        if (s.Stream is { } stream) steps.Add(new($"{Formatting.Capitalized(stream)} copy", s.Copy == "waiting" ? "running" : s.Copy));
-        steps.Add(new("Analysis", s.Analysis));
-        steps.Add(new("Instruments", s.Stems, s.Stems == "running" && s.Elapsed is { } e ? Formatting.TimeString(e) : null));
-        steps.Add(new("AI", s.Ai, s.Ai == "running" ? $"{s.AiDone ?? 0}/{s.AiTotal?.ToString(CultureInfo.InvariantCulture) ?? "…"}" : null));
+        if (s.Stream is { } stream) steps.Add(new(L("{0} copy", Formatting.Capitalized(stream)), s.Copy == "waiting" ? "running" : s.Copy));
+        steps.Add(new(L("Analysis"), s.Analysis));
+        steps.Add(new(L("Instruments"), s.Stems, s.Stems == "running" && s.Elapsed is { } e ? Formatting.TimeString(e) : null));
+        steps.Add(new(L("AI"), s.Ai, s.Ai == "running" ? $"{s.AiDone ?? 0}/{s.AiTotal?.ToString(CultureInfo.InvariantCulture) ?? "…"}" : null));
         return steps;
     }
 
@@ -312,10 +313,10 @@ public static class Director
 {
     public static string Source(string s) => s switch
     {
-        "openai" => "AI (Decisions API)",
-        "openai+hold" => "AI, unsure: held the look",
-        "rules" => "Rules",
-        _ => s.StartsWith("ollama", StringComparison.Ordinal) ? "Local AI" : s,
+        "openai" => L("AI (Decisions API)"),
+        "openai+hold" => L("AI, unsure: held the look"),
+        "rules" => L("Rules"),
+        _ => s.StartsWith("ollama", StringComparison.Ordinal) ? L("Local AI") : s,
     };
 
     /// Under a rules plan: why there are no probabilities (yet).
@@ -323,10 +324,10 @@ public static class Director
     {
         var st = decks.Select(d => d.Status).FirstOrDefault(s => s?.Lights == "rules");
         if (st?.Ai == "running")
-            return $"Quick plan for now: the AI is still deciding this track ({st.AiDone ?? 0}/{st.AiTotal?.ToString(CultureInfo.InvariantCulture) ?? "…"} phrases). It takes over when it is done.";
-        if (st?.Stems == "running") return "Quick plan for now: the instruments are separated first, then the AI decides.";
-        if (st?.Ai == "failed") return "OpenAI refused the API key: the rule-based director lights this track.";
-        return "The rule-based director has no probabilities. Choose an AI director in the set's settings to see how sure it is.";
+            return L("Quick plan for now: the AI is still deciding this track ({0}/{1} phrases). It takes over when it is done.", st.AiDone ?? 0, st.AiTotal?.ToString(CultureInfo.InvariantCulture) ?? "…");
+        if (st?.Stems == "running") return L("Quick plan for now: the instruments are separated first, then the AI decides.");
+        if (st?.Ai == "failed") return L("OpenAI refused the API key: the rule-based director lights this track.");
+        return L("The rule-based director has no probabilities. Choose an AI director in the set's settings to see how sure it is.");
     }
 
     /// The first decision with probabilities, its five likeliest choices.
@@ -371,11 +372,11 @@ public static class Genre
 
     public static string Source(string s) => s switch
     {
-        "you" => "Your choice",
-        "ai" => "From the artist and title (Decisions API)",
-        "tag" => "From the file's genre tag",
-        "sound" => "From its sound (EffNet-Discogs)",
-        _ => "From the audio: groove, bass and tempo",
+        "you" => L("Your choice"),
+        "ai" => L("From the artist and title (Decisions API)"),
+        "tag" => L("From the file's genre tag"),
+        "sound" => L("From its sound (EffNet-Discogs)"),
+        _ => L("From the audio: groove, bass and tempo"),
     };
 
     static bool Restyled(string genre, string style) => style.Length > 0 && style != genre;
@@ -385,8 +386,8 @@ public static class Genre
         Restyled(genre, style) ? $"{genre.ToUpperInvariant()} → {style.ToUpperInvariant()}" : genre.ToUpperInvariant();
 
     public static string ChipHelp(string genre, string source, string style) =>
-        $"Genre: {genre}. {Source(source)}."
-        + (Restyled(genre, style) ? $" Lit in the set's {style} style, so the set looks like one show." : "");
+        Restyled(genre, style) ? L("Genre: {0}. {1}. Lit in the set's {2} style, so the set looks like one show.", genre, Source(source), style)
+            : L("Genre: {0}. {1}.", genre, Source(source));
 }
 
 // MARK: the engine's log (EngineView)
@@ -400,10 +401,10 @@ public static class EngineLog
     public static Tone Tone(EngineProcess.LogLine l) =>
         l.IsError ? AmadeusDMX.Tone.Red : l.Text.Contains('✓') ? AmadeusDMX.Tone.Green : l.Text.Contains('⚠') ? AmadeusDMX.Tone.Orange : AmadeusDMX.Tone.Primary;
 
-    public static string Empty(bool show) => show ? "The Show Engine Hasn’t Run Yet" : "Setup Service Not Started";
+    public static string Empty(bool show) => show ? L("The Show Engine Hasn’t Run Yet") : L("Setup Service Not Started");
 
     public static string EmptyDetail(bool show) =>
-        show ? "Start a show (Ctrl+R) and its output appears here." : "It starts when the wizard or the rig tools need it.";
+        show ? L("Start a show (Ctrl+R) and its output appears here.") : L("It starts when the wizard or the rig tools need it.");
 
     /// How the list on screen follows the log: drop lines from its front (the log keeps its last 4000), add the
     /// new ones at its end; or, when the two no longer line up (cleared, a new filter), start again.

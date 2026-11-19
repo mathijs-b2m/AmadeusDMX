@@ -10,7 +10,7 @@ public sealed class AddToSetSheet
     readonly AppModel _model;
     readonly Action _onDone;
     readonly ContentDialog _dialog = new();
-    readonly TextBox _query = new() { PlaceholderText = "e.g. sharpy, fuze, katana, pixbar, atomic, laserworld", BorderThickness = new Thickness(0) };
+    readonly TextBox _query = new() { PlaceholderText = L("e.g. sharpy, fuze, katana, pixbar, atomic, laserworld"), BorderThickness = new Thickness(0) };
     readonly ProgressRing _busyRing = UI.Spinner();
     readonly ListView _results = new() { SelectionMode = ListViewSelectionMode.Single, MinHeight = 200, Height = 220 };
     readonly ContentControl _options = Host(), _note = Host(), _error = Host();
@@ -44,9 +44,9 @@ public sealed class AddToSetSheet
     async Task Show(XamlRoot root)
     {
         _dialog.XamlRoot = root;
-        _dialog.Title = $"Add Fixtures to {_model.EditingSet}";
+        _dialog.Title = L("Add Fixtures to {0}", _model.EditingSet);
         _dialog.Resources["ContentDialogMaxWidth"] = 640.0;
-        _dialog.CloseButtonText = "Cancel";
+        _dialog.CloseButtonText = L("Cancel");
         _dialog.DefaultButton = ContentDialogButton.Primary;
         _dialog.PrimaryButtonClick += async (_, e) =>
         {
@@ -78,12 +78,12 @@ public sealed class AddToSetSheet
         };
         var newFixture = UI.HStack(8,
             _madeNote.Grow(),
-            UI.Button("Import GDTF…", ImportGDTF, "square.and.arrow.down")
-                .Tooltip("Convert a .gdtf file from the maker's site or your own GDTF Share account into your fixtures"),
-            UI.Button("New Fixture…", ShowNew, "plus")
-                .Tooltip("Make it from a common channel layout, then check it channel by channel on the real fixture"));
+            UI.Button(L("Import GDTF…"), ImportGDTF, "square.and.arrow.down")
+                .Tooltip(L("Convert a .gdtf file from the maker's site or your own GDTF Share account into your fixtures")),
+            UI.Button(L("New Fixture…"), ShowNew, "plus")
+                .Tooltip(L("Make it from a common channel layout, then check it channel by channel on the real fixture")));
         _dialog.Content = _main = UI.VStack(14,
-            UI.Text("Search by brand or model. Then give each its start address (the one set on the fixture) on the right; where they hang is set on the Rigs page.").Secondary().Wrap(),
+            UI.Text(L("Search by brand or model. Then give each its start address (the one set on the fixture) on the right; where they hang is set on the Rigs page.")).Secondary().Wrap(),
             field,
             _results,
             newFixture,
@@ -99,15 +99,15 @@ public sealed class AddToSetSheet
     {
         if (_new is { } n)
         {
-            _dialog.PrimaryButtonText = "Make Fixture";
+            _dialog.PrimaryButtonText = L("Make Fixture");
             _dialog.IsPrimaryButtonEnabled = n.CanMake;
             return;
         }
         _busyRing.Visibility = _busy ? Visibility.Visible : Visibility.Collapsed;
-        _dialog.PrimaryButtonText = _key is null ? "Add to the Set" : $"Add {_count} to the Set";  // a number once a fixture is chosen
+        _dialog.PrimaryButtonText = _key is null ? L("Add to the Set") : L("Add {0} to the Set", _count);  // a number once a fixture is chosen
         _dialog.IsPrimaryButtonEnabled = _key is not null && _mode.Length > 0 && !_busy;
-        _madeNote.Text = _madeKey is null ? "Not in any library? Import the maker's GDTF file, or make it from a common layout."
-            : "Made for you: once added, give it its start address and check its channels on the fixture once.";
+        _madeNote.Text = _madeKey is null ? L("Not in any library? Import the maker's GDTF file, or make it from a common layout.")
+            : L("Made for you: once added, give it its start address and check its channels on the fixture once.");
         _note.Content = _definition?.AddingNote is { } note
             ? UI.Text(note, Font.Callout).Foreground(_definition.Warning is null ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Red)).Wrap()
             : null;
@@ -135,7 +135,7 @@ public sealed class AddToSetSheet
                     UI.Icon(Icon(e)).Secondary().Frame(width: 22),
                     UI.VStack(1,
                         UI.Text($"{e.Manufacturer} {e.Model}"),
-                        UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? "in your library" : e.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0)),
+                        UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? L("in your library") : e.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0)),
                                 Font.Caption).Secondary())),
             });
     }
@@ -156,7 +156,7 @@ public sealed class AddToSetSheet
     async void ImportGDTF()
     {
         if (_main is null || Dialogs.WindowOf(_main) is not { } id) return;
-        var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(id) { CommitButtonText = "Import" };
+        var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(id) { CommitButtonText = L("Import") };
         picker.FileTypeFilter.Add(".gdtf");
         if (await picker.PickSingleFileAsync() is not { } file) return;
         _busy = true;
@@ -166,7 +166,7 @@ public sealed class AddToSetSheet
             if (!await _model.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             var name = Path.GetFileName(file.Path);
             var r = await _model.Api.ImportGDTF(name, await File.ReadAllBytesAsync(file.Path));
-            if (r.Key is not { } k || r.Mode is not { } m) throw SetupAPIException.Server($"Couldn’t import {name}");
+            if (r.Key is not { } k || r.Mode is not { } m) throw SetupAPIException.Server(L("Couldn’t import {0}", name));
             _busy = false;
             Use(k, m);
         }
@@ -192,7 +192,7 @@ public sealed class AddToSetSheet
     void CloseNew()
     {
         _new = null;
-        _dialog.Title = $"Add Fixtures to {_model.EditingSet}";
+        _dialog.Title = L("Add Fixtures to {0}", _model.EditingSet);
         _dialog.Content = _main;
         Refresh();
     }
@@ -208,7 +208,7 @@ public sealed class AddToSetSheet
         _definition = _model.Workspace?.Definition(k);
         _mode = m;
         _count = 2;
-        ShowError(_definition is null ? $"Couldn’t read {k}" : null);
+        ShowError(_definition is null ? L("Couldn’t read {0}", k) : null);
         ShowOptions();
         Refresh();
     }
@@ -226,7 +226,7 @@ public sealed class AddToSetSheet
             _definition = _model.Workspace?.Definition(k);
             _mode = _definition?.DefaultMode ?? "";
             _count = _definition?.IsMoving == true ? 4 : 2;
-            ShowError(_definition is null ? $"Couldn’t read {k}" : null);
+            ShowError(_definition is null ? L("Couldn’t read {0}", k) : null);
         }
         catch (Exception x) when (SetView.IsApiError(x)) { ShowError(x.Message); }
         finally
@@ -243,8 +243,8 @@ public sealed class AddToSetSheet
         var modes = d.Modes.Keys.OrderByDescending(d.ChannelCount).ToList();
         _options.Content = Form.Section(null,
         [
-            Form.Row("DMX mode", UI.Picker(modes, _mode, m => $"{m} · {d.ChannelCount(m)} channels", m => { _mode = m; Refresh(); })),
-            Form.Stepper(_count, 1, 96, v => $"How many: {v}", v => { _count = v; Refresh(); }),
+            Form.Row(L("DMX mode"), UI.Picker(modes, _mode, m => L("{0} · {1} channels", m, d.ChannelCount(m)), m => { _mode = m; Refresh(); })),
+            Form.Stepper(_count, 1, 96, v => L("How many: {0}", v), v => { _count = v; Refresh(); }),
         ]);
     }
 

@@ -60,8 +60,8 @@ public sealed class MapperSheet
         _dialog.XamlRoot = root;
         _dialog.Resources["ContentDialogMaxWidth"] = 900.0;
         _dialog.Resources["ContentDialogMaxHeight"] = 760.0;
-        _dialog.CloseButtonText = "Cancel";
-        _dialog.PrimaryButtonText = "Save Mapping";
+        _dialog.CloseButtonText = L("Cancel");
+        _dialog.PrimaryButtonText = L("Save Mapping");
         _dialog.DefaultButton = ContentDialogButton.Primary;
         _dialog.PrimaryButtonClick += async (_, e) =>
         {
@@ -95,46 +95,46 @@ public sealed class MapperSheet
     {
         var m = _m.Mapping;
         var title = UI.HStack(8,
-            UI.Text("Map DMX Channels", Font.Title2),
+            UI.Text(L("Map DMX Channels"), Font.Title2),
             UI.Text(m?.Name ?? _target.Key).Secondary(),
             UI.Spacer(),
             m is { Refusal.Length: 0 }
                 ? UI.Picker(MapperModel.KindChoices(m), MapperModel.KindChoices(m).FirstOrDefault(k => k.Kind == m.Kind), k => k.Label,
                             k => _m.SetKind(k.Kind))
-                    .Tooltip("What it is, when its channels don't say: pan and tilt make a moving head, cells a bar")
+                    .Tooltip(L("What it is, when its channels don't say: pan and tilt make a moving head, cells a bar"))
                 : null);
         Microsoft.UI.Xaml.Controls.Primitives.ToggleButton? tryIt = null;
         if (!_checking && _colours is null)
         {
-            tryIt = Form.ToggleButton(UI.Label(_trying ? "lightbulb.fill" : "lightbulb", "Try on the Lights"), _trying, on =>
+            tryIt = Form.ToggleButton(UI.Label(_trying ? "lightbulb.fill" : "lightbulb", L("Try on the Lights")), _trying, on =>
             {
                 if (on) StartTrying(); else StopTrying();
                 Header();
             });
             tryIt.IsEnabled = _tryRefusal is null && _m.Editable;
             if (_trying) tryIt.Foreground(Tint.Yellow);
-            tryIt.Tooltip(_tryRefusal ?? $"Send these values as they are to {_target.Fixture} (the rest of the set dark, a running show paused), to see what each channel does");
+            tryIt.Tooltip(_tryRefusal ?? L("Send these values as they are to {0} (the rest of the set dark, a running show paused), to see what each channel does", _target.Fixture));
         }
-        var check = UI.Button(_checking ? "Stop Checking" : "Check Channels", () =>
+        var check = UI.Button(_checking ? L("Stop Checking") : L("Check Channels"), () =>
         {
             if (_checking) StopCheck(); else StartCheck();
         }, _checking ? "stop.fill" : "checklist")
             .Disabled(_tryRefusal is not null || !_m.Editable || _colours is not null)
-            .Tooltip(_tryRefusal ?? $"Go through the channels one by one on {_target.Fixture}: each sweeps while you say what the fixture does");
+            .Tooltip(_tryRefusal ?? L("Go through the channels one by one on {0}: each sweeps while you say what the fixture does", _target.Fixture));
         if (_m.NeedsCheck && !_checking) check.Foreground(Tint.Orange);
         var line = UI.HStack(14,
-            UI.Text($"Mode {_target.Mode}", Font.Callout).Secondary(),
+            UI.Text(L("Mode {0}", _target.Mode), Font.Callout).Secondary(),
             m is null ? null
-                : m.Plays ? UI.Label("checkmark.circle", "The show plays it", Font.Callout).Secondary()
-                : UI.Label("exclamationmark.triangle.fill", "The show plays nothing in this mode yet", Font.Callout).Foreground(Tint.Orange),
+                : m.Plays ? UI.Label("checkmark.circle", L("The show plays it"), Font.Callout).Secondary()
+                : UI.Label("exclamationmark.triangle.fill", L("The show plays nothing in this mode yet"), Font.Callout).Foreground(Tint.Orange),
             UI.Spacer(),
             tryIt,
             check);
         UIElement note = _m.NeedsCheck && !_checkedAll && !_checking
-            ? Form.Note("exclamationmark.triangle.fill", "Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong.", Tint.Orange)
+            ? Form.Note("exclamationmark.triangle.fill", L("Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong."), Tint.Orange)
             : _checkedAll && !_checking
-                ? Form.Note("checkmark.circle.fill", "Every channel checked: save it.", Tint.Green)
-                : UI.Text($"Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every {m?.Name ?? "fixture of this model"} in your sets plays by it.",
+                ? Form.Note("checkmark.circle.fill", L("Every channel checked: save it."), Tint.Green)
+                : UI.Text(L("Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every {0} in your sets plays by it.", m?.Name ?? L("fixture of this model")),
                           Font.Caption).Secondary().Wrap();
         _header.Content = UI.VStack(8, title, line, note).Margin(0, 0, 0, 10);
     }
@@ -143,7 +143,7 @@ public sealed class MapperSheet
     {
         if (_m.Mapping is { } m)
         {
-            if (m.Refusal.Length > 0) { _body.Content = UI.Unavailable("exclamationmark.triangle", "Not Mapped Here", m.Refusal); return; }
+            if (m.Refusal.Length > 0) { _body.Content = UI.Unavailable("exclamationmark.triangle", L("Not Mapped Here"), m.Refusal); return; }
             if (_checking)
             {
                 _body.Content = new ChannelCheck(_m, _check, () =>
@@ -171,7 +171,7 @@ public sealed class MapperSheet
             _body.Content = UI.Scroll(list);
         }
         else if (_error is { } e)
-            _body.Content = UI.Unavailable("exclamationmark.triangle", "Couldn’t Read the Fixture", e);
+            _body.Content = UI.Unavailable("exclamationmark.triangle", L("Couldn’t Read the Fixture"), e);
     }
 
     void Footer()
@@ -370,7 +370,7 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
         {
             var ranges = UI.MenuButton(UI.Icon("list.bullet", 12), () => UI.Menu([.. c.Ranges.Select(r =>
                 (MenuFlyoutItemBase)UI.Item($"{r.Lo}–{r.Hi}  {(r.What.Length == 0 ? "–" : r.What)}", () => SetValue(r.Mid)))]))
-                .Tooltip("What its values do (from the fixture library): pick one to set it");
+                .Tooltip(L("What its values do (from the fixture library): pick one to set it"));
             ranges.Padding = new Thickness(6, 2, 6, 2);
             name.Children.Add(ranges);
         }
@@ -378,7 +378,7 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
 
         var role = RolePicker().Frame(width: 150);
         _slider = UI.Slider(c.Value, 0, 255, v => SetValue((int)Math.Round(v)), step: 1).MinWidth(120)
-            .Tooltip(c.Role == "hold" ? "The value it is held at" : "A value to try on the lights (the show plays this channel)");
+            .Tooltip(c.Role == "hold" ? L("The value it is held at") : L("A value to try on the lights (the show plays this channel)"));
         _value = new TextBox { Text = c.Value.ToString(), Width = 56, TextAlignment = TextAlignment.Right };
         _value.TextChanged += (_, _) =>
         {
@@ -401,8 +401,8 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
             box.Items.Add(item);
             if (role == c.Role) box.SelectedItem = item;
         }
-        Add("hold", "Hold at value");
-        if (c.Role == "keep") Add("keep", $"Keep ({c.Attr.Replace('_', ' ')})");
+        Add("hold", L("Hold at value"));
+        if (c.Role == "keep") Add("keep", L("Keep ({0})", c.Attr.Replace('_', ' ')));
         foreach (var (group, roles) in MapperModel.Groups(m.Mapping!))
         {
             Add(null, group, header: true);
@@ -414,7 +414,7 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
             {
                 m.SetRole(index, role);
                 Cell();
-                _slider?.Tooltip(role == "hold" ? "The value it is held at" : "A value to try on the lights (the show plays this channel)");
+                _slider?.Tooltip(role == "hold" ? L("The value it is held at") : L("A value to try on the lights (the show plays this channel)"));
                 if (_value is not null) _value.Opacity = role == "hold" ? 1 : 0.6;
             }
         };
@@ -426,14 +426,14 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
     {
         var role = m.Mapping!.Roles.FirstOrDefault(r => r.RoleName == Channel.Role);
         _cell.Content = role?.Cell == true
-            ? Form.Stepper(Channel.Cell, 0, 64, v => v == 0 ? "Whole" : $"Cell {v}", v => m.SetCell(index, v))
-                .Tooltip("Which cell of a bar it belongs to (Whole: the fixture as one)")
+            ? Form.Stepper(Channel.Cell, 0, 64, v => v == 0 ? L("Whole") : L("Cell {0}", v), v => m.SetCell(index, v))
+                .Tooltip(L("Which cell of a bar it belongs to (Whole: the fixture as one)"))
             : Channel.Role is "color_wheel" or "ring_color"
-                ? UI.Button("Colours…", () => colours?.Invoke()).Disabled(colours is null)
-                    .Tooltip(colours is null ? "Give the fixture a start address and a DMX output to see its colours"
+                ? UI.Button(L("Colours…"), () => colours?.Invoke()).Disabled(colours is null)
+                    .Tooltip(colours is null ? L("Give the fixture a start address and a DMX output to see its colours")
                              : Channel.Role == "ring_color"
-                             ? "Show each colour of the ring on the fixture, name it and set its values (name the one where it is off \"off\")"
-                             : "Show each colour of the wheel on the fixture, name it and set its values")
+                             ? L("Show each colour of the ring on the fixture, name it and set its values (name the one where it is off \"off\")")
+                             : L("Show each colour of the wheel on the fixture, name it and set its values"))
                 : null;
     }
 

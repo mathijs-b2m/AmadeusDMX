@@ -7,7 +7,7 @@ namespace AmadeusDMX;
 
 static class LimiterText
 {
-    public const string Explanation = "A ceiling on every light, to test and set up without eye strain. At 70 %, a light the show plays at 50 % stays at 50 %; one at 100 % plays at 70 %. The show, the light test and Identify all keep to it. Smoke isn't limited. For a show: 100 %.";
+    public static string Explanation => L("A ceiling on every light, to test and set up without eye strain. At 70 %, a light the show plays at 50 % stays at 50 %; one at 100 % plays at 70 %. The show, the light test and Identify all keep to it. Smoke isn't limited. For a show: 100 %.");
 }
 
 public sealed class LimiterButton(AppModel model)
@@ -18,10 +18,10 @@ public sealed class LimiterButton(AppModel model)
         return button.Bind(model, [nameof(AppModel.Limiter), nameof(AppModel.Workspace)], b =>
         {
             if (model.LimiterOn)
-                b.Content = UI.Label("sun.max.trianglebadge.exclamationmark.fill", $"Limited to {Percent(model.Limiter)}").Foreground(Tint.Orange).Bold();
+                b.Content = UI.Label("sun.max.trianglebadge.exclamationmark.fill", L("Limited to {0}", Percent(model.Limiter))).Foreground(Tint.Orange).Bold();
             else
                 b.Content = UI.Icon("sun.max");
-            b.Tooltip(model.LimiterOn ? $"Every light is limited to {Percent(model.Limiter)}. Click to change" : "Brightness limiter: off (100 %)");
+            b.Tooltip(model.LimiterOn ? L("Every light is limited to {0}. Click to change", Percent(model.Limiter)) : L("Brightness limiter: off (100 %)"));
             b.IsEnabled = model.Workspace is not null;
         });
     }
@@ -33,16 +33,16 @@ public sealed class LimiterPanel(AppModel model)
     {
         var level = UI.Text("", Font.Title3).Bold().Bind(model, nameof(AppModel.Limiter), t =>
         {
-            t.Text = model.LimiterOn ? Percent(model.Limiter) : "Off";
+            t.Text = model.LimiterOn ? Percent(model.Limiter) : L("Off");
             t.Foreground = model.LimiterOn ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush");
         });
         var slider = UI.Slider(model.Limiter, Workspace.LimiterMinimum, 1, v => model.SetLimiter(Math.Round(v * 20) / 20), step: 0.05)
             .Bind(model, nameof(AppModel.Limiter), s => s.SetValueQuietly(model.Limiter));
-        slider.Header = "Ceiling";
-        var off = UI.Button("100% (Off)", () => model.SetLimiter(1)).Prominent()
+        slider.Header = L("Ceiling");
+        var off = UI.Button(L("100% (Off)"), () => model.SetLimiter(1)).Prominent()
             .Bind(model, nameof(AppModel.Limiter), b => b.IsEnabled = model.LimiterOn);
         return UI.VStack(12,
-            UI.HStack(UI.Text("Brightness Limiter", Font.Headline), UI.Spacer(), level),
+            UI.HStack(UI.Text(L("Brightness Limiter"), Font.Headline), UI.Spacer(), level),
             UI.HStack(6, UI.Text("5%", Font.Caption).Secondary(), slider.Grow(), UI.Text("100%", Font.Caption).Secondary()),
             UI.HStack(
                 UI.Button(Percent(0.25), () => model.SetLimiter(0.25)),
@@ -51,7 +51,7 @@ public sealed class LimiterPanel(AppModel model)
                 UI.Spacer(),
                 off),
             UI.Text(LimiterText.Explanation, Font.Callout).Secondary().Wrap(),
-            UI.Text("The app starts at 100 % every time it opens.", Font.Caption).Secondary().Wrap()
+            UI.Text(L("The app starts at 100 % every time it opens."), Font.Caption).Secondary().Wrap()
         ).Frame(width: 360);
     }
 }
@@ -64,7 +64,7 @@ public sealed class LimiterBanner(AppModel model)
         var black = Tint.Brush(Tint.Black);
         var title = UI.Text("", Font.Headline).Foreground(black);
         var line = UI.Text("", Font.Callout).Foreground(black).Lines(1);
-        var back = UI.Button("Back to 100%", () => model.SetLimiter(1));
+        var back = UI.Button(L("Back to 100%"), () => model.SetLimiter(1));
         back.Background = black;
         back.Foreground = Tint.Brush(Tint.White);
         var banner = new Border
@@ -76,8 +76,8 @@ public sealed class LimiterBanner(AppModel model)
         return banner.Bind(model, nameof(AppModel.Limiter), b =>
         {
             b.Visible(model.LimiterOn);
-            title.Text = $"Brightness limited to {Percent(model.Limiter)}";
-            line.Text = $"lights above it play at {Percent(model.Limiter)}, the rest as the show plays them · set it to 100 % for a show";
+            title.Text = L("Brightness limited to {0}", Percent(model.Limiter));
+            line.Text = L("lights above it play at {0}, the rest as the show plays them · set it to 100 % for a show", Percent(model.Limiter));
         });
     }
 

@@ -36,8 +36,8 @@ public sealed class RigView(AppModel model)
         if (model.Workspace is { } ws && model.EditingRig.Length > 0
             && RigEditorModel.Create(ws, model.EditingRig, model.EditingRigSet) is { } editor)
             return new RigEditorView(model, editor).Build();
-        return UI.Unavailable("square.split.bottomrightquarter", "No Rig Yet", "A rig is the venue: the stage and the trusses your fixtures hang on.",
-                              UI.Button("New Rig…", () => model.ShowNewRig = true).Prominent());
+        return UI.Unavailable("square.split.bottomrightquarter", L("No Rig Yet"), L("A rig is the venue: the stage and the trusses your fixtures hang on."),
+                              UI.Button(L("New Rig…"), () => model.ShowNewRig = true).Prominent());
     }
 }
 
@@ -78,15 +78,15 @@ sealed class RigList(AppModel model)
                     void Title(UIElement content) =>
                         l.Items.Add(new ListViewItem { Content = content, IsTabStop = false, Padding = new Thickness(12, 10, 12, 2) });
                     if (!rows.Any(r => !r.IsExample))
-                        Title(UI.Text("None yet. Your venues go in rigs of your own: make one with New Rig…", Font.Callout).Secondary().Wrap());
+                        Title(UI.Text(L("None yet. Your venues go in rigs of your own: make one with New Rig…"), Font.Callout).Secondary().Wrap());
                     var titled = false;
                     foreach (var (name, line, example) in rows)
                     {
                         if (example && !titled)
                         {
                             titled = true;
-                            Title(UI.VStack(1, UI.Text("Examples", Font.Subheadline).Secondary().Bold(),
-                                            UI.Text("Venues to look around in and try the show on.", Font.Caption).Secondary().Wrap()));
+                            Title(UI.VStack(1, UI.Text(L("Examples"), Font.Subheadline).Secondary().Bold(),
+                                            UI.Text(L("Venues to look around in and try the show on."), Font.Caption).Secondary().Wrap()));
                         }
                         var text = UI.VStack(2, UI.Text(name, Font.Headline), UI.Text(line, Font.Caption).Secondary().Wrap(2));
                         text.Padding = new Thickness(0, 4, 0, 4);
@@ -98,15 +98,15 @@ sealed class RigList(AppModel model)
             finally { _quiet = false; }
         });
 
-        var header = UI.HStack(8, UI.Text("Your Rigs", Font.Subheadline).Secondary().Bold(), UI.Spacer(),
-                               UI.IconButton("plus", "Make a new rig (Ctrl+Alt+N)", () => model.ShowNewRig = true)).Padding(14, 10);
+        var header = UI.HStack(8, UI.Text(L("Your Rigs"), Font.Subheadline).Secondary().Bold(), UI.Spacer(),
+                               UI.IconButton("plus", L("Make a new rig (Ctrl+Alt+N)"), () => model.ShowNewRig = true)).Padding(14, 10);
         // a real button, full width under the list: the first place you look for a new rig
-        var add = UI.Button("New Rig…", () => model.ShowNewRig = true, "plus").Prominent().Tooltip("Make a new rig: start from an empty room or a template (Ctrl+Alt+N)");
+        var add = UI.Button(L("New Rig…"), () => model.ShowNewRig = true, "plus").Prominent().Tooltip(L("Make a new rig: start from an empty room or a template (Ctrl+Alt+N)"));
         add.HorizontalAlignment = HorizontalAlignment.Stretch;
         add.Padding = new Thickness(10);
         // and one built from what a venue sends: its patch lists, rider and light plots
-        var import = UI.Button("Import from Documents…", () => model.ShowImport = true, "doc.badge.arrow.up")
-            .Tooltip("Build a set and a rig from a venue's documents: MVR files, patch sheets, PDFs of patch lists, riders and light plots");
+        var import = UI.Button(L("Import from Documents…"), () => model.ShowImport = true, "doc.badge.arrow.up")
+            .Tooltip(L("Build a set and a rig from a venue's documents: MVR files, patch sheets, PDFs of patch lists, riders and light plots"));
         import.HorizontalAlignment = HorizontalAlignment.Stretch;
         import.Padding = new Thickness(10);
         var buttons = UI.VStack(8, add, import).Padding(10);
@@ -162,31 +162,31 @@ sealed class PlacementBar(AppModel model)
         var row = UI.HStack(10);
         if (on.Count == 0)
         {
-            var place = UI.MenuButton(UI.Label("plus", "Place a Set"), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
-                .Prominent().Tooltip("Put one of your sets on this rig, to hang its fixtures: a combination the show can run");
+            var place = UI.MenuButton(UI.Label("plus", L("Place a Set")), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
+                .Prominent().Tooltip(L("Put one of your sets on this rig, to hang its fixtures: a combination the show can run"));
             place.IsEnabled = !(off.Count == 0 || model.EngineRunning || _busy);
-            row.Children.Add(UI.Text("No set on this rig yet").Secondary());
+            row.Children.Add(UI.Text(L("No set on this rig yet")).Secondary());
             row.Children.Add(place);
         }
         else
         {
             // the sets on it, then (after a divider on the Mac) the rig alone, last
             List<string> choices = [.. on, ""];
-            var picker = UI.Picker(choices, model.EditingRigSet, s => s.Length == 0 ? "No set: the rig alone" : s, s => model.EditingRigSet = s)
-                .Tooltip("Which of the sets on this rig you see and hang; or the rig alone (its trusses, no fixtures)");
-            var place = UI.MenuButton(UI.Label("plus", "Place Another Set"), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
-                .Tooltip(off.Count == 0 ? "Every set is on this rig already" : "Put another of your sets on this rig: another combination the show can run");
+            var picker = UI.Picker(choices, model.EditingRigSet, s => s.Length == 0 ? L("No set: the rig alone") : s, s => model.EditingRigSet = s)
+                .Tooltip(L("Which of the sets on this rig you see and hang; or the rig alone (its trusses, no fixtures)"));
+            var place = UI.MenuButton(UI.Label("plus", L("Place Another Set")), () => UI.Menu([.. off.Select(s => UI.Item(s, () => Place(s)))]))
+                .Tooltip(off.Count == 0 ? L("Every set is on this rig already") : L("Put another of your sets on this rig: another combination the show can run"));
             place.IsEnabled = !(off.Count == 0 || model.EngineRunning || _busy);
-            row.Children.Add(UI.Text("Showing").Secondary());
+            row.Children.Add(UI.Text(L("Showing")).Secondary());
             row.Children.Add(picker);
             row.Children.Add(place);
         }
         if (model.EditingRigSet.Length > 0)
-            row.Children.Add(UI.Button("Take Off…", TakeOff, "minus.circle").Disabled(model.EngineRunning || _busy)
-                .Tooltip("Take this set off the rig: where its fixtures hang here is forgotten"));
+            row.Children.Add(UI.Button(L("Take Off…"), TakeOff, "minus.circle").Disabled(model.EngineRunning || _busy)
+                .Tooltip(L("Take this set off the rig: where its fixtures hang here is forgotten")));
         if (_busy) row.Children.Add(UI.Spinner());
         row.Children.Add(UI.Spacer());
-        if (on.Count > 0) row.Children.Add(UI.Text($"{on.Count} combination{(on.Count == 1 ? "" : "s")} for the show", Font.Caption).Secondary());
+        if (on.Count > 0) row.Children.Add(UI.Text(on.Count == 1 ? L("1 combination for the show") : L("{0} combinations for the show", on.Count), Font.Caption).Secondary());
         return row.Padding(14, 8);
     }
 
@@ -196,9 +196,9 @@ sealed class PlacementBar(AppModel model)
         var rig = model.EditingRig;
         var d = new ContentDialog
         {
-            XamlRoot = xr, Title = $"Place “{set}” on {rig}",
-            Content = UI.Text("Auto-mount hangs them the way a lighting tech would start; by hand they wait in front of the stage until you drag them onto the trusses.").Wrap(),
-            PrimaryButtonText = "Auto-Mount the Fixtures", SecondaryButtonText = "Place Them by Hand", CloseButtonText = "Cancel",
+            XamlRoot = xr, Title = L("Place “{0}” on {1}", set, rig),
+            Content = UI.Text(L("Auto-mount hangs them the way a lighting tech would start; by hand they wait in front of the stage until you drag them onto the trusses.")).Wrap(),
+            PrimaryButtonText = L("Auto-Mount the Fixtures"), SecondaryButtonText = L("Place Them by Hand"), CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         var r = await d.ShowAsync();
@@ -209,8 +209,8 @@ sealed class PlacementBar(AppModel model)
     async void TakeOff()
     {
         var (s, rig) = (model.EditingRigSet, model.EditingRig);
-        if (await EditorUI.Confirm(_host?.XamlRoot, $"Take “{s}” off {rig}?",
-                "Where its fixtures hang on this rig is forgotten, and the show can no longer run this combination. The set and the rig stay.", "Take Off"))
+        if (await EditorUI.Confirm(_host?.XamlRoot, L("Take “{0}” off {1}?", s, rig),
+                L("Where its fixtures hang on this rig is forgotten, and the show can no longer run this combination. The set and the rig stay."), L("Take Off")))
             Run(() => model.UnplaceSet(s, rig));
     }
 
@@ -219,7 +219,7 @@ sealed class PlacementBar(AppModel model)
         _busy = true;
         Rebuild();
         try { await op(); }
-        catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(_host?.XamlRoot, "Couldn’t Change the Rig", e.Message); }
+        catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(_host?.XamlRoot, L("Couldn’t Change the Rig"), e.Message); }
         _busy = false;
         Rebuild();
     }

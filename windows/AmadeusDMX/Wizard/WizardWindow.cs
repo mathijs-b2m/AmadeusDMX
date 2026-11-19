@@ -15,7 +15,7 @@ public sealed partial class WizardWindow : Window
     public WizardWindow(AppModel model)
     {
         _model = model;
-        Title = "Set Up a Rig";
+        Title = L("Set Up a Rig");
         var icon = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AmadeusDMX.ico");
         if (File.Exists(icon)) AppWindow.SetIcon(icon);
         SystemBackdrop = new MicaBackdrop();
@@ -122,32 +122,32 @@ public sealed class WizardView(AppModel model, WizardModel w, Action dismiss)
         if (w.Step is not (WizardStep.Welcome or WizardStep.Engine or WizardStep.Review or WizardStep.Done))
         {
             // never trapped: what is chosen so far is saved, the pages take it from there
-            var close = UI.Button(w.HasSomethingToSave ? "Save and Close" : "Close", () =>
+            var close = UI.Button(w.HasSomethingToSave ? L("Save and Close") : L("Close"), () =>
             {
                 if (!w.HasSomethingToSave) { dismiss(); return; }
                 _ = SaveAndClose();
             }).Disabled(w.Creating)
-              .Tooltip(w.HasSomethingToSave ? "Save the DMX output and the fixtures chosen so far, and go on later on the pages" : "Close the assistant");
+              .Tooltip(w.HasSomethingToSave ? L("Save the DMX output and the fixtures chosen so far, and go on later on the pages") : L("Close the assistant"));
             row.Children.Add(close.Margin(0, 0, 12, 0));
         }
         if (w.Step is not WizardStep.Welcome and not WizardStep.Done)
-            row.Children.Add(UI.Button("Back", () => w.Step = w.PreviousStep).Disabled(w.Creating));
+            row.Children.Add(UI.Button(L("Back"), () => w.Step = w.PreviousStep).Disabled(w.Creating));
         Button main;
         switch (w.Step)
         {
             case WizardStep.Review:
-                main = UI.Button(w.AutoMount ? "Create and Mount" : "Create", () => _ = w.Create(new AppWizardHost(model)))
+                main = UI.Button(w.AutoMount ? L("Create and Mount") : L("Create"), () => _ = w.Create(new AppWizardHost(model)))
                     .Disabled(!w.CanContinue || w.Creating);
                 break;
             case WizardStep.Done:
-                main = UI.Button(w.AutoMount ? "Open the Show" : "Place the Fixtures", () =>
+                main = UI.Button(w.AutoMount ? L("Open the Show") : L("Place the Fixtures"), () =>
                 {
                     model.Section = w.AutoMount ? Section.Show : Section.Rig;
                     dismiss();
                 });
                 break;
             default:
-                main = UI.Button(w.Step == WizardStep.Welcome ? "Get Started" : "Continue", Next)
+                main = UI.Button(w.Step == WizardStep.Welcome ? L("Get Started") : L("Continue"), Next)
                     .Disabled(!w.CanContinue || (w.Step == WizardStep.Engine && model.Workspace is null));
                 break;
         }
@@ -162,7 +162,7 @@ public sealed class WizardView(AppModel model, WizardModel w, Action dismiss)
         if (await w.SaveAndClose(new AppWizardHost(model)) is not { } note || _content.XamlRoot is not { } root) return;
         await Dialogs.Show(new ContentDialog
         {
-            XamlRoot = root, Title = "Saved. Continue Later", Content = Rich(note), CloseButtonText = "Close",
+            XamlRoot = root, Title = L("Saved. Continue Later"), Content = Rich(note), CloseButtonText = L("Close"),
             DefaultButton = ContentDialogButton.Close,
         });
         model.Section = w.Planned.Count == 0 ? Section.Dmx : Section.Set;
@@ -204,7 +204,7 @@ public static class StepRail
 {
     public static UIElement Build(WizardStep current)
     {
-        var s = UI.VStack(4, UI.HStack(8, AppIcon(20), UI.Text("Set Up", Font.Headline)).Margin(0, 0, 0, 18));
+        var s = UI.VStack(4, UI.HStack(8, AppIcon(20), UI.Text(L("Set Up"), Font.Headline)).Margin(0, 0, 0, 18));
         foreach (var step in WizardSteps.All.Where(x => x != WizardStep.Welcome))
         {
             var done = step < current;

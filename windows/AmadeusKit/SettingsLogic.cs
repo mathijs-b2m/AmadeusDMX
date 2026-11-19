@@ -1,5 +1,7 @@
 // The rules behind Settings (mac/Sources/AmadeusDMX/Settings): which kind of director a value is, where the OpenAI
 // key comes from and how it is shown, the Mixxx MIDI port's name, and how updates compare versions.
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit;
 
 /// Which director decides the show: the rules, OpenAI, or a local decision model in Ollama.
@@ -14,9 +16,9 @@ public static class DirectorKinds
 
     public static string Title(this DirectorKind k) => k switch
     {
-        DirectorKind.Rules => "Rules",
+        DirectorKind.Rules => L("Rules"),
         DirectorKind.OpenAI => "OpenAI",
-        _ => "Local model",
+        _ => L("Local model"),
     };
 }
 

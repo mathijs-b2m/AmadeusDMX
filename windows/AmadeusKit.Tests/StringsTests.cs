@@ -7,11 +7,11 @@ public sealed class StringsTests
 {
     static readonly string Windows = Path.Combine(AmadeusKit.Tests.EditorWorkspace.RepoRoot, "windows");
 
-    /// Every L("…") key in the apps' code (comments left out), as the running app sees it.
+    /// Every L("…") and Key("…") in the apps' code (comments left out), as the running app sees it.
     static HashSet<string> Keys()
     {
         var keys = new HashSet<string>();
-        var call = new Regex(@"\bL\(""((?:[^""\\\n]|\\.)*)""");
+        var call = new Regex(@"\b(?:L|Key)\(""((?:[^""\\\n]|\\.)*)""");
         foreach (var project in new[] { "AmadeusDMX", "AmadeusKit", "AmadeusLink" })
             foreach (var file in Directory.EnumerateFiles(Path.Combine(Windows, project), "*.cs", SearchOption.AllDirectories))
             {

@@ -5,6 +5,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit.DJ;
 
 /// One deck as the DJ software reports it.
@@ -36,9 +38,9 @@ public sealed record DeckReading
         get
         {
             var what = Title.Length == 0 ? Paths.LastComponent(File) : (Artist.Length == 0 ? Title : $"{Artist} – {Title}");
-            var why = Stream is { } s ? $"  ({Text.Capitalized(s.Service)}: the lighting computer fetches a copy)"
-                : File.Length == 0 && Title.Length > 0 ? "  (no file on this laptop: not sent)" : "";
-            return $"{Deck}: {(Play ? "▶" : "■")} {(what.Length == 0 ? "no track" : what)}{why}";
+            var why = Stream is { } s ? "  " + L("({0}: the lighting computer fetches a copy)", Text.Capitalized(s.Service))
+                : File.Length == 0 && Title.Length > 0 ? "  " + L("(no file on this laptop: not sent)") : "";
+            return $"{Deck}: {(Play ? "▶" : "■")} {(what.Length == 0 ? L("no track") : what)}{why}";
         }
     }
 }

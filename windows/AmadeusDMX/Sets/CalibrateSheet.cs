@@ -28,6 +28,7 @@ public sealed class CalibrateSheet
     string _order = "";          // which end of the bar red should be at
     string _output = "";
     readonly Dictionary<string, List<string>> _fixed = [];   // what was put right, per fixture
+    readonly Dictionary<string, HashSet<string>> _fixedAs = [];   // the ones whose fix each was put right with
     readonly HashSet<string> _confirmed = [];   // said right, or put right on its own: siblings' fixes pass it by
     string? _note;
     string? _error;
@@ -63,7 +64,7 @@ public sealed class CalibrateSheet
     {
         _dialog.XamlRoot = root;
         _dialog.Resources["ContentDialogMaxWidth"] = 760.0;
-        _dialog.CloseButtonText = "Done";
+        _dialog.CloseButtonText = L("Done");
         _dialog.Closed += (_, _) =>
         {
             if (_closed) return;
@@ -104,18 +105,18 @@ public sealed class CalibrateSheet
     {
         _header.Content = UI.VStack(4,
             UI.HStack(8,
-                UI.Text("Calibrate", Font.Title2).Bold(),
+                UI.Text(L("Calibrate"), Font.Title2).Bold(),
                 UI.Text(_target.Name).Secondary(),
                 UI.Spacer(),
-                _target.Fixtures.Count > 0 ? UI.Text($"{_index + 1} of {_target.Fixtures.Count}").Secondary() : null),
-            UI.Text($"Stand where the audience would be, facing the stage. Each one lights as it hangs on {_rig}; say what the real one does and it is put right, and the others of this model with it (except those you already went through).",
+                _target.Fixtures.Count > 0 ? UI.Text(L("{0} of {1}", _index + 1, _target.Fixtures.Count)).Secondary() : null),
+            UI.Text(L("Stand where the audience would be, facing the stage. Each one lights as it hangs on {0}; say what the real one does and it is put right, and the others of this model with it (except those you already went through).", _rig),
                     Font.Callout).Secondary().Wrap()
         ).Margin(0, 0, 0, 12);
     }
 
     void Body()
     {
-        if (_error is { } e) { _body.Content = UI.Unavailable("exclamationmark.triangle", "Couldn’t Light It", e); return; }
+        if (_error is { } e) { _body.Content = UI.Unavailable("exclamationmark.triangle", L("Couldn’t Light It"), e); return; }
         if (Id is not { } id) { _body.Content = UI.Spinner(32); return; }
         var big = UI.Text(id, Font.Mono).Bold();
         big.FontSize = 26;
@@ -125,11 +126,13 @@ public sealed class CalibrateSheet
             c is null ? null : UI.Text(c.Where, Font.Callout).Wrap());
         if (Unplaced(id))
             panel.Children.Add(Form.Note("exclamationmark.triangle.fill",
-                $"Not placed on {_rig} yet: place it on the Rigs page first, so the calibration knows how it hangs.", Tint.Orange, Font.Body));
+                L("Not placed on {0} yet: place it on the Rigs page first, so the calibration knows how it hangs.", _rig), Tint.Orange, Font.Body));
         else if (_step is { } step)
             foreach (var part in StepView(id, step)) panel.Children.Add(part);
         if (_fixed.TryGetValue(id, out var done) && done.Count > 0)
-            panel.Children.Add(Form.Note("checkmark.circle.fill", $"Put right: {string.Join(", ", done)}. Saved{SiblingNote(id)}.", Tint.Green));
+            panel.Children.Add(Form.Note("checkmark.circle.fill", SiblingNote(id) is { } others
+                ? L("Put right: {0}. Saved, and for {1} too.", string.Join(", ", done), others)
+                : L("Put right: {0}. Saved.", string.Join(", ", done)), Tint.Green));
         if (_note is { } n) panel.Children.Add(UI.Text(n, Font.Callout).Foreground(Tint.Orange).Wrap());
         if (_output.Length > 0) panel.Children.Add(UI.Text(_output, Font.Caption).Secondary().Lines(1));
         panel.Alignment = 0;
@@ -142,36 +145,36 @@ public sealed class CalibrateSheet
         {
             case Step.Front:
                 yield return Form.Note("light.beacon.max",
-                    "Its beam should point straight out at the audience, a little down (up when it stands on the floor). Where does the real one point?",
+                    L("Its beam should point straight out at the audience, a little down (up when it stands on the floor). Where does the real one point?"),
                     null, Font.Callout).Bold();
                 yield return Buttons(
-                    UI.Button("At the Audience", Advance, "checkmark").Prominent(),
-                    UI.Button("Left", () => Fix(id, "left", "its pan home turned"), "arrow.left"),
-                    UI.Button("Right", () => Fix(id, "right", "its pan home turned"), "arrow.right"),
-                    UI.Button("Back at the Stage", () => Fix(id, "back", "turned round"), "arrow.uturn.down"),
-                    UI.Button("Up or Down", () =>
+                    UI.Button(L("At the Audience"), Advance, "checkmark").Prominent(),
+                    UI.Button(L("Left"), () => Fix(id, "left", L("its pan home turned")), "arrow.left"),
+                    UI.Button(L("Right"), () => Fix(id, "right", L("its pan home turned")), "arrow.right"),
+                    UI.Button(L("Back at the Stage"), () => Fix(id, "back", L("turned round")), "arrow.uturn.down"),
+                    UI.Button(L("Up or Down"), () =>
                     {
-                        _note = "A head that points at the ceiling or the floor here is placed the wrong way up: on the Rigs page, put it hanging under the truss or standing, as it really is.";
+                        _note = L("A head that points at the ceiling or the floor here is placed the wrong way up: on the Rigs page, put it hanging under the truss or standing, as it really is.");
                         Body();
                     })
-                ).Tooltip("Left and right as you see it, facing the stage. Pressed the wrong one, it ends up the other way: press that one");
+                ).Tooltip(L("Left and right as you see it, facing the stage. Pressed the wrong one, it ends up the other way: press that one"));
                 break;
             case Step.Check:
                 var c = _checks.GetValueOrDefault(id);
-                yield return Form.Note("light.beacon.max", c is { Expect.Length: > 0 } ? c.Expect : "Its beam points to one side.", null, Font.Callout).Bold();
-                yield return UI.Text("This catches a head that pans the other way: pointing straight out, that looks right.", Font.Caption).Secondary().Wrap();
+                yield return Form.Note("light.beacon.max", c is { Expect.Length: > 0 } ? c.Expect : L("Its beam points to one side."), null, Font.Callout).Bold();
+                yield return UI.Text(L("This catches a head that pans the other way: pointing straight out, that looks right."), Font.Caption).Secondary().Wrap();
                 yield return Buttons([
-                    UI.Button("Yes, There", Advance, "checkmark").Prominent(),
-                    .. (c?.Faults ?? []).Select(f => UI.Button($"No, it points {f.Seen}",
+                    UI.Button(L("Yes, There"), Advance, "checkmark").Prominent(),
+                    .. (c?.Faults ?? []).Select(f => UI.Button(L("No, it points {0}", f.Seen),
                                                                () => Fix(id, f.Fix, HangCheckPanel.Cause.GetValueOrDefault(f.Fix) ?? f.Fix))),
                 ]);
                 break;
             case Step.Cells:
-                yield return Form.Note("light.strip.2", _order.Length == 0 ? "Its cells light red, green, blue, white along it." : _order,
+                yield return Form.Note("light.strip.2", _order.Length == 0 ? L("Its cells light red, green, blue, white along it.") : _order,
                                        null, Font.Callout).Bold();
                 yield return Buttons(
-                    UI.Button("Yes", Advance, "checkmark").Prominent(),
-                    UI.Button("The Other Way Round", () => Reverse(id), "arrow.left.arrow.right"));
+                    UI.Button(L("Yes"), Advance, "checkmark").Prominent(),
+                    UI.Button(L("The Other Way Round"), () => Reverse(id), "arrow.left.arrow.right"));
                 break;
         }
     }
@@ -187,9 +190,9 @@ public sealed class CalibrateSheet
     void Footer()
     {
         _footer.Content = UI.HStack(8,
-            UI.Button("Previous", () => Go(_index - 1), "chevron.left").Disabled(_index == 0 || _busy),
-            UI.Button("Skip", () => Go(_index + 1), "chevron.right").Disabled(_index + 1 >= _target.Fixtures.Count || _busy)
-                .Tooltip("On to the next one, without finishing this one"),
+            UI.Button(L("Previous"), () => Go(_index - 1), "chevron.left").Disabled(_index == 0 || _busy),
+            UI.Button(L("Skip"), () => Go(_index + 1), "chevron.right").Disabled(_index + 1 >= _target.Fixtures.Count || _busy)
+                .Tooltip(L("On to the next one, without finishing this one")),
             UI.Spacer()
         ).Margin(0, 12, 0, 0);
     }
@@ -312,7 +315,7 @@ public sealed class CalibrateSheet
             var fields = await _model.Api.HangCheckFix(_layout, id, seen);
             var also = await Update(id, [.. fields.Keys], f => { foreach (var (k, v) in fields) f[k] = v; });
             Fixed(id, what);
-            foreach (var o in also) Fixed(o, $"{what} (as {id})");
+            foreach (var o in also) Fixed(o, L("{0} (as {1})", what, id), id);
             await Light();
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
@@ -330,18 +333,22 @@ public sealed class CalibrateSheet
             {
                 if (f.GetValueOrDefault("reverse")?.Bool ?? false) f.Remove("reverse"); else f["reverse"] = JSONValue.True;
             });
-            Fixed(id, "its cells the other way round");
-            foreach (var o in also) Fixed(o, $"its cells the other way round (as {id})");
+            Fixed(id, L("its cells the other way round"));
+            foreach (var o in also) Fixed(o, L("{0} (as {1})", L("its cells the other way round"), id), id);
             await Light();
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
         finally { SetBusy(false); }
     }
 
-    void Fixed(string id, string what)
+    /// `from`: put right as that one was (a sibling's fix).
+    void Fixed(string id, string what, string? from = null)
     {
         if (!_fixed.TryGetValue(id, out var l)) _fixed[id] = l = [];
         l.Add(what);
+        if (from is null) return;
+        if (!_fixedAs.TryGetValue(id, out var s)) _fixedAs[id] = s = [];
+        s.Add(from);
     }
 
     void SetBusy(bool busy)
@@ -377,11 +384,11 @@ public sealed class CalibrateSheet
         return also;
     }
 
-    /// The siblings a fix of this one went to, in words.
-    string SiblingNote(string id)
+    /// The siblings a fix of this one went to, listed (null: none).
+    string? SiblingNote(string id)
     {
-        var others = _target.Fixtures.Where(o => o != id && (_fixed.GetValueOrDefault(o) ?? []).Any(w => w.EndsWith($"(as {id})"))).ToList();
-        return others.Count == 0 ? "" : $", and for {string.Join(", ", others)} too";
+        var others = _target.Fixtures.Where(o => o != id && (_fixedAs.GetValueOrDefault(o)?.Contains(id) ?? false)).ToList();
+        return others.Count == 0 ? null : string.Join(", ", others);
     }
 
     Dictionary<string, JSONValue>? Fixture(string id) => SetLayout.Fixtures(_layout).FirstOrDefault(f => Patch.Id(f) == id);

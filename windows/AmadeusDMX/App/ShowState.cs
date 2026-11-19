@@ -38,12 +38,12 @@ public static class SectionExtensions
     /// What the page is for, in a few words (the sidebar's tooltip).
     public static string Help(this Section s) => s switch
     {
-        Section.Show => "The show: the stage, the music and the director",
-        Section.Dmx => "Your DMX devices (Art-Net and sACN nodes, USB interfaces), and where each universe of the set goes (Ctrl+Shift+D)",
-        Section.Rig => "Your rigs (the venues: trusses, stage, zones), and the sets placed on them",
-        Section.Set => "Your sets of fixtures: their DMX patch and where the DMX goes",
-        Section.Engine => "The engine's log",
-        _ => "The engine folder, the director and its AI key, the DJ software integrations (also Ctrl+,)",
+        Section.Show => L("The show: the stage, the music and the director"),
+        Section.Dmx => L("Your DMX devices (Art-Net and sACN nodes, USB interfaces), and where each universe of the set goes (Ctrl+Shift+D)"),
+        Section.Rig => L("Your rigs (the venues: trusses, stage, zones), and the sets placed on them"),
+        Section.Set => L("Your sets of fixtures: their DMX patch and where the DMX goes"),
+        Section.Engine => L("The engine's log"),
+        _ => L("The engine folder, the director and its AI key, the DJ software integrations (also Ctrl+,)"),
     };
 }
 
@@ -71,13 +71,13 @@ public readonly record struct ShowState(ShowStateKind Kind, string Reason = "")
 
     public string Title => Kind switch
     {
-        ShowStateKind.Stopped => "Stopped",
-        ShowStateKind.Starting => "Starting…",
-        ShowStateKind.WaitingForDJ => "Waiting for the DJ software",  // (AppModel.ShowTitle names it)
-        ShowStateKind.Live => "Live",
-        ShowStateKind.Playing => "Playing",
-        ShowStateKind.Attached => "Watching",
-        _ => "Engine Stopped",
+        ShowStateKind.Stopped => L("Stopped"),
+        ShowStateKind.Starting => L("Starting…"),
+        ShowStateKind.WaitingForDJ => L("Waiting for the DJ software"),  // (AppModel.ShowTitle names it)
+        ShowStateKind.Live => L("Live"),
+        ShowStateKind.Playing => L("Playing"),
+        ShowStateKind.Attached => L("Watching"),
+        _ => L("Engine Stopped"),
     };
 
     public string Symbol => Kind switch

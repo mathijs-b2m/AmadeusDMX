@@ -1,6 +1,8 @@
 // The rig templates (amadeus/rig/templates.py): the structure a new rig starts from. The Mac keeps the enum in
 // mac/Sources/AmadeusDMX/Rig/NewRigSheet.swift; here it lives in the kit, so the wizard and New Rig… share it and
 // its rules are tested.
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit;
 
 public enum RigTemplate { Floor, Stands, Bridge, Booth, Club, Stage, Festival, Ring, Carre }
@@ -14,28 +16,28 @@ public static class RigTemplates
 
     public static string Title(this RigTemplate t) => t switch
     {
-        RigTemplate.Floor => "Empty Room",
-        RigTemplate.Stands => "Two Stands",
-        RigTemplate.Bridge => "Light Bridge",
-        RigTemplate.Booth => "Truss over the Booth",
-        RigTemplate.Club => "Club",
-        RigTemplate.Stage => "Concert Stage",
-        RigTemplate.Festival => "Festival Stage",
-        RigTemplate.Carre => "Carré",
-        _ => "Round Truss",
+        RigTemplate.Floor => L("Empty Room"),
+        RigTemplate.Stands => L("Two Stands"),
+        RigTemplate.Bridge => L("Light Bridge"),
+        RigTemplate.Booth => L("Truss over the Booth"),
+        RigTemplate.Club => L("Club"),
+        RigTemplate.Stage => L("Concert Stage"),
+        RigTemplate.Festival => L("Festival Stage"),
+        RigTemplate.Carre => L("Carré"),
+        _ => L("Round Truss"),
     };
 
     public static string Detail(this RigTemplate t) => t switch
     {
-        RigTemplate.Floor => "Fixtures on the floor and on tripods.",
-        RigTemplate.Stands => "A mobile DJ: a T-bar stand left and right of the booth.",
-        RigTemplate.Bridge => "A mobile DJ: a bar over the booth on two stands.",
-        RigTemplate.Booth => "One truss over the DJ.",
-        RigTemplate.Club => "Two trusses over the booth, front and back.",
-        RigTemplate.Stage => "Two overhead trusses, a low one at the back, a tower each side.",
-        RigTemplate.Festival => "A scaffold wall behind a raised stage, the LED wall hanging on it: fixtures clamp anywhere on it.",
-        RigTemplate.Carre => "A square of truss on its own four legs round the booth: heads play it like a ring.",
-        _ => "A circle over the booth, a half circle behind it: heads play crowns, cones and twisters.",
+        RigTemplate.Floor => L("Fixtures on the floor and on tripods."),
+        RigTemplate.Stands => L("A mobile DJ: a T-bar stand left and right of the booth."),
+        RigTemplate.Bridge => L("A mobile DJ: a bar over the booth on two stands."),
+        RigTemplate.Booth => L("One truss over the DJ."),
+        RigTemplate.Club => L("Two trusses over the booth, front and back."),
+        RigTemplate.Stage => L("Two overhead trusses, a low one at the back, a tower each side."),
+        RigTemplate.Festival => L("A scaffold wall behind a raised stage, the LED wall hanging on it: fixtures clamp anywhere on it."),
+        RigTemplate.Carre => L("A square of truss on its own four legs round the booth: heads play it like a ring."),
+        _ => L("A circle over the booth, a half circle behind it: heads play crowns, cones and twisters."),
     };
 
     /// Width, truss height, room depth (m).

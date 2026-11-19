@@ -41,7 +41,7 @@ public static class EditorUI
     {
         double Clamp(double v) => Math.Min(Math.Max(v, min()), Math.Max(min(), max()));
         string Text(double v) => unit == "°" ? $"{(int)Math.Round(v, MidpointRounding.AwayFromZero)}°"
-            : v.ToString("0.00", CultureInfo.InvariantCulture) + unit;
+            : Strings.Number(v, "0.00") + unit;
         var value = UI.Text(Text(get())).Secondary();
         value.TextAlignment = TextAlignment.Right;
         value.Width = 62;
@@ -133,7 +133,7 @@ public static class EditorUI
     public static FrameworkElement Stepper(INotifyPropertyChanged model, Func<string> text, Action minus, Action plus, string? help = null)
     {
         var label = UI.Text(text());
-        var row = UI.HStack(4, label, UI.IconButton("minus", "Less", minus), UI.IconButton("plus", "More", plus)).Tooltip(help);
+        var row = UI.HStack(4, label, UI.IconButton("minus", L("Less"), minus), UI.IconButton("plus", L("More"), plus)).Tooltip(help);
         return row.BindAll(model, _ => label.Text = text());
     }
 
@@ -188,7 +188,7 @@ public static class EditorUI
     public static async Task Alert(XamlRoot? root, string title, string message)
     {
         if (root is null) return;
-        await new ContentDialog { XamlRoot = root, Title = title, Content = UI.Text(message).Wrap(), CloseButtonText = "OK" }.ShowAsync();
+        await new ContentDialog { XamlRoot = root, Title = title, Content = UI.Text(message).Wrap(), CloseButtonText = L("OK") }.ShowAsync();
     }
 
     /// A question with one action (SwiftUI's confirmationDialog): true if it was chosen.
@@ -197,7 +197,7 @@ public static class EditorUI
         if (root is null) return false;
         var d = new ContentDialog
         {
-            XamlRoot = root, Title = title, Content = UI.Text(message).Wrap(), PrimaryButtonText = action, CloseButtonText = "Cancel",
+            XamlRoot = root, Title = title, Content = UI.Text(message).Wrap(), PrimaryButtonText = action, CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
         return await d.ShowAsync() == ContentDialogResult.Primary;

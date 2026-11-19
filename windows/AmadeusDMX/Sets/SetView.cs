@@ -40,13 +40,13 @@ public sealed class SetView(AppModel model, MainWindow window)
             if (_sets.SelectedItem is ListViewItem { Tag: string name }) { if (name != model.EditingSet) model.EditingSet = name; }
             else ListSets();  // a section header isn't a set
         };
-        var newSet = UI.Button("New Set…", window.OpenWizard, "plus").Prominent();
+        var newSet = UI.Button(L("New Set…"), window.OpenWizard, "plus").Prominent();
         newSet.HorizontalAlignment = HorizontalAlignment.Stretch;
         var setsPane = new Grid { MinWidth = 180, Width = 220 };
         setsPane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         setsPane.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         setsPane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var setsTitle = UI.Text("Sets", Font.Subheadline).Secondary().Bold().Margin(16, 12, 0, 4);
+        var setsTitle = UI.Text(L("Sets"), Font.Subheadline).Secondary().Bold().Margin(16, 12, 0, 4);
         setsTitle.Visibility = Visibility.Collapsed;  // the list has its own sections
         Grid.SetRow(setsTitle, 0);
         Grid.SetRow(_sets, 1);
@@ -144,19 +144,19 @@ public sealed class SetView(AppModel model, MainWindow window)
                     Tag = s.Name,
                     Content = UI.VStack(2,
                         UI.Text(s.Name, Font.Headline),
-                        UI.Text($"{s.FixtureCount} fixtures · {(s.IsVirtual ? "visualiser only" : s.OutputText)}", Font.Caption).Secondary().Lines(1)
+                        UI.Text(L("{0} fixtures · {1}", s.FixtureCount, s.IsVirtual ? L("visualiser only") : s.OutputText), Font.Caption).Secondary().Lines(1)
                     ).Padding(0, 4),
                 });
             // as on the Rigs page: a + by the title, the big button under the list
-            Title(UI.HStack(8, UI.Text("Your Sets", Font.Subheadline).Secondary().Bold(), UI.Spacer(),
-                            UI.IconButton("plus", "Make a new set with the set-up assistant", window.OpenWizard).Disabled(model.EngineRunning)));
+            Title(UI.HStack(8, UI.Text(L("Your Sets"), Font.Subheadline).Secondary().Bold(), UI.Spacer(),
+                            UI.IconButton("plus", L("Make a new set with the set-up assistant"), window.OpenWizard).Disabled(model.EngineRunning)));
             foreach (var s in model.Sets.Where(s => !s.IsExample)) Row(s);
             if (!model.Sets.Any(s => !s.IsExample))
-                Title(UI.Text("None yet. Your fixtures go in a set of your own: make one with New Set…", Font.Callout).Secondary().Wrap());
+                Title(UI.Text(L("None yet. Your fixtures go in a set of your own: make one with New Set…"), Font.Callout).Secondary().Wrap());
             if (model.Sets.Any(s => s.IsExample))
             {
-                Title(UI.VStack(1, UI.Text("Examples", Font.Subheadline).Secondary().Bold(),
-                                UI.Text("To look around in and try the show.", Font.Caption).Secondary().Wrap()));
+                Title(UI.VStack(1, UI.Text(L("Examples"), Font.Subheadline).Secondary().Bold(),
+                                UI.Text(L("To look around in and try the show."), Font.Caption).Secondary().Wrap()));
                 foreach (var s in model.Sets.Where(s => s.IsExample)) Row(s);
             }
             _sets.SelectedItem = _sets.Items.OfType<ListViewItem>().FirstOrDefault(i => i.Tag as string == model.EditingSet);
@@ -182,9 +182,9 @@ public sealed class SetView(AppModel model, MainWindow window)
     {
         if (_doc is not { Fixtures.Count: > 0 } doc)
         {
-            _middle.Content = UI.Unavailable("light.overhead.right", "No Fixtures Yet",
-                "Add the fixtures you own: search by brand or model across our library, QLC+, the Open Fixture Library and DMXControl.",
-                UI.Button("Add Fixtures…", ShowAdd).Prominent());
+            _middle.Content = UI.Unavailable("light.overhead.right", L("No Fixtures Yet"),
+                L("Add the fixtures you own: search by brand or model across our library, QLC+, the Open Fixture Library and DMXControl."),
+                UI.Button(L("Add Fixtures…"), ShowAdd).Prominent());
             return;
         }
         _quiet = true;
@@ -203,7 +203,7 @@ public sealed class SetView(AppModel model, MainWindow window)
                     var item = new ListViewItem
                     {
                         Tag = f.Id,
-                        Content = FixtureRow(f, _lit.Contains(f.Id), f.Address is null ? "No start address yet: give it one first" : TestRefusal(g.Definition)),
+                        Content = FixtureRow(f, _lit.Contains(f.Id), f.Address is null ? L("No start address yet: give it one first") : TestRefusal(g.Definition)),
                         HorizontalContentAlignment = HorizontalAlignment.Stretch,
                     };
                     item.ContextFlyout = ContextMenu(f.Id);
@@ -224,17 +224,17 @@ public sealed class SetView(AppModel model, MainWindow window)
         {
             var ids = _selection.Contains(id) ? _selection.ToHashSet() : [id];
             menu.Items.Clear();
-            var identify = UI.Item("Identify on the Lights", () => Identify(ids), "lightbulb.max");
+            var identify = UI.Item(L("Identify on the Lights"), () => Identify(ids), "lightbulb.max");
             identify.IsEnabled = !((EditingSummary?.IsVirtual ?? true) || model.EngineRunning);
-            var map = UI.Item("Map DMX Channels…", () => MapChannels(_doc?.Fixtures.FirstOrDefault(f => ids.Contains(f.Id))), "slider.vertical.3");
+            var map = UI.Item(L("Map DMX Channels…"), () => MapChannels(_doc?.Fixtures.FirstOrDefault(f => ids.Contains(f.Id))), "slider.vertical.3");
             map.IsEnabled = ids.Count > 0 && !model.EngineRunning;
-            var remove = UI.Item("Remove from the Set", () => Remove(ids), "trash");
+            var remove = UI.Item(L("Remove from the Set"), () => Remove(ids), "trash");
             remove.IsEnabled = !model.EngineRunning;
             menu.Items.Add(identify);
             menu.Items.Add(map);
             if (_doc is { } doc && Groups(doc).FirstOrDefault(g => g.Fixtures.Any(f => ids.Contains(f.Id))) is { } g && Calibrates(g))
             {
-                var calibrate = UI.Item("Calibrate…", () => Calibrate(g, g.Fixtures.FirstOrDefault(f => ids.Contains(f.Id))?.Id), "scope");
+                var calibrate = UI.Item(L("Calibrate…"), () => Calibrate(g, g.Fixtures.FirstOrDefault(f => ids.Contains(f.Id))?.Id), "scope");
                 calibrate.IsEnabled = CalibrateRefusal(g) is null;
                 menu.Items.Add(calibrate);
             }
@@ -251,30 +251,30 @@ public sealed class SetView(AppModel model, MainWindow window)
         var tried = g.Fixtures.FirstOrDefault(x => x.Address is not null) ?? f;  // the mapper tries its values on a patched one
         var row = UI.HStack(8,
             UI.Icon(FixtureIcon.Symbol(d?.Kind)).Foreground(Tint.Accent),
-            UI.Text($"{g.Fixtures.Count}× {d?.Name ?? g.Key}", Font.Headline),
-            f is null ? null : UI.Text($"{f.Mode} · {d?.ChannelCount(f.Mode) ?? 0} ch", Font.Caption).Secondary(),
+            UI.Text(L("{0}× {1}", g.Fixtures.Count, d?.Name ?? g.Key), Font.Headline),
+            f is null ? null : UI.Text(L("{0} · {1} ch", f.Mode, d?.ChannelCount(f.Mode) ?? 0), Font.Caption).Secondary(),
             UI.Spacer());
         if (d is not null && f is not null && d.Inert.Length == 0 && d.Kind != "smoke")
         {
             var dark = !d.Plays(f.Mode);
             if (dark)
-                row.Children.Add(UI.Label("exclamationmark.triangle.fill", "Plays nothing", Font.Caption).Foreground(Tint.Orange)
-                    .Tooltip("The show finds no dimmer or colour channel in this mode: map its channels by hand"));
+                row.Children.Add(UI.Label("exclamationmark.triangle.fill", L("Plays nothing"), Font.Caption).Foreground(Tint.Orange)
+                    .Tooltip(L("The show finds no dimmer or colour channel in this mode: map its channels by hand")));
             else if (d.NeedsCheck)
-                row.Children.Add(UI.Label("exclamationmark.triangle.fill", "Not checked yet", Font.Caption).Foreground(Tint.Orange)
-                    .Tooltip("Made from a common layout: check its channels one by one on the fixture"));
-            var b = UI.Button(dark ? "Map Channels…" : d.NeedsCheck ? "Check Channels…" : "Channels…", () => MapChannels(tried), "slider.vertical.3")
+                row.Children.Add(UI.Label("exclamationmark.triangle.fill", L("Not checked yet"), Font.Caption).Foreground(Tint.Orange)
+                    .Tooltip(L("Made from a common layout: check its channels one by one on the fixture")));
+            var b = UI.Button(dark ? L("Map Channels…") : d.NeedsCheck ? L("Check Channels…") : L("Channels…"), () => MapChannels(tried), "slider.vertical.3")
                 .Font(Font.Caption).Padding(8, 3)
                 .Disabled(model.EngineRunning)
-                .Tooltip("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture");
+                .Tooltip(L("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture"));
             if (dark || d.NeedsCheck) b.Foreground(Tint.Orange);
             row.Children.Add(b);
             if (Calibrates(g))
             {
                 var refusal = CalibrateRefusal(g);
-                row.Children.Add(UI.Button("Calibrate…", () => Calibrate(g), "scope").Font(Font.Caption).Padding(8, 3)
+                row.Children.Add(UI.Button(L("Calibrate…"), () => Calibrate(g), "scope").Font(Font.Caption).Padding(8, 3)
                     .Disabled(refusal is not null)
-                    .Tooltip(refusal ?? "One behaves oddly (goes the wrong way, a bar runs backwards)? Light each on the real rig and say what it does: it is put right"));
+                    .Tooltip(refusal ?? L("One behaves oddly (goes the wrong way, a bar runs backwards)? Light each on the real rig and say what it does: it is put right")));
             }
         }
         return row;
@@ -282,16 +282,16 @@ public sealed class SetView(AppModel model, MainWindow window)
 
     UIElement FixtureRow(PlacedFixture f, bool lit, string? test)
     {
-        var button = UI.Button(lit ? "On" : "Test", () => ToggleTest(f.Id), lit ? "lightbulb.fill" : "lightbulb").Font(Font.Caption).Padding(8, 3)
+        var button = UI.Button(lit ? L("On") : L("Test"), () => ToggleTest(f.Id), lit ? "lightbulb.fill" : "lightbulb").Font(Font.Caption).Padding(8, 3)
             .Disabled(test is not null && !lit)
-            .Tooltip(test ?? (lit ? "Switch it off again"
-                : "Light it on the real rig until you switch it off (a minute at most): is it patched and connected?"));
+            .Tooltip(test ?? (lit ? L("Switch it off again")
+                : L("Light it on the real rig until you switch it off (a minute at most): is it patched and connected?")));
         if (lit) button.Foreground(Tint.Yellow);
         return UI.HStack(8,
             UI.Text(f.Id, Font.Mono).Frame(width: 110),
-            (f.Address is null ? UI.Text("no address").Foreground(Tint.Orange) : UI.Text(f.PatchText).Secondary()).Frame(width: 80)
-                .Tooltip(f.Address is null ? "No start address yet: select it and give it one (the visualiser only until then)"
-                    : "Universe.address: set this start address on the fixture's display"),
+            (f.Address is null ? UI.Text(L("no address")).Foreground(Tint.Orange) : UI.Text(f.PatchText).Secondary()).Frame(width: 80)
+                .Tooltip(f.Address is null ? L("No start address yet: select it and give it one (the visualiser only until then)")
+                    : L("Universe.address: set this start address on the fixture's display")),
             UI.Text(f.Mode, Font.Callout).Secondary(),
             UI.Spacer(),
             button);
@@ -307,8 +307,8 @@ public sealed class SetView(AppModel model, MainWindow window)
         if (_selection.Count == 0)
         {
             _patchInspector = null;
-            _inspector.Content = UI.Unavailable("slider.horizontal.3", "Select a Fixture",
-                "Its DMX mode, universe and address, and its name, are edited here. Select several to patch them in a row.");
+            _inspector.Content = UI.Unavailable("slider.horizontal.3", L("Select a Fixture"),
+                L("Its DMX mode, universe and address, and its name, are edited here. Select several to patch them in a row."));
             return;
         }
         _patchInspector = new PatchInspector(_selection, SetLayout.Fixtures(_layout), Definition, Change, RenameFixture, _typing, SaveLens);
@@ -323,7 +323,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         if (problems.Count == 0)
         {
             _names[key] = model.Workspace?.Definition(key);
-            Flash($"Saved the lens of {_names[key]?.Name ?? key}");
+            Flash(L("Saved the lens of {0}", _names[key]?.Name ?? key));
         }
         return problems;
     }
@@ -380,7 +380,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         }
         catch (Exception e) when (IsApiError(e))
         {
-            await Dialogs.Alert(Root, "Couldn’t Change the Set", e.Message);
+            await Dialogs.Alert(Root, L("Couldn’t Change the Set"), e.Message);
             Load();
         }
     }
@@ -394,9 +394,9 @@ public sealed class SetView(AppModel model, MainWindow window)
             await model.Api.RenameFixture(old, to, set);
             _selection = [to];
             model.ReloadSets();
-            Flash($"Renamed {old} → {to}");
+            Flash(L("Renamed {0} → {1}", old, to));
         }
-        catch (Exception e) when (IsApiError(e)) { await Dialogs.Alert(Root, "Couldn’t Change the Set", e.Message); }
+        catch (Exception e) when (IsApiError(e)) { await Dialogs.Alert(Root, L("Couldn’t Change the Set"), e.Message); }
     }
 
     async void Flash(string text, double seconds = 3)
@@ -410,13 +410,13 @@ public sealed class SetView(AppModel model, MainWindow window)
     async void Identify(IReadOnlySet<string> ids)
     {
         var (rig, set) = (model.SelectedRig, model.EditingSet);  // (identify only needs the set's patch and output)
-        if (!await model.EnsureSetupService()) { await Dialogs.Alert(Root, "Couldn’t Change the Set", "The engine's setup service did not start."); return; }
+        if (!await model.EnsureSetupService()) { await Dialogs.Alert(Root, L("Couldn’t Change the Set"), L("The engine's setup service did not start.")); return; }
         foreach (var id in ids)
         {
             try { await model.Api.Identify(id, rig, set); }
             catch (Exception e) when (IsApiError(e)) { }
         }
-        Flash($"Lit {(ids.Count == 1 ? ids.First() : $"{ids.Count} fixtures")} for 2 s");
+        Flash(ids.Count == 1 ? L("Lit {0} for 2 s", ids.First()) : L("Lit {0} fixtures for 2 s", ids.Count));
     }
 
     void ShowAdd() => AddToSetSheet.Present(model, Root, () => model.ReloadSets());
@@ -427,11 +427,11 @@ public sealed class SetView(AppModel model, MainWindow window)
         if (f is null) return;
         SwitchOffTests();
         var target = new MapTarget(f.Key, f.Mode, f.Id, f.Address, f.Universe);
-        MapperSheet.Present(model, Root, target, target.Address is null ? $"Give {target.Fixture} a start address to try values on it" : TryRefusal, () =>
+        MapperSheet.Present(model, Root, target, target.Address is null ? L("Give {0} a start address to try values on it", target.Fixture) : TryRefusal, () =>
         {
             _names[target.Key] = model.Workspace?.Definition(target.Key);
             model.ReloadSets();
-            Flash($"Mapped {_names[target.Key]?.Name ?? target.Key} ({target.Mode}): every one in your sets plays by it");
+            Flash(L("Mapped {0} ({1}): every one in your sets plays by it", _names[target.Key]?.Name ?? target.Key, target.Mode));
         });
     }
 
@@ -444,8 +444,8 @@ public sealed class SetView(AppModel model, MainWindow window)
     string? CalibrateRefusal(Group g)
     {
         if (TryRefusal is { } r) return r;
-        if (model.SelectedRig.Length == 0) return "Pick a rig first: a fixture is calibrated as it hangs on one";
-        if (!g.Fixtures.Any(f => f.Address is not null)) return "No start address yet: give them one first";
+        if (model.SelectedRig.Length == 0) return L("Pick a rig first: a fixture is calibrated as it hangs on one");
+        if (!g.Fixtures.Any(f => f.Address is not null)) return L("No start address yet: give them one first");
         return null;
     }
 
@@ -458,7 +458,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         CalibrateSheet.Present(model, Root, target, g.Definition, model.SelectedRig, model.EditingSet, () =>
         {
             Load();
-            Flash($"Calibration of {target.Name} saved");
+            Flash(L("Calibration of {0} saved", target.Name));
         });
     }
 
@@ -467,8 +467,8 @@ public sealed class SetView(AppModel model, MainWindow window)
     {
         get
         {
-            if (EditingSummary?.IsVirtual ?? true) return "This set only feeds the visualiser: give it a DMX output to test the real lights";
-            if (model.EngineRunning) return "Stop the show to test the lights";
+            if (EditingSummary?.IsVirtual ?? true) return L("This set only feeds the visualiser: give it a DMX output to test the real lights");
+            if (model.EngineRunning) return L("Stop the show to test the lights");
             return null;
         }
     }
@@ -477,8 +477,8 @@ public sealed class SetView(AppModel model, MainWindow window)
     string? TestRefusal(FixtureDefinition? d)
     {
         if (TryRefusal is { } r) return r;
-        if (d is { Inert.Length: > 0 }) return $"Not tested: {d.Inert}";
-        if (d?.Kind == "smoke") return "Smoke machines fire only in the show or the hardware test";
+        if (d is { Inert.Length: > 0 }) return L("Not tested: {0}", d.Inert);
+        if (d?.Kind == "smoke") return L("Smoke machines fire only in the show or the hardware test");
         return null;
     }
 
@@ -497,7 +497,7 @@ public sealed class SetView(AppModel model, MainWindow window)
             var r = await model.Api.TestLight(id, on, rig: rig, set: set);
             if (on)
             {
-                Flash($"{id} on: {r.Summary}", 8);
+                Flash(L("{0} on: {1}", id, r.Summary), 8);
                 var cts = new CancellationTokenSource();
                 _testOff[id] = cts;
                 try
@@ -514,7 +514,7 @@ public sealed class SetView(AppModel model, MainWindow window)
         {
             _lit.Remove(id);
             ListFixtures();
-            await Dialogs.Alert(Root, "Couldn’t Change the Set", e.Message);
+            await Dialogs.Alert(Root, L("Couldn’t Change the Set"), e.Message);
         }
     }
 
@@ -548,9 +548,9 @@ public sealed class SetView(AppModel model, MainWindow window)
             await model.Api.SaveSet(SetLayout.WithFixtures(layout, kept), set);
             _selection = [];
             model.ReloadSets();
-            Flash($"Removed {(ids.Count == 1 ? ids.First() : $"{ids.Count} fixtures")}");
+            Flash(ids.Count == 1 ? L("Removed {0}", ids.First()) : L("Removed {0} fixtures", ids.Count));
         }
-        catch (Exception e) when (IsApiError(e)) { await Dialogs.Alert(Root, "Couldn’t Change the Set", e.Message); }
+        catch (Exception e) when (IsApiError(e)) { await Dialogs.Alert(Root, L("Couldn’t Change the Set"), e.Message); }
     }
 
     internal static bool IsApiError(Exception e) =>
@@ -567,41 +567,41 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
         var example = set?.IsExample ?? false;
         var name = UI.MenuButton(UI.Text(model.EditingSet, Font.Title2), () =>
         {
-            var delete = UI.Item("Delete…", Delete, "trash");
+            var delete = UI.Item(L("Delete…"), Delete, "trash");
             delete.IsEnabled = model.Sets.Count > 1;
             return UI.Menu(
-                UI.Item("New Set…", window.OpenWizard, "plus"),
-                UI.Item("Duplicate", () => Run(() => model.Api.CreateSet(Unique(model.EditingSet + "-copy"), copyOf: model.EditingSet)),
+                UI.Item(L("New Set…"), window.OpenWizard, "plus"),
+                UI.Item(L("Duplicate"), () => Run(() => model.Api.CreateSet(Unique(model.EditingSet + "-copy"), copyOf: model.EditingSet)),
                         "plus.square.on.square"),
-                UI.Item("Rename…", Rename, "pencil"),
+                UI.Item(L("Rename…"), Rename, "pencil"),
                 UI.Separator(),
-                UI.Item("Show in File Explorer", () => { if (model.Workspace is { } ws) Dialogs.ShowInExplorer(ws.SetURL(model.EditingSet)); }, "folder"),
+                UI.Item(L("Show in File Explorer"), () => { if (model.Workspace is { } ws) Dialogs.ShowInExplorer(ws.SetURL(model.EditingSet)); }, "folder"),
                 delete);
         }).Disabled(model.EngineRunning);
         name.Background = Tint.Brush(Tint.Black, 0);
         name.BorderThickness = new Thickness(0);
-        var identifyButton = UI.Button("Identify", identify, "lightbulb.max")
+        var identifyButton = UI.Button(L("Identify"), identify, "lightbulb.max")
             .Disabled(!hasSelection || (set?.IsVirtual ?? true) || model.EngineRunning)
-            .Tooltip("Light the selected fixtures on the real rig for 2 seconds");
+            .Tooltip(L("Light the selected fixtures on the real rig for 2 seconds"));
         var add = example
-            ? UI.Button("Add Fixtures…", AddToExample, "plus").Disabled(model.EngineRunning)
-            : UI.Button("Add Fixtures…", showAdd, "plus").Prominent().Disabled(model.EngineRunning);
+            ? UI.Button(L("Add Fixtures…"), AddToExample, "plus").Disabled(model.EngineRunning)
+            : UI.Button(L("Add Fixtures…"), showAdd, "plus").Prominent().Disabled(model.EngineRunning);
         var output = new Button
         {
-            Content = Metric(set?.IsVirtual ?? true ? "Visualiser" : set?.OutputText ?? "–", "DMX output ›"),
+            Content = Metric(set?.IsVirtual ?? true ? L("Visualiser") : set?.OutputText ?? "–", L("DMX output ›")),
             Background = Tint.Brush(Tint.Black, 0), BorderThickness = new Thickness(0), Padding = new Thickness(0),
-        }.Tooltip("Where the set's universes go: the DMX Output page (Ctrl+Shift+D)");
+        }.Tooltip(L("Where the set's universes go: the DMX Output page (Ctrl+Shift+D)"));
         output.Click += (_, _) => window.OpenDMX();
         var fixtures = doc?.Fixtures ?? [];
         return UI.VStack(12,
-            UI.HStack(8, name, UI.Text(example ? "example" : "your fixtures").Secondary(), UI.Spacer(), identifyButton, add),
+            UI.HStack(8, name, UI.Text(example ? L("example") : L("your fixtures")).Secondary(), UI.Spacer(), identifyButton, add),
             UI.HStack(18,
-                Metric($"{fixtures.Count}", "fixtures"),
-                Metric($"{fixtures.Select(f => f.Key).Distinct().Count()}", "models"),
-                Metric($"{fixtures.Select(f => f.Universe).Distinct().Count()}", "universes"),
+                Metric($"{fixtures.Count}", L("fixtures")),
+                Metric($"{fixtures.Select(f => f.Key).Distinct().Count()}", L("models")),
+                Metric($"{fixtures.Select(f => f.Universe).Distinct().Count()}", L("universes")),
                 fixtures.Count(f => f.Address is null) is > 0 and var unpatched
-                    ? Metric($"{unpatched}", "without address", Tint.Orange)
-                        .Tooltip("Fixtures without a start address play in the visualiser only: select one and give it the address set on the fixture")
+                    ? Metric($"{unpatched}", L("without address"), Tint.Orange)
+                        .Tooltip(L("Fixtures without a start address play in the visualiser only: select one and give it the address set on the fixture"))
                     : null,
                 output,
                 UI.Spacer()),
@@ -616,10 +616,10 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
         Child = UI.HStack(12,
             UI.Icon("info.circle", 22).Foreground(Tint.Accent),
             UI.VStack(2,
-                UI.Text("This is an example set", Font.Headline),
-                UI.Text("Look around and try the show with it. For the fixtures you own, make a set of your own.", Font.Callout).Secondary().Wrap()
+                UI.Text(L("This is an example set"), Font.Headline),
+                UI.Text(L("Look around and try the show with it. For the fixtures you own, make a set of your own."), Font.Callout).Secondary().Wrap()
             ).Grow(),
-            UI.Button("New Set…", window.OpenWizard, "plus").Prominent().Disabled(model.EngineRunning)),
+            UI.Button(L("New Set…"), window.OpenWizard, "plus").Prominent().Disabled(model.EngineRunning)),
     };
 
     /// Adding to an example asks first: most who do meant to start their own set.
@@ -628,9 +628,9 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
         if (window.Root is null) return;
         var d = new ContentDialog
         {
-            XamlRoot = window.Root, Title = $"Add fixtures to the example “{model.EditingSet}”?",
-            Content = UI.Text("The examples are there to look around in. Your own fixtures belong in a set of your own.").Wrap(),
-            PrimaryButtonText = "New Set…", SecondaryButtonText = "Add to the Example", CloseButtonText = "Cancel",
+            XamlRoot = window.Root, Title = L("Add fixtures to the example “{0}”?", model.EditingSet),
+            Content = UI.Text(L("The examples are there to look around in. Your own fixtures belong in a set of your own.")).Wrap(),
+            PrimaryButtonText = L("New Set…"), SecondaryButtonText = L("Add to the Example"), CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         switch (await Dialogs.Show(d))
@@ -655,7 +655,7 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
     async void Rename()
     {
         var old = model.EditingSet;
-        if (await Dialogs.AskText(window.Root, "Rename the Set", "Name", old, "Rename") is not { } to || to == old) return;
+        if (await Dialogs.AskText(window.Root, L("Rename the Set"), L("Name"), old, L("Rename")) is not { } to || to == old) return;
         Run(async () =>
         {
             await model.Api.RenameSet(old, to);
@@ -666,16 +666,16 @@ public sealed class SetHeader(AppModel model, MainWindow window, RigDocument? do
     async void Delete()
     {
         var s = model.EditingSet;
-        if (await Dialogs.Confirm(window.Root, $"Delete the set “{s}”?",
-                "Its fixture list and patch are removed, and where it hung on every rig. The rigs themselves stay.", "Delete", destructive: true))
+        if (await Dialogs.Confirm(window.Root, L("Delete the set “{0}”?", s),
+                L("Its fixture list and patch are removed, and where it hung on every rig. The rigs themselves stay."), L("Delete"), destructive: true))
             Run(() => model.Api.DeleteSet(s));
     }
 
     async void Run(Func<Task> op)
     {
-        if (!await model.EnsureSetupService()) { error("Couldn’t Change the Sets", "The engine's setup service did not start."); return; }
+        if (!await model.EnsureSetupService()) { error(L("Couldn’t Change the Sets"), L("The engine's setup service did not start.")); return; }
         try { await op(); }
-        catch (Exception e) when (SetView.IsApiError(e)) { error("Couldn’t Change the Sets", e.Message); }
+        catch (Exception e) when (SetView.IsApiError(e)) { error(L("Couldn’t Change the Sets"), e.Message); }
         model.ReloadSets();
     }
 }

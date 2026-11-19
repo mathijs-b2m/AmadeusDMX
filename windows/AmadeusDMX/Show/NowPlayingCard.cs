@@ -19,16 +19,16 @@ public sealed class NowPlayingCard(AppModel model)
         var feed = model.Feed;
         if (feed.Hello is not { } h || !state.IsActive)
             return UI.VStack(6,
-                UI.Text(model.CurrentSet?.Name ?? "No set", Font.Headline).Leading(),
+                UI.Text(model.CurrentSet?.Name ?? L("No set"), Font.Headline).Leading(),
                 UI.Text(Idle(state), Font.Callout).Secondary().Wrap().Leading());
 
         var i = feed.Phrase;
         var d = NowPlaying.At(h, i);
         var next = NowPlaying.At(h, i + 1);
         var metrics = UI.HStack(14,
-            Metric.Build($"{Num.Round(h.Bpm)}", "BPM"),
-            Metric.Build("", $"of {TimeString(h.Duration)}", bind: t => t.Text = TimeString(feed.Time), feed: feed),
-            d is null ? null : Metric.Build(Capitalized(d.Section), "now", ShowUI.Section(d.Section)),
+            Metric.Build($"{Num.Round(h.Bpm)}", L("BPM")),
+            Metric.Build("", L("of {0}", TimeString(h.Duration)), bind: t => t.Text = TimeString(feed.Time), feed: feed),
+            d is null ? null : Metric.Build(Capitalized(d.Section), L("now"), ShowUI.Section(d.Section)),
             next is null ? null : Metric.Build("", $"→ {next.Section}", bind: t => t.Text = NowPlaying.NextValue(next, feed.Time), feed: feed));
         var rows = new List<UIElement?>
         {
@@ -45,21 +45,21 @@ public sealed class NowPlayingCard(AppModel model)
             rows.Add(UI.VStack(2, [.. NowPlaying.Guard(feed.LaserGuard).Select(g =>
                     (UIElement)UI.Label(NowPlaying.GuardIsSevere(g.Note) ? "exclamationmark.octagon.fill" : "arrow.up.circle", $"{g.Id}: {g.Note}", Font.Caption)
                         .Foreground(NowPlaying.GuardIsSevere(g.Note) ? Tint.Red : Tint.Orange).Leading())])
-                .Tooltip("The laser guard keeps laser beams out of the laser safety zones (rig editor)").Leading());
+                .Tooltip(L("The laser guard keeps laser beams out of the laser safety zones (rig editor)")).Leading());
         return UI.VStack(8, [.. rows]);
     }
 
     UIElement LightshowSwitch()
     {
         var toggle = UI.Toggle("", model.PlayingLightshow, model.SetPlayLightshow);
-        return UI.HStack(8, UI.Label("sparkles", "Lightshow", Font.Callout), toggle).Leading()
-            .Tooltip("Play this track as a show piece: every hit played by its own lights, building up section by section to the climax. The track starts again where it is (a few seconds).");
+        return UI.HStack(8, UI.Label("sparkles", L("Lightshow"), Font.Callout), toggle).Leading()
+            .Tooltip(L("Play this track as a show piece: every hit played by its own lights, building up section by section to the climax. The track starts again where it is (a few seconds)."));
     }
 
     string Idle(ShowState s) => s.Kind switch
     {
-        ShowStateKind.Stopped => "Rig preview. Press Start (Ctrl+R) for a live show, or play a track (Ctrl+O).",
-        ShowStateKind.Starting => "The engine is starting…",
+        ShowStateKind.Stopped => L("Rig preview. Press Start (Ctrl+R) for a live show, or play a track (Ctrl+O)."),
+        ShowStateKind.Starting => L("The engine is starting…"),
         ShowStateKind.WaitingForDJ => $"{model.ShowTitle}. {model.DjWaiting}",
         ShowStateKind.Failed => s.Reason,
         _ => "",
@@ -92,7 +92,7 @@ public static class IntensityPips
                 Width = 18, Height = 4, CornerRadius = new CornerRadius(2),
                 Background = k <= level ? Tint.Brush(Tint.Orange) : ShowUI.Brush(Tone.Secondary, 0.25),
             });
-        if (!labelHidden) row.Children.Add(UI.Text("intensity", Font.Caption2).Secondary().Margin(4, 0, 0, 0));
+        if (!labelHidden) row.Children.Add(UI.Text(L("intensity"), Font.Caption2).Secondary().Margin(4, 0, 0, 0));
         return row;
     }
 }

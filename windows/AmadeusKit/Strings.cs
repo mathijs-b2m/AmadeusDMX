@@ -27,8 +27,12 @@ public static class Strings
     /// The language in use ("en" when nothing is translated).
     public static string Language { get; private set; } = "en";
 
-    /// How the holes' numbers are written: the language's, for showing only.
-    public static CultureInfo Culture { get; private set; } = CultureInfo.GetCultureInfo("en-US");
+    /// How the holes' numbers are written, for showing only: the user's own regional format when it is of the
+    /// language in use (English on a Dutch Windows keeps 12,5 as before; Spanish in Argentina writes it its way),
+    /// else the language's.
+    public static CultureInfo Culture { get; private set; } = CultureInfo.CurrentCulture;
+
+    static readonly CultureInfo Regional = CultureInfo.CurrentCulture;
 
     /// Picks the language once, at startup, before any view is built: the setting, else Windows's own (any Spanish
     /// gets the Latin American one: the only Spanish there is). A change takes effect at the next start.
@@ -48,9 +52,10 @@ public static class Strings
     {
         Language = language;
         _table = language == "en" ? new Dictionary<string, string>() : Table(language) ?? new Dictionary<string, string>();
-        Culture = CultureInfo.GetCultureInfo(language == "en" ? "en-US" : language);
-        CultureInfo.DefaultThreadCurrentUICulture = Culture;  // WinUI's own words (Cancel in a picker, …) where it has them
-        CultureInfo.CurrentUICulture = Culture;
+        var ui = CultureInfo.GetCultureInfo(language == "en" ? "en-US" : language);
+        Culture = language == "en" || Regional.TwoLetterISOLanguageName == ui.TwoLetterISOLanguageName ? Regional : ui;
+        CultureInfo.DefaultThreadCurrentUICulture = ui;  // WinUI's own words (Cancel in a picker, …) where it has them
+        CultureInfo.CurrentUICulture = ui;
     }
 
     /// A language's table, from the embedded Strings/<language>.json: {"English": "translation", …}.
@@ -65,8 +70,14 @@ public static class Strings
                      .ToDictionary(p => p.Key, p => p.Value.String!);
     }
 
-    /// `english` in the language in use.
-    public static string L(string english) => _table.TryGetValue(english, out var t) ? t : english;
+    /// Marks English that is translated later, where it is shown (`L(Key("Welcome"))` through a switch or a
+    /// table kept in English for matching): it returns the English, and StringsTests counts it as a key.
+    public static string Key(string english) => english;
+
+    /// `english` in the language in use. One English word with two meanings carries the one meant after a bar,
+    /// `L("Show|verb")` beside `L("Show")` (the menu): each its own translation, English without the bar.
+    public static string L(string english) =>
+        _table.TryGetValue(english, out var t) ? t : english.IndexOf('|') is var bar and > 0 ? english[..bar] : english;
 
     /// `format` (English, with {0}, {1:0.0}, …) in the language in use, its holes filled in that language's way.
     public static string L(string format, params object?[] values) => string.Format(Culture, L(format), values);

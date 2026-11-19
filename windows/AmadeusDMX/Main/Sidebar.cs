@@ -49,7 +49,7 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
     string? _shape;
     TextBlock? _linkLine;
 
-    static string LinkLine(LinkStatus link) => link.Up ? $"{link.Name} · {link.JitterMs:F0} ms jitter" : $"{link.Name}: link down";
+    static string LinkLine(LinkStatus link) => link.Up ? L("{0} · {1:F0} ms jitter", link.Name, link.JitterMs) : L("{0}: link down", link.Name);
 
     UIElement Content()
     {
@@ -58,7 +58,7 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
         var state = model.ShowState;
         var fps = model.Feed.State == FeedState.Connected && state.IsActive && !model.Feed.Lite
             ? UI.Text("", Font.Caption).Secondary().Bind(model.Feed, nameof(LiveFeed.Fps),
-                  t => t.Text = $"{Math.Round(model.Feed.Fps).ToString(CultureInfo.CurrentCulture)} fps")
+                  t => t.Text = L("{0} fps", Math.Round(model.Feed.Fps)))
             : null;
         var rows = new List<UIElement?>
         {
@@ -83,14 +83,14 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
         else if (state.Kind == ShowStateKind.WaitingForDJ)
             rows.Add(UI.Text(model.DjWaiting, Font.Caption).Secondary().Wrap());
         else if (state.Kind == ShowStateKind.Attached)
-            rows.Add(UI.Text("An engine started outside the app is running; the app shows its lights.", Font.Caption).Secondary().Wrap());
+            rows.Add(UI.Text(L("An engine started outside the app is running; the app shows its lights."), Font.Caption).Secondary().Wrap());
         else if (model.CurrentSet is { } set)
         {
             var output = new HyperlinkButton
             {
-                Content = UI.Label("cable.connector", set.IsVirtual || !model.SendArtNet ? "Visualiser only" : set.OutputText, Font.Caption).Secondary(),
+                Content = UI.Label("cable.connector", set.IsVirtual || !model.SendArtNet ? L("Visualiser only") : set.OutputText, Font.Caption).Secondary(),
                 Padding = new Thickness(0),
-            }.Tooltip("DMX Output (Ctrl+Shift+D)");
+            }.Tooltip(L("DMX Output (Ctrl+Shift+D)"));
             output.Click += (_, _) => window.OpenDMX();
             rows.Add(output);
         }
@@ -100,10 +100,10 @@ public sealed class EngineFooter(AppModel model, MainWindow window)
     /// Windows Firewall keeps the DJ laptop's decks from the engine: say so, and let them in.
     static UIElement FirewallRows(FirewallWatch fw, NetProfile profile, string dj) =>
         UI.VStack(4,
-            UI.Text($"Windows Firewall keeps {dj}'s decks out on this network (a {Firewall.Name(profile)} network to Windows).",
+            UI.Text(L("Windows Firewall keeps {0}'s decks out on this network (a {1} network to Windows).", dj, Firewall.Name(profile)),
                     Font.Caption).Foreground(Tint.Orange).Wrap(3),
-            UI.Button(fw.Allowing ? "Allowing…" : "Allow the Engine…", () => _ = fw.Allow()).Disabled(fw.Allowing).Font(Font.Caption)
-                .Tooltip("Windows asks for an administrator."),
+            UI.Button(fw.Allowing ? L("Allowing…") : L("Allow the Engine…"), () => _ = fw.Allow()).Disabled(fw.Allowing).Font(Font.Caption)
+                .Tooltip(L("Windows asks for an administrator.")),
             fw.Note is { } note ? UI.Text(note, Font.Caption).Secondary().Wrap() : null);
 }
 
@@ -143,17 +143,17 @@ public sealed class VersionFooter(AppModel model)
         {
             Content = UI.HStack(5, icon, UI.Text(Line(u), Font.Caption).Secondary()),
             Padding = new Thickness(0),
-        }.Tooltip(!u.IsAvailable ? "A development build: it updates with the code, not by itself"
-            : u.State == UpdateState.Available ? $"{u.Newest} is available: you have {u.Version}. Click for the update settings."
-            : "Updates: this version, the newest, and whether to check by itself");
+        }.Tooltip(!u.IsAvailable ? L("A development build: it updates with the code, not by itself")
+            : u.State == UpdateState.Available ? L("{0} is available: you have {1}. Click for the update settings.", u.Newest, u.Version)
+            : L("Updates: this version, the newest, and whether to check by itself"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(line, Line(u));  // its content is a stack: no name of its own
         line.Click += (_, _) => new Flyout { Content = Options(u), Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.RightEdgeAlignedBottom }.ShowAt(line);
         UIElement? action = u.State switch
         {
-            UpdateState.Available when u.IsAvailable => UI.Button($"Update to {u.Newest}", () => u.InstallNewest()).Prominent()
-                .Disabled(!u.CanCheck).Font(Font.Caption).Tooltip($"Downloads Amadeus DMX {u.Newest} and installs it; Amadeus DMX starts again"),
+            UpdateState.Available when u.IsAvailable => UI.Button(L("Update to {0}", u.Newest), () => u.InstallNewest()).Prominent()
+                .Disabled(!u.CanCheck).Font(Font.Caption).Tooltip(L("Downloads Amadeus DMX {0} and installs it; Amadeus DMX starts again", u.Newest)),
             UpdateState.Downloading => UI.HStack(4, UI.Progress(u.Progress).Frame(width: 50),
-                UI.IconButton("xmark.circle.fill", "Stop the download", u.CancelInstall)),
+                UI.IconButton("xmark.circle.fill", L("Stop the download"), u.CancelInstall)),
             _ => null,
         };
         var row = UI.HStack(6, line.Grow(), action);
@@ -163,15 +163,15 @@ public sealed class VersionFooter(AppModel model)
 
     static string Line(Updates u)
     {
-        if (!u.IsAvailable) return $"Amadeus DMX {u.Version} · development build";
+        if (!u.IsAvailable) return L("Amadeus DMX {0} · development build", u.Version);
         return u.State switch
         {
             UpdateState.Available => u.Version,  // the button names the newer one
-            UpdateState.Downloading => $"Downloading {u.Newest}…",
-            UpdateState.Installing => u.WaitingForIdle ? $"{u.Newest} installs when the show stops" : $"Installing {u.Newest}…",
-            UpdateState.Checking => $"Amadeus DMX {u.Version} · checking…",
-            UpdateState.UpToDate => $"Amadeus DMX {u.Version} · up to date",
-            UpdateState.Failed => $"Amadeus DMX {u.Version} · couldn’t check",
+            UpdateState.Downloading => L("Downloading {0}…", u.Newest),
+            UpdateState.Installing => u.WaitingForIdle ? L("{0} installs when the show stops", u.Newest) : L("Installing {0}…", u.Newest),
+            UpdateState.Checking => L("Amadeus DMX {0} · checking…", u.Version),
+            UpdateState.UpToDate => L("Amadeus DMX {0} · up to date", u.Version),
+            UpdateState.Failed => L("Amadeus DMX {0} · couldn’t check", u.Version),
             _ => $"Amadeus DMX {u.Version}",
         };
     }
@@ -181,13 +181,13 @@ public sealed class VersionFooter(AppModel model)
     {
         if (!u.IsAvailable)
             return UI.VStack(6, UI.Text($"Amadeus DMX {u.Version}", Font.Headline),
-                UI.Text("A development build: it updates with the code, not by itself.").Secondary().Wrap()).Frame(width: 340);
+                UI.Text(L("A development build: it updates with the code, not by itself.")).Secondary().Wrap()).Frame(width: 340);
         var toggles = UI.Live(u, () => UI.VStack(4,
-            UI.Row("Check for updates automatically", UI.Toggle("", u.ChecksAutomatically, v => u.ChecksAutomatically = v)),
-            UI.Row("Download and install updates by themselves",
+            UI.Row(L("Check for updates automatically"), UI.Toggle("", u.ChecksAutomatically, v => u.ChecksAutomatically = v)),
+            UI.Row(L("Download and install updates by themselves"),
                 UI.Toggle("", u.InstallsAutomatically, v => u.InstallsAutomatically = v).Disabled(!u.ChecksAutomatically))));
         return UI.VStack(10,
-            UpdateStatusView.Build(u, "Amadeus DMX", "when the show stops"),
+            UpdateStatusView.Build(u, "Amadeus DMX", L("when the show stops")),
             toggles,
             UI.Text(UpdatesSection.Rules, Font.Caption).Secondary().Wrap()).Frame(width: 360);
     }
@@ -198,16 +198,16 @@ public static class PowerLine
 {
     public static FrameworkElement Build(PowerMeter power, bool stageOn) =>
         UI.VStack(2,
-            Row("Lights", power.Engine.Cpu, null),
-            stageOn ? Row("3D stage", power.Stage.Cpu, power.Gpu) : null)
-        .Tooltip("CPU use (100% = one core) of the light engine and of the app's 3D stage, and the GPU time the "
-                 + $"stage takes. Measured every {(int)PowerMeter.Interval.TotalSeconds} s.");
+            Row(L("Lights"), power.Engine.Cpu, null),
+            stageOn ? Row(L("3D stage"), power.Stage.Cpu, power.Gpu) : null)
+        .Tooltip(L("CPU use (100% = one core) of the light engine and of the app's 3D stage, and the GPU time the stage takes. Measured every {0} s.",
+                   (int)PowerMeter.Interval.TotalSeconds));
 
     // one line each, however narrow the sidebar: a taller footer would push the show's timeline out of the window
     static FrameworkElement Row(string name, double cpu, double? gpu) =>
         UI.HStack(6,
             UI.Text(name, Font.Caption).Secondary().Frame(width: 58),
-            UI.Text($"{cpu * 100:F0}% CPU" + (gpu is { } g ? $" · GPU {g * 100:F0}%" : ""), Font.Caption).Secondary().Lines(1));
+            UI.Text(gpu is { } g ? L("{0:F0}% CPU · GPU {1:F0}%", cpu * 100, g * 100) : L("{0:F0}% CPU", cpu * 100), Font.Caption).Secondary().Lines(1));
 }
 
 /// The 3D stage costs more than the show can spare: say so, and offer Perform Only.
@@ -217,16 +217,17 @@ public static class PowerWarning
     public static FrameworkElement Build(PowerMeter power, Action performOnly)
     {
         var ratio = (power.Stage.Cpu + power.Gpu) / Math.Max(power.Engine.Cpu, 0.05);
-        string? why = power.Hot ? "The computer is getting hot" : power.LowPower ? "Battery saver is on" : power.OnBattery ? "On battery" : null;
-        var cost = ratio >= 1.5 ? $"3D {Math.Round(ratio)}× the lights" : "3D stage is heavy";
-        var shortText = power.Hot ? $"Hot · {cost}" : power.LowPower ? $"Battery Saver · {cost}" : power.OnBattery ? $"Battery · {cost}" : cost;
-        var longCost = ratio >= 1.5 ? $"the 3D stage takes {Math.Round(ratio)}× what the lights do" : "the 3D stage adds to the load";
-        var reason = (why is null ? "" : $"{why}: ") + longCost + ". During a gig, Perform Only keeps the lights on time.";
-        var button = UI.Button("Perform Only", performOnly).Font(Font.Caption).Padding(6, 2);
+        string? why = power.Hot ? L("The computer is getting hot") : power.LowPower ? L("Battery saver is on") : power.OnBattery ? L("On battery") : null;
+        var cost = ratio >= 1.5 ? L("3D {0}× the lights", Math.Round(ratio)) : L("3D stage is heavy");
+        var shortText = power.Hot ? L("Hot · {0}", cost) : power.LowPower ? L("Battery Saver · {0}", cost) : power.OnBattery ? L("Battery · {0}", cost) : cost;
+        var longCost = ratio >= 1.5 ? L("the 3D stage takes {0}× what the lights do", Math.Round(ratio)) : L("the 3D stage adds to the load");
+        var reason = why is null ? L("{0}. During a gig, Perform Only keeps the lights on time.", longCost)
+            : L("{0}: {1}. During a gig, Perform Only keeps the lights on time.", why, longCost);
+        var button = UI.Button(L("Perform Only"), performOnly).Font(Font.Caption).Padding(6, 2);
         return UI.HStack(6,
             UI.Label("exclamationmark.triangle.fill", shortText, Font.Caption).Foreground(Tint.Orange),
             UI.Spacer(4),
             button)
-        .Tooltip(reason + " Perform Only: the lights only, no 3D stage, so the computer's power goes to the show.");
+        .Tooltip(L("{0} Perform Only: the lights only, no 3D stage, so the computer's power goes to the show.", reason));
     }
 }

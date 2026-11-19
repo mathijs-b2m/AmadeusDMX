@@ -128,9 +128,9 @@ public sealed class NewRigSheet(AppModel model)
         }
         _dialog = new ContentDialog
         {
-            XamlRoot = root, Title = "New Rig", PrimaryButtonText = "Create Rig", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = root, Title = L("New Rig"), PrimaryButtonText = L("Create Rig"), CloseButtonText = L("Cancel"), DefaultButton = ContentDialogButton.Primary,
             Content = UI.Scroll(UI.VStack(16,
-                UI.Text("A rig is the venue: the stage and what your fixtures hang on. Start from what's there; you can move and add trusses afterwards.")
+                UI.Text(L("A rig is the venue: the stage and what your fixtures hang on. Start from what's there; you can move and add trusses afterwards."))
                     .Secondary().Wrap(),
                 grid, _form, _error).Frame(width: 680)),
         };
@@ -187,21 +187,21 @@ public sealed class NewRigSheet(AppModel model)
 
     UIElement Form()
     {
-        var name = new TextBox { Text = _name, PlaceholderText = "Name" };
+        var name = new TextBox { Text = _name, PlaceholderText = L("Name") };
         name.TextChanged += (_, _) => { _name = name.Text; Validate(); };
         return UI.Card(UI.VStack(12,
-            UI.Row("Name", name.MinWidth(260)),
-            SizeRow("Stage width", _width, 2, 30, 0.5, v => _width = v),
+            UI.Row(L("Name"), name.MinWidth(260)),
+            SizeRow(L("Stage width"), _width, 2, 30, 0.5, v => _width = v),
             _template == RigTemplate.Floor ? null
-                : SizeRow(_template is RigTemplate.Stands or RigTemplate.Bridge ? "Stand height" : _template == RigTemplate.Carre ? "Leg height" : "Truss height", _height, 2, 12, 0.5, v => _height = v),
-            SizeRow("Room depth", _depth, 4, 40, 1, v => _depth = v),
-            UI.Row("LED wall behind the DJ", UI.Toggle("", _screen, v => _screen = v))));
+                : SizeRow(_template is RigTemplate.Stands or RigTemplate.Bridge ? L("Stand height") : _template == RigTemplate.Carre ? L("Leg height") : L("Truss height"), _height, 2, 12, 0.5, v => _height = v),
+            SizeRow(L("Room depth"), _depth, 4, 40, 1, v => _depth = v),
+            UI.Row(L("LED wall behind the DJ"), UI.Toggle("", _screen, v => _screen = v))));
     }
 
     /// A size with its slider (the wizard's SizeRow).
     static FrameworkElement SizeRow(string title, double value, double min, double max, double step, Action<double> set)
     {
-        string Text(double v) => step < 1 ? v.ToString("0.0", CultureInfo.InvariantCulture) + " m" : $"{(int)v} m";
+        string Text(double v) => step < 1 ? L("{0:0.0} m", v) : L("{0} m", (int)v);
         var text = UI.Text(Text(value)).Secondary();
         text.Width = 56;
         text.TextAlignment = TextAlignment.Right;
@@ -259,17 +259,17 @@ public sealed class MountPromptSheet(AppModel model, string rig, string set)
         _spinner.Visible(false);
         _dialog = new ContentDialog
         {
-            XamlRoot = root, CloseButtonText = "Later",
+            XamlRoot = root, CloseButtonText = L("Later"),
             Content = UI.VStack(18,
                 UI.HStack(14, UI.Icon("square.split.bottomrightquarter", 34).Foreground(Tint.Accent),
-                          UI.VStack(4, UI.Text($"Mount “{set}” on “{rig}”?", Font.Title2),
-                                    UI.Text(placed == 0 ? $"None of the set's {total} fixtures hang on this rig yet."
-                                            : $"{waiting} of the set's {total} fixtures don't hang on this rig yet.").Secondary().Wrap())),
-                Choice("wand.and.stars", "Auto-Mount",
-                       "Moving heads under the trusses, lasers high at the back, strobes and blinders on the front, bars and pars on the floor. Mirrored, model by model. Move anything afterwards.",
+                          UI.VStack(4, UI.Text(L("Mount “{0}” on “{1}”?", set, rig), Font.Title2),
+                                    UI.Text(placed == 0 ? L("None of the set's {0} fixtures hang on this rig yet.", total)
+                                            : L("{0} of the set's {1} fixtures don't hang on this rig yet.", waiting, total)).Secondary().Wrap())),
+                Choice("wand.and.stars", L("Auto-Mount"),
+                       L("Moving heads under the trusses, lasers high at the back, strobes and blinders on the front, bars and pars on the floor. Mirrored, model by model. Move anything afterwards."),
                        true, Auto),
-                Choice("hand.draw", "I’ll Place Them Myself",
-                       "They wait on the floor in front of the stage: drag them onto the trusses one by one, or a whole group at once.",
+                Choice("hand.draw", L("I’ll Place Them Myself"),
+                       L("They wait on the floor in front of the stage: drag them onto the trusses one by one, or a whole group at once."),
                        false, () => { _dialog?.Hide(); model.Section = Section.Rig; }),
                 UI.HStack(8, _error.Grow(), _spinner)).Frame(width: 480),
         };

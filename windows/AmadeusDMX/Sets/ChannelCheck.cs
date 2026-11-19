@@ -54,10 +54,10 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
 
         return UI.Scroll(UI.VStack(14,
             UI.HStack(8,
-                UI.Text($"Channel {ch.N} of {Mapping.Channels.Count}", Font.Title3).Bold(),
-                UI.Text($"now: {Now}").Secondary(),
+                UI.Text(L("Channel {0} of {1}", ch.N, Mapping.Channels.Count), Font.Title3).Bold(),
+                UI.Text(L("now: {0}", Now)).Secondary(),
                 UI.Spacer()),
-            UI.Text("Watch the fixture: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?")
+            UI.Text(L("Watch the fixture: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?"))
                 .Secondary().Wrap(),
             Probing(s),
             answers,
@@ -65,21 +65,21 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
             ch.Role == "color_wheel" ? new WheelNaming(m, s).Build() : null,
             ch.Role == "ring_color" ? new WheelNaming(m, s, ring: true).Build() : null,
             UI.HStack(8,
-                UI.Button("Previous", () => Go(s.Index - 1), "chevron.left").Disabled(s.Index == 0),
+                UI.Button(L("Previous"), () => Go(s.Index - 1), "chevron.left").Disabled(s.Index == 0),
                 UI.Spacer(),
-                Last ? UI.Button("Finish Check", finish).Prominent()
-                     : UI.Button("Next Channel", () => Go(s.Index + 1), "chevron.right").Prominent())
+                Last ? UI.Button(L("Finish Check"), finish).Prominent()
+                     : UI.Button(L("Next Channel"), () => Go(s.Index + 1), "chevron.right").Prominent())
         ).Padding(16));
     }
 
     /// Sweep (or not) and the value the probed channel gets now.
     internal static UIElement Probing(ChannelCheckState s)
     {
-        var sweep = Form.ToggleButton(UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? "Sweeping" : "Sweep"), s.Sweeping, on => s.Sweeping = on)
+        var sweep = Form.ToggleButton(UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? L("Sweeping") : L("Sweep")), s.Sweeping, on => s.Sweeping = on)
             .Bind(s, nameof(ChannelCheckState.Sweeping), b =>
             {
                 b.IsChecked = s.Sweeping;
-                b.Content = UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? "Sweeping" : "Sweep");
+                b.Content = UI.Label(s.Sweeping ? "pause.fill" : "play.fill", s.Sweeping ? L("Sweeping") : L("Sweep"));
             });
         var probe = UI.Slider(s.Probe, 0, 255, v => { s.Probe = (int)Math.Round(v); s.Sweeping = false; }, step: 1)
             .Bind(s, nameof(ChannelCheckState.Probe), sl => sl.SetValueQuietly(s.Probe));
@@ -103,7 +103,7 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
             text.Text = $"{x}";
         }, step: 1);
         return UI.VStack(4,
-            UI.Text("Held at a value: set it where the light is on and steady (no strobe, no programs)", Font.Callout).Wrap(),
+            UI.Text(L("Held at a value: set it where the light is on and steady (no strobe, no programs)"), Font.Callout).Wrap(),
             UI.HStack(8, slider.Grow(), text),
             ch.Ranges.Count == 0 ? null
                 : UI.Text(string.Join(" · ", ch.Ranges.Select(r => $"{r.Lo}–{r.Hi} {r.What}")), Font.Caption).Secondary().Wrap());
@@ -115,7 +115,7 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
         get
         {
             var ch = Channel;
-            if (ch.Role == "hold") return $"held at {ch.Value} ({ch.Attr.Replace('_', ' ')})";
+            if (ch.Role == "hold") return L("held at {0} ({1})", ch.Value, ch.Attr.Replace('_', ' '));
             return Mapping.Roles.FirstOrDefault(r => r.RoleName == ch.Role)?.Label ?? ch.Role;
         }
     }
@@ -154,12 +154,12 @@ public sealed class ColourWheelEditor(MapperModel m, int index, ChannelCheckStat
 
     public FrameworkElement Build() => UI.Scroll(UI.VStack(14,
         UI.HStack(8,
-            UI.Text(Ring ? "Ring Colour" : "Colour Wheel", Font.Title3).Bold(),
-            UI.Text($"channel {m.Mapping!.Channels[index].N}").Secondary(),
+            UI.Text(Ring ? L("Ring Colour") : L("Colour Wheel"), Font.Title3).Bold(),
+            UI.Text(L("channel {0}", m.Mapping!.Channels[index].N)).Secondary(),
             UI.Spacer(),
-            UI.Button("Done", done).Prominent()),
-        UI.Text(Ring ? "The light is on and the head in the middle. Show each colour of the ring round the lens, say what you see, and set its values. Name the one where the ring is off \"off\": the ring rests with the head. Sweep goes through the whole channel."
-                     : "The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel.")
+            UI.Button(L("Done"), done).Prominent()),
+        UI.Text(Ring ? L("The light is on and the head in the middle. Show each colour of the ring round the lens, say what you see, and set its values. Name the one where the ring is off \"off\": the ring rests with the head. Sweep goes through the whole channel.")
+                     : L("The light is on and the head in the middle. Show each colour, say what you see, and set its values where the colour is whole (not between two). Sweep goes through the whole wheel."))
             .Secondary().Wrap(),
         ChannelCheck.Probing(s),
         new WheelNaming(m, s, Ring).Build()
@@ -194,9 +194,9 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s, bool ring = false)
     UIElement Body()
     {
         var rows = UI.VStack(6,
-            UI.Text("Name the colours: show each, say what you see, and set its values where the colour is whole", Font.Callout).Wrap());
+            UI.Text(L("Name the colours: show each, say what you see, and set its values where the colour is whole"), Font.Callout).Wrap());
         for (var i = 0; i < Slots.Count; i++) rows.Children.Add(Row(i));
-        var add = UI.Button("Add a Colour", () =>
+        var add = UI.Button(L("Add a Colour"), () =>
         {
             var from = Math.Min((Slots.Count > 0 ? Slots[^1].To : -1) + 1, 255);
             m.SetWheel([.. Slots, new FixtureMapping.Slot("red", from, Math.Min(from + 15, 255), [1, 0, 0])], ring);
@@ -209,7 +209,8 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s, bool ring = false)
     UIElement Row(int i)
     {
         var slot = Slots[i];
-        var show = UI.Button("Show", () => { s.Sweeping = false; s.Probe = Slots[i].Mid; })
+        // shows this colour on the fixture ("Show" the verb, not the Show menu)
+        var show = UI.Button(L("Show|verb"), () => { s.Sweeping = false; s.Probe = Slots[i].Mid; })
             .Bind(s, [nameof(ChannelCheckState.Probe), nameof(ChannelCheckState.Sweeping)], b =>
             {
                 var on = i < Slots.Count && s.Probe >= Slots[i].From && s.Probe <= Slots[i].To && !s.Sweeping;
@@ -233,13 +234,13 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s, bool ring = false)
         };
         var names = Choices.Select(c => c.Name).ToList();
         if (!names.Contains(slot.Name)) names.Insert(0, slot.Name);
-        var picker = UI.Picker(names, slot.Name, n => n, n =>
+        var picker = UI.Picker(names, slot.Name, n => ColourName(n), n =>
         {
             var known = Choices.Where(c => c.Name == n).Select(c => c.Rgb).FirstOrDefault();
             m.SetSlot(i, sl => sl with { Name = n, Rgb = known ?? sl.Rgb }, ring);
             _host.Rebuild(Body);
         }).Frame(width: 130);
-        var remove = UI.IconButton("minus.circle", "Remove", () =>
+        var remove = UI.IconButton("minus.circle", L("Remove"), () =>
         {
             var list = Slots.ToList();
             if (list.Count <= 1 || i >= list.Count) return;
@@ -250,6 +251,15 @@ sealed class WheelNaming(MapperModel m, ChannelCheckState s, bool ring = false)
         return UI.HStack(8, show, Number(slot.From, (sl, x) => sl with { From = x }), UI.Text("–"),
                          Number(slot.To, (sl, x) => sl with { To = x }), swatch, picker, remove);
     }
+
+    /// A colour's name as shown (the saved name stays the engine's).
+    static string ColourName(string n) => n switch
+    {
+        "open" => L("open"), "off" => L("off"), "white" => L("white"), "red" => L("red"), "orange" => L("orange"),
+        "yellow" => L("yellow"), "green" => L("green"), "cyan" => L("cyan"), "light blue" => L("light blue"),
+        "blue" => L("blue"), "purple" => L("purple"), "magenta" => L("magenta"), "pink" => L("pink"), "uv" => L("uv"),
+        "warm white" => L("warm white"), _ => n,
+    };
 
     static Vector3 Rgb(IReadOnlyList<double> c) =>
         c.Count >= 3 ? new Vector3((float)c[0], (float)c[1], (float)c[2]) : Vector3.One;

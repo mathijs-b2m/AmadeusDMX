@@ -15,13 +15,20 @@ public sealed class StageSettings : Observable
         ("Side", "arrow.left.and.right"), ("DJ", "headphones"), ("Plan", "square.grid.3x3"),
     ];
 
+    /// A preset's name for people (its raw value is the English one).
+    public static string PresetTitle(string raw) => raw switch
+    {
+        "Front of House" => L("Front of House"), "In the Crowd" => L("In the Crowd"), "Drone" => L("Drone"),
+        "Side" => L("Side"), "DJ" => L("DJ"), "Plan" => L("Plan"), _ => raw,
+    };
+
     /// Swift's WallScene (Render/WallRenderer.swift): raw value, title, symbol.
-    public static readonly IReadOnlyList<(string RawValue, string Title, string Symbol)> WallScenes =
+    public static IReadOnlyList<(string RawValue, string Title, string Symbol)> WallScenes =>
     [
-        ("auto", "Director's Choice", "wand.and.stars"), ("off", "Off", "rectangle.slash"), ("ambient", "Ambient", "cloud.fog"),
-        ("runner", "Runner", "figure.run"), ("dancer", "Dancer", "figure.dance"), ("crowd", "Crowd", "person.3"),
-        ("pong", "Pong", "gamecontroller"), ("words", "Words", "textformat.size"), ("equalizer", "Equalizer", "chart.bar"),
-        ("psychedelic", "Psychedelic", "circle.hexagongrid"),
+        ("auto", L("Director's Choice"), "wand.and.stars"), ("off", L("Off"), "rectangle.slash"), ("ambient", L("Ambient"), "cloud.fog"),
+        ("runner", L("Runner"), "figure.run"), ("dancer", L("Dancer"), "figure.dance"), ("crowd", L("Crowd"), "person.3"),
+        ("pong", L("Pong"), "gamecontroller"), ("words", L("Words"), "textformat.size"), ("equalizer", L("Equalizer"), "chart.bar"),
+        ("psychedelic", L("Psychedelic"), "circle.hexagongrid"),
     ];
 
     // -camera Plan / Drone … (development), as on the Mac

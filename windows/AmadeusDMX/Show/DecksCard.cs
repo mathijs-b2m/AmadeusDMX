@@ -45,7 +45,7 @@ public sealed class DecksCard(AppModel model)
                 UI.Spacer(),
                 _linkLine));
             if (link.Fetching.Count > 0)
-                rows.Add(UI.Label("arrow.down.circle", $"Fetching {string.Join(", ", link.Fetching)}", Font.Caption2).Secondary().Leading());
+                rows.Add(UI.Label("arrow.down.circle", L("Fetching {0}", string.Join(", ", link.Fetching)), Font.Caption2).Secondary().Leading());
         }
         foreach (var d in model.Feed.Decks) rows.Add(DeckRow(d));
         return UI.VStack(10, [.. rows]);
@@ -67,7 +67,7 @@ public sealed class DecksCard(AppModel model)
             UI.HStack(8,
                 number,
                 UI.Text(deck.Track, Font.Callout).Lines(1),
-                deck.Genre == "cinematic" ? UI.Icon("film.stack").Foreground(Tint.Orange).Tooltip("Cinematic program") : null,  // a program of its own: say so
+                deck.Genre == "cinematic" ? UI.Icon("film.stack").Foreground(Tint.Orange).Tooltip(L("Cinematic program")) : null,  // a program of its own: say so
                 GenreChip.Build(deck.Genre ?? "", style: deck.Style ?? ""),
                 UI.Spacer(),
                 UI.Icon(deck.Play ? "play.fill" : "pause.fill", Theme.Size(Font.Caption)).Secondary()),

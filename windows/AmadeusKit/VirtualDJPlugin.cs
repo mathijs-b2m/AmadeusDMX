@@ -1,6 +1,8 @@
 // The AmadeusLink plugin for VirtualDJ (vdj/): where VirtualDJ looks for it, whether ours is there, putting it
 // there. Amadeus DMX installs it from the engine folder; Amadeus Link carries its own copy (a DJ laptop has no
 // engine). Both copies are the same build, so "up to date" is the same bytes.
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit;
 
 public static class VirtualDJPlugin
@@ -29,7 +31,7 @@ public static class VirtualDJPlugin
         try { File.Copy(bundled, installed, overwrite: true); }
         catch (IOException e) when (File.Exists(installed))
         {
-            throw new IOException("VirtualDJ is using the plugin: quit VirtualDJ, then install it again.", e);
+            throw new IOException(L("VirtualDJ is using the plugin: quit VirtualDJ, then install it again."), e);
         }
     }
 }
