@@ -73,7 +73,8 @@ def test_solo_one_lit_the_rest_dark(track, rig_name):
 
 def test_single_group_rigs_get_solos_in_calm_parts():
     a = synthetic_analysis()
-    plan = direct(a, RuleDirector(groups=[{"name": "all", "cls": "all", "ids": ["h1", "h2", "h3", "h4"]}]), verbose=False)
+    one = [{"name": "all", "cls": "all", "ids": ["h1", "h2", "h3", "h4"]}]
+    plan = direct(a, RuleDirector(groups=one), verbose=False)
     calm = [d for d in plan if d.section in ("intro", "breakdown", "bridge")]
     if not calm:
         pytest.skip("no calm parts in the synthetic track")

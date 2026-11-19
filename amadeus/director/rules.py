@@ -47,7 +47,9 @@ RULE_LOOKS = {
     ],
     "drop": [
         ("off", "pulse", "kick", "steady", "ballyhoo", "mirror", "crowd", "white", "impact"),
-        ("full", "color_pop", "kick", "pulse", "step_on_beat", "cross", "crowd", "sides", "impact"),
+        ("sides", "color_pop", "kick", "pulse", "step_on_beat", "cross", "crowd", "sides", "impact"),
+        # the pars hold a steady colour wash, the white beams play the kick over it
+        ("full", "none", "kick", "pulse", "swing", "fan", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "flick", "bounce", "mirror", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "random", "tilt_wave", "wave", "crowd", "white", "impact"),
         ("full", "color_pop", "kick", "steady", "tilt_wave", "mirror", "sky", "accent", "impact"),
@@ -76,7 +78,7 @@ RULE_LOOKS = {
     ],
     "chorus": [
         ("full", "color_pop", "backbeat", "steady", "swing", "fan", "crowd", "white", "steady"),
-        ("full", "pulse", "kick", "pulse", "sweep", "mirror", "crowd", "sides", "steady"),
+        ("sides", "pulse", "kick", "pulse", "sweep", "mirror", "crowd", "sides", "steady"),
         ("full", "color_pop", "kick", "steady", "circle", "cross", "sky", "white", "steady"),
         ("full", "alternate", "backbeat", "pulse", "step_on_beat", "fan", "crowd", "accent", "steady"),
         ("full", "pulse", "kick", "steady", "scissor", "sync", "crowd", "white", "steady"),

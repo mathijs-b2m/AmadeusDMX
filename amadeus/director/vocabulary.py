@@ -95,6 +95,11 @@ PAR_BASE = [
     ("dim", "Pars glow softly in the base colour between hits."),
     ("full", "Pars stay bright in the base colour; hits change the colour rather than the brightness."),
     ("fade", "Pars slowly cross-fade through the palette: calm, no hard edges."),
+    (
+        "sides",
+        "Pars split down the middle: stage left glows in the base colour, stage right in the accent; a hit "
+        "turns each side to the other's colour.",
+    ),
 ]
 
 PAR_ACCENT = [

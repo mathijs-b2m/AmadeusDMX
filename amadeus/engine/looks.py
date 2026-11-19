@@ -26,6 +26,7 @@ from amadeus.engine.timing import (
     ring_env,
     stab_env,
 )
+from amadeus.library import fixtures as fxlib
 from amadeus.rig import sections
 
 XFADE = 0.6  # seconds of crossfade between scenes at phrase boundaries
@@ -114,7 +115,8 @@ RUN_STEPS = 4  # a lap has at most this many steps: the pairs, middle out, in as
 MELODY_TAU = 0.7  # how long a melody note keeps its par lit
 
 
-PAR_BASE_LEVEL = {"off": 0.0, "dim": 0.22, "full": 0.75, "fade": 0.5}
+PAR_BASE_LEVEL = {"off": 0.0, "dim": 0.22, "full": 0.75, "fade": 0.5, "sides": 0.6}
+STROBE_WASH = 0.8  # an LED strobe with colour holds the pars' glow, a little under them (it is far brighter)
 
 
 INTENSITY_MASTER = [0.55, 0.7, 0.85, 1.0]  # "Subtle" must still be clearly visible
@@ -170,14 +172,16 @@ class LooksMixin:
         """Blinders: dark but for the song's heaviest moments (engine/blinders.py)."""
         self._blinders(t, out)
 
-    def _strobe_states(self, d: Decision, t: float, out: dict, acc_env: float):
-        """Strobes: flashes, never a steady light. Dark by default. A build-up into a drop flashes on the beat
-        over its last quarter, twice per beat over its last bar (never faster than the set's max_flash_hz);
-        in a drop (intensity 2+) they flash on the big hits, on the kick. The drop moment itself flashes
-        everything anyway."""
+    def _strobe_states(self, d: Decision, t: float, out: dict, acc_env: float, base=None, accent=None):
+        """Strobes: white flashes, never a steady white light. Dark by default. A build-up into a drop flashes on
+        the beat over its last quarter, twice per beat over its last bar (never faster than the set's
+        max_flash_hz); in a drop (intensity 2+) they flash on the big hits, on the kick. The drop moment itself
+        flashes everything anyway. An LED strobe with colour (an Atomic 3000 LED) also washes: while the pars
+        glow it holds their base colour a little under them, the flashes white on top."""
         strobes = getattr(self, "_strobes", None)
         if strobes is None:
             strobes = self._strobes = [e for e in self.rig["elements"] if e["kind"] == "strobe"]
+            self._strobe_rgb = {e["id"] for e in strobes if self._has_colour(e)}
         if not strobes:
             return
         beat, phase, period = self.beat_info(t)
@@ -199,8 +203,37 @@ class LooksMixin:
                 gate, hz = math.exp(-since / 0.06), min(1.0 / (every * self._beat_s()), max_hz)
         elif d.section == "drop" and d.intensity >= 2:  # the big hits, on the kick (the flash timeline)
             dim = _decay(self.flash_t, self.flash_s, t, 0.06)
+        wash = self._strobe_wash(d, t) if base is not None and hz == 0.0 else 0.0
         for e in strobes:
+            if wash > 0 and e["id"] in self._strobe_rgb:  # the wash, the flash white on top of it
+                col = base if d.par_base != "sides" or float(e.get("x", 0.5)) <= 0.5 else accent
+                lvl = max(wash, dim)
+                w = dim / lvl if lvl > 0 else 0.0
+                r, g, b = _lerp(col, (1.0, 1.0, 1.0), w)
+                out[e["id"]] = State(dimmer=lvl, r=r, g=g, b=b)
+                continue
             out[e["id"]] = State(dimmer=dim, r=1.0, g=1.0, b=1.0, strobe_hz=hz, gate=gate)
+
+    def _strobe_wash(self, d: Decision, t: float) -> float:
+        """How bright a colour strobe washes in this look: the pars' glow between hits (none when the pars wait
+        dark), rising with them in a build-up."""
+        level = PAR_BASE_LEVEL.get(d.par_base, 0.0) * STROBE_WASH
+        if d.dynamics == "rise":
+            progress = min(max((t - d.start) / max(d.end - d.start, 1e-6), 0.0), 1.0)
+            level = level * (0.45 + 0.55 * progress) + 0.15 * progress
+        return level
+
+    def _has_colour(self, e: dict) -> bool:
+        """Does this fixture mix colour (red/green/blue or cyan channels in its mode)?"""
+        fx = next((f for f in self.rig["fixtures"] if f["id"] == e["fixture"]), None)
+        if fx is None:
+            return False
+        try:
+            defn = fxlib.get(fx["fixture"])
+            attrs = {c["attr"] for c in fxlib.channels(defn, fx["mode"])}
+        except (KeyError, ValueError, FileNotFoundError):
+            return False
+        return bool(attrs & {"red", "green", "blue", "cyan"}) and not fxlib.uv_only(defn)
 
     def _beat_s(self) -> float:
         """The track's beat: a strobe channel gets one steady rate, not every beat's own length."""
@@ -794,6 +827,9 @@ class LooksMixin:
             pair = self.par_pair.get(f["id"], (k, n))[0]  # mirrored pars play as one
             slot = self.turn.get(f["id"], (k, n))[0]
             col = _mix(cols, ((beat + phase) / 32 + pair / pairs) % 1.0) if d.par_base == "fade" else base
+            acc = accent
+            if d.par_base == "sides" and float(f.get("x", 0.5)) > 0.5:  # stage right in the accent, hits in the base
+                col, acc = accent, base
             dim = base_level
             a = d.par_accent
             tac_voice = False
@@ -802,7 +838,7 @@ class LooksMixin:
                 voice = self._voice(d, f["id"])
                 if run is not None and f["id"] in run[0]:  # a kick run: the waterfall, then the landing
                     v = run[0][f["id"]]
-                    col = (base if voice == "boom" else accent) if run[1] else accent
+                    col = (base if voice == "boom" else acc) if run[1] else acc
                     dim = low + (1 - low) * v
                 elif dance:  # cumbia: its section's colour of the fiesta (one light: the boom's, the cha's)
                     one = voice if voice != "both" else ("tac" if tac > boom else "boom")
@@ -810,32 +846,32 @@ class LooksMixin:
                     dim = low + (1 - low) * {"boom": boom, "tac": tac}.get(voice, max(boom, tac))
                     tac_voice = voice == "tac"
                 elif voice == "both":  # one light plays both: the boom, and the tac in the accent colour
-                    col, dim = _lerp(col, accent, tac), low + (1 - low) * max(boom, tac)
+                    col, dim = _lerp(col, acc, tac), low + (1 - low) * max(boom, tac)
                 elif voice == "boom":
                     dim = low + (1 - low) * boom
                 else:
-                    col, dim, tac_voice = accent, low + (1 - low) * tac, True
+                    col, dim, tac_voice = acc, low + (1 - low) * tac, True
             elif a in ("pulse", "stutter"):  # on its turn in the phrase's pattern ("stutter": older plans)
                 on = kick_turn(pattern, *self._turn(pattern, f["id"], k, n), hit)
                 dim = base_level + (1 - base_level) * (env if on else 0.0)
             elif a == "color_pop":
-                col, dim = _lerp(col, accent, env), max(base_level, env)
+                col, dim = _lerp(col, acc, env), max(base_level, env)
             elif a == "run":  # a short shot stepping across the pairs (one pair: the kick)
                 v = self.run(d, t, f["id"], "par")
                 v = env if v is None else v
-                col, dim = _lerp(col, accent, v), max(base_level, v)
+                col, dim = _lerp(col, acc, v), max(base_level, v)
             elif a == "chase":
                 gap = abs(k - chase_pos)
                 if loop:
                     gap = min(gap, n - gap)
                 lit = env * max(0.0, 1.0 - gap * 0.7)  # lit par plus a short tail
-                col, dim = _lerp(col, accent, min(1.0, lit * 1.5)), max(base_level, lit)
+                col, dim = _lerp(col, acc, min(1.0, lit * 1.5)), max(base_level, lit)
             elif a == "alternate":
                 if slot % 2 == hits % 2:
-                    col, dim = accent, max(base_level, 0.45 + 0.55 * env)
+                    col, dim = acc, max(base_level, 0.45 + 0.55 * env)
             elif a == "sparkle":
                 if pair == sparkle:
-                    col, dim = _lerp(col, accent, env), max(base_level, env)
+                    col, dim = _lerp(col, acc, env), max(base_level, env)
             elif a == "melody":  # recent notes, each on the par of its pitch, coloured by its pitch class
                 i = bisect.bisect_right(self.lead_t, t)
                 for j in range(max(0, i - 6), i):
@@ -845,7 +881,7 @@ class LooksMixin:
                     glow = float(self.lead_s[j]) * math.exp(-(t - self.lead_t[j]) / MELODY_TAU)
                     if glow > dim:
                         pc = int(self.lead_pc[fr])
-                        col, dim = (cols[pc % len(cols)] if pc >= 0 else accent), max(base_level, glow)
+                        col, dim = (cols[pc % len(cols)] if pc >= 0 else acc), max(base_level, glow)
             if rise:  # brighter and whiter towards the drop
                 col = _lerp(col, (1.0, 1.0, 1.0), 0.6 * progress**2)
                 dim = dim * (0.45 + 0.55 * progress) + 0.15 * progress
@@ -853,8 +889,9 @@ class LooksMixin:
             zoom = self._fixed_zoom(d, f["id"], progress)
             if zoom is not None:
                 st.zoom = zoom
-            if (d.dynamics == "impact" or rise) and not tac_voice and a != "run":  # (the flash is on the kick: the
-                st.white = flash  # boom's; a run's shots are its hits, a flash on the kick a second rhythm)
+            if (d.dynamics == "impact" or rise) and not tac_voice and a not in ("run", "none"):  # (the flash is on
+                st.white = flash  # the kick: the boom's; a run's shots are its hits, a flash on the kick a second
+                # rhythm; pars that don't play the hits hold a steady wash under the beams)
             if run is not None and f["id"] in run[0]:  # a kick run: only the group on its kick flashes
                 st.white *= run[0][f["id"]]
             out[f["id"]] = st
@@ -958,7 +995,7 @@ class LooksMixin:
 
         self._laser_states(d, t, out, env, acc_env, beat, phase, cols, base, accent, bar)
         self._blinder_states(d, t, out, acc_env)
-        self._strobe_states(d, t, out, acc_env)
+        self._strobe_states(d, t, out, acc_env, base, accent)
         if getattr(d, "special", "off") == "stars":
             self._stars(d, t, out)
         self._accents(d, t, out, accent)
