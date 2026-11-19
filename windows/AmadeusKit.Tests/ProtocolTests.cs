@@ -234,6 +234,10 @@ public class ProtocolTests
         Assert.Empty(off.Channels);
         Assert.Null(off.Dir);
         Assert.Null(Decode("""{"on": true, "seconds": 60, "output": "", "universe": 1, "dir": [1, 2]}""").Dir);  // too short
+        // a bar's cells lit in colours: which end red should be at; missing (an older engine): empty
+        Assert.Equal("Red at stage left, white at stage right.",
+            Decode("""{"on": true, "seconds": 60, "output": "", "universe": 1, "order": "Red at stage left, white at stage right."}""").Order);
+        Assert.Equal("", off.Order);
     }
 
     [Fact]

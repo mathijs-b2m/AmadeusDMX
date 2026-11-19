@@ -368,6 +368,17 @@ public sealed class SetupAPI
                                           CancellationToken ct = default) =>
         Post("api/test-light", new { fixture, rig = layout, on, point = "front" }, LightTest.From, ct: ct);
 
+    /// The calibration on the Sets page: one fixture of a layout lit, a moving head pointed `point` ("front": straight
+    /// out to the audience, "check": the check after hanging's way, null: centred), with `cells` a bar's cells red,
+    /// green, blue, white along it (the reply's `Order` says which end red should be at).
+    public Task<LightTest> TestLight(string fixture, bool on, IReadOnlyDictionary<string, JSONValue> layout, string? point, bool cells,
+                                     CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object?> { ["fixture"] = fixture, ["rig"] = layout, ["on"] = on, ["cells"] = cells };
+        if (point is not null) body["point"] = point == "front" ? "front" : true;
+        return Post("api/test-light", body, LightTest.From, ct: ct);
+    }
+
     /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
     public Task<HangCheckStep[]> HangCheck(IReadOnlyDictionary<string, JSONValue> layout, CancellationToken ct = default) =>
         Post("api/hangcheck", new { rig = layout }, c => J.Req(c, "steps", J.ArrayOf(HangCheckStep.From)), ct: ct);
@@ -791,6 +802,7 @@ public sealed record LightTest
     public int? WireUniverse { get; init; }           // the Art-Net / sACN universe it goes out as
     public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel (empty: no start address)
     public Vector3? Dir { get; init; }                // a pointed head: where its beam goes (world, as the feed's)
+    public string Order { get; init; } = "";          // a bar's cells lit in colours: which end red should be at, in words
 
     public static LightTest From(JsonElement c) => new()
     {
@@ -798,6 +810,7 @@ public sealed record LightTest
         Universe = J.Req(c, "universe", J.Int), WireUniverse = J.Val(c, "wire_universe", J.Int),
         Channels = J.Ref(c, "channels", J.ArrayOf(J.Int)) ?? [],  // null: no start address (switching off one)
         Dir = J.Ref(c, "dir", J.ArrayOf(J.Float)) is { Length: >= 3 } d ? new Vector3(d[0], d[1], d[2]) : null,
+        Order = J.Ref(c, "order", J.String) ?? "",
     };
 
     /// "universe 1, channels 43–50 · Art-Net → 2.0.0.10:6454 (universe 1 on the wire)"

@@ -36,7 +36,7 @@ public static class Symbols
         ["plus.square.on.square"] = "", ["arrow.counterclockwise"] = "", ["arrow.triangle.2.circlepath"] = "",
         ["arrow.down.circle"] = "", ["arrow.up.circle"] = "", ["arrow.down.to.line"] = "", ["arrow.up.to.line"] = "",
         ["arrow.right"] = "", ["arrow.up.right"] = "", ["arrow.down.right"] = "", ["arrow.left.and.right"] = "",
-        ["arrow.left"] = "\uE72B", ["arrow.uturn.down"] = "\uE7A7",
+        ["arrow.left"] = "\uE72B", ["arrow.uturn.down"] = "\uE7A7", ["arrow.left.arrow.right"] = "\uE8AB", ["scope"] = "\uE81D",
         ["arrow.up.and.down.and.arrow.left.and.right"] = "", ["rotate.right"] = "",
         ["chevron.down"] = "", ["chevron.left"] = "", ["chevron.right"] = "",
         ["pin.fill"] = "", ["cursorarrow"] = "", ["hand.draw"] = "", ["hand.raised.fill"] = "",
