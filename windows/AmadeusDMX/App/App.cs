@@ -37,6 +37,7 @@ public sealed partial class App : Application
     {
         Resources.MergedDictionaries.Add(new XamlControlsResources());
         Defaults.Standard = new Defaults(Defaults.FileFor("Amadeus DMX"), Environment.GetCommandLineArgs());
+        Strings.Start(Defaults.Standard.String(Strings.SettingKey));  // before any view: they take their words as they are built
         var updater = Updater.Create();  // NetSparkle, for a release with a feed (Settings/Updater.cs); nil in a development build
         _model = new AppModel(updater);
         _window = new MainWindow(_model);
@@ -72,31 +73,31 @@ public static class AppCommands
     {
         var bar = new MenuBar();
 
-        var file = new MenuBarItem { Title = "File" };
-        file.Items.Add(Command("New Set…", window.OpenWizard, VirtualKey.N, Ctrl | Shift));
-        file.Items.Add(Command("New Rig…", () => { model.Section = Section.Rig; model.ShowNewRig = true; }, VirtualKey.N, Ctrl | Alt)
+        var file = new MenuBarItem { Title = L("File") };
+        file.Items.Add(Command(L("New Set…"), window.OpenWizard, VirtualKey.N, Ctrl | Shift));
+        file.Items.Add(Command(L("New Rig…"), () => { model.Section = Section.Rig; model.ShowNewRig = true; }, VirtualKey.N, Ctrl | Alt)
             .Follow(model, [nameof(AppModel.Workspace)], i => i.IsEnabled = model.Workspace is not null));
         file.Items.Add(new MenuFlyoutSeparator());
-        file.Items.Add(Command("Settings", () => model.Section = Section.Settings, (VirtualKey)0xBC /* the comma key */));
+        file.Items.Add(Command(L("Settings"), () => model.Section = Section.Settings, (VirtualKey)0xBC /* the comma key */));
         file.Items.Add(new MenuFlyoutSeparator());
-        file.Items.Add(Command("Exit", window.Close));
+        file.Items.Add(Command(L("Exit"), window.Close));
         bar.Items.Add(file);
 
-        var show = new MenuBarItem { Title = "Show" };
-        show.Items.Add(Command("Start Live Show", () => { if (model.EngineRunning) model.StopShow(); else model.StartLive(); }, VirtualKey.R)
+        var show = new MenuBarItem { Title = L("Show") };
+        show.Items.Add(Command(L("Start Live Show"), () => { if (model.EngineRunning) model.StopShow(); else model.StartLive(); }, VirtualKey.R)
             .Follow(model, [nameof(AppModel.EngineRunning), nameof(AppModel.Workspace)], i =>
             {
-                i.Text = model.EngineRunning ? "Stop Show" : "Start Live Show";
+                i.Text = model.EngineRunning ? L("Stop Show") : L("Start Live Show");
                 i.IsEnabled = model.Workspace is not null;
             }));
-        show.Items.Add(Command("Play a Track…", () => PlayPanel.Choose(model, window), VirtualKey.O)
+        show.Items.Add(Command(L("Play a Track…"), () => PlayPanel.Choose(model, window), VirtualKey.O)
             .Follow(model, [nameof(AppModel.EngineRunning), nameof(AppModel.Workspace)],
                     i => i.IsEnabled = model.Workspace is not null && !model.EngineRunning));
-        show.Items.Add(Command("Play a Track as Lightshow…", () => PlayPanel.Choose(model, window, lightshow: true), VirtualKey.O, Ctrl | Shift)
+        show.Items.Add(Command(L("Play a Track as Lightshow…"), () => PlayPanel.Choose(model, window, lightshow: true), VirtualKey.O, Ctrl | Shift)
             .Follow(model, [nameof(AppModel.EngineRunning), nameof(AppModel.Workspace)],
                     i => i.IsEnabled = model.Workspace is not null && !model.EngineRunning));
         show.Items.Add(new MenuFlyoutSeparator());
-        show.Items.Add(Command("DMX Output", window.OpenDMX, VirtualKey.D, Ctrl | Shift)
+        show.Items.Add(Command(L("DMX Output"), window.OpenDMX, VirtualKey.D, Ctrl | Shift)
             .Follow(model, [nameof(AppModel.Workspace)], i => i.IsEnabled = model.Workspace is not null));
         show.Items.Add(new MenuFlyoutSeparator());
         foreach (var m in ShowModes.All)
@@ -104,25 +105,25 @@ public static class AppCommands
                 .Follow(model, [nameof(AppModel.Mode)], i => i.IsChecked = model.Mode == m));
         bar.Items.Add(show);
 
-        var view = new MenuBarItem { Title = "View" };
+        var view = new MenuBarItem { Title = L("View") };
         var n = 1;
         foreach (var s in SectionExtensions.All)
             view.Items.Add(Command(s.Title(), () => model.Section = s, VirtualKey.Number0 + n++));
-        view.Items.Add(Command("Edit Rig Layout", model.EditLayout, VirtualKey.E));
+        view.Items.Add(Command(L("Edit Rig Layout"), model.EditLayout, VirtualKey.E));
         view.Items.Add(new MenuFlyoutSeparator());
-        view.Items.Add(Command("Hide Director", () => model.ShowInspector = !model.ShowInspector, VirtualKey.I, Ctrl | Alt)
-            .Follow(model, [nameof(AppModel.ShowInspector)], i => i.Text = model.ShowInspector ? "Hide Director" : "Show Director"));
+        view.Items.Add(Command(L("Hide Director"), () => model.ShowInspector = !model.ShowInspector, VirtualKey.I, Ctrl | Alt)
+            .Follow(model, [nameof(AppModel.ShowInspector)], i => i.Text = model.ShowInspector ? L("Hide Director") : L("Show Director")));
         bar.Items.Add(view);
 
-        var help = new MenuBarItem { Title = "Help" };
-        help.Items.Add(Command("Amadeus DMX Help", () => Dialogs.OpenURL(HelpLinks.Documentation), VirtualKey.F1, VirtualKeyModifiers.None));
-        help.Items.Add(Command("System Requirements", () => Dialogs.OpenURL(HelpLinks.SystemRequirements)));
-        help.Items.Add(Command("Release Notes", () => Dialogs.OpenURL(HelpLinks.ReleaseNotes)));
+        var help = new MenuBarItem { Title = L("Help") };
+        help.Items.Add(Command(L("Amadeus DMX Help"), () => Dialogs.OpenURL(HelpLinks.Documentation), VirtualKey.F1, VirtualKeyModifiers.None));
+        help.Items.Add(Command(L("System Requirements"), () => Dialogs.OpenURL(HelpLinks.SystemRequirements)));
+        help.Items.Add(Command(L("Release Notes"), () => Dialogs.OpenURL(HelpLinks.ReleaseNotes)));
         help.Items.Add(new MenuFlyoutSeparator());
         if (model.Updates.IsAvailable)
-            help.Items.Add(Command("Check for Updates…", model.Updates.CheckForUpdates)
+            help.Items.Add(Command(L("Check for Updates…"), model.Updates.CheckForUpdates)
                 .Follow(model.Updates, [nameof(Updates.CanCheck)], i => i.IsEnabled = model.Updates.CanCheck));
-        help.Items.Add(Command("About Amadeus DMX", window.ShowAbout));
+        help.Items.Add(Command(L("About Amadeus DMX"), window.ShowAbout));
         bar.Items.Add(help);
         return bar;
     }
@@ -147,7 +148,7 @@ public static class PlayPanel
     {
         var picker = new FileOpenPicker(window.AppWindow.Id)
         {
-            CommitButtonText = "Play",  // choose a track to play with the lights
+            CommitButtonText = L("Play"),  // choose a track to play with the lights
             SuggestedStartLocation = PickerLocationId.MusicLibrary,
         };
         foreach (var t in Audio) picker.FileTypeFilter.Add(t);

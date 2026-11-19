@@ -17,12 +17,12 @@ public static class SectionExtensions
 
     public static string Title(this Section s) => s switch
     {
-        Section.Show => "Show",
-        Section.Dmx => "DMX Output",
-        Section.Rig => "Rigs",
-        Section.Set => "Sets",
-        Section.Engine => "Engine",
-        _ => "Settings",
+        Section.Show => L("Show"),
+        Section.Dmx => L("DMX Output"),
+        Section.Rig => L("Rigs"),
+        Section.Set => L("Sets"),
+        Section.Engine => L("Engine"),
+        _ => L("Settings"),
     };
 
     public static string Symbol(this Section s) => s switch
@@ -120,9 +120,9 @@ public static class ShowModes
 
     public static string Title(this ShowMode m) => m switch
     {
-        ShowMode.Visualise => "Visualise Only",
-        ShowMode.Perform => "Perform Only",
-        _ => "Perform + Visualise",
+        ShowMode.Visualise => L("Visualise Only"),
+        ShowMode.Perform => L("Perform Only"),
+        _ => L("Perform + Visualise"),
     };
 
     public static string Symbol(this ShowMode m) => m switch
@@ -134,9 +134,9 @@ public static class ShowModes
 
     public static string Detail(this ShowMode m) => m switch
     {
-        ShowMode.Visualise => "The 3D stage only: nothing goes to the lights.",
-        ShowMode.Perform => "The lights only: no 3D stage, the computer's power goes to the show.",
-        _ => "The lights, and the 3D stage alongside.",
+        ShowMode.Visualise => L("The 3D stage only: nothing goes to the lights."),
+        ShowMode.Perform => L("The lights only: no 3D stage, the computer's power goes to the show."),
+        _ => L("The lights, and the 3D stage alongside."),
     };
 
     public static bool SendsDMX(this ShowMode m) => m != ShowMode.Visualise;
