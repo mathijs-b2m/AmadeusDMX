@@ -723,7 +723,12 @@ def fix(fx: dict, defn: dict, what: str) -> dict:
     return out
 
 
-ORDER_COLORS = (("red", (1.0, 0.0, 0.0)), ("green", (0.0, 1.0, 0.0)), ("blue", (0.0, 0.0, 1.0)), ("white", (1.0, 1.0, 1.0)))
+ORDER_COLORS = (
+    ("red", (1.0, 0.0, 0.0)),
+    ("green", (0.0, 1.0, 0.0)),
+    ("blue", (0.0, 0.0, 1.0)),
+    ("white", (1.0, 1.0, 1.0)),
+)
 
 
 def cell_order(rig: dict, fx: dict) -> tuple[dict[str, tuple[float, float, float]], str]:
@@ -738,11 +743,10 @@ def cell_order(rig: dict, fx: dict) -> tuple[dict[str, tuple[float, float, float
     r = math.radians(fx.get("rot_deg", 0.0))
     across = abs(math.cos(r)) >= abs(math.sin(r))
     # the cells' place along the bar: offset_m turned by rot_deg (geometry.position)
-    along = (lambda e: e.get("offset_m", 0.0) * math.cos(r)) if across else (lambda e: e.get("offset_m", 0.0) * math.sin(r))
-    order = sorted(els, key=along)
+    turn = math.cos(r) if across else math.sin(r)
+    order = sorted(els, key=lambda e: e.get("offset_m", 0.0) * turn)
     colors = {e["id"]: ORDER_COLORS[i % 4][1] for i, e in enumerate(order)}
     names = ", ".join(ORDER_COLORS[i % 4][0] for i in range(1, min(len(order), 4)))
     start = "stage left (your right, facing the stage)" if across else "the back of the stage"
     other = "stage right" if across else "the audience"
     return colors, f"Red at {start}, then {names}{', …' if len(order) > 4 else ''} towards {other}."
-
