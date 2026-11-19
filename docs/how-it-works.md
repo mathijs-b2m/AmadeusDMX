@@ -52,7 +52,26 @@ peaks, deeper breathers against fatigue, a finale and an outro.
 - **Knobs** (all live, in every mode of the app): light groups in play, special effects, LED wall, smoke,
   movement, look changes, colour variety, responsiveness, drop size, flashes and intensity. The operator can
   take over any knob at any moment and give it back to the arc, force or hold a stage, pick the event type and
-  change the show's length. The drop moment at full keeps its full response.
+  change the show's length. The drop moment at full keeps its full response. The master level knob is called
+  Brightness in the apps.
+- **Intensity level** (1 to 5, on the night card, remembered from night to night): how hard the show plays,
+  whatever the knobs say. 2 is the show as designed. 1 is a step gentler: no strobing heads, hammer or runs,
+  calmer paths, but no dimmer. 3 hits harder: the heads play the kick in drops and choruses, drops flash and run
+  a step faster. 4: drops hammer (beams punching, then strobing), the top of a build strobes, the pars chase,
+  the paths snap on the beat, the heads pan and tilt half as fast again, and now and then a wave runs through
+  the rig. 5 is all out, but still with the show's variety: every energetic phrase at full energy, a head light
+  that already hits keeps its own way of hitting, a softer one takes the next hard one in turn (strobe, hammer,
+  flick, random, run), so no two drops look alike; the pars and formations likewise, and the heads twice as fast
+  (loops, ballyhoo, pendulum, twister and tilt waves faster; a beat-landed move lands every beat where the motors
+  took two). The waves are one variation among these: one 2-bar passage in three of a phrase (its own look in
+  between, never at its start), very fast: the whole rig, stage left to right and back, front to back and back to
+  front (on a rig with depth), from the middle out and in again, each wave the next way, a short shot through
+  every light in a quarter of a beat, on every beat of a drop. One wave passage in three waves softly: slower,
+  once a bar, each light swelling up and dissolving into the next (a strobe-free set only waves softly). Levels 3
+  to 5 also lift the arc's own knobs (beat response, flashes, movement, light groups, special effects; the ones
+  the operator holds stay put). Calm parts never strobe, the drop moment keeps its own timing, and the set's
+  flash limit holds at every level: a wave hits a
+  light once, and has the lights to itself from one flash period before to one after.
 
 ## Songs and club tracks
 

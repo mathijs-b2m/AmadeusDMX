@@ -21,6 +21,10 @@ struct NightCard: View {
                     }
                     Divider()
                 }
+                if let level = arc.level {
+                    IntensityLevelRow(level: level, levels: arc.levels ?? 5, send: send)
+                    Divider()
+                }
                 if arc.on {
                     StageStrip(arc: arc, send: send)
                     HeatRow(arc: arc)
@@ -65,6 +69,11 @@ struct NightCard: View {
                         if arc.haze != nil {
                             Image(systemName: "cloud.fog.fill").font(.caption).foregroundStyle(.orange)
                                 .help("You push the haze")
+                        }
+                        if let level = arc.level, level != 2 {
+                            Text("\(level)").font(.caption.weight(.bold).monospacedDigit())
+                                .foregroundStyle(level > 2 ? Color.orange : Color.secondary)
+                                .help("Intensity level \(level) of \(arc.levels ?? 5)")
                         }
                         if !arc.manual.isEmpty {
                             Image(systemName: "hand.raised.fill").font(.caption).foregroundStyle(.orange)
@@ -134,7 +143,7 @@ struct Knob: Identifiable {
             Knob(id: "flashes", title: "Flashes", symbol: "bolt", help: "White flash accents and strobes"),
         ]),
         ("Level", [
-            Knob(id: "intensity", title: "Intensity", symbol: "sun.max", help: "The master: how bright the whole rig plays. All the way down: dark"),
+            Knob(id: "intensity", title: "Brightness", symbol: "sun.max", help: "The master: how bright the whole rig plays. All the way down: dark"),
         ]),
     ]
 }
@@ -198,6 +207,42 @@ private struct LightshowRow: View {
                 .labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
         .help("Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.")
+    }
+}
+
+/// The operator's intensity level: how hard the show plays, 1 … 5. 2 is the show as designed; 1 a step gentler;
+/// 3, 4 and 5 ever harder, 5 with a lot of strobing, every look harder and very fast waves now and then. The set's flash limit holds.
+private struct IntensityLevelRow: View {
+    var level: Int
+    var levels: Int
+    var send: ([String: Any]) -> Void
+
+    private var status: String {
+        switch level {
+        case 1: "Gentler: no strobing heads, calmer paths"
+        case 2: "The show as designed"
+        case 3: "Harder: the heads hit the kick, drops flash"
+        case 4: "Drops hammer, builds strobe, faster heads"
+        default: "All out: every look harder, fast heads, waves"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "flame").frame(width: 18).foregroundStyle(level > 2 ? Color.orange : Color.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Intensity").font(.callout.weight(.semibold))
+                    Text(status).font(.caption).foregroundStyle(level > 2 ? Color.orange : Color.secondary)
+                }
+                Spacer()
+            }
+            Picker("Intensity", selection: Binding(get: { level }, set: { send(["level": $0]) })) {
+                ForEach(1...max(levels, 1), id: \.self) { Text("\($0)").tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+        }
+        .help("How hard the show plays, whatever the knobs say: 2 is the show as designed, 1 a step gentler, 5 really intense (a lot of strobing, every look harder, the heads twice as fast, very fast waves now and then). Within the set's flash limit. Re-plans the tracks in a few seconds")
     }
 }
 

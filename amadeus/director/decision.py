@@ -78,6 +78,9 @@ class Decision:
     # The show arc calms a plan's effects by lowering its intensity; the brightness stays the director's (0..3,
     # -1: the intensity's own). The arc's intensity knob dims the lights, nothing else.
     brightness: int = -1
+    # The operator's intensity level speeds the heads up (show/arc.py push_plan): their paths this many times as
+    # fast as the intensity's own tempo (1: as designed). Beat-landed moves keep landing on a beat.
+    pace: float = 1.0
 
     def look(self) -> tuple:
         return tuple(getattr(self, n) for n in LAYER_NAMES)

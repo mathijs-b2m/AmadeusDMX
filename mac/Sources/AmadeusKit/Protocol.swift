@@ -402,11 +402,14 @@ public struct ArcStatus: Decodable, Sendable, Equatable {
     public var named: String?
     /// The named shows the engine offers, per genre.
     public var namedShows: [NamedShow]?
+    /// The operator's intensity level, 1 … `levels` (2: the show as designed; nil: an engine without levels).
+    public var level: Int?
+    public var levels: Int?
 
     enum CodingKeys: String, CodingKey {
         case on, length, elapsed, stage, stages, event, events, locked, heat, trend, bpm, baseBpm = "base_bpm"
         case values, manual, groups, playing, movementLevel = "movement_level", hold, hazers, haze, lightshow
-        case named, namedShows = "named_shows"
+        case named, namedShows = "named_shows", level, levels
     }
 
     public var stageName: String { stages.first { $0.first == stage }?.last ?? stage }

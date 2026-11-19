@@ -36,12 +36,16 @@ import math
 import time
 from pathlib import Path
 
+import numpy as np
+
 from amadeus import paths, system
 from amadeus.director.arc import song_arc
 from amadeus.director.style import NAMED, named_shows
 from amadeus.engine.fog import DEFAULT_CLEAR_S, MIN_GAP_S, OUTDOOR_CLEAR_S, machine
+from amadeus.engine.looks import envelope_release
 from amadeus.engine.state import State
 from amadeus.library import fixtures as fxlib
+from amadeus.rig import geometry
 from amadeus.rig.groups import head_groups
 
 FILE = "show-arc.json"
@@ -254,6 +258,57 @@ GLIDE_S = 8.0  # the knobs follow a stage the music brings this quickly (1/e)
 DROP_FLASH = 0.6  # flashes turned down: a big drop still flashes at least this much
 HEAD_STROBE_FROM = 0.35  # the flashes knob from here: strobing heads strobe; below it they hold a steady beam
 BIG_DROP = 0.5  # drops at least this big keep their full response and flash (the moment the lights hit)
+
+# The operator's intensity level (the night card, 1..5): how hard the show plays, whatever the knobs say. 2 is the
+# show as designed; 1 a step gentler; 3, 4 and 5 ever harder, 5 with a lot of strobing and very fast waves. The
+# level reshapes the plans (push_plan: rebuilt in the background like movement) and plays on the frame at once
+# (floors under some knobs, the waves). The set's flash limit (max_flash_hz, allow_fast_strobe, strobe_free) holds
+# at every level.
+LEVELS = (1, 2, 3, 4, 5)
+DEFAULT_LEVEL = 2
+LEVEL_FLOORS = {  # per level: knob → at least this, for the knobs the arc turns (one the operator holds stays put)
+    3: {"response": 0.8, "flashes": 0.5, "movement": 0.4},
+    4: {"response": 0.9, "flashes": 0.75, "groups": 0.75, "specials": SPECIALS_MOMENTS, "movement": 0.75},
+    5: {"response": 1.0, "flashes": 1.0, "groups": 1.0, "specials": SPECIALS_FREE, "drops": 1.0, "movement": 1.0},
+}
+LEVEL_CEILINGS = {1: {"flashes": 0.5, "response": 0.75}}  # … and at most this
+GENTLE_LIGHT = {"strobe": "beat", "hammer": "pulse", "run": "pulse", "flick": "beat", "random": "pulse"}
+GENTLE_PARS = {"run": "chase", "sparkle": "color_pop"}
+PUSH3_LIGHT = {"steady": "beat", "pulse": "beat", "breathe": "pulse", "accents": "beat"}
+PUSH_PARS = {"none": "pulse", "pulse": "chase", "color_pop": "chase", "sparkle": "chase", "melody": "chase"}
+SNAP_PATH = {"sweep": "swing", "nod": "bounce", "pendulum": "swing", "figure8": "circle", "still": "sweep"}
+WILD_PATH = {**SNAP_PATH, "circle": "ballyhoo", "figure8": "ballyhoo", "rose": "ballyhoo", "knot": "ballyhoo"}
+# Level 5 keeps the show's variety, played harder: a head light that already hits keeps its own way of hitting,
+# a softer one takes the next hard one in turn (phrase by phrase, so the drops don't all look alike); the same for
+# the pars and the formations.
+LEVEL_PACE = {4: 1.5, 5: 2.0}  # the heads this many times as fast in the energetic phrases (Decision.pace)
+HOT_LIGHT = ("strobe", "hammer", "run", "flick", "random", "alternate")
+HARD_LIGHT = {
+    "drop": ("strobe", "hammer", "flick", "strobe", "random", "hammer"),  # (strobing the most: it's level 5)
+    "chorus": ("hammer", "flick", "strobe", "random", "alternate"),
+    "groove": ("run", "flick", "random", "alternate"),
+    "buildup": ("flick", "run", "random"),
+}
+HOT_PARS = ("chase", "alternate", "run", "sparkle")
+HARD_PARS = ("run", "chase", "alternate", "sparkle")
+HARD_FORMATIONS = ("wave", "mirror", "cross", "fan")
+# The waves (levels 4 and 5): the rig's lights, stage left to right (by rank, so a bar's cells play in turn too),
+# as one sequence a short shot runs through, very fast: across the whole rig in this many beats.
+WAVE_SWEEP_BEATS = {4: 0.5, 5: 0.25}
+WAVE_HOLD_S, WAVE_RELEASE_S = 0.04, 0.12  # each light: hit, held a moment, let go (no blip)
+# The soft waves, a variation: one wave passage in WAVE_SOFT_EVERY plays them (a strobe-free set only them), one a
+# bar on the one, slower across the rig, each light swelling up and dissolving into the next instead of a cut.
+WAVE_SOFT_EVERY = 3
+WAVE_PASSAGE_BARS = 2  # level 5 waves in passages of this many bars, one in WAVE_PASSAGE_EVERY (its third): a variation
+WAVE_PASSAGE_EVERY = 3
+WAVE_SOFT_SWEEP_BEATS = {4: 1.5, 5: 1.0}
+WAVE_SOFT_S = 0.12, 0.08, 0.5  # rise, hold, release
+WAVE_GLOW = 0.3  # while a wave runs, the lights' own glow at most this (their hits wait)
+WAVE_WHITE = 0.6  # a wave shot runs this much towards white (a dark light shoots white)
+# One after the other: across the stage (from stage left, from stage right), front to back (the row nearest the
+# audience first), back again, from the middle out and to it. Front-back waves only on rigs with depth to them.
+WAVE_DIRECTIONS = ("right", "back", "left", "front", "out", "in")
+WAVE_DEPTH_M = 1.5  # the lights stand at least this far apart front to back: the waves go front to back too
 DROPS_OWN_LOOK = 0.25  # drops at least this big bring their own look, also when looks are held
 
 
@@ -278,6 +333,7 @@ def calm_plan(plan: list, level: int, ambient: bool = False) -> list:
                     grouping=MODERATE_GROUPING.get(d.grouping, d.grouping),
                     intensity=min(d.intensity, 2),
                     brightness=bright,
+                    pace=1.0,  # (a calm movement knob: the heads at their own speed, whatever the level)
                 )
             )
         else:
@@ -285,6 +341,7 @@ def calm_plan(plan: list, level: int, ambient: bool = False) -> list:
                 d,
                 movement=CALM_PATH.get(d.movement, d.movement),
                 movement2=CALM_PATH.get(d.movement2, d.movement2),
+                pace=1.0,
                 head_light=CALM_LIGHT.get(d.head_light, d.head_light),
                 beam_fx=CALM_BEAM.get(d.beam_fx, d.beam_fx),
                 dynamics="steady" if d.dynamics == "impact" else d.dynamics,
@@ -341,10 +398,95 @@ def hold_looks(plan: list, hold: int, at_drops: bool = True) -> list:
     return out
 
 
+def _energetic(d) -> bool:
+    """A phrase the intensity level pushes: a drop or a chorus, or a groove or build with energy."""
+    return d.section in ("drop", "chorus") or (d.section in ("groove", "buildup") and d.intensity >= 2)
+
+
+def push_plan(plan: list, level: int) -> list:
+    """The director's plan at the operator's intensity level (1..5; DEFAULT_LEVEL plays it as it is). 1: gentler,
+    no head strobes, no hammer or run, flash accents only in the drops, the paths a step calmer (the brightness
+    stays). 3: the energetic phrases hit harder: the heads on the kick, drops with flash accents and a step more
+    energy. 4: the drops hammer (beams punching, then strobing), the pars chase, the top of a build strobes, the
+    paths snap on the beat, the heads half as fast again (LEVEL_PACE), everything a step faster. 5: every
+    energetic phrase at full energy and hitting hard, but each its own way: a head light that hits keeps its own,
+    a softer one takes the next of the hard ones in turn (strobe, hammer, flick, random, run...), the top of a
+    build strobes, the pars and formations likewise; the heads twice as fast. Calm parts (an intro, a breakdown,
+    a verse) never strobe; the two-voice triggers (dembow, cumbia, drums) keep their own pars, a pour keeps its
+    own light. The waves of levels 4 and 5 are played on the frame (ShowArc._waves)."""
+    from dataclasses import replace
+
+    if level == DEFAULT_LEVEL or not plan:
+        return plan
+    out, turns = [], {}  # (how many of each section so far: each the next hard one)
+    for k, d in enumerate(plan):
+        bright = d.intensity if d.brightness < 0 else d.brightness
+        own_pars = d.trigger in ("dembow", "cumbia", "drums")
+        own_light = d.movement == "pour" or d.head_light == "off"
+        if level < DEFAULT_LEVEL:
+            out.append(
+                replace(
+                    d,
+                    head_light=d.head_light if own_light else GENTLE_LIGHT.get(d.head_light, d.head_light),
+                    par_accent=GENTLE_PARS.get(d.par_accent, d.par_accent),
+                    dynamics="steady" if d.dynamics == "impact" and d.section != "drop" else d.dynamics,
+                    movement=MODERATE_PATH.get(d.movement, d.movement),
+                    movement2=MODERATE_PATH.get(d.movement2, d.movement2),
+                    intensity=min(d.intensity, 2),
+                    brightness=bright,  # (gentler, not dimmer)
+                )
+            )
+            continue
+        nxt = plan[k + 1] if k + 1 < len(plan) else None
+        into_drop = d.section == "buildup" and nxt is not None and nxt.section == "drop"
+        change: dict = {}
+        if not _energetic(d):  # calm parts: a little livelier from level 4, never strobing
+            if level >= 4 and d.section not in ("intro", "outro"):
+                change["intensity"] = min(d.intensity + 1, 3)
+            out.append(replace(d, **change))
+            continue
+        drop = d.section == "drop"
+        n = turns[d.section] = turns.get(d.section, -1) + 1
+        lift = 1 if level == 3 else 2 if level == 4 else 3
+        change["intensity"] = min(d.intensity + lift, 3) if drop or level >= 4 else d.intensity
+        light = d.head_light
+        if level == 3:
+            light = PUSH3_LIGHT.get(light, light) if drop or d.section == "chorus" else light
+        elif level == 4:
+            light = "hammer" if drop else "strobe" if into_drop else PUSH3_LIGHT.get(light, light)
+        elif into_drop:
+            light = "strobe"
+        elif light not in HOT_LIGHT or light == "alternate" and drop:
+            hard = HARD_LIGHT.get(d.section, HARD_LIGHT["groove"])
+            light = hard[n % len(hard)]
+        if not own_light:
+            change["head_light"] = light
+        if not own_pars and level >= 4:
+            if level == 5 and d.par_accent not in HOT_PARS:
+                change["par_accent"] = HARD_PARS[(n + k) % len(HARD_PARS)]
+            else:
+                change["par_accent"] = PUSH_PARS.get(d.par_accent, d.par_accent)
+        if level >= 4 and d.movement != "pour":
+            change["pace"] = LEVEL_PACE[level]  # (the heads pan and tilt faster)
+            wild = WILD_PATH if level == 5 and drop and n % 2 else SNAP_PATH  # (not every drop a ballyhoo)
+            change["movement"] = wild.get(d.movement, d.movement)
+            change["movement2"] = wild.get(d.movement2, d.movement2)
+        runs = "run" in (change.get("head_light", d.head_light), change.get("par_accent", d.par_accent))
+        if (drop and d.intensity >= 2 or level >= 4 and d.section in ("drop", "chorus")) and not runs:
+            change["dynamics"] = "impact"  # white flashes on the big hits (a run is its own fast sequence: none)
+        if level == 5 and d.formation == "sync" and d.movement not in ("twister", "pour"):
+            change["formation"] = HARD_FORMATIONS[(n + k) % len(HARD_FORMATIONS)]  # (the beams apart, crossing)
+        out.append(replace(d, **change))
+    return out
+
+
 def shape_plan(plan: list, shape: tuple) -> list:
     """The director's plan in the show arc's shape: (movement level, phrases a look is held, new look at drops,
-    the warm-up's ambient look)."""
-    return hold_looks(calm_plan(plan, shape[0], len(shape) > 3 and shape[3]), shape[1], shape[2])
+    the warm-up's ambient look, the operator's intensity level). The level pushes the director's plan first; the
+    knobs calm it after (a calm movement knob still calms a pushed plan)."""
+    level = shape[4] if len(shape) > 4 else DEFAULT_LEVEL
+    pushed = push_plan(plan, level)
+    return hold_looks(calm_plan(pushed, shape[0], len(shape) > 3 and shape[3]), shape[1], shape[2])
 
 
 def _ramp(share: float, lo: float, hi: float) -> float:
@@ -378,6 +520,7 @@ class ShowArc:
         self.manual: dict[str, float] = {}
         self.lightshow = False  # the operator's show piece: every track played by the lightshow program
         self.named = ""  # the DJ's named show (director/style.py, NAMED): every track lit in it ("": none)
+        self.level = DEFAULT_LEVEL  # the operator's intensity level (LEVELS): how hard the show plays
         self.fast = self.slow = None  # heat, followed quickly and slowly
         self.bpm_fast = self.bpm_slow = None
         self.bpm_base: float | None = None  # the warm-up's tempo
@@ -434,6 +577,21 @@ class ShowArc:
         self.special_gain = 1.0
         self.heads = {e["id"] for e in els if e["kind"] == "head"}
         self.lights = [e["id"] for e in els if e["kind"] not in ("smoke", "inert")]
+        # the waves' sequences: every light but the specials, across the stage by rank (stage left to right, a
+        # bar's cells in their order) and front to back by distance (a row of lights at once)
+        lights = set(self.lights) - self.specials
+        where = {e["id"]: geometry.position(rig, e, by_fixture[e["fixture"]]) for e in els if e["id"] in lights}
+        wave = sorted((where[e["id"]][0], k, e["id"]) for k, e in enumerate(els) if e["id"] in lights)
+        n = len(wave)
+        self.wave_pos = {eid: (r / (n - 1) if n > 1 else 0.0) for r, (_, _, eid) in enumerate(wave)}
+        ys = [p[1] for p in where.values()]
+        front, back = (max(ys), min(ys)) if ys else (0.0, 0.0)
+        deep = front - back >= WAVE_DEPTH_M
+        self.wave_depth = {eid: (front - p[1]) / (front - back) for eid, p in where.items()} if deep else {}
+        self.wave_ways = WAVE_DIRECTIONS if deep else tuple(w for w in WAVE_DIRECTIONS if w not in ("back", "front"))
+        safety = rig.get("safety", {})
+        self.strobe_free = bool(safety.get("strobe_free"))
+        self.flash_hz = 10.0 if safety.get("allow_fast_strobe") else float(safety.get("max_flash_hz", 4.0))
         self.hazers, self.foggers = set(), set()
         for e in els:
             if e["kind"] == "smoke":
@@ -579,6 +737,7 @@ class ShowArc:
         """The arc's values follow the stage within seconds (a stage the music brings: a crossfade, not a jump);
         a stage, event or knob the operator picks applies at once (`snap`)."""
         k = 1.0 if snap else 1 - math.exp(-dt / GLIDE_S) if dt else 0.0
+        target = self._at_level(target)
         out = {}
         for name in KNOBS:
             if name in self.manual:
@@ -587,6 +746,13 @@ class ShowArc:
                 cur = self.values.get(name, target[name])
                 out[name] = cur + (target[name] - cur) * k
         return out
+
+    def _at_level(self, target: dict[str, float]) -> dict[str, float]:
+        """The arc's knobs under the operator's intensity level: floors (levels 3..5) and ceilings (level 1)."""
+        lo, hi = LEVEL_FLOORS.get(self.level, {}), LEVEL_CEILINGS.get(self.level, {})
+        if not lo and not hi:
+            return target
+        return {k: min(max(v, lo.get(k, 0.0)), hi.get(k, 1.0)) for k, v in target.items()}
 
     def value(self, name: str) -> float:
         return 1.0 if not self.enabled else self.values[name]
@@ -616,9 +782,10 @@ class ShowArc:
         level, how many phrases a look is held, whether a drop still brings its own look (not for small drops),
         and the warm-up's ambient look (in the warm-up while the heads are calm)."""
         if self.lightshow:  # the program plays the plan as its director made it
-            return 2, 1, True, False
+            return 2, 1, True, False, DEFAULT_LEVEL
         move = self.movement_level()
-        return move, self.hold(), self._level("drops", (DROPS_OWN_LOOK,)) == 1, self.ambient()
+        drops = self._level("drops", (DROPS_OWN_LOOK,)) == 1 if self.enabled else True
+        return move, self.hold(), drops, self.ambient(), self.level
 
     def ambient(self) -> bool:
         """The warm-up's ambient look (shape_plan): in the warm-up while the heads are calm."""
@@ -660,11 +827,14 @@ class ShowArc:
         """Shape the mixed frame (in place): responsiveness, the groups that play, specials, intensity, flashes
         and smoke. `engine`: the dominant deck's (its bars and drops), `t` its position."""
         if not self.enabled:
+            self._waves(states, engine, t)
             return
         if self.lightshow:
+            self._waves(states, engine, t)
             self._as_programmed(states)
             return
         self._respond(states, engine, t, dt)
+        self._waves(states, engine, t)  # (on the hits as played; the groups that rest stay dark)
         self._group_gains(engine, t, dt)
         sp = self.value("specials")  # in the box, out for the big moments only, or free (as directed)
         moment = engine is not None and engine.big_moment(t)
@@ -702,6 +872,92 @@ class ShowArc:
             s.dimmer *= level
             s.white *= level * (flashes if eid in self.strobes else 1.0)
         self._smoke(states)
+
+    def wave_starts(self, engine, t: float) -> list[tuple[float, float, str, bool]]:
+        """The waves running at t, or about to (levels 4 and 5): (start, sweep seconds, direction, soft), in order.
+        Level 4: a wave on the one of every other bar in the drops and choruses; level 5: in one 2-bar passage
+        in three of a phrase (bars 5-6, 11-12...; the phrase's own look in between), one on every beat of the drops
+        and choruses (every other beat where that would flash a light faster than the set allows) and on the one of
+        every bar in the energetic grooves and builds. One wave passage in WAVE_SOFT_EVERY plays soft waves, one a
+        bar (a strobe-free set only those). Never in the drop moment (its timing is the
+        director's), never in calm parts."""
+        if self.level < 4 or engine is None or not len(engine.beats) or not len(engine.downbeat_times):
+            return []
+        beats, downs = engine.beats, engine.downbeat_times
+        guard = 1.0 / max(self.flash_hz, 1.0)  # (a wave has the lights from this long before it: _waves)
+        i = int(np.searchsorted(beats, t, "right")) - 1
+        out = []
+        for b in range(max(i - 1, 0), i + 3):
+            if b + 1 >= len(beats):
+                break
+            start = float(beats[b])
+            if start > t + guard:
+                break
+            period = float(beats[b + 1] - beats[b])
+            bar = int(np.searchsorted(downs, start + 1e-3, "right")) - 1
+            if bar < 0:
+                continue
+            beat = b - int(np.searchsorted(beats, downs[bar] - 1e-3))
+            k, d = engine.decision_at(start)
+            if not _energetic(d) or engine.in_drop_moment(start) or engine.in_drop_moment(start - guard):
+                continue
+            big = d.section in ("drop", "chorus")
+            sweep = WAVE_SWEEP_BEATS[self.level] * period
+            # a light flashes once a wave; the next wave may come the other way (the last light of this one is the
+            # first of the next): every other beat where that would come faster than the set's flash limit
+            every = 1 if (period - sweep) * self.flash_hz >= 1.0 else 2
+            # the phrase in 2-bar passages from its start: level 5 waves in one in three (the phrase's own look,
+            # pushed, in the others); one wave passage in WAVE_SOFT_EVERY soft
+            passage = (bar - int(np.searchsorted(downs, d.start - 1e-3))) // WAVE_PASSAGE_BARS
+            soft = self.strobe_free or (passage // WAVE_PASSAGE_EVERY + k) % WAVE_SOFT_EVERY == WAVE_SOFT_EVERY - 1
+            if self.level == 4:
+                on, spacing = big and beat == 0 and bar % 2 == 1, 8
+            elif passage % WAVE_PASSAGE_EVERY != WAVE_PASSAGE_EVERY - 1:
+                on, spacing = False, 4
+            elif big and not soft:
+                on, spacing = beat % every == 0, every
+            else:
+                on, spacing = beat == 0, 4
+            if on:  # each wave the next way (counted in waves, so every way comes round, whatever the spacing)
+                way = self.wave_ways[(bar * 4 + beat) // spacing % len(self.wave_ways)]
+                out.append((start, WAVE_SOFT_SWEEP_BEATS[self.level] * period if soft else sweep, way, soft))
+        return out
+
+    def _waves(self, states: dict, engine, t: float):
+        """Levels 4 and 5: a short shot runs through the rig's lights in sequence, very fast (wave_starts): each
+        light hit, held a moment, let go, towards white. While a wave runs it has the lights to itself, from one
+        flash period before it to one after (the set's flash limit): their own hits wait, their glow stays low, so
+        no light is hit twice too fast. A head strobing keeps its strobe; the groups resting stay dark (their gain
+        is applied after)."""
+        runs = self.wave_starts(engine, t)
+        if not runs:
+            return
+        guard = 1.0 / max(self.flash_hz, 1.0)
+        for eid, pos in self.wave_pos.items():
+            env, owned = 0.0, False
+            mid = abs(2 * pos - 1)  # (from the middle: 0, at the sides: 1)
+            depth = self.wave_depth.get(eid, 0.0)  # (the front row: 0, the back: 1)
+            ways = {"right": pos, "left": 1 - pos, "out": mid, "in": 1 - mid, "back": depth, "front": 1 - depth}
+            for start, sweep, way, soft in runs:
+                at = start + ways[way] * sweep
+                rise, hold, release = WAVE_SOFT_S if soft else (0.0, WAVE_HOLD_S, WAVE_RELEASE_S)
+                if start - guard <= t <= start + sweep + rise + hold + release + guard:
+                    owned = True
+                if t >= at:
+                    env = max(env, _swell(t - at, rise, hold, release))
+            if not owned:
+                continue
+            s = states.get(eid)
+            if s is None:
+                s = states[eid] = State()
+            if s.strobe_hz > 0:
+                continue
+            glow = min(s.dimmer * s.gate, WAVE_GLOW)
+            if env > glow:
+                w = WAVE_WHITE if max(s.r, s.g, s.b) > 0.05 else 1.0
+                s.r, s.g, s.b = (c + (1.0 - c) * w * env for c in (s.r, s.g, s.b))
+            s.dimmer, s.gate = max(glow, env), 1.0
+            s.white = min(s.white, s.dimmer)
 
     def _respond(self, states: dict, engine, t: float, dt: float):
         """Low responsiveness: the lights follow the music's hits less and glow more (a slow follower, mixed in);
@@ -848,7 +1104,7 @@ class ShowArc:
         stage: key (force it), lock: bool, length_s: seconds, event: type, reset: true (a new night), enabled: bool,
         haze: {level: 0..1, seconds, every} (push the hazers, then keep the room that hazy: a burst every `every` s)
         | "auto" (back to the show), lightshow: bool (every track played as a show piece), named: a named show's key
-        | "" (the DJ's fixed style for the set, or none)."""
+        | "" (the DJ's fixed style for the set, or none), level: the operator's intensity level (LEVELS)."""
         now = time.time() if now is None else now
         haze = msg.get("haze")
         if isinstance(haze, dict):
@@ -890,7 +1146,15 @@ class ShowArc:
         if "named" in msg and (msg["named"] or "") in (*NAMED, ""):
             self.named = msg["named"] or ""
             print(f"  ☾ show arc: named show {NAMED[self.named].title if self.named else 'off'}", flush=True)
-        snap = any(k in msg for k in ("stage", "event", "reset", "enabled", "auto", "length_s"))
+        if "level" in msg:
+            try:
+                level = int(msg["level"])
+            except (TypeError, ValueError):
+                level = self.level
+            if level in LEVELS and level != self.level:
+                self.level = level
+                print(f"  ☾ show arc: intensity level {level}", flush=True)
+        snap = any(k in msg for k in ("stage", "event", "reset", "enabled", "auto", "length_s", "level"))
         self.values = self._glide(self._targets(self.heat(), now), 0.0, snap)
         self._dirty = True  # saved within a few seconds (a slider sends many of these)
 
@@ -922,6 +1186,8 @@ class ShowArc:
             "lightshow": self.lightshow,
             "named": self.named,
             "named_shows": named_shows(),
+            "level": self.level,
+            "levels": len(LEVELS),
         }
 
     # ------------------------------------------------------------ remembered between engine starts
@@ -940,6 +1206,7 @@ class ShowArc:
             "manual": self.manual,
             "lightshow": self.lightshow,
             "named": self.named,
+            "level": self.level,
             "revealed": sorted(getattr(self, "revealed", ())),
             "countdowns": self.countdowns,
             "heat": [self.fast, self.slow],
@@ -963,6 +1230,7 @@ class ShowArc:
         self.length = _ramp(float(d.get("length_s", DEFAULT_LENGTH_S)), MIN_LENGTH_S, MAX_LENGTH_S)
         self.manual = {k: float(v) for k, v in (d.get("manual") or {}).items() if k in KNOBS}
         self.locked = bool(d.get("locked", False))
+        self.level = d.get("level") if d.get("level") in LEVELS else DEFAULT_LEVEL  # (the operator's: it stays)
         if d.get("started") is None or now - float(d.get("seen") or 0) > NEW_NIGHT_AFTER_S:
             return  # the knobs and the length stay; the night itself starts again with the music
         self.started, self.seen = float(d["started"]), float(d["seen"])
@@ -986,6 +1254,13 @@ def countdown_drop(a, plan: list) -> int | None:
         if plan[i - 1].section in ("buildup", "breakdown"):
             return i
     return None
+
+
+def _swell(dt: float, rise: float, hold: float, release: float) -> float:
+    """A light in a wave: up over `rise` (at once without one), held, let go gently."""
+    if dt < rise:
+        return 0.5 * (1 - math.cos(math.pi * dt / rise))
+    return envelope_release(dt - rise, 1.0, hold, release)
 
 
 def _towards(v: float, target: float, dt: float, seconds: float) -> float:

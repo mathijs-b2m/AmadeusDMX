@@ -28,6 +28,7 @@ public sealed class NightCard(AppModel model)
     readonly FontIcon _fog = UI.Icon("cloud.fog.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _sparkles = UI.Icon("sparkles", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _star = UI.Icon("star.circle.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
+    readonly TextBlock _level = UI.Text("", Font.Caption).Bold();
     readonly TextBlock _clock = UI.Text("", Font.Caption).Secondary();
     readonly TextBlock _countdown = UI.Text("", Font.Title2).Bold();
     readonly FontIcon _chevron = UI.Icon("chevron.down").Secondary();
@@ -42,7 +43,7 @@ public sealed class NightCard(AppModel model)
         {
             Content = UI.HStack(10,
                 _moon,
-                UI.VStack(1, UI.HStack(5, _title, _pin, _sparkles, _star, _fog, _hand).Leading(), _clock.Leading()),
+                UI.VStack(1, UI.HStack(5, _title, _pin, _sparkles, _star, _level, _fog, _hand).Leading(), _clock.Leading()),
                 UI.Spacer(8),
                 _countdown,
                 _chevron),
@@ -64,7 +65,7 @@ public sealed class NightCard(AppModel model)
     void Refresh()
     {
         if (Arc is not { } arc || _card is null) return;
-        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{string.Join(",", (arc.NamedShows ?? []).Select(n => $"{n.Key}={n.Title}={n.Genre}"))}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
+        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{arc.Level is not null}|{arc.Levels}|{string.Join(",", (arc.NamedShows ?? []).Select(n => $"{n.Key}={n.Title}={n.Genre}"))}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
         if (shape != _shape)
         {
             _shape = shape;
@@ -85,6 +86,10 @@ public sealed class NightCard(AppModel model)
         _fog.Visible(arc.Haze is not null).Tooltip(L("You push the haze"));
         _sparkles.Visible(arc.Lightshow == true).Tooltip(L("Lightshow: every track played as a show piece"));
         _star.Visible(arc.NamedShow is not null).Tooltip(arc.NamedShow is { } named ? L("Named show: {0}", named.Title) : "");
+        _level.Visible(arc.Level is { } lv && lv != 2);
+        _level.Text = arc.Level?.ToString() ?? "";
+        _level.Foreground(arc.Level > 2 ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush"));
+        _level.Tooltip(arc.Level is { } l ? L("Intensity level {0} of {1}", l, arc.Levels ?? 5) : "");
         _clock.Text = Night.Clock(arc);
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
@@ -104,6 +109,11 @@ public sealed class NightCard(AppModel model)
         {
             _body.Children.Add(LightshowRow(arc));
             if (arc.NamedShows is { Count: > 0 } shows) _body.Children.Add(NamedShowRow(shows));
+            _body.Children.Add(UI.Divider());
+        }
+        if (arc.Level is not null)
+        {
+            _body.Children.Add(LevelRow(arc));
             _body.Children.Add(UI.Divider());
         }
         if (arc.On)
@@ -203,6 +213,29 @@ public sealed class NightCard(AppModel model)
         // the line wraps (it is longer while on), so the switch stays in the card
         return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow(), toggle)
             .Tooltip(Night.LightshowHelp);
+    }
+
+    // MARK: the operator's intensity level: how hard the show plays, 1 … 5. 2 is the show as designed; 1 a step
+    // gentler; 3, 4 and 5 ever harder, 5 with a lot of strobing and very fast waves through the rig
+
+    UIElement LevelRow(ArcStatus arc)
+    {
+        var icon = UI.Icon("flame").Frame(width: 18);
+        var status = UI.Text("", Font.Caption);
+        var levels = Enumerable.Range(1, Math.Max(arc.Levels ?? 5, 1)).ToList();
+        var picker = UI.Segmented(levels, arc.Level ?? 2, l => l.ToString(), l => Send(ArcMessage.Level(l)));
+        _updates.Add(a =>
+        {
+            var level = a.Level ?? 2;
+            foreach (var b in picker.Children.OfType<ToggleButton>()) b.IsChecked = b.Tag is int t && t == level;
+            status.Text = Night.LevelStatus(level);
+            var tint = level > 2 ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush");
+            status.Foreground(tint);
+            icon.Foreground(tint);
+        });
+        var title = UI.Text(L("Intensity"), Font.Callout).Bold();
+        return UI.VStack(6, UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow()), picker)
+            .Tooltip(Night.LevelHelp);
     }
 
     // MARK: the DJ's named show: a fixed style for their whole set (Prydz Tomorrow …), per genre; None: the house

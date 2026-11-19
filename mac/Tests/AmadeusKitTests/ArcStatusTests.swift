@@ -38,6 +38,13 @@ import Testing
     #expect(on.lightshow == true)
 }
 
+@Test func theIntensityLevelDecodes() throws {
+    let base = #"{"on": true, "length": 14400, "stage": "peak", "stages": [], "event": "club", "events": [], "locked": false, "heat": 0.5, "trend": 0, "values": {}, "manual": [], "groups": 2, "playing": 2"#
+    #expect(try JSONDecoder().decode(ArcStatus.self, from: Data((base + "}").utf8)).level == nil)  // an older engine
+    let five = try JSONDecoder().decode(ArcStatus.self, from: Data((base + #", "level": 5, "levels": 5}"#).utf8))
+    #expect(five.level == 5 && five.levels == 5)
+}
+
 @Test func outdoorStageRoundTrips() throws {
     let st = try JSONDecoder().decode(Stage.self, from: Data(#"{"width_m": 12, "outdoor": true}"#.utf8))
     #expect(st.outdoor)

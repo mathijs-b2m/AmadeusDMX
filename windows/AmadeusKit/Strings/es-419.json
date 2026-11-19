@@ -1384,5 +1384,13 @@
   "Review": "Revisión",
   "Show|verb": "Mostrar",
   "Right|correct": "Correcto",
-  "Not checked yet|updates": "Todavía no se buscó"
+  "Not checked yet|updates": "Todavía no se buscó",
+  "Brightness": "Brillo",
+  "Intensity level {0} of {1}": "Nivel de intensidad {0} de {1}",
+  "Gentler: no strobing heads, calmer paths": "Más suave: cabezas sin estrobo, recorridos más tranquilos",
+  "The show as designed": "El show tal como fue diseñado",
+  "Harder: the heads hit the kick, drops flash": "Más fuerte: las cabezas golpean con el bombo, los drops destellan",
+  "Drops hammer, builds strobe, faster heads": "Los drops martillan, los builds estroban, cabezas más rápidas",
+  "All out: every look harder, fast heads, waves": "A tope: cada look más fuerte, cabezas rápidas, olas",
+  "How hard the show plays, whatever the knobs say: 2 is the show as designed, 1 a step gentler, 5 really intense (a lot of strobing, every look harder, the heads twice as fast, very fast waves now and then). Within the set's flash limit. Re-plans the tracks in a few seconds": "Qué tan fuerte toca el show, digan lo que digan las perillas: 2 es el show tal como fue diseñado, 1 un paso más suave, 5 realmente intenso (mucho estrobo, cada look más fuerte, las cabezas el doble de rápidas, olas muy rápidas de vez en cuando). Dentro del límite de destellos del set. Vuelve a planear los temas en unos segundos"
 }

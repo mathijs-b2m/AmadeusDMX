@@ -113,6 +113,18 @@ public class ShowLogicTests
     }
 
     [Fact]
+    public void TheIntensityLevelAsTheEngineSendsIt()
+    {
+        Assert.Null(Arc(ArcJson).Level);  // an engine without levels: no row
+        var five = Arc(ArcJson.Replace("\"hold\": 4}", "\"hold\": 4, \"level\": 5, \"levels\": 5}"));
+        Assert.Equal(5, five.Level);
+        Assert.Equal(5, five.Levels);
+        Assert.NotEqual(Arc(ArcJson), five);
+        Assert.Equal("""{"type":"arc","level":5}""", ArcMessage.Json(ArcMessage.Level(5)));
+        Assert.Equal("The show as designed", Night.LevelStatus(2));
+    }
+
+    [Fact]
     public void TheLightshowSwitchAsTheEngineSendsIt()
     {
         Assert.Null(Arc(ArcJson).Lightshow);  // an engine without it: no row
