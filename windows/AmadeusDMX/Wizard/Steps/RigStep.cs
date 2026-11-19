@@ -26,14 +26,22 @@ public sealed class RigStep(AppModel model, WizardModel w)
         }
         else
         {
-            var cards = UI.HStack(8);
+            // two rows: nine in one left about 30 px for a name ("Two Stands" cut short, worse in Spanish)
+            const int perRow = 5;
+            var cards = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+            for (var c = 0; c < perRow; c++) cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var i = 0;
             foreach (var t in RigTemplates.All)
             {
                 var card = ChoiceCard.Build(UI.VStack(4, Sketch.Build(t).Frame(height: 44), UI.Text(t.Title(), Font.Caption).Bold().Wrap(2)),
                                             () => w.Template = t, selected: w.Template == t).Tooltip(t.Detail());
                 card.MinHeight = 90;
                 card.VerticalContentAlignment = VerticalAlignment.Top;
-                cards.Children.Add(card.Grow());
+                if (i / perRow >= cards.RowDefinitions.Count) cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetRow(card, i / perRow);
+                Grid.SetColumn(card, i % perRow);
+                cards.Children.Add(card);
+                i++;
             }
             s.Children.Add(cards);
             var rows = new List<UIElement?>
