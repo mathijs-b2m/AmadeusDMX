@@ -700,10 +700,17 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         buf[addr] = min(max(int(v), 0), 255)  # a bad value in a definition must never stop the show
 
 
-def test_light(buf: bytearray, fx: dict, level: float = 0.6, aim: tuple[float, float] | None = None) -> None:
+def test_light(
+    buf: bytearray,
+    fx: dict,
+    level: float = 0.6,
+    aim: tuple[float, float] | None = None,
+    colors: dict[str, tuple[float, float, float]] | None = None,
+) -> None:
     """Light one fixture for the light test (is it patched and connected?): every cell white at `level`, its
-    emitters the show keeps dark (UV, amber…) lit too, heads centred (or at `aim`: pan and tilt, 0..1). Not for
-    lasers and smoke machines."""
+    emitters the show keeps dark (UV, amber…) lit too, heads centred (or at `aim`: pan and tilt, 0..1). `colors`
+    (element id → rgb) gives cells a colour of their own instead (the calibration's cell order), the dark emitters
+    then left dark. Not for lasers and smoke machines."""
     defn = get(fx["fixture"])
     if inert(defn) or defn["kind"] == "smoke":
         raise ValueError(test_refusal(defn))
@@ -712,7 +719,11 @@ def test_light(buf: bytearray, fx: dict, level: float = 0.6, aim: tuple[float, f
     from amadeus.engine.state import State
 
     pan, tilt = aim or (0.5, 0.5)
-    patch(buf, fx, {e["id"]: State(dimmer=level, r=1, g=1, b=1, pan=pan, tilt=tilt) for e in expand(fx)})
+    white = (1.0, 1.0, 1.0)
+    looks = {e["id"]: (colors or {}).get(e["id"], white) for e in expand(fx)}
+    patch(buf, fx, {i: State(dimmer=level, r=c[0], g=c[1], b=c[2], pan=pan, tilt=tilt) for i, c in looks.items()})
+    if colors:
+        return
     chans = channels(defn, fx["mode"])
     has_dimmer = any(c["attr"] == "dimmer" for c in chans)
     cells_mixed = len(heads(defn, fx["mode"])) > 1 and not any(c["attr"] == "dimmer" and "head" in c for c in chans)

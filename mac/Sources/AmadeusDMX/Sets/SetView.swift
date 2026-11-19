@@ -16,6 +16,7 @@ struct SetView: View {
     @State private var lit = Set<String>()   // fixtures the light test keeps on
     @State private var testOff: [String: Task<Void, Never>] = [:]   // their switch-off when the engine's time runs out
     @State private var mapTarget: MapTarget?   // the DMX mapper, for a model and mode of the set
+    @State private var calibrateTarget: CalibrateTarget?   // the calibration, for the fixtures of a model
     @State private var error: String?
 
     var body: some View {
@@ -73,7 +74,9 @@ struct SetView: View {
                                                    : testRefusal(g.definition)) { toggleTest(f.id) }
                                 }
                             } header: {
-                                GroupHeader(group: g) { mapChannels(g.fixtures.first { $0.address != nil } ?? g.fixtures.first) }
+                                GroupHeader(group: g, calibrateRefusal: calibrateRefusal(g),
+                                            map: { mapChannels(g.fixtures.first { $0.address != nil } ?? g.fixtures.first) },
+                                            calibrate: { calibrate(g) })
                             }
                         }
                     }
@@ -84,6 +87,12 @@ struct SetView: View {
                             mapChannels(doc.fixtures.first { ids.contains($0.id) })
                         }
                         .disabled(ids.isEmpty || model.engineRunning)
+                        if let g = groups(doc).first(where: { g in g.fixtures.contains { ids.contains($0.id) } }), Self.calibrates(g) {
+                            Button("Calibrate…", systemImage: "scope") {
+                                calibrate(g, from: g.fixtures.first { ids.contains($0.id) }?.id)
+                            }
+                            .disabled(calibrateRefusal(g) != nil)
+                        }
                         Divider()
                         Button("Remove from the Set", systemImage: "trash", role: .destructive) { remove(ids) }
                             .disabled(model.engineRunning)
@@ -126,6 +135,13 @@ struct SetView: View {
                 names[t.key] = model.workspace?.definition(t.key)
                 load()
                 flash("Mapped \(names[t.key]?.name ?? t.key) (\(t.mode)): every one in your sets plays by it")
+            }
+            .environment(model)
+        }
+        .sheet(item: $calibrateTarget) { t in
+            CalibrateSheet(target: t, definition: names[t.key], rig: model.selectedRig, set: model.editingSet) {
+                load()
+                flash("Calibration of \(t.name) saved")
             }
             .environment(model)
         }
@@ -234,6 +250,28 @@ struct SetView: View {
         guard let f else { return }
         switchOffTests()
         mapTarget = MapTarget(key: f.key, mode: f.mode, fixture: f.id, address: f.address, universe: f.universe)
+    }
+
+    /// Models the calibration has something to ask about: moving heads, and bars (their cells' order).
+    static func calibrates(_ g: Group) -> Bool {
+        guard let d = g.definition, d.inert.isEmpty, d.kind != "smoke", let f = g.fixtures.first, d.plays(f.mode) else { return false }
+        return d.isMoving || d.cells(f.mode) > 1
+    }
+
+    /// Why this model can't be calibrated now (nil: it can).
+    private func calibrateRefusal(_ g: Group) -> String? {
+        if let r = tryRefusal { return r }
+        if model.selectedRig.isEmpty { return "Pick a rig first: a fixture is calibrated as it hangs on one" }
+        if !g.fixtures.contains(where: { $0.address != nil }) { return "No start address yet: give them one first" }
+        return nil
+    }
+
+    /// The calibration for a model's fixtures (those with an address), from `start` on.
+    private func calibrate(_ g: Group, from start: String? = nil) {
+        switchOffTests()
+        let ids = g.fixtures.filter { $0.address != nil }.map(\.id)
+        calibrateTarget = CalibrateTarget(key: g.key, name: g.definition?.name ?? g.key, fixtures: ids,
+                                          start: start.flatMap { ids.firstIndex(of: $0) } ?? 0)
     }
 
     /// Why nothing can be lit on the real rig now (nil: it can).
@@ -441,7 +479,9 @@ private struct ExampleNotice: View {
 private struct GroupHeader: View {
     @Environment(AppModel.self) private var model
     let group: SetView.Group
+    let calibrateRefusal: String?
     let map: () -> Void
+    let calibrate: () -> Void
 
     var body: some View {
         let d = group.definition
@@ -469,6 +509,13 @@ private struct GroupHeader: View {
                     .tint(dark || d.needsCheck ? .orange : nil)
                     .disabled(model.engineRunning)
                     .help("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture")
+                if SetView.calibrates(group) {
+                    Button("Calibrate…", systemImage: "scope", action: calibrate)
+                        .controlSize(.small)
+                        .buttonStyle(.bordered)
+                        .disabled(calibrateRefusal != nil)
+                        .help(calibrateRefusal ?? "One behaves oddly (goes the wrong way, a bar runs backwards)? Light each on the real rig and say what it does: it is put right")
+                }
             }
         }
         .padding(.vertical, 2)

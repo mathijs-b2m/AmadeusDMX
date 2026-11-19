@@ -421,6 +421,15 @@ public struct SetupAPI: Sendable {
         try await post("api/test-light", ["fixture": fixture, "rig": layout, "on": on, "point": "front"])
     }
 
+    /// The calibration on the Sets page: one fixture of a layout lit, a moving head pointed `point` ("front": straight
+    /// out to the audience, "check": the check after hanging's way, nil: centred), with `cells` a bar's cells red,
+    /// green, blue, white along it (the reply's `order` says which end red should be at).
+    public func testLight(fixture: String, on: Bool, layout: [String: Any], point: String?, cells: Bool) async throws -> LightTest {
+        var body: [String: Any] = ["fixture": fixture, "rig": layout, "on": on, "cells": cells]
+        if let point { body["point"] = point == "front" ? "front" as Any : true as Any }
+        return try await post("api/test-light", body)
+    }
+
     /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
     public func hangCheck(layout: [String: Any]) async throws -> [HangCheckStep] {
         struct R: Decodable { var steps: [HangCheckStep] }
@@ -726,9 +735,10 @@ public struct LightTest: Decodable, Sendable {
     public var wireUniverse: Int?       // the Art-Net / sACN universe it goes out as
     public var channels: [Int]          // first and last DMX channel (empty: no start address)
     public var dir: SIMD3<Float>?       // a pointed head: where its beam goes (world, as the feed's)
+    public var order = ""               // a bar's cells lit in colours: which end red should be at, in words
 
     enum CodingKeys: String, CodingKey {
-        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir
+        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir, order
     }
 
     public init(from decoder: Decoder) throws {
@@ -740,6 +750,7 @@ public struct LightTest: Decodable, Sendable {
         wireUniverse = try c.decodeIfPresent(Int.self, forKey: .wireUniverse)
         channels = try c.decodeIfPresent([Int].self, forKey: .channels) ?? []  // null: a fixture without an address
         dir = try c.decodeIfPresent([Float].self, forKey: .dir).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
+        order = try c.decodeIfPresent(String.self, forKey: .order) ?? ""
     }
 
     /// "universe 1, channels 43–50 · Art-Net → 192.168.2.18:6454 (universe 1 on the wire)"
