@@ -232,6 +232,12 @@ public sealed class SetView(AppModel model, MainWindow window)
             remove.IsEnabled = !model.EngineRunning;
             menu.Items.Add(identify);
             menu.Items.Add(map);
+            if (_doc is { } doc && Groups(doc).FirstOrDefault(g => g.Fixtures.Any(f => ids.Contains(f.Id))) is { } g && Calibrates(g))
+            {
+                var calibrate = UI.Item("Calibrate…", () => Calibrate(g, g.Fixtures.FirstOrDefault(f => ids.Contains(f.Id))?.Id), "scope");
+                calibrate.IsEnabled = CalibrateRefusal(g) is null;
+                menu.Items.Add(calibrate);
+            }
             menu.Items.Add(UI.Separator());
             menu.Items.Add(remove);
         };
@@ -263,6 +269,13 @@ public sealed class SetView(AppModel model, MainWindow window)
                 .Tooltip("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture");
             if (dark || d.NeedsCheck) b.Foreground(Tint.Orange);
             row.Children.Add(b);
+            if (Calibrates(g))
+            {
+                var refusal = CalibrateRefusal(g);
+                row.Children.Add(UI.Button("Calibrate…", () => Calibrate(g), "scope").Font(Font.Caption).Padding(8, 3)
+                    .Disabled(refusal is not null)
+                    .Tooltip(refusal ?? "One behaves oddly (goes the wrong way, a bar runs backwards)? Light each on the real rig and say what it does: it is put right"));
+            }
         }
         return row;
     }
@@ -419,6 +432,33 @@ public sealed class SetView(AppModel model, MainWindow window)
             _names[target.Key] = model.Workspace?.Definition(target.Key);
             model.ReloadSets();
             Flash($"Mapped {_names[target.Key]?.Name ?? target.Key} ({target.Mode}): every one in your sets plays by it");
+        });
+    }
+
+    /// Models the calibration has something to ask about: moving heads, and bars (their cells' order).
+    public static bool Calibrates(Group g) =>
+        g.Definition is { Inert.Length: 0 } d && d.Kind != "smoke" && g.Fixtures.FirstOrDefault() is { } f && d.Plays(f.Mode)
+        && (d.IsMoving || d.Cells(f.Mode) > 1);
+
+    /// Why this model can't be calibrated now (nil: it can).
+    string? CalibrateRefusal(Group g)
+    {
+        if (TryRefusal is { } r) return r;
+        if (model.SelectedRig.Length == 0) return "Pick a rig first: a fixture is calibrated as it hangs on one";
+        if (!g.Fixtures.Any(f => f.Address is not null)) return "No start address yet: give them one first";
+        return null;
+    }
+
+    /// The calibration for a model's fixtures (those with an address), from `start` on.
+    void Calibrate(Group g, string? start = null)
+    {
+        SwitchOffTests();
+        var ids = g.Fixtures.Where(f => f.Address is not null).Select(f => f.Id).ToList();
+        var target = new CalibrateTarget(g.Key, g.Definition?.Name ?? g.Key, ids, start is null ? 0 : Math.Max(ids.IndexOf(start), 0));
+        CalibrateSheet.Present(model, Root, target, g.Definition, model.SelectedRig, model.EditingSet, () =>
+        {
+            Load();
+            Flash($"Calibration of {target.Name} saved");
         });
     }
 

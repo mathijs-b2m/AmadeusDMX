@@ -10,7 +10,9 @@ POST /api/autopatch          assign non-overlapping addresses + stage layout to 
 POST /api/discover           ArtPoll on the network; returns the nodes found
 POST /api/identify           {"fixture": id, "rig": {...}}: light that fixture white for 2 s
 POST /api/test-light         {"fixture": id, "rig": {...}, "on": bool}: keep that fixture lit (≤ 60 s) or stop;
-                             "raw": [v, …] sends those values to its channels instead (the DMX mapper)
+                             "raw": [v, …] sends those values to its channels instead (the DMX mapper);
+                             "point": true / "front" aims a head (check after hanging, calibration); "cells": true
+                             lights a bar's cells red, green, blue, white along it ("order" says which end is red)
 GET  /api/fixture/map?key=…&mode=…   a mode channel by channel, with the library's names and ranges (DMX mapper)
 POST /api/fixture/map        {"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}: save a hand mapping
                              ("wheel": colour wheel slots, "ring": a ring colour channel's, "checked": true from

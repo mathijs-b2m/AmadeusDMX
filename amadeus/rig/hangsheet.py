@@ -721,3 +721,32 @@ def fix(fx: dict, defn: dict, what: str) -> dict:
         else:  # not enough pan for that (or a moving bar): tilt the other way gives the same beam
             out["tilt_invert"] = not fx.get("tilt_invert", False)
     return out
+
+
+ORDER_COLORS = (
+    ("red", (1.0, 0.0, 0.0)),
+    ("green", (0.0, 1.0, 0.0)),
+    ("blue", (0.0, 0.0, 1.0)),
+    ("white", (1.0, 1.0, 1.0)),
+)
+
+
+def cell_order(rig: dict, fx: dict) -> tuple[dict[str, tuple[float, float, float]], str]:
+    """A bar's cells in colours of their own, red at one end, then green, blue, white (and round again), along the
+    bar as it is placed: the calibration sees whether the real one runs the same way or is reversed (`reverse`).
+    Returns {element id: rgb} and what to see, in crew words (a loaded rig: its `elements`). Across the stage it
+    starts at stage left (x = 0), the right end as the audience sees it; a bar running up and down the stage at its
+    upstage end."""
+    els = [e for e in rig["elements"] if e["fixture"] == fx["id"]]
+    if len(els) < 2:
+        return {}, ""
+    r = math.radians(fx.get("rot_deg", 0.0))
+    across = abs(math.cos(r)) >= abs(math.sin(r))
+    # the cells' place along the bar: offset_m turned by rot_deg (geometry.position)
+    turn = math.cos(r) if across else math.sin(r)
+    order = sorted(els, key=lambda e: e.get("offset_m", 0.0) * turn)
+    colors = {e["id"]: ORDER_COLORS[i % 4][1] for i, e in enumerate(order)}
+    names = ", ".join(ORDER_COLORS[i % 4][0] for i in range(1, min(len(order), 4)))
+    start = "stage left (your right, facing the stage)" if across else "the back of the stage"
+    other = "stage right" if across else "the audience"
+    return colors, f"Red at {start}, then {names}{', …' if len(order) > 4 else ''} towards {other}."

@@ -401,7 +401,7 @@ def _identify(rig: dict, fixture_id: str, seconds: float = 2.0):
 # switched off, or for TEST_SECONDS at most.
 TEST_SECONDS = 60.0
 _test_lock = threading.Lock()
-_test: dict = {"rig": None, "lit": {}, "raw": {}, "aim": {}, "thread": None}
+_test: dict = {"rig": None, "lit": {}, "raw": {}, "aim": {}, "cells": {}, "thread": None}
 
 
 def test_light(req):
@@ -410,7 +410,9 @@ def test_light(req):
     mapper: what does this channel do?); "light": [channel index, …] the ones it plays light on, kept under the
     brightness limiter with the definition's own. With "point": true a moving head points its beam the way the
     check after hanging says (rig/hangsheet.py check_aim) instead of straight out; "point": "front" straight out to
-    the audience (front_aim: the rig editor's test). Then "dir" says where the beam goes (world, as the feed's)."""
+    the audience (front_aim: the rig editor's test). Then "dir" says where the beam goes (world, as the feed's).
+    With "cells": true a bar's cells light red, green, blue, white along it as it is placed, and "order" says which
+    end red should be at (the calibration: is the real one reversed?)."""
     from amadeus.dmx import outputs
     from amadeus.rig.loader import load_rig_dict
 
@@ -435,6 +437,8 @@ def test_light(req):
         _test["raw"] = {fid: v for fid, v in _test["raw"].items() if fid in _test["lit"]}
         _test["aim"] = {fid: v for fid, v in _test["aim"].items() if fid in _test["lit"]}
         _test["aim"].pop(fixture_id, None)
+        _test["cells"] = {fid: v for fid, v in _test["cells"].items() if fid in _test["lit"] and fid != fixture_id}
+        order = ""
         if on:
             _test["lit"][fixture_id] = time.monotonic() + TEST_SECONDS
             if body.get("point") and fxlib.is_moving(defn):  # the check after hanging: its beam a known way
@@ -443,6 +447,12 @@ def test_light(req):
                 aim = (hangsheet.front_aim if body["point"] == "front" else hangsheet.check_aim)(fx, defn)
                 _test["aim"][fixture_id] = aim
                 pointed = [round(float(v), 3) for v in geometry.fk(fx, defn, *aim)]
+            if body.get("cells") and raw is None:
+                from amadeus.rig import hangsheet
+
+                colors, order = hangsheet.cell_order(rig, fx)
+                if colors:
+                    _test["cells"][fixture_id] = colors
             if raw is not None:
                 light = {int(i) for i in body.get("light", []) if isinstance(i, int)}
                 _test["raw"][fixture_id] = (raw[: fxlib.footprint(fx)], light)
@@ -462,6 +472,7 @@ def test_light(req):
         "wire_universe": outputs.wire_universe(rig, fx["universe"]),
         "channels": [fx["address"], fx["address"] + fxlib.footprint(fx) - 1] if fxlib.patched(fx) else None,
         "dir": pointed,
+        "order": order,
     }
 
 
@@ -478,7 +489,7 @@ def _test_loop():
                 for fid, until in list(_test["lit"].items()):
                     if until < now:
                         del _test["lit"][fid]
-                lit, raw, aim = set(_test["lit"]), dict(_test["raw"]), dict(_test["aim"])
+                lit, raw, aim, cells = set(_test["lit"]), dict(_test["raw"]), dict(_test["aim"]), dict(_test["cells"])
                 if _test["rig"] is not rig:
                     if sender:
                         sender.blackout(sorted({f["universe"] for f in rig["fixtures"]}))
@@ -494,7 +505,7 @@ def _test_loop():
                 if f["id"] in raw:  # as they are: the mapper tries what a channel does
                     fxlib.test_raw(buf, f, *raw[f["id"]])
                 elif f["id"] in lit:
-                    fxlib.test_light(buf, f, aim=aim.get(f["id"]))
+                    fxlib.test_light(buf, f, aim=aim.get(f["id"]), colors=cells.get(f["id"]))
                 else:  # dark, and heads where a blackout leaves them (DMX 0): they don't move on every test
                     fxlib.patch(buf, f, {e["id"]: State(pan=0.0, tilt=0.0) for e in fxlib.expand(f)})
             sender.send(unis)
