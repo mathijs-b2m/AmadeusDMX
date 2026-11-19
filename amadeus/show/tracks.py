@@ -29,7 +29,7 @@ class TrackShows:
         self.pool = ThreadPoolExecutor(max_workers=2)
         self.lock = threading.Lock()
         self.set_genre = SetGenre()  # the set's genre: tracks of a genre share a house style
-        self.shape = (2, 1, True, False)  # the show arc's shape for the plans (show/arc.py, plan_shape)
+        self.shape = (2, 1, True, False, 2)  # the show arc's shape for the plans (show/arc.py, plan_shape)
         self.directed: dict[str, list] = {}  # file → the director's plan, before calming
         self.lightshow = False  # the operator's Lightshow: every track played by the lightshow program
         self.named = ""  # the DJ's named show (director/style.py, NAMED): every track lit in it
@@ -92,7 +92,8 @@ class TrackShows:
         if shape == self.shape:
             return
         ambient = ", warm-up ambience" if len(shape) > 3 and shape[3] else ""
-        print(f"  ⇄ plans: heads {MOVES[shape[0]]}, a look held {shape[1]} phrase(s){ambient}", flush=True)
+        level = f", intensity level {shape[4]}" if len(shape) > 4 else ""
+        print(f"  ⇄ plans: heads {MOVES[shape[0]]}, a look held {shape[1]} phrase(s){ambient}{level}", flush=True)
         self.shape = level = shape
         with self.lock:
             files = [f for f in self.shows if f in self.directed]
@@ -257,5 +258,6 @@ class TrackShows:
                 self.pool.submit(self._recalm, file, self.shape)
             self.directed[file] = plan
             self.shows[file] = (a, played, engine, director)
-        how = "" if level == (2, 1, True) else f", heads {MOVES[level[0]]}, looks held {level[1]}"
+        how = "" if level[:2] == (2, 1) else f", heads {MOVES[level[0]]}, looks held {level[1]}"
+        how += f", intensity level {level[4]}" if len(level) > 4 and level[4] != 2 else ""
         print(f"  ✓ {Path(file).name}: {len(plan)} phrases, {a.bpm:.1f} BPM ({director}{how})")

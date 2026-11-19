@@ -19,7 +19,7 @@ public static class Symbols
         ["exclamationmark.shield"] = "", ["xmark.octagon.fill"] = "",
         // modes and the toolbar
         ["cube.transparent"] = "", ["light.beacon.max"] = "", ["square.stack.3d.up"] = "",
-        ["square.stack.3d.up.slash"] = "", ["list.bullet.rectangle"] = "", ["sparkles"] = "",
+        ["square.stack.3d.up.slash"] = "", ["list.bullet.rectangle"] = "", ["sparkles"] = "", ["flame"] = "\uE945",
         ["play.fill"] = "", ["stop.fill"] = "", ["pause.fill"] = "", ["sidebar.trailing"] = "",
         ["laptopcomputer"] = "", ["laptopcomputer.and.arrow.down"] = "", ["music.note"] = "",
         ["music.note.list"] = "", ["music.quarternote.3"] = "", ["music.mic"] = "",

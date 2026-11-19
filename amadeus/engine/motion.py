@@ -328,9 +328,13 @@ class MotionMixin:
             aim = {**aim, "el": top - amp, "el_amp": amp}
         return aim
 
-    def _twist_beats(self, intensity: int) -> float:
-        """Beats per turn of the twister: the level's, doubled until the slowest head can make the circle."""
-        beats = float(TWIST_BEATS[max(0, min(3, intensity))])
+    def _pace_now(self) -> float:
+        return max(getattr(self, "_pace", 1.0), 1.0)
+
+    def _twist_beats(self, intensity: int, pace: float = 1.0) -> float:
+        """Beats per turn of the twister: the level's (faster at a pace), doubled until the slowest head can make
+        the circle."""
+        beats = float(TWIST_BEATS[max(0, min(3, intensity))]) / max(pace, 1.0)
         motions = [defn.get("motion", DEFAULT_MOTION) for _, defn in self.head_fx]
         speed = min((min(m["pan_speed_dps"], m["tilt_speed_dps"]) for m in motions), default=1e9)
         accel = min(
@@ -372,7 +376,7 @@ class MotionMixin:
         else:
             place = 2 * math.pi * role["idx"] / max(role["count"], 1)
         way = -1.0 if self._path_var(d, "twister") % 2 else 1.0  # every other time it turns the other way
-        turn = place + way * 2 * math.pi * (pos + role["phase"]) / self._twist_beats(d.intensity)
+        turn = place + way * 2 * math.pi * (pos + role["phase"]) / self._twist_beats(d.intensity, d.pace)
         flip = -1.0 if f == "mirror" and side > 0 and not ring else 1.0
         point = middle + radius * (flip * np.cos(turn)[:, None] * e1 + np.sin(turn)[:, None] * e2)
         vec = point - head_pos
@@ -389,7 +393,8 @@ class MotionMixin:
         if f == "wave":
             pos -= j  # one beat later per head
         seed = j if f in ("wave",) else 0  # ballyhoo: same random path unless the heads are offset anyway
-        tempo = TEMPO[max(0, min(3, d.intensity))]
+        tempo = TEMPO[max(0, min(3, d.intensity))] * d.pace
+        self._pace = d.pace
         aim_name = self._aim_name(d.aim, j)
         self._reach_uv = self.reach_uv[j].get(aim_name, (1.0, 1.0))
         self._move_beats = self.move_beats.get(j, (1, 1))
@@ -688,7 +693,7 @@ class MotionMixin:
             s = alt * np.sin(w)
             return ((s, z), (0.25 * alt + z, s), (s, 0.6 * s))[var % 3]
         if m == "pendulum":  # one side to the other per bar: it hangs, swings through and lands on the one
-            q = pos / PENDULUM_BEATS
+            q = pos * self._pace_now() / PENDULUM_BEATS
             k = np.floor(q).astype(np.int64)
             x = np.clip((np.mod(q, 1.0) - PENDULUM_HANG) / (1 - PENDULUM_HANG), 0.0, 1.0)
             u0 = np.where(np.mod(k, 2) == 0, -1.0, 1.0)
@@ -700,6 +705,7 @@ class MotionMixin:
         tr_pan, tr_tilt = self.move_travel.get(j, (0.9, 0.9))
 
         def step(n, travel):  # hold at the landing, then jump the target so the head arrives on the next landing
+            n = max(1, round(n / self._pace_now()))  # (at a pace: a move a beat where the motors take two)
             q = pos / n
             return np.floor(q).astype(np.int64), np.where(np.mod(q, 1.0) >= 1.0 - travel, 1.0, 0.0)
 
@@ -746,8 +752,9 @@ class MotionMixin:
             def rnd(k):
                 return np.mod(np.sin(k * 12.9898 + (seed + 101 * var) * 78.233) * 43758.5453, 1.0) * 2 - 1
 
-            seg = np.floor(pos / 2)
-            x = np.clip(np.mod(pos, 2) / 2, 0.0, 1.0)
+            bp = 2 / self._pace_now()  # beats per stretch
+            seg = np.floor(pos / bp)
+            x = np.clip(np.mod(pos, bp) / bp, 0.0, 1.0)
             a = 0.5 - 0.5 * np.cos(math.pi * x)
             amp = 0.6
             return (
@@ -797,7 +804,8 @@ class MotionMixin:
             pos = pos - idx * min(1.0, WAVE_BEATS / max(count - 1, 1))
         pos = pos + role["phase"]
         seed = role["seed"] if role["seed"] is not None else (idx if f in ("wave",) else 0)
-        tempo = TEMPO[max(0, min(3, d.intensity))]
+        tempo = TEMPO[max(0, min(3, d.intensity))] * d.pace
+        self._pace = d.pace
         aim_name = self._aim_name(d.aim, j)
         self._reach_uv = self.reach_uv[j].get(aim_name, (1.0, 1.0))
         var = self._path_var(d, movement)
@@ -825,7 +833,7 @@ class MotionMixin:
             # A row of heads tilting up and down in a wave that rolls over the row: each head a step behind its
             # neighbour by where it hangs (left to right; mirrored: from the centre out). One wave per bar, every
             # two beats at the peaks. The beams fan out a little so the row reads as a row.
-            period = 2.0 if d.intensity >= 3 else 4.0
+            period = (2.0 if d.intensity >= 3 else 4.0) / max(d.pace, 1.0)
             amp = TILT_WAVE_DEG * (0.8 if period < 4 else 1.0)
             across = abs(side) if f == "mirror" else (side + 1) / 2
             if var % 2 and f != "mirror":  # every other time it rolls the other way

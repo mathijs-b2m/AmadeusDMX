@@ -588,6 +588,9 @@ public sealed record ArcStatus
     public string? Named { get; init; }
     /// The named shows the engine offers, per genre.
     public IReadOnlyList<NamedShow>? NamedShows { get; init; }
+    /// The operator's intensity level, 1 … `Levels` (2: the show as designed; null: an engine without levels).
+    public int? Level { get; init; }
+    public int? Levels { get; init; }
 
     public string StageName => Stages.FirstOrDefault(s => s.Count > 0 && s[0] == Stage) is { Count: > 0 } s ? s[^1] : Stage;
     public double? Remaining => Elapsed is { } e ? Length - e : null;
@@ -609,6 +612,7 @@ public sealed record ArcStatus
             Hazers = J.Val(c, "hazers", J.Int), Haze = J.Ref(c, "haze", HazePush.From),
             Lightshow = J.Val(c, "lightshow", J.Bool),
             Named = J.Ref(c, "named", J.String), NamedShows = J.Ref(c, "named_shows", J.ArrayOf(AmadeusKit.NamedShow.From)),
+            Level = J.Val(c, "level", J.Int), Levels = J.Val(c, "levels", J.Int),
         };
     }
 
@@ -620,7 +624,7 @@ public sealed record ArcStatus
         && Values.Count == o.Values.Count && Values.All(p => o.Values.TryGetValue(p.Key, out var v) && v == p.Value)
         && Manual.SequenceEqual(o.Manual) && Groups == o.Groups && Playing == o.Playing
         && MovementLevel == o.MovementLevel && Hold == o.Hold && Hazers == o.Hazers && Equals(Haze, o.Haze)
-        && Lightshow == o.Lightshow && Named == o.Named
+        && Lightshow == o.Lightshow && Named == o.Named && Level == o.Level && Levels == o.Levels
         && (NamedShows is null ? o.NamedShows is null : o.NamedShows is not null && NamedShows.SequenceEqual(o.NamedShows));
 
     public override int GetHashCode() => HashCode.Combine(Stage, Heat, Elapsed, Manual.Count, Values.Count);

@@ -268,7 +268,7 @@ def test_the_switch_on_the_show_arc(tmp_path):
     assert not arc.lightshow and not arc.snapshot(1000.0)["lightshow"]
     arc.control({"type": "arc", "lightshow": True}, now=1000.0)
     assert arc.snapshot(1000.0)["lightshow"]
-    assert arc.plan_shape() == (2, 1, True, False)  # the plan as the director made it
+    assert arc.plan_shape() == (2, 1, True, False, 2)  # the plan as the director made it (at the default level)
     arc.started, arc.seen = 1000.0, 1000.0
     arc.save(1000.0)
     assert ShowArc(rig, path=tmp_path / "arc.json", now=1100.0).lightshow  # an engine restart keeps it…

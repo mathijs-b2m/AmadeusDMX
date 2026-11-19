@@ -54,7 +54,7 @@ public sealed record Knob(string Id, string Title, string Symbol, string Help, b
             new("flashes", L("Flashes"), "bolt", L("White flash accents and strobes")),
         ]),
         (L("Level"), [
-            new("intensity", L("Intensity"), "sun.max", L("The master: how bright the whole rig plays. All the way down: dark")),
+            new("intensity", L("Brightness"), "sun.max", L("The master: how bright the whole rig plays. All the way down: dark")),
         ]),
     ];
 
@@ -118,6 +118,18 @@ public static class Night
 
     public static string LightshowHelp => L("Every hit played by its own lights, very intense: one section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax. Takes a few seconds per track to prepare; the show keeps playing meanwhile.");
 
+    /// The Intensity row's line: what the operator's level does.
+    public static string LevelStatus(int level) => level switch
+    {
+        1 => L("Gentler: no strobing heads, calmer paths"),
+        2 => L("The show as designed"),
+        3 => L("Harder: the heads hit the kick, drops flash"),
+        4 => L("Drops hammer, builds strobe, faster heads"),
+        _ => L("All out: every look harder, fast heads, waves"),
+    };
+
+    public static string LevelHelp => L("How hard the show plays, whatever the knobs say: 2 is the show as designed, 1 a step gentler, 5 really intense (a lot of strobing, every look harder, the heads twice as fast, very fast waves now and then). Within the set's flash limit. Re-plans the tracks in a few seconds");
+
     /// The named show plays: one is picked and the Lightshow isn't on (it waits for it).
     public static bool NamedShowPlaying(ArcStatus arc) => arc.NamedShow is not null && arc.Lightshow != true;
 
@@ -162,6 +174,8 @@ public static class ArcMessage
     public static Dictionary<string, object> Lightshow(bool on) => Make("lightshow", on);
     /// The DJ's named show by its key ("": none, each track in its genre's style).
     public static Dictionary<string, object> Named(string key) => Make("named", key);
+    /// The operator's intensity level (1..5; 2: the show as designed).
+    public static Dictionary<string, object> Level(int level) => Make("level", level);
     /// Push the hazers at `level` (0..1) for `seconds`, then keep the room that hazy with a burst every `every`
     /// seconds; "auto" gives it back.
     public static Dictionary<string, object> Haze(double level, double seconds, double every) =>
