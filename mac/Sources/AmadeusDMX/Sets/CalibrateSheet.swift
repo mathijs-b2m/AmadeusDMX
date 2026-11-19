@@ -37,6 +37,7 @@ struct CalibrateSheet: View {
     @State private var error: String?
     @State private var busy = false
     @State private var lit: String?
+    @State private var confirmed = Set<String>()   // said right, or put right on its own: siblings' fixes pass it by
 
     private var id: String? { target.fixtures.indices.contains(index) ? target.fixtures[index] : nil }
 
@@ -57,7 +58,7 @@ struct CalibrateSheet: View {
             Divider()
             footer
         }
-        .frame(minWidth: 560, idealWidth: 620, minHeight: 420, idealHeight: 460)
+        .frame(minWidth: 720, idealWidth: 760, minHeight: 440, idealHeight: 480)
         .task { await load() }
         .onDisappear { switchOff() }
     }
@@ -74,7 +75,7 @@ struct CalibrateSheet: View {
                     Text("\(index + 1) of \(target.fixtures.count)").foregroundStyle(.secondary).monospacedDigit()
                 }
             }
-            Text("Stand where the audience would be, facing the stage. Each one lights as it hangs on \(rig); say what the real one does and it is put right.")
+            Text("Stand where the audience would be, facing the stage. Each one lights as it hangs on \(rig); say what the real one does and it is put right, and the others of this model with it (except those you already went through).")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
@@ -96,7 +97,7 @@ struct CalibrateSheet: View {
                 stepView(id, step)
             }
             if let done = fixed[id], !done.isEmpty {
-                Label("Put right: \(done.joined(separator: ", ")). Saved.", systemImage: "checkmark.circle.fill")
+                Label("Put right: \(done.joined(separator: ", ")). Saved\(siblingNote(id)).", systemImage: "checkmark.circle.fill")
                     .font(.callout).foregroundStyle(.green).fixedSize(horizontal: false, vertical: true)
             }
             if let note {
@@ -117,10 +118,12 @@ struct CalibrateSheet: View {
                 .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button("At the Audience", systemImage: "checkmark") { advance() }
+                    .fixedSize()
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                 Button("Left", systemImage: "arrow.left") { fix(id, "left", "its pan home turned") }
                 Button("Right", systemImage: "arrow.right") { fix(id, "right", "its pan home turned") }
                 Button("Back at the Stage", systemImage: "arrow.uturn.down") { fix(id, "back", "turned round") }
+                    .fixedSize()
                 Button("Up or Down") {
                     note = "A head that points at the ceiling or the floor here is placed the wrong way up: on the Rigs page, put it hanging under the truss or standing, as it really is."
                 }
@@ -133,12 +136,14 @@ struct CalibrateSheet: View {
                 .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
             Text("This catches a head that pans the other way: pointing straight out, that looks right.")
                 .font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Button("Yes", systemImage: "checkmark") { advance() }
+            VStack(alignment: .leading, spacing: 6) {
+                Button("Yes, There", systemImage: "checkmark") { advance() }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                 ForEach(c?.faults ?? [], id: \.self) { f in
-                    Button("\(f.seen.prefix(1).uppercased() + f.seen.dropFirst())") {
+                    Button {
                         fix(id, f.fix, HangCheckPanel.cause[f.fix] ?? f.fix)
+                    } label: {
+                        Text("No, it points \(f.seen)").fixedSize()
                     }
                 }
             }
@@ -190,8 +195,10 @@ struct CalibrateSheet: View {
             step = all[i + 1]
             Task { await light() }
         } else if index + 1 < target.fixtures.count {
+            confirmed.insert(id)
             go(index + 1)
         } else {
+            confirmed.insert(id)
             switchOff()
             saved()
             dismiss()
@@ -259,8 +266,9 @@ struct CalibrateSheet: View {
             do {
                 let fields = try await model.api.hangCheckFix(layout: layout, fixture: id, fix: seen)
                 let any = try JSONSerialization.jsonObject(with: JSONEncoder().encode(fields)) as? [String: Any] ?? [:]
-                try await update(id) { f in f.merge(any) { _, new in new } }
+                let also = try await update(id, keys: Array(any.keys)) { f in f.merge(any) { _, new in new } }
                 fixed[id, default: []].append(what)
+                for o in also { fixed[o, default: []].append("\(what) (as \(id))") }
                 await light()
             } catch { note = error.localizedDescription }
         }
@@ -273,24 +281,42 @@ struct CalibrateSheet: View {
         Task {
             defer { busy = false }
             do {
-                try await update(id) { f in f["reverse"] = (f["reverse"] as? Bool ?? false) ? nil : true }
+                let also = try await update(id, keys: ["reverse"]) { f in f["reverse"] = (f["reverse"] as? Bool ?? false) ? nil : true }
                 fixed[id, default: []].append("its cells the other way round")
+                for o in also { fixed[o, default: []].append("its cells the other way round (as \(id))") }
                 await light()
             } catch { note = error.localizedDescription }
         }
     }
 
-    /// A change to one fixture, saved at once (the engine splits it into the set and the rig).
-    private func update(_ id: String, _ body: (inout [String: Any]) -> Void) async throws {
+    /// A change to one fixture, its `keys` then copied to the siblings of its model in the set that weren't said
+    /// right or put right on their own yet (hung alike, they are wrong alike); saved at once (the engine splits it
+    /// into the set and the rig). Returns the siblings it went to.
+    @discardableResult
+    private func update(_ id: String, keys: [String], _ body: (inout [String: Any]) -> Void) async throws -> [String] {
         var l = layout
         var fixtures = l["fixtures"] as? [[String: Any]] ?? []
-        guard let i = fixtures.firstIndex(where: { $0["id"] as? String == id }) else { return }
+        guard let i = fixtures.firstIndex(where: { $0["id"] as? String == id }) else { return [] }
         body(&fixtures[i])
+        var also: [String] = []
+        for j in fixtures.indices where j != i && fixtures[j]["fixture"] as? String == fixtures[i]["fixture"] as? String {
+            guard let sid = fixtures[j]["id"] as? String, !confirmed.contains(sid) else { continue }
+            for k in keys { fixtures[j][k] = fixtures[i][k] }
+            also.append(sid)
+        }
         l["fixtures"] = fixtures
         try await model.api.saveRig(l, rigName: rig, setName: set)
         layout = l
+        confirmed.insert(id)
         try await refreshChecks()
         model.reloadSets()
+        return also
+    }
+
+    /// The siblings a fix of this one went to, in words.
+    private func siblingNote(_ id: String) -> String {
+        let others = target.fixtures.filter { $0 != id && (fixed[$0] ?? []).contains { $0.hasSuffix("(as \(id))") } }
+        return others.isEmpty ? "" : ", and for \(others.joined(separator: ", ")) too"
     }
 
     private func fixture(_ id: String) -> [String: Any]? {

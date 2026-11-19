@@ -28,6 +28,7 @@ public sealed class CalibrateSheet
     string _order = "";          // which end of the bar red should be at
     string _output = "";
     readonly Dictionary<string, List<string>> _fixed = [];   // what was put right, per fixture
+    readonly HashSet<string> _confirmed = [];   // said right, or put right on its own: siblings' fixes pass it by
     string? _note;
     string? _error;
     bool _busy;
@@ -107,7 +108,7 @@ public sealed class CalibrateSheet
                 UI.Text(_target.Name).Secondary(),
                 UI.Spacer(),
                 _target.Fixtures.Count > 0 ? UI.Text($"{_index + 1} of {_target.Fixtures.Count}").Secondary() : null),
-            UI.Text($"Stand where the audience would be, facing the stage. Each one lights as it hangs on {_rig}; say what the real one does and it is put right.",
+            UI.Text($"Stand where the audience would be, facing the stage. Each one lights as it hangs on {_rig}; say what the real one does and it is put right, and the others of this model with it (except those you already went through).",
                     Font.Callout).Secondary().Wrap()
         ).Margin(0, 0, 0, 12);
     }
@@ -128,7 +129,7 @@ public sealed class CalibrateSheet
         else if (_step is { } step)
             foreach (var part in StepView(id, step)) panel.Children.Add(part);
         if (_fixed.TryGetValue(id, out var done) && done.Count > 0)
-            panel.Children.Add(Form.Note("checkmark.circle.fill", $"Put right: {string.Join(", ", done)}. Saved.", Tint.Green));
+            panel.Children.Add(Form.Note("checkmark.circle.fill", $"Put right: {string.Join(", ", done)}. Saved{SiblingNote(id)}.", Tint.Green));
         if (_note is { } n) panel.Children.Add(UI.Text(n, Font.Callout).Foreground(Tint.Orange).Wrap());
         if (_output.Length > 0) panel.Children.Add(UI.Text(_output, Font.Caption).Secondary().Lines(1));
         panel.Alignment = 0;
@@ -160,8 +161,8 @@ public sealed class CalibrateSheet
                 yield return Form.Note("light.beacon.max", c is { Expect.Length: > 0 } ? c.Expect : "Its beam points to one side.", null, Font.Callout).Bold();
                 yield return UI.Text("This catches a head that pans the other way: pointing straight out, that looks right.", Font.Caption).Secondary().Wrap();
                 yield return Buttons([
-                    UI.Button("Yes", Advance, "checkmark").Prominent(),
-                    .. (c?.Faults ?? []).Select(f => UI.Button(Capitalised(f.Seen),
+                    UI.Button("Yes, There", Advance, "checkmark").Prominent(),
+                    .. (c?.Faults ?? []).Select(f => UI.Button($"No, it points {f.Seen}",
                                                                () => Fix(id, f.Fix, HangCheckPanel.Cause.GetValueOrDefault(f.Fix) ?? f.Fix))),
                 ]);
                 break;
@@ -182,7 +183,6 @@ public sealed class CalibrateSheet
         return row;
     }
 
-    static string Capitalised(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     void Footer()
     {
@@ -220,8 +220,8 @@ public sealed class CalibrateSheet
             Render();
             _ = Light();
         }
-        else if (_index + 1 < _target.Fixtures.Count) Go(_index + 1);
-        else _dialog.Hide();   // Closed: switched off, saved()
+        else if (_index + 1 < _target.Fixtures.Count) { _confirmed.Add(id); Go(_index + 1); }
+        else { _confirmed.Add(id); _dialog.Hide(); }   // Closed: switched off, saved()
     }
 
     void Go(int i)
@@ -310,8 +310,9 @@ public sealed class CalibrateSheet
         try
         {
             var fields = await _model.Api.HangCheckFix(_layout, id, seen);
-            await Update(id, f => { foreach (var (k, v) in fields) f[k] = v; });
+            var also = await Update(id, [.. fields.Keys], f => { foreach (var (k, v) in fields) f[k] = v; });
             Fixed(id, what);
+            foreach (var o in also) Fixed(o, $"{what} (as {id})");
             await Light();
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
@@ -325,11 +326,12 @@ public sealed class CalibrateSheet
         SetBusy(true);
         try
         {
-            await Update(id, f =>
+            var also = await Update(id, ["reverse"], f =>
             {
                 if (f.GetValueOrDefault("reverse")?.Bool ?? false) f.Remove("reverse"); else f["reverse"] = JSONValue.True;
             });
             Fixed(id, "its cells the other way round");
+            foreach (var o in also) Fixed(o, $"its cells the other way round (as {id})");
             await Light();
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
@@ -349,17 +351,37 @@ public sealed class CalibrateSheet
         Footer();
     }
 
-    /// A change to one fixture, saved at once (the engine splits it into the set and the rig).
-    async Task Update(string id, Action<Dictionary<string, JSONValue>> body)
+    /// A change to one fixture, its `keys` then copied to the siblings of its model in the set that weren't said
+    /// right or put right on their own yet (hung alike, they are wrong alike); saved at once (the engine splits it
+    /// into the set and the rig). Returns the siblings it went to.
+    async Task<List<string>> Update(string id, string[] keys, Action<Dictionary<string, JSONValue>> body)
     {
         var fixtures = SetLayout.Fixtures(_layout);
-        if (fixtures.FirstOrDefault(f => Patch.Id(f) == id) is not { } f) return;
+        if (fixtures.FirstOrDefault(f => Patch.Id(f) == id) is not { } f) return [];
         body(f);
+        var model = f.GetValueOrDefault("fixture")?.String;
+        var also = new List<string>();
+        foreach (var o in fixtures)
+        {
+            if (ReferenceEquals(o, f) || o.GetValueOrDefault("fixture")?.String != model || _confirmed.Contains(Patch.Id(o))) continue;
+            foreach (var k in keys)
+                if (f.TryGetValue(k, out var v)) o[k] = v; else o.Remove(k);
+            also.Add(Patch.Id(o));
+        }
         var l = SetLayout.WithFixtures(_layout, fixtures);
         await _model.Api.SaveRig(l, _rig, _set);
         _layout = l;
+        _confirmed.Add(id);
         await RefreshChecks();
         _model.ReloadSets();
+        return also;
+    }
+
+    /// The siblings a fix of this one went to, in words.
+    string SiblingNote(string id)
+    {
+        var others = _target.Fixtures.Where(o => o != id && (_fixed.GetValueOrDefault(o) ?? []).Any(w => w.EndsWith($"(as {id})"))).ToList();
+        return others.Count == 0 ? "" : $", and for {string.Join(", ", others)} too";
     }
 
     Dictionary<string, JSONValue>? Fixture(string id) => SetLayout.Fixtures(_layout).FirstOrDefault(f => Patch.Id(f) == id);
