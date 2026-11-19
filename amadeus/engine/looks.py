@@ -264,7 +264,16 @@ class LooksMixin:
             return "accent" if self._featured(d, j) else "base"
         return None
 
+    def _grouping(self, d: Decision) -> str:
+        """How the heads' groups act in this look. A rig with one group of heads acts as one, but it can still play
+        a solo: one mirrored pair lit, the rest dark (it needs two pairs at least)."""
+        if self.multi:
+            return d.grouping
+        return "solo" if d.grouping == "solo" and len(self.head_pairs) >= 2 else "unison"
+
     def _featured(self, d: Decision, j: int) -> bool:
+        if not self.multi:  # one group: the solo goes round the pairs, a phrase each
+            return self.heads[j]["id"] in self.head_pairs[d.phrase % len(self.head_pairs)]
         hg = self.hgroup[j]
         return d.featured in (hg["cls"], hg["name"])
 
@@ -272,7 +281,7 @@ class LooksMixin:
         """What head j does in this decision: its movement/formation and the scope its formation is
         measured in (the whole rig, or its own group)."""
         n = len(self.heads)
-        grouping = d.grouping if self.multi else "unison"
+        grouping = self._grouping(d)
         mv, f = d.movement, d.formation
         if grouping == "split" and not self._featured(d, j):
             mv, f = d.movement2, d.formation2
@@ -599,13 +608,24 @@ class LooksMixin:
         else:
             v = stab_env(self.stab_t, self.stab_s, t)
         col = (1.0, 1.0, 1.0) if d.section == "drop" and d.intensity >= 3 else accent
+        dark = self._dark_heads(d)  # heads the look keeps dark stay dark on the stabs too
         for eid in players or lights:
+            if eid in dark:
+                continue
             s = out[eid]
             if solo:
                 if v > s.dimmer:
                     s.dimmer, (s.r, s.g, s.b) = v, col
             else:
                 s.dimmer, (s.r, s.g, s.b), s.white = v, col, 0.0
+
+    def _dark_heads(self, d: Decision) -> set[str]:
+        """The heads this look keeps dark: all of them while the pars carry the look alone, the others in a solo."""
+        if d.head_light == "off" and self.pars:
+            return {e["id"] for e in self.heads}
+        if self._grouping(d) == "solo":
+            return {e["id"] for j, e in enumerate(self.heads) if not self._featured(d, j)}
+        return set()
 
     def _break_at(self, t: float):
         """The kick break t falls in, if any: (start, end, kick_returns)."""
@@ -620,7 +640,7 @@ class LooksMixin:
             self._bs = [b[0] for b in self.kick_breaks]
         return self._bs
 
-    def _kick_return(self, t: float, states: dict[str, State]) -> None:
+    def _kick_return(self, t: float, states: dict[str, State], skip=frozenset()) -> None:
         """The kick comes back after a break: a breath of darkness just before (after a break of two bars or
         more), then everything hits on the downbeat: full, with a white flash, settling over one beat. A real
         drop has its own, bigger moment (_drop_moment), and inside a snare roll the lights play the roll."""
@@ -641,7 +661,7 @@ class LooksMixin:
                 boost, flash = 1.0 - since / period, math.exp(-since / 0.15)
                 blinders = set(self.blinder_ids)  # (they keep to the heaviest moments: engine/blinders.py)
                 for eid, s in states.items():
-                    if eid in blinders:
+                    if eid in blinders or eid in skip:
                         continue
                     s.dimmer = max(s.dimmer, boost)
                     s.white = max(s.white, flash)
@@ -718,6 +738,7 @@ class LooksMixin:
         units = sections.parts(self.sections, 2, heads)
         base = sections.share_out(units, 2)[1] if len(units) >= 2 else []
         self.layer_base = {eid: eid in base for eid in heads} if base else {}
+        self.head_pairs = sections.parts(self.sections, math.inf, heads)  # mirrored pairs of heads (solos)
         at = {eid: j for j, eid in enumerate(heads)}
         self.camera_parts = [[at[eid] for eid in u] for u in sections.parts(self.sections, CAMERA_UNITS, heads)]
 
@@ -842,7 +863,7 @@ class LooksMixin:
         head_trig = getattr(d, "head_trigger", "same")
         if head_trig not in ("same", d.trigger):  # layering: heads pulse on their own rhythm
             env, hit = self._note(head_trig, t)
-        grouping = d.grouping if self.multi else "unison"
+        grouping = self._grouping(d)
         head_pattern = pattern if grouping == "unison" else "all"  # groups acting apart have their own roles
         rank, nh = self._x_rank(self.heads), len(self.heads)
         for j, f in enumerate(self.heads):
@@ -854,8 +875,11 @@ class LooksMixin:
             step = bar // 4 if cv is not None and cv < 0.5 else bar  # little colour variety: a slower cycle
             slot = self.turn.get(f["id"], (j, nh))[0]  # a section plays as one, left and right alike
             cycle = cols[(slot + step) % len(cols)]
-            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cycle}[hc]
+            side = base if self.head_pos[j][0] <= self.stage["width_m"] / 2 else accent  # stage left | stage right
+            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cycle, "sides": side}[hc]
             hl = d.head_light
+            if hl == "off" and not self.pars:  # nothing else to carry the look: the heads keep a pulse
+                hl = "pulse"
             if hl == "hammer":
                 hl = "strobe" if self._hammering(d, t) else "pulse"
             on = kick_turn(head_pattern, *self._turn(head_pattern, f["id"], rank[f["id"]], nh), hit)
@@ -896,7 +920,7 @@ class LooksMixin:
             elif layer == "accent" and hc == "base":
                 col = accent  # accents stand out from the carpet
             if grouping == "solo" and not self._featured(d, j):
-                dim *= 0.1  # the others wait, barely glowing
+                dim = 0.0  # the others wait dark: one beam in the room
             elif grouping == "chase":  # one group lit per beat, in turn
                 dim *= 1.0 if beat % max(len(self.groups), 1) == self.hgroup[j]["g"] else 0.12
             voice = self._voice(d, f["id"]) if dembow and hl != "off" else ""
