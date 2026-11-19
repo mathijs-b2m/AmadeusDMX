@@ -163,7 +163,7 @@ def test_a_track_just_loaded_is_found_by_title_and_kept_once_the_library_knows_i
     link = fetcher.folder / "Britney Spears - Toxic [spotify-6I9].webm"
     assert link.read_bytes() == Path(copy).read_bytes()  # found by its own name next time
     assert link.is_symlink() or sys.platform == "win32"  # (Windows without the right: a hard link or a copy)
-    assert fetcher.file(TOXIC) == str(link)
+    assert fetcher.file(TOXIC) == copy  # the path the deck's show was made from: not decoded, analysed, planned again
 
 
 def test_a_guess_that_is_another_version_is_fetched_again_by_isrc(fetcher):
@@ -172,12 +172,51 @@ def test_a_guess_that_is_another_version_is_fetched_again_by_isrc(fetcher):
     guess = streamed.guessed("Toxic", "Britney Spears", 200.0)
     fetcher.file(guess)
     wait(fetcher, guess)
-    assert fetcher.file(guess)  # taken: the clocks can't tell 200.4 from 200
+    old = fetcher.file(guess)
+    assert old  # taken: the clocks can't tell 200.4 from 200
+    gate = []
+    search = fetcher._search
+
+    def slow(s):
+        while not gate:
+            time.sleep(0.01)
+        return search(s)
+
     fake(fetcher, {"same": 198.82}, calls)
-    assert fetcher.file(TOXIC) == ""  # 1.6 s off the exact length: another version, fetched again
+    search, fetcher._search = fetcher._search, slow
+    assert fetcher.file(TOXIC) == old  # 1.6 s off the exact length: fetched again, the guess's show lights it meanwhile
+    assert fetcher.file(TOXIC) == old and fetcher.state[TOXIC.id] in ("waiting", "running")
+    gate.append(1)
     wait(fetcher, TOXIC)
     assert fetcher.file(TOXIC).endswith("[spotify-6I9].webm")
-    assert not list(fetcher.folder.glob("*streamed-*"))
+    assert not list(fetcher.folder.glob("*streamed-*"))  # the other version is gone once the exact copy is in
+
+
+def test_a_guess_that_found_no_exact_copy_keeps_its_own(fetcher):
+    fake(fetcher, {"edit": 200.4}, [])
+    guess = streamed.guessed("Toxic", "Britney Spears", 200.0)
+    fetcher.file(guess)
+    wait(fetcher, guess)
+    old = fetcher.file(guess)
+    fake(fetcher, {"extended": 260.0}, [])
+    fetcher.file(TOXIC)
+    wait(fetcher, TOXIC)
+    assert fetcher.state[TOXIC.id] == "failed" and fetcher.file(TOXIC) == old  # better than a dark deck
+
+
+def test_a_guess_looks_further_than_the_clocks_slack(fetcher):
+    """A copy 1.9 s off the deck's clock is within a guess's slack, but too far to be sure: the next candidate
+    is tried, and the closer one kept (else djay's exact length throws the first one out once it plays)."""
+    calls = []
+    fake(fetcher, {"other": 198.1, "label": 199.8}, calls)
+    guess = streamed.guessed("Toxic", "Britney Spears", 200.0)
+    fetcher.file(guess)
+    wait(fetcher, guess)
+    assert [c for c in calls if c[0] == "download"] == [("download", "other"), ("download", "label")]
+    assert sorted(p.name for p in fetcher.folder.iterdir()) == [
+        f"Britney Spears - Toxic [streamed-{guess.id}].json",
+        f"Britney Spears - Toxic [streamed-{guess.id}].webm",
+    ]
 
 
 def test_saved_settings_and_the_command_line(tmp_path):

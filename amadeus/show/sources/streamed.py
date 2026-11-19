@@ -345,6 +345,7 @@ class Fetcher:
         self.why: dict[str, str] = {}
         self.offline_at: dict[str, float] = {}  # stream id → when its fetch failed for want of a connection
         self.asked: dict[str, float] = {}  # stream id → when a deck last asked for it
+        self.stand_in: dict[str, Path] = {}  # stream id → the guess's copy (another version) lighting it meanwhile
         self.last = 0.0  # when we last asked YouTube anything
         self.lock = threading.Lock()
         threading.Thread(target=self._work, daemon=True, name="fetch").start()
@@ -354,10 +355,17 @@ class Fetcher:
         return f"{safe} [{s.service}-{s.id}]"
 
     def cached(self, s: Stream) -> str:
+        """The copy's path. A guess's copy linked under s's name is given by its own path: the one the deck's
+        show was prepared from (another path, and the decode, the analysis and the plans would all start over)."""
         if self.folder.is_dir():
             for f in self.folder.glob(glob.escape(self._stem(s)) + ".*"):
                 if f.suffix not in {".json", ".part", ".ytdl"} and f.stem == self._stem(s):
-                    return str(f)
+                    try:
+                        of = json.loads(f.with_suffix(".json").read_text(encoding="utf-8")).get("copy_of")
+                    except (OSError, ValueError):
+                        of = None
+                    original = self.folder / of if isinstance(of, str) and of else None
+                    return str(original) if original and original.is_file() else str(f)
         return ""
 
     def file(self, s: Stream) -> str:
@@ -365,7 +373,13 @@ class Fetcher:
         self.asked[s.id] = time.monotonic()
         if (self.state.get(s.id) == "done" or s.id not in self.state) and (f := self.cached(s)):
             self.state[s.id] = "done"
+            if old := self.stand_in.pop(s.id, None):  # the exact copy is in: the other version goes
+                old.unlink(missing_ok=True)
+                old.with_suffix(".json").unlink(missing_ok=True)
             return f
+        if s.id in self.stand_in and self.stand_in[s.id].is_file():
+            self._queue(s)  # (a fetch that failed for want of a connection: once more, later)
+            return str(self.stand_in[s.id])  # the exact copy on its way: the guess's show plays on meanwhile
         if not s.guess and s.id not in self.state:  # perhaps found by its title before the library knew it
             g = guessed(s.title, s.artist, s.length)
             if self.state.get(g.id) in ("waiting", "running"):
@@ -373,17 +387,21 @@ class Fetcher:
                 return ""  # that copy is on its way: checked against this one when it is in
             if f := self._adopt(s, g):
                 return f
+        self._queue(s)
+        return str(self.stand_in[s.id]) if s.id in self.stand_in else ""
+
+    def _queue(self, s: Stream):
         with self.lock:
             if s.id in self.offline_at and time.monotonic() - self.offline_at[s.id] > OFFLINE_RETRY_S:
                 del self.offline_at[s.id], self.state[s.id]  # perhaps back online: once more
             if s.id not in self.state:
                 self.state[s.id] = "waiting"
                 self.queue.put(s)
-        return ""
 
     def _adopt(self, s: Stream, g: Stream) -> str:
         """The guess's copy, when it is the same recording as `s` (its length): kept under its own name (the
-        show made from it plays on), and linked under s's (found next time). "": none, or another version."""
+        show made from it plays on), and linked under s's (found next time). "": none, or another version: then
+        that copy stands in (its show lights the deck) until the exact one, fetched by ISRC, is in."""
         f = self.cached(g)
         if not f:
             return ""
@@ -394,9 +412,8 @@ class Fetcher:
             length = 0.0
         if s.length and length and abs(length - s.length) > LENGTH_MATCH_S:
             print(f"  ⚠ {s.name}: the copy found by its title is another version ({length - s.length:+.1f} s vs "
-                  f"{s.service.title()}): looking again by ISRC", flush=True)  # fmt: skip
-            f.unlink(missing_ok=True)
-            f.with_suffix(".json").unlink(missing_ok=True)
+                  f"{s.service.title()}): looking again by ISRC, its show plays on meanwhile", flush=True)  # fmt: skip
+            self.stand_in[s.id] = f
             self.state.pop(g.id, None)
             return ""
         link = f.with_name(self._stem(s) + f.suffix)
@@ -446,8 +463,8 @@ class Fetcher:
                     best = (off, f, hit, length)
                 else:
                     f.unlink(missing_ok=True)  # another version after all
-                if best and best[0] <= (s.slack if s.guess else EXACT_S):
-                    break  # the same length to the frame (a guess: to the second): the same recording
+                if best and best[0] <= (LENGTH_MATCH_S if s.guess else EXACT_S):
+                    break  # the same length to the frame (a guess: within the clocks' second): the same recording
             if best is None:
                 raise LookupError("no download of the same length")
             off, f, hit, length = best
