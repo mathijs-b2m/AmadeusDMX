@@ -16,11 +16,11 @@ public static class StackLayout
         var out_ = new double[n];
         if (n == 0) return out_;
         var gaps = spacing * (n - 1);
-        double fixedTotal = 0;
+        double fixedTotal = 0, growMin = 0;   // a growing child's Wanted is its least length (a slider's MinWidth)
         var growers = 0;
         for (var i = 0; i < n; i++)
         {
-            if (children[i].Grows) growers++;
+            if (children[i].Grows) { growers++; growMin += children[i].Wanted; }
             else fixedTotal += children[i].Wanted;
         }
         if (double.IsInfinity(room))
@@ -28,8 +28,8 @@ public static class StackLayout
             for (var i = 0; i < n; i++) out_[i] = children[i].Wanted;
             return out_;
         }
-        var over = fixedTotal + gaps - room;
-        if (over > 0)  // too little room: those that can give way do, in proportion to their length
+        var over = fixedTotal + growMin + gaps - room;
+        if (over > 0)  // too little room: those that can give way do, in proportion to their length (growers keep their least)
         {
             double shrinkable = 0;
             for (var i = 0; i < n; i++) if (!children[i].Grows && children[i].Shrinks) shrinkable += children[i].Wanted;

@@ -241,7 +241,9 @@ public static partial class UI
         var buttons = new List<ToggleButton>();
         foreach (var item in items)
         {
-            var b = new ToggleButton { Content = title(item), IsChecked = EqualityComparer<T>.Default.Equals(item, selected), Tag = item };
+            // the title wraps ("Front 90°" on two lines) when the row is too narrow, instead of being cut off
+            var label = new TextBlock { Text = title(item), TextWrapping = TextWrapping.WrapWholeWords, TextAlignment = TextAlignment.Center };
+            var b = new ToggleButton { Content = label, HorizontalContentAlignment = HorizontalAlignment.Center, IsChecked = EqualityComparer<T>.Default.Equals(item, selected), Tag = item };
             b.Click += (_, _) =>
             {
                 foreach (var o in buttons) o.IsChecked = ReferenceEquals(o, b);

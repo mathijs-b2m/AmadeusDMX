@@ -47,7 +47,10 @@ public sealed partial class Stack : Panel
     public static void SetFill(UIElement e, bool v) => e.SetValue(FillProperty, v);
     static bool IsSpacer(UIElement e) => (double)e.GetValue(SpacerProperty) >= 0;
     static double SpacerMin(UIElement e) => Math.Max(0, (double)e.GetValue(SpacerProperty));
-    static bool Shrinks(UIElement e) => e is TextBlock or RichTextBlock;
+    /// Text gives way when room is short, except text given a set width (a value column): it keeps it.
+    bool Shrinks(UIElement e) => e is TextBlock or RichTextBlock && double.IsNaN(Horizontal ? ((FrameworkElement)e).Width : ((FrameworkElement)e).Height);
+    /// A growing child's least length along the stack: its MinWidth (MinHeight in a VStack), so text beside it gives way first.
+    double MinMain(UIElement e) => e is FrameworkElement f && (Horizontal ? f.MinWidth : f.MinHeight) is var m && m > 0 && !double.IsInfinity(m) ? m : 0;
 
     // MARK: layout
 
@@ -73,7 +76,7 @@ public sealed partial class Stack : Panel
             var k = kids[i];
             if (IsSpacer(k)) { k.Measure(Make(0, 0)); wanted[i] = new(SpacerMin(k), Grows: true); continue; }
             var grows = GetGrow(k);
-            if (grows && !double.IsInfinity(room)) { wanted[i] = new(0, Grows: true); continue; }  // measured with its share below
+            if (grows && !double.IsInfinity(room)) { wanted[i] = new(MinMain(k), Grows: true); continue; }  // measured with its share below; never under its MinWidth
             k.Measure(Make(double.PositiveInfinity, crossRoom));
             wanted[i] = new(Main(k.DesiredSize), grows, Shrinks(k));
         }
