@@ -100,7 +100,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
     async void Save()
     {
         try { await editor.Save(_host); }
-        catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(_root?.XamlRoot, "Couldn’t Save", e.Message); }
+        catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(_root?.XamlRoot, L("Couldn’t Save"), e.Message); }
     }
 
     static void Run(Func<Task> op) => _ = op();
@@ -134,11 +134,11 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
     FrameworkElement ChangedOnDisk()
     {
         var row = UI.HStack(10,
-            UI.Label("exclamationmark.triangle", "Saved elsewhere while you were editing", Font.Callout)
-                .Tooltip("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours."),
-            UI.Button("Load Their Changes", editor.TakeChangesOnDisk).Prominent()
-                .Tooltip("Show the rig as it was saved elsewhere. Undo brings your changes back"),
-            UI.Button("Keep Mine", editor.KeepChangesHere).Tooltip("Keep your changes: saving puts them over the other ones"));
+            UI.Label("exclamationmark.triangle", L("Saved elsewhere while you were editing"), Font.Callout)
+                .Tooltip(L("Your AI assistant, the setup page or the command line saved this rig while you have unsaved changes here. Load theirs (Undo brings yours back), or keep yours.")),
+            UI.Button(L("Load Their Changes"), editor.TakeChangesOnDisk).Prominent()
+                .Tooltip(L("Show the rig as it was saved elsewhere. Undo brings your changes back")),
+            UI.Button(L("Keep Mine"), editor.KeepChangesHere).Tooltip(L("Keep your changes: saving puts them over the other ones")));
         return new Border
         {
             Child = row, Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(12),
@@ -154,73 +154,73 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         row.Children.Add(new RigMenu(model, editor).Build());
         row.Children.Add(ToolPicker());
         if (editor.Tool == EditorTool.Truss)
-            row.Children.Add(EditorUI.Stepper(editor, () => string.Format(CultureInfo.InvariantCulture, "at {0:0.0} m", editor.BuildHeight),
+            row.Children.Add(EditorUI.Stepper(editor, () => L("at {0:0.0} m", editor.BuildHeight),
                 () => editor.BuildHeight = Math.Max(1, editor.BuildHeight - 0.25), () => editor.BuildHeight = Math.Min(15, editor.BuildHeight + 0.25),
-                "The height a new truss goes up to"));
+                L("The height a new truss goes up to")));
         else if (editor.Tool == EditorTool.Tower)
-            row.Children.Add(EditorUI.Stepper(editor, () => string.Format(CultureInfo.InvariantCulture, "{0:0.0} m tall", editor.TowerHeight),
+            row.Children.Add(EditorUI.Stepper(editor, () => L("{0:0.0} m tall", editor.TowerHeight),
                 () => editor.TowerHeight = Math.Max(1, editor.TowerHeight - 0.5), () => editor.TowerHeight = Math.Min(12, editor.TowerHeight + 0.5),
-                "How tall a new tower is"));
+                L("How tall a new tower is")));
 
-        row.Children.Add(UI.MenuButton(UI.Label("square.split.bottomrightquarter", "Truss"), () => UI.Menu([
-            UI.Note("Box truss (quatro, 30 cm)"),
-            .. TrussLengths.Select(l => UI.Item($"{(int)l} m", () => editor.AddTruss(l))),
+        row.Children.Add(UI.MenuButton(UI.Label("square.split.bottomrightquarter", L("Truss")), () => UI.Menu([
+            UI.Note(L("Box truss (quatro, 30 cm)")),
+            .. TrussLengths.Select(l => UI.Item(L("{0} m", (int)l), () => editor.AddTruss(l))),
             UI.Separator(),
-            UI.Note("Round truss (circle)"),
-            .. Truss.RingDiameters.Select(dm => UI.Item($"Ø {(int)dm} m circle", () => editor.AddRing(dm))),
+            UI.Note(L("Round truss (circle)")),
+            .. Truss.RingDiameters.Select(dm => UI.Item(L("Ø {0} m circle", (int)dm), () => editor.AddRing(dm))),
             UI.Separator(),
-            UI.Note("Half circle"),
-            .. Truss.RingDiameters.Select(dm => UI.Item($"Ø {(int)dm} m half circle", () => editor.AddRing(dm, 180))),
+            UI.Note(L("Half circle")),
+            .. Truss.RingDiameters.Select(dm => UI.Item(L("Ø {0} m half circle", (int)dm), () => editor.AddRing(dm, 180))),
             UI.Separator(),
-            UI.Note("Carré (on four legs)"),
-            .. Truss.CarreSizes.Select(c => UI.Item($"{(int)c.W} × {(int)c.D} m carré", () => editor.AddCarre(c.W, c.D))),
+            UI.Note(L("Carré (on four legs)")),
+            .. Truss.CarreSizes.Select(c => UI.Item(L("{0} × {1} m carré", (int)c.W, (int)c.D), () => editor.AddCarre(c.W, c.D))),
             UI.Separator(),
-            UI.Note("Scaffold (a wall of tube)"),
-            .. Truss.ScaffoldSizes.Select(s => UI.Item($"{(int)s.W} × {(int)s.H} m scaffold", () => editor.AddScaffold(s.W, s.H))),
+            UI.Note(L("Scaffold (a wall of tube)")),
+            .. Truss.ScaffoldSizes.Select(s => UI.Item(L("{0} × {1} m scaffold", (int)s.W, (int)s.H), () => editor.AddScaffold(s.W, s.H))),
             UI.Separator(),
-            UI.Note("Tower"),
-            .. TowerLengths.Select(l => UI.Item($"{(int)l} m tower", () => editor.AddTruss(l, vertical: true))),
+            UI.Note(L("Tower")),
+            .. TowerLengths.Select(l => UI.Item(L("{0} m tower", (int)l), () => editor.AddTruss(l, vertical: true))),
             UI.Separator(),
-            UI.Note("Light stands (bar on tripods)"),
+            UI.Note(L("Light stands (bar on tripods)")),
             .. Truss.StandPresets.Select(p => UI.Item(p.Title, () => editor.AddStand(p))),
-        ])).Tooltip("Add a truss or a tower"));
+        ])).Tooltip(L("Add a truss or a tower")));
 
-        row.Children.Add(UI.MenuButton(UI.Label("square.dashed", "Zone"), () => UI.Menu([
-            UI.Note("Artistic (moving heads)"),
+        row.Children.Add(UI.MenuButton(UI.Label("square.dashed", L("Zone")), () => UI.Menu([
+            UI.Note(L("Artistic (moving heads)")),
             .. new[] { RigEditorModel.ZonePreset.Wall, RigEditorModel.ZonePreset.FloorArea, RigEditorModel.ZonePreset.KeepIn }
                 .Select(p => UI.Item(RigEditorModel.Title(p), () => editor.AddZone(p), RigEditorModel.Symbol(p))),
             UI.Separator(),
-            UI.Note("Safety (lasers)"),
+            UI.Note(L("Safety (lasers)")),
             .. new[] { RigEditorModel.ZonePreset.LaserAudience, RigEditorModel.ZonePreset.LaserPlane }
                 .Select(p => UI.Item(RigEditorModel.Title(p), () => editor.AddZone(p), RigEditorModel.Symbol(p))),
-        ])).Tooltip("Draw a zone: where beams may not go (or may only go)"));
+        ])).Tooltip(L("Draw a zone: where beams may not go (or may only go)")));
 
         row.Children.Add(AutoMountButton());
 
         if (d.Set.Length > 0)
         {
-            var check = UI.IconButton("checklist", "The check after hanging: light the fixtures one by one in the hang sheet's order, and put right what was hung the wrong way in the app",
+            var check = UI.IconButton("checklist", L("The check after hanging: light the fixtures one by one in the hang sheet's order, and put right what was hung the wrong way in the app"),
                 () => Run(() => editor.Check is null ? editor.StartCheck(_host) : editor.StopCheck(_host)))
                 .Disabled(editor.Busy || d.Fixtures.Count == 0);
             if (editor.Check is not null) check.Prominent();
             row.Children.Add(check);
-            row.Children.Add(UI.IconButton("printer", "The hang sheet for the crew: where every fixture goes on which truss, which way round, its DMX address, and labels to stick on them. Opens in your browser to print or save as PDF",
+            row.Children.Add(UI.IconButton("printer", L("The hang sheet for the crew: where every fixture goes on which truss, which way round, its DMX address, and labels to stick on them. Opens in your browser to print or save as PDF"),
                 () => Run(() => editor.HangSheet(_host))).Disabled(editor.Busy || d.Fixtures.Count == 0));
         }
 
         if (editor.Drawings.Count > 0) row.Children.Add(DrawingsMenu());
 
         row.Children.Add(IconToggle(editor.ShowZones ? "eye" : "eye.slash", editor.ShowZones, v => editor.ShowZones = v,
-                                    "Show or hide the zones (a selected zone always shows)"));
+                                    L("Show or hide the zones (a selected zone always shows)")));
         row.Children.Add(IconToggle("squareshape.split.3x3", editor.Snap, v => editor.Snap = v,
-                                    "Snap to the 25 cm grid and onto trusses (hold Alt while dragging to place freely)"));
+                                    L("Snap to the 25 cm grid and onto trusses (hold Alt while dragging to place freely)")));
         var end = UI.HStack(8);
         if (editor.Busy) end.Children.Add(UI.Spinner());
         var message = UI.Text("", Font.Callout).Secondary().Bind(editor, nameof(RigEditorModel.Message), t => t.Text = editor.Message ?? "");
         message.MaxWidth = 240;
         end.Children.Add(message);
-        end.Children.Add(UI.Button("Revert", editor.Revert).Disabled(!editor.IsDirty));
-        end.Children.Add(UI.Button("Save", Save).Prominent().Disabled(!editor.IsDirty).Tooltip("Save the rig, and where the set hangs on it (Ctrl+S)"));
+        end.Children.Add(UI.Button(L("Revert"), editor.Revert).Disabled(!editor.IsDirty));
+        end.Children.Add(UI.Button(L("Save"), Save).Prominent().Disabled(!editor.IsDirty).Tooltip(L("Save the rig, and where the set hangs on it (Ctrl+S)")));
         end.VerticalAlignment = VerticalAlignment.Top;
         var bar = new Grid { ColumnSpacing = 8 };
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -235,7 +235,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
     FrameworkElement ToolPicker()
     {
         (EditorTool Tool, string Symbol, string Title)[] tools =
-            [(EditorTool.Select, "cursorarrow", "Select"), (EditorTool.Truss, "line.diagonal", "Draw Truss"), (EditorTool.Tower, "arrow.up.to.line", "Place Tower")];
+            [(EditorTool.Select, "cursorarrow", L("Select")), (EditorTool.Truss, "line.diagonal", L("Draw Truss")), (EditorTool.Tower, "arrow.up.to.line", L("Place Tower"))];
         var row = UI.HStack(2);
         foreach (var (tool, symbol, title) in tools)
         {
@@ -244,7 +244,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             b.Click += (_, _) => editor.Tool = tool;
             row.Children.Add(b);
         }
-        return row.Tooltip("Select and move · Draw a truss on the floor (T) · Click to set a tower · Esc: back to select");
+        return row.Tooltip(L("Select and move · Draw a truss on the floor (T) · Click to set a tower · Esc: back to select"));
     }
 
     static ToggleButton IconToggle(string symbol, bool on, Action<bool> changed, string help)
@@ -261,14 +261,14 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         var waiting = d.WaitingCount;
         var selected = editor.SelectedFixtures.ToList();
         var menu = UI.Menu(
-            UI.Item($"Mount the {waiting} Waiting", () => Run(() => editor.AutoMount(_host)), "wand.and.stars").Disabled(waiting == 0),
-            selected.Count > 0 ? UI.Item($"Re-Mount the Selected {selected.Count}", () => Run(() => editor.AutoMount(_host, selected)), "arrow.triangle.2.circlepath") : null,
-            UI.Item("Put in Name Order", () => Run(() => editor.PutInOrder(_host)), "list.number").Disabled(d.Fixtures.Count == d.WaitingCount)
-                .Tooltip("The fixtures stay on their spots, but in name order along the rig: top1 at the first place, top2 at the next"),
+            UI.Item(L("Mount the {0} Waiting", waiting), () => Run(() => editor.AutoMount(_host)), "wand.and.stars").Disabled(waiting == 0),
+            selected.Count > 0 ? UI.Item(L("Re-Mount the Selected {0}", selected.Count), () => Run(() => editor.AutoMount(_host, selected)), "arrow.triangle.2.circlepath") : null,
+            UI.Item(L("Put in Name Order"), () => Run(() => editor.PutInOrder(_host)), "list.number").Disabled(d.Fixtures.Count == d.WaitingCount)
+                .Tooltip(L("The fixtures stay on their spots, but in name order along the rig: top1 at the first place, top2 at the next")),
             UI.Separator(),
-            UI.Item("Re-Mount Everything", () => Run(() => editor.AutoMount(_host, all: true)), "arrow.counterclockwise"));
-        var b = new SplitButton { Content = UI.Label("wand.and.stars", "Auto-Mount"), Flyout = menu }
-            .Tooltip("Hang the fixtures that wait in front of the stage: heads on the trusses, lasers high at the back, bars on the floor…");
+            UI.Item(L("Re-Mount Everything"), () => Run(() => editor.AutoMount(_host, all: true)), "arrow.counterclockwise"));
+        var b = new SplitButton { Content = UI.Label("wand.and.stars", L("Auto-Mount")), Flyout = menu }
+            .Tooltip(L("Hang the fixtures that wait in front of the stage: heads on the trusses, lasers high at the back, bars on the floor…"));
         b.Click += (_, _) => Run(() => editor.AutoMount(_host, all: editor.Doc.WaitingCount == 0));
         b.IsEnabled = !(editor.Busy || d.Fixtures.Count == 0);
         return b;
@@ -284,33 +284,33 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         {
             var drawings = editor.Drawings;
             var items = new List<MenuFlyoutItemBase?>();
-            if (drawings.Count > 1) items.Add(UI.Note("Show"));
+            if (drawings.Count > 1) items.Add(UI.Note(L("Show|verb")));  // show these drawings, not the Show menu
             foreach (var u in drawings)
             {
-                var shown = new ToggleMenuFlyoutItem { Text = drawings.Count == 1 ? $"Show “{u.Name}”" : u.Name, IsChecked = editor.IsShown(u) };
+                var shown = new ToggleMenuFlyoutItem { Text = drawings.Count == 1 ? L("Show “{0}”", u.Name) : u.Name, IsChecked = editor.IsShown(u) };
                 shown.Click += (_, _) => editor.SetShown(u, shown.IsChecked);
                 items.Add(shown.Tooltip(u.Source));
             }
             items.Add(UI.Separator());
-            items.Add(UI.Note("Opacity"));
+            items.Add(UI.Note(L("Opacity")));
             foreach (var o in RigEditorModel.Opacities)
-                items.Add(UI.Choice($"{o * 100:0} %", "drawingOpacity", Math.Abs(editor.DrawingOpacity - o) < 0.01, () => editor.DrawingOpacity = o));
+                items.Add(UI.Choice(L("{0:0} %", o * 100), "drawingOpacity", Math.Abs(editor.DrawingOpacity - o) < 0.01, () => editor.DrawingOpacity = o));
             items.Add(UI.Separator());
             if (drawings.Count == 1)
             {
                 var u = drawings[0];
-                items.Add(UI.Item("Line Up…", () => LineUp(u), "ruler"));
-                items.Add(UI.Item("Remove…", () => RemoveDrawing(u), "trash"));
+                items.Add(UI.Item(L("Line Up…"), () => LineUp(u), "ruler"));
+                items.Add(UI.Item(L("Remove…"), () => RemoveDrawing(u), "trash"));
             }
             else
             {
-                items.Add(UI.SubMenu("Line Up", [.. drawings.Select(u => UI.Item($"{u.Name}…", () => LineUp(u)))]));
-                items.Add(UI.SubMenu("Remove", [.. drawings.Select(u => UI.Item($"{u.Name}…", () => RemoveDrawing(u)))]));
+                items.Add(UI.SubMenu(L("Line Up"), [.. drawings.Select(u => UI.Item(L("{0}…", u.Name), () => LineUp(u)))]));
+                items.Add(UI.SubMenu(L("Remove"), [.. drawings.Select(u => UI.Item(L("{0}…", u.Name), () => RemoveDrawing(u)))]));
             }
             return UI.Menu([.. items]);
         }
-        var b = UI.MenuButton(UI.Label("doc.richtext", "Drawings"), Menu)
-            .Tooltip("The venue's drawings under the rig (from the import): show or hide them, line one up with the stage, remove one. Best seen from Plan view");
+        var b = UI.MenuButton(UI.Label("doc.richtext", L("Drawings")), Menu)
+            .Tooltip(L("The venue's drawings under the rig (from the import): show or hide them, line one up with the stage, remove one. Best seen from Plan view"));
         b.IsEnabled = !editor.Busy;
         return b;
     }
@@ -322,22 +322,22 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         if (root is null) return;
         if (editor.Picture(u) is not { } picture)
         {
-            await EditorUI.Alert(root, "Couldn’t Show the Drawing", "Its page isn’t there yet: the engine's setup service may still be starting. Try again in a moment.");
+            await EditorUI.Alert(root, L("Couldn’t Show the Drawing"), L("Its page isn’t there yet: the engine's setup service may still be starting. Try again in a moment."));
             return;
         }
         if (editor.IsDirty)
         {
             var ask = new ContentDialog
             {
-                XamlRoot = root, Title = "Save your changes first?",
-                Content = UI.Text("Lining up a drawing moves its fixtures and trusses in the saved rig, and the editor reads it again: changes not saved are lost.").Wrap(),
-                PrimaryButtonText = "Save", SecondaryButtonText = "Discard", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = root, Title = L("Save your changes first?"),
+                Content = UI.Text(L("Lining up a drawing moves its fixtures and trusses in the saved rig, and the editor reads it again: changes not saved are lost.")).Wrap(),
+                PrimaryButtonText = L("Save"), SecondaryButtonText = L("Discard"), CloseButtonText = L("Cancel"), DefaultButton = ContentDialogButton.Primary,
             };
             switch (await Dialogs.Show(ask))
             {
                 case ContentDialogResult.Primary:
                     try { await editor.Save(_host); }
-                    catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(root, "Couldn’t Save", e.Message); return; }
+                    catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(root, L("Couldn’t Save"), e.Message); return; }
                     break;
                 case ContentDialogResult.Secondary:
                     editor.Revert();
@@ -352,7 +352,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
     async void RemoveDrawing(Underlay u)
     {
-        if (await EditorUI.Confirm(_root?.XamlRoot, $"Remove the drawing “{u.Name}”?", "It is taken away from under the rig; the fixtures stay where they are.", "Remove"))
+        if (await EditorUI.Confirm(_root?.XamlRoot, L("Remove the drawing “{0}”?", u.Name), L("It is taken away from under the rig; the fixtures stay where they are."), L("Remove")))
             await editor.RemoveDrawing(_host, u);
     }
 
@@ -371,11 +371,11 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         {
             var n = editor.SelectedFixtures.Count;
             text.Text = editor.Doc.WaitingCount > 0 && editor.Selection is null
-                ? $"{editor.Doc.WaitingCount} fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount"
-                : editor.Selection is null ? "Click to select · Shift-click for more · Ctrl+A all fixtures · drag empty space to turn the view"
-                    + (_viewport!.Stage.CanFly ? " · WASD walks · F flies" : "")
-                : n > 1 ? $"{n} selected: drag one and the rest come along · Delete unmounts them · R rotates"
-                : "Drag to move · R rotates 15° (Shift+R 90°) · arrows nudge · Delete unmounts or deletes · Alt-drag places freely";
+                ? L("{0} fixtures wait in front of the stage: drag them onto a truss, drag a group from the list, or Auto-Mount", editor.Doc.WaitingCount)
+                : editor.Selection is null ? L("Click to select · Shift-click for more · Ctrl+A all fixtures · drag empty space to turn the view")
+                    + (_viewport!.Stage.CanFly ? " · " + L("WASD walks · F flies") : "")
+                : n > 1 ? L("{0} selected: drag one and the rest come along · Delete unmounts them · R rotates", n)
+                : L("Drag to move · R rotates 15° (Shift+R 90°) · arrows nudge · Delete unmounts or deletes · Alt-drag places freely");
         });
     }
 
@@ -384,7 +384,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         var stage = _viewport!.Stage;
         var hint = new Border
         {
-            Child = UI.Text("WASD move · Q/E down/up · drag to look · Shift faster · Esc lands", Font.Caption).Secondary(),
+            Child = UI.Text(L("WASD move · Q/E down/up · drag to look · Shift faster · Esc lands"), Font.Caption).Secondary(),
             Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(14),
             Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"), VerticalAlignment = VerticalAlignment.Bottom,
         };
@@ -397,7 +397,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             {
                 Content = UI.Icon(EditorUI.Symbol(symbol), 14), IsChecked = _viewport!.Preset == preset, Padding = new Thickness(8, 6, 8, 6),
                 Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"),
-            }.Tooltip(preset);
+            }.Tooltip(PresetTitle(preset));
             b.Click += (_, _) =>
             {
                 _viewport!.Preset = preset;
@@ -412,7 +412,7 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
             {
                 Content = UI.Icon("figure.walk.motion", 14), Padding = new Thickness(8, 6, 8, 6),
                 Background = Theme.Brush("AcrylicInAppFillColorDefaultBrush"),
-            }.Tooltip("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom.");
+            }.Tooltip(L("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom."));
             fly.Click += (_, _) => stage.Fly = !stage.Fly;
             row.Children.Add(fly.Bind(stage, nameof(IEditorStage.Fly), f => f.IsChecked = stage.Fly));
             var room = new ToggleButton
@@ -426,6 +426,18 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
         row.VerticalAlignment = VerticalAlignment.Bottom;
         return row;
     }
+
+    /// A camera preset's name as shown (its raw value is the key the stage reads).
+    static string PresetTitle(string preset) => preset switch
+    {
+        "Front of House" => L("Front of House"),
+        "In the Crowd" => L("In the Crowd"),
+        "Drone" => L("Drone"),
+        "Side" => L("Side"),
+        "DJ" => L("DJ"),
+        "Plan" => L("Plan"),
+        _ => preset,
+    };
 }
 
 /// The rig's name: make a new one, duplicate, rename, delete (switching rigs is the list on the Rigs page).
@@ -435,26 +447,26 @@ public sealed class RigMenu(AppModel model, RigEditorModel editor)
 
     public FrameworkElement Build()
     {
-        var label = UI.Label("building.2", editor.IsDirty ? $"{model.EditingRig} •" : model.EditingRig);
+        var label = UI.Label("building.2", editor.IsDirty ? L("{0} •", model.EditingRig) : model.EditingRig);
         var b = UI.MenuButton(label, () => UI.Menu(
-            UI.Item("New Rig…", () => model.ShowNewRig = true, "plus"),
-            UI.Item("Duplicate", () =>
+            UI.Item(L("New Rig…"), () => model.ShowNewRig = true, "plus"),
+            UI.Item(L("Duplicate"), () =>
             {
                 var r = model.EditingRig;
                 Run(() => model.Api.CreateRig(Unique(r + "-copy"), copyOf: r));
             }, "plus.square.on.square"),
-            UI.Item("Import from Documents…", () => model.ShowImport = true, "doc.badge.arrow.up"),
-            UI.Item("Rename…", Rename, "pencil"),
-            UI.Item("Show in File Explorer", () =>
+            UI.Item(L("Import from Documents…"), () => model.ShowImport = true, "doc.badge.arrow.up"),
+            UI.Item(L("Rename…"), Rename, "pencil"),
+            UI.Item(L("Show in File Explorer"), () =>
             {
                 if (model.Workspace?.RigURL(model.EditingRig) is { } path)
                     try { Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { $"/select,{path}" } })?.Dispose(); }
                     catch (System.ComponentModel.Win32Exception) { }
             }, "folder"),
             UI.Separator(),
-            UI.Item("Delete…", ConfirmDelete, "trash").Disabled(model.Rigs.Count <= 1)));
+            UI.Item(L("Delete…"), ConfirmDelete, "trash").Disabled(model.Rigs.Count <= 1)));
         b.IsEnabled = !model.EngineRunning;
-        _button = b.Tooltip("The rig: a new one, duplicate, rename, delete");
+        _button = b.Tooltip(L("The rig: a new one, duplicate, rename, delete"));
         return _button;
     }
 
@@ -468,10 +480,10 @@ public sealed class RigMenu(AppModel model, RigEditorModel editor)
     async void Rename()
     {
         if (_button?.XamlRoot is not { } root) return;
-        var field = new TextBox { Text = model.EditingRig, PlaceholderText = "Name" };
+        var field = new TextBox { Text = model.EditingRig, PlaceholderText = L("Name") };
         var d = new ContentDialog
         {
-            XamlRoot = root, Title = "Rename the Rig", Content = field, PrimaryButtonText = "Rename", CloseButtonText = "Cancel",
+            XamlRoot = root, Title = L("Rename the Rig"), Content = field, PrimaryButtonText = L("Rename"), CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         if (await d.ShowAsync() != ContentDialogResult.Primary) return;
@@ -486,8 +498,8 @@ public sealed class RigMenu(AppModel model, RigEditorModel editor)
     async void ConfirmDelete()
     {
         var r = model.EditingRig;
-        if (await EditorUI.Confirm(_button?.XamlRoot, $"Delete the rig “{r}”?",
-                "Its trusses, zones and where every set hung on it are removed. Your sets (the fixtures) stay.", "Delete"))
+        if (await EditorUI.Confirm(_button?.XamlRoot, L("Delete the rig “{0}”?", r),
+                L("Its trusses, zones and where every set hung on it are removed. Your sets (the fixtures) stay."), L("Delete")))
             Run(() => model.Api.DeleteRig(r));
     }
 
@@ -495,11 +507,11 @@ public sealed class RigMenu(AppModel model, RigEditorModel editor)
     {
         if (!await model.EnsureSetupService())
         {
-            await EditorUI.Alert(_button?.XamlRoot, "Couldn’t Change the Rigs", "The engine's setup service did not start.");
+            await EditorUI.Alert(_button?.XamlRoot, L("Couldn’t Change the Rigs"), L("The engine's setup service did not start."));
             return;
         }
         try { await op(); }
-        catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(_button?.XamlRoot, "Couldn’t Change the Rigs", e.Message); }
+        catch (Exception e) when (e is not OutOfMemoryException) { await EditorUI.Alert(_button?.XamlRoot, L("Couldn’t Change the Rigs"), e.Message); }
         model.ReloadSets();
     }
 }

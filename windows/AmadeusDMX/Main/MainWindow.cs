@@ -109,12 +109,12 @@ public sealed partial class MainWindow : Window
         var subtitle = UI.Text("", Font.Caption).Secondary();
         void Titles(FrameworkElement _)
         {
-            title.Text = _model.Section == Section.Show ? (_model.ShowState.IsActive ? _model.Feed.Hello?.Title ?? "Show" : "Show") : _model.Section.Title();
+            title.Text = _model.Section == Section.Show ? (_model.ShowState.IsActive ? _model.Feed.Hello?.Title ?? L("Show") : L("Show")) : _model.Section.Title();
             subtitle.Text = Subtitle();
         }
         var showOnly = UI.HStack(8, new SetMenu(_model).Build(), new DirectorMenu(_model).Build())
             .Bind(_model, nameof(AppModel.Section), s => s.Visible(_model.Section == Section.Show));  // the combination the show runs: only on the Show page
-        var inspector = UI.IconButton("sidebar.trailing", "Show what the director decided for this phrase", () => _model.ShowInspector = !_model.ShowInspector)
+        var inspector = UI.IconButton("sidebar.trailing", L("Show what the director decided for this phrase"), () => _model.ShowInspector = !_model.ShowInspector)
             .Bind(_model, nameof(AppModel.Section), b => b.Visible(_model.Section == Section.Show));
         var bar = UI.HStack(8,
             UI.VStack(0, title, subtitle).MinWidth(120),
@@ -138,12 +138,12 @@ public sealed partial class MainWindow : Window
         switch (m.Section)  // each page about its own thing
         {
             case Section.Set:
-                return m.Sets.FirstOrDefault(s => s.Name == m.EditingSet) is { } set ? $"{set.FixtureCount} fixtures" : "";
+                return m.Sets.FirstOrDefault(s => s.Name == m.EditingSet) is { } set ? (set.FixtureCount == 1 ? L("1 fixture") : L("{0} fixtures", set.FixtureCount)) : "";
             case Section.Rig:
                 return m.Rigs.FirstOrDefault(r => r.Name == m.EditingRig) is { } r
-                    ? r.Summary + (m.EditingRigSet.Length == 0 ? "" : $" · {m.EditingRigSet} on it") : "";
+                    ? r.Summary + (m.EditingRigSet.Length == 0 ? "" : L(" · {0} on it", m.EditingRigSet)) : "";
             case Section.Dmx:
-                return $"set “{m.SelectedSet}”";
+                return L("set “{0}”", m.SelectedSet);
             case Section.Engine or Section.Settings:
                 return "";
         }
@@ -151,7 +151,7 @@ public sealed partial class MainWindow : Window
             return m.Feed.Hello is { } h ? $"{(int)Math.Round(h.Bpm)} BPM · {m.ShowTitle}" : m.ShowTitle;
         var (placed, total) = m.Mounted;
         if (total == 0) return m.CurrentRig?.Summary ?? "";
-        return placed < total ? $"{total - placed} of {total} fixtures not mounted" : $"{total} fixtures · {m.CurrentRig?.Summary ?? ""}";
+        return placed < total ? L("{0} of {1} fixtures not mounted", total - placed, total) : L("{0} fixtures · {1}", total, m.CurrentRig?.Summary ?? "");
     }
 
     void ShowPage()
@@ -175,8 +175,8 @@ public sealed partial class MainWindow : Window
     }
 
     FrameworkElement EngineMissingView() =>
-        UI.Unavailable("shippingbox", "Engine Not Found", "Amadeus DMX needs its engine folder (with the Python environment).",
-                       UI.Button("Set Up…", OpenWizard).Prominent());
+        UI.Unavailable("shippingbox", L("Engine Not Found"), L("Amadeus DMX needs its engine folder (with the Python environment)."),
+                       UI.Button(L("Set Up…"), OpenWizard).Prominent());
 
     void FirstShown()
     {
@@ -222,11 +222,11 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = Root,
-            Title = $"Switch to {m.Title()}?",
-            Content = UI.Text(m.SendsDMX() ? "Sending to the lights needs the show to restart. It picks up where it was in a few seconds."
-                              : "The show restarts without sending to the lights: the lights black out.").Wrap(),
-            PrimaryButtonText = "Restart Show",
-            CloseButtonText = "Cancel",
+            Title = L("Switch to {0}?", m.Title()),
+            Content = UI.Text(m.SendsDMX() ? L("Sending to the lights needs the show to restart. It picks up where it was in a few seconds.")
+                              : L("The show restarts without sending to the lights: the lights black out.")).Wrap(),
+            PrimaryButtonText = L("Restart Show"),
+            CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         if (await dialog.ShowAsync() == ContentDialogResult.Primary) _model.ConfirmPendingMode();
@@ -242,8 +242,8 @@ public sealed partial class MainWindow : Window
         {
             XamlRoot = Root,
             Title = "Amadeus DMX",
-            Content = UI.Text($"Version {version}"),
-            CloseButtonText = "OK",
+            Content = UI.Text(L("Version {0}", version)),
+            CloseButtonText = L("OK"),
         }.ShowAsync();
     }
 }

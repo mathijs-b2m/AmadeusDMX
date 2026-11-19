@@ -127,7 +127,7 @@ public static class Dialogs
         if (root is null) return;
         await Show(new ContentDialog
         {
-            XamlRoot = root, Title = title, Content = UI.Text(message).Wrap().Selectable(), CloseButtonText = "OK",
+            XamlRoot = root, Title = title, Content = UI.Text(message).Wrap().Selectable(), CloseButtonText = L("OK"),
             DefaultButton = ContentDialogButton.Close,
         });
     }
@@ -138,7 +138,7 @@ public static class Dialogs
         if (root is null) return false;
         var d = new ContentDialog
         {
-            XamlRoot = root, Title = title, Content = UI.Text(message).Wrap(), PrimaryButtonText = action, CloseButtonText = "Cancel",
+            XamlRoot = root, Title = title, Content = UI.Text(message).Wrap(), PrimaryButtonText = action, CloseButtonText = L("Cancel"),
             DefaultButton = destructive ? ContentDialogButton.Close : ContentDialogButton.Primary,
         };
         return await Show(d) == ContentDialogResult.Primary;
@@ -151,7 +151,7 @@ public static class Dialogs
         var field = new TextBox { PlaceholderText = placeholder, Text = text, MinWidth = 280 };
         var d = new ContentDialog
         {
-            XamlRoot = root, Title = title, Content = field, PrimaryButtonText = action, CloseButtonText = "Cancel",
+            XamlRoot = root, Title = title, Content = field, PrimaryButtonText = action, CloseButtonText = L("Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         field.Loaded += (_, _) => { field.Focus(FocusState.Programmatic); field.SelectAll(); };
@@ -192,10 +192,10 @@ public static class Dialogs
     public static Microsoft.UI.WindowId? WindowOf(UIElement e) => e.XamlRoot?.ContentIslandEnvironment?.AppWindowId;
 
     /// Choose a folder (NSOpenPanel with canChooseDirectories).
-    public static async Task<string?> ChooseFolder(UIElement from, string commit = "Choose")
+    public static async Task<string?> ChooseFolder(UIElement from, string? commit = null)
     {
         if (WindowOf(from) is not { } id) return null;
-        var picker = new Microsoft.Windows.Storage.Pickers.FolderPicker(id) { CommitButtonText = commit };
+        var picker = new Microsoft.Windows.Storage.Pickers.FolderPicker(id) { CommitButtonText = commit ?? L("Choose") };
         return (await picker.PickSingleFolderAsync())?.Path;
     }
 }

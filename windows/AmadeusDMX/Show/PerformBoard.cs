@@ -44,11 +44,11 @@ public sealed class PerformBoard(AppModel model)
         {
             rows.Add(UI.Icon(ShowMode.Perform.Symbol(), 44).Secondary());
             rows.Add(UI.Text(ShowMode.Perform.Title(), Font.Title).Bold().Center());
-            rows.Add(UI.Text("The 3D stage is off: the computer's power goes to the lights.").Secondary().Center().Wrap());
+            rows.Add(UI.Text(L("The 3D stage is off: the computer's power goes to the lights.")).Secondary().Center().Wrap());
         }
         rows.Add(UI.HStack(8, UI.Icon("cable.connector"), UI.Text(NowPlaying.Output(model.CurrentSet), Font.Callout))
             .Secondary().Font(Font.Callout).Margin(0, 10, 0, 0));
-        rows.Add(UI.Button("Show the Stage", () => model.SetMode(ShowMode.Both)).Tooltip("Perform + Visualise: the 3D stage alongside the lights"));
+        rows.Add(UI.Button(L("Show the Stage"), () => model.SetMode(ShowMode.Both)).Tooltip(L("Perform + Visualise: the 3D stage alongside the lights")));
         var stack = UI.VStack(14, [.. rows]).Padding(40);
         stack.Alignment = 0.5;
         return stack;

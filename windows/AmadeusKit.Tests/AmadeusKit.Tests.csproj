@@ -14,6 +14,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="AmadeusKit" />
+    <Using Include="AmadeusKit.Strings" Static="true" />
     <ProjectReference Include="..\AmadeusKit\AmadeusKit.csproj" />
     <None Include="Samples\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- the stacks' arithmetic, from the app (pure C#: tested here) -->

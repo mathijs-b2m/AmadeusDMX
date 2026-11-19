@@ -27,7 +27,7 @@ public static class ProgramBanner
         if (program != "cinematic" && program != "lightshow") return null;
         var lightshow = program == "lightshow";
         var white = Tint.Brush(Tint.White);
-        var title = UI.Text(lightshow ? "LIGHTSHOW" : "CINEMATIC PROGRAM", Font.Callout).Foreground(white);
+        var title = UI.Text(lightshow ? L("LIGHTSHOW") : L("CINEMATIC PROGRAM"), Font.Callout).Foreground(white);
         title.FontWeight = FontWeights.Black;
         title.CharacterSpacing = 115;  // tracking 1.5 pt at 13 pt
         var gradient = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
@@ -42,10 +42,10 @@ public static class ProgramBanner
                 UI.Icon(lightshow ? "sparkles" : "film.stack", Theme.Size(Font.Title2)).Foreground(white),
                 UI.VStack(1,
                     title.Leading(),
-                    UI.Text(lightshow ? "Every hit played, building up section by section" : "Every hit played by its own fixtures, exactly on time", Font.Caption).Foreground(white).Opacity(0.85).Leading()),
+                    UI.Text(lightshow ? L("Every hit played, building up section by section") : L("Every hit played by its own fixtures, exactly on time"), Font.Caption).Foreground(white).Opacity(0.85).Leading()),
                 UI.Spacer()),
         }.Tooltip(lightshow
-            ? "You switched the Lightshow on: every hit is played by its own lights. One section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax."
-            : "A film-score track: no beat grid. The hits are found where they are, sorted into voices, and every voice plays its own fixtures; the biggest hits play the whole rig.");
+            ? L("You switched the Lightshow on: every hit is played by its own lights. One section starts, the others join phrase by phrase, each with an instrument of its own, until the whole rig plays at the climax.")
+            : L("A film-score track: no beat grid. The hits are found where they are, sorted into voices, and every voice plays its own fixtures; the biggest hits play the whole rig."));
     }
 }

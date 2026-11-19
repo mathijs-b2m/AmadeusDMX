@@ -7,6 +7,8 @@
 // The rules are read through an IFirewallRules so the logic is tested on a Mac; on Windows, HNetCfg.FwPolicy2.
 using System.Diagnostics;
 
+using static AmadeusKit.Strings;
+
 namespace AmadeusKit;
 
 [Flags]
@@ -79,7 +81,7 @@ public static class Firewall
 
     public static string Name(NetProfile p) => p switch
     {
-        NetProfile.Public => "public", NetProfile.Private => "private", NetProfile.Domain => "domain", _ => "",
+        NetProfile.Public => L("public"), NetProfile.Private => L("private"), NetProfile.Domain => L("domain"), _ => "",
     };
 
     /// The commands that let a program in from the local network, on every profile: its inbound rules (the
@@ -259,7 +261,7 @@ public sealed class FirewallWatch : Observable, IDisposable
         Note = null;
         var ok = await Firewall.Allow(Firewall.AllowCommands(_rule, _programs, _openings));
         Allowing = false;
-        if (!ok) Note = "Windows Firewall wasn't changed. Allowing needs an administrator.";
+        if (!ok) Note = L("Windows Firewall wasn't changed. Allowing needs an administrator.");
         await Task.Run(Look);
     }
 

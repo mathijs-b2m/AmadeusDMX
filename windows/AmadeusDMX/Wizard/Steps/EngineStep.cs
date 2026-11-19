@@ -10,10 +10,10 @@ public sealed class EngineStep(AppModel model)
     {
         _checks.Bind(model, nameof(AppModel.Workspace), c => c.Content = Checks());
         return UI.VStack(16,
-            StepHeader.Build("shippingbox.fill", "The Engine",
-                "The analysis, the director and the DMX output run in the Amadeus DMX engine (Python). The app starts it for you."),
+            StepHeader.Build("shippingbox.fill", L("The Engine"),
+                L("The analysis, the director and the DMX output run in the Amadeus DMX engine (Python). The app starts it for you.")),
             UI.Card(_checks, padding: 12),
-            UI.Text("OpenAI API Key (optional: the rule-based director works without)", Font.Subheadline).Secondary().Bold(),
+            UI.Text(L("OpenAI API Key (optional: the rule-based director works without)"), Font.Subheadline).Secondary().Bold(),
             UI.Card(new OpenAIKeyView(model).Build(), padding: 12));
     }
 
@@ -22,22 +22,22 @@ public sealed class EngineStep(AppModel model)
         var ws = model.Workspace;
         var rows = UI.VStack(10);
         if (ws?.IsBuiltIn == true)
-            rows.Children.Add(Check.Build(true, "Engine", "Built into the app"));
+            rows.Children.Add(Check.Build(true, L("Engine"), L("Built into the app")));
         else
         {
-            rows.Children.Add(Check.Build(ws?.HasPackage == true, "Engine folder", ws?.Root ?? "Not found"));
-            rows.Children.Add(Check.Build(ws?.IsValid == true, "Python environment (.venv)", ws?.Python ?? "–"));
+            rows.Children.Add(Check.Build(ws?.HasPackage == true, L("Engine folder"), ws?.Root ?? L("Not found")));
+            rows.Children.Add(Check.Build(ws?.IsValid == true, L("Python environment (.venv)"), ws?.Python ?? "–"));
         }
         rows.Children.Add(UI.HStack(8,
-            UI.Button("Choose Engine Folder…", Choose),
+            UI.Button(L("Choose Engine Folder…"), Choose),
             _error is { } e ? UI.Text(e, Font.Callout).Foreground(Tint.Red) : null));
         return rows;
     }
 
     async void Choose()
     {
-        if (await Dialogs.ChooseFolder(_checks, "Choose") is not { } folder) return;
-        _error = model.UseWorkspace(folder) ? null : "No engine in that folder.";
+        if (await Dialogs.ChooseFolder(_checks, L("Choose")) is not { } folder) return;
+        _error = model.UseWorkspace(folder) ? null : L("No engine in that folder.");
         _checks.Content = Checks();
     }
 }

@@ -5,20 +5,20 @@ public sealed class StageControls(StageSettings stage, AppModel model)
 {
     public FrameworkElement Build()
     {
-        var hint = ShowUI.Glass(UI.Text("WASD move · Q/E down/up · drag to look · Shift faster · Esc lands", Font.Caption).Secondary(), padding: 0, corner: 14);
+        var hint = ShowUI.Glass(UI.Text(L("WASD move · Q/E down/up · drag to look · Shift faster · Esc lands"), Font.Caption).Secondary(), padding: 0, corner: 14);
         hint.Padding = new Thickness(12, 8, 12, 8);
         hint.Bind(stage, nameof(StageSettings.Fly), h => h.Visible(stage.Fly));
 
         var row = UI.HStack(8, hint);
         foreach (var (raw, symbol) in StageSettings.Presets)
-            row.Children.Add(Glassy(UI.IconButton(symbol, raw, () => stage.Preset = raw), () => stage.Preset == raw, nameof(StageSettings.Preset)));
+            row.Children.Add(Glassy(UI.IconButton(symbol, StageSettings.PresetTitle(raw), () => stage.Preset = raw), () => stage.Preset == raw, nameof(StageSettings.Preset)));
         row.Children.Add(Glassy(UI.IconButton("figure.walk.motion",
-            "Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom.",
+            L("Fly through the room (F): WASD or arrows move, Q/E down/up, drag to look around, scroll or pinch to move, Shift faster. Without flying: WASD still walks, +/− zoom."),
             () => stage.Fly = !stage.Fly), () => stage.Fly, nameof(StageSettings.Fly)));
         row.Children.Add(Glassy(UI.IconButton("cube.transparent", StageRoom.Help, () => StageRoom.Shared.On = !StageRoom.Shared.On),
             () => StageRoom.Shared.On, nameof(StageRoom.On), StageRoom.Shared));
 
-        var wall = new Button { Padding = new Thickness(8, 6, 8, 6) }.Tooltip("LED wall: the director's choice, or try one scene");
+        var wall = new Button { Padding = new Thickness(8, 6, 8, 6) }.Tooltip(L("LED wall: the director's choice, or try one scene"));
         var wallMenu = new MenuFlyout();
         wallMenu.Opening += (_, _) =>
         {
@@ -33,14 +33,14 @@ public sealed class StageControls(StageSettings stage, AppModel model)
         wall.Bind(model.Feed, nameof(LiveFeed.Hello), b => b.IsEnabled = model.StageInput()?.Screen ?? false);
         row.Children.Add(wall);
 
-        row.Children.Add(Glassy(UI.IconButton("square.dashed", "Show the zones: where beams may (not) go", () => model.ShowZones = !model.ShowZones),
+        row.Children.Add(Glassy(UI.IconButton("square.dashed", L("Show the zones: where beams may (not) go"), () => model.ShowZones = !model.ShowZones),
                                 () => model.ShowZones, nameof(AppModel.ShowZones), model));
 
         var haze = UI.Slider(stage.Haze, 0, 1.5, v => stage.Haze = v);
-        haze.Header = "Haze";
+        haze.Header = L("Haze");
         var exposure = UI.Slider(stage.Exposure, 0.4, 2, v => stage.Exposure = v);
-        exposure.Header = "Exposure";
-        var orbit = UI.Check("Slow orbit", stage.AutoOrbit, v => stage.AutoOrbit = v);
+        exposure.Header = L("Exposure");
+        var orbit = UI.Check(L("Slow orbit"), stage.AutoOrbit, v => stage.AutoOrbit = v);
         var look = new Flyout
         {
             Content = UI.VStack(12, haze, exposure, orbit).Frame(width: 260),
@@ -52,7 +52,7 @@ public sealed class StageControls(StageSettings stage, AppModel model)
             exposure.SetValueQuietly(stage.Exposure);
             orbit.IsChecked = stage.AutoOrbit;
         };
-        row.Children.Add(UI.IconButton("cloud.fog", "Haze and exposure", () => { }).Flyout(look));
+        row.Children.Add(UI.IconButton("cloud.fog", L("Haze and exposure"), () => { }).Flyout(look));
         return row;
     }
 

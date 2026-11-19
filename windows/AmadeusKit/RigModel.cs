@@ -16,6 +16,7 @@
 // Swift's structs are value types; here the editable ones are classes with Clone() (RigDocument.Clone copies
 // everything), so an editor keeps a copy before it changes one.
 using System.Text.Json;
+using static AmadeusKit.Strings;
 
 namespace AmadeusKit;
 
@@ -71,8 +72,9 @@ public sealed record Truss
         {
             get
             {
-                var what = Type == "tbar" ? "T-bar stand" : "Light bridge";
-                return $"{what} {Format.Number(LengthM)} m · up to {Format.Number(MaxHeightM)} m, {Format.Number(MaxKg)} kg";
+                return Type == "tbar"
+                    ? L("T-bar stand {0:0.###} m · up to {1:0.###} m, {2:0.###} kg", LengthM, MaxHeightM, MaxKg)
+                    : L("Light bridge {0:0.###} m · up to {1:0.###} m, {2:0.###} kg", LengthM, MaxHeightM, MaxKg);
             }
         }
     }
@@ -410,8 +412,8 @@ public sealed class FixtureDefinition
             NeedsCheck = J.Try(() => J.Val(c, "made", m => !(J.Val(m, "checked", J.Bool) ?? false))) ?? false,
             Inert = reason.Length > 0 ? reason
                 : kind == "smoke" && !modes.Values.SelectMany(m => m).Any(ch => ch.GetValueOrDefault("attr")?.String == "fog")
-                    ? "a smoke machine whose output channel isn’t known: the show never fires it"
-                : kind == "laser" && !J.Has(c, "laser") ? "a laser whose channels aren’t mapped by hand yet: it stays dark"
+                    ? L("a smoke machine whose output channel isn’t known: the show never fires it")
+                : kind == "laser" && !J.Has(c, "laser") ? L("a laser whose channels aren’t mapped by hand yet: it stays dark")
                 : "",
         };
     }
@@ -421,7 +423,7 @@ public sealed class FixtureDefinition
     {
         get
         {
-            var parts = new[] { Inert.Length == 0 ? null : $"Not driven by the show: {Inert}.", Warning is null ? null : $"⚠ {Warning}." }
+            var parts = new[] { Inert.Length == 0 ? null : L("Not driven by the show: {0}.", Inert), Warning is null ? null : $"⚠ {Warning}." }
                 .OfType<string>().ToList();
             return parts.Count == 0 ? null : string.Join(" ", parts);
         }
@@ -480,7 +482,7 @@ public sealed class FixtureDefinition
 public sealed class PlacedFixture
 {
     /// "1.033", or what it is without a start address.
-    public string PatchText => Address is { } a ? $"{Universe}.{a:000}" : "no address";
+    public string PatchText => Address is { } a ? $"{Universe}.{a:000}" : L("no address");
 
     public string Id { get; set; }
     public string Key { get; set; }

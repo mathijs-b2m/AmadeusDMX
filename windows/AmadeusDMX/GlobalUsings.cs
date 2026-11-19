@@ -2,3 +2,4 @@
 global using AmadeusKit;
 global using Microsoft.UI.Xaml;
 global using Microsoft.UI.Xaml.Controls;
+global using static AmadeusKit.Strings;  // L("…"): the words in the user's language (AmadeusKit/Strings.cs)

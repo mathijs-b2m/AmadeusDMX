@@ -7,6 +7,7 @@
 // %LOCALAPPDATA%\Amadeus DMX, so an update of the app never touches it).
 using System.Diagnostics;
 using System.Reflection;
+using static AmadeusKit.Strings;
 
 namespace AmadeusKit;
 
@@ -414,7 +415,7 @@ public sealed record RigFile
         {
             if (Dmx is null) return LegacyOutputText;
             var devs = MappedDevices;
-            return devs.Count == 0 ? "Visualiser only" : "→ " + string.Join(", ", devs);
+            return devs.Count == 0 ? L("Visualiser only") : "→ " + string.Join(", ", devs);
         }
     }
 
@@ -431,7 +432,7 @@ public sealed record RigFile
             };
             return string.Join(" + ", specs.Select(s => (s.GetValueOrDefault("type")?.String ?? "artnet") switch
             {
-                "sacn" => $"sACN → {s.GetValueOrDefault("ip")?.String ?? "multicast"}",
+                "sacn" => $"sACN → {s.GetValueOrDefault("ip")?.String ?? L("multicast")}",
                 "enttec_pro" => $"USB ENTTEC Pro → {(s.GetValueOrDefault("port")?.String is { } p ? (p == "auto" ? "auto" : LastPathComponent(p)) : "auto")}",
                 _ => $"Art-Net → {s.GetValueOrDefault("ip")?.String ?? Artnet?.Ip ?? "127.0.0.1"}",
             }));
@@ -533,11 +534,11 @@ public sealed record RigSummary
     {
         get
         {
-            var parts = new List<string> { $"{Format.Number(WidthM)} m wide" };
-            if (Trusses > 0) parts.Add($"{Trusses} truss{(Trusses == 1 ? "" : "es")}");
-            if (Towers > 0) parts.Add($"{Towers} tower{(Towers == 1 ? "" : "s")}");
-            if (Trusses + Towers == 0) parts.Add("floor and stands");
-            if (HasScreen) parts.Add("LED wall");
+            var parts = new List<string> { L("{0} m wide", Strings.Number(Math.Round(WidthM, 3), "0.###")) };
+            if (Trusses > 0) parts.Add(Trusses == 1 ? L("1 truss") : L("{0} trusses", Trusses));
+            if (Towers > 0) parts.Add(Towers == 1 ? L("1 tower") : L("{0} towers", Towers));
+            if (Trusses + Towers == 0) parts.Add(L("floor and stands"));
+            if (HasScreen) parts.Add(L("LED wall"));
             return string.Join(" · ", parts);
         }
     }

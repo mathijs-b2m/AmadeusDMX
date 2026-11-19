@@ -3,6 +3,7 @@
 // (auto-mounted, or by hand in the rig editor). Everything is made through the engine's setup API. In the kit so
 // the steps' rules are tested; the app is the IWizardHost.
 using System.Text.RegularExpressions;
+using static AmadeusKit.Strings;
 
 namespace AmadeusKit;
 
@@ -34,21 +35,24 @@ public static class WizardSteps
 {
     public static readonly WizardStep[] All = Enum.GetValues<WizardStep>();
 
-    public static string Title(this WizardStep s) => s switch
+    public static string Title(this WizardStep s) => L(s.English());
+
+    /// The title in English (what -wizardStep is matched against).
+    static string English(this WizardStep s) => s switch
     {
-        WizardStep.Welcome => "Welcome",
-        WizardStep.Engine => "Engine",
-        WizardStep.Fixtures => "Your Fixtures",
-        WizardStep.Network => "DMX Output",
-        WizardStep.Rig => "Rig",
-        WizardStep.Director => "Director",
-        WizardStep.Review => "Review",
-        _ => "Done",
+        WizardStep.Welcome => Key("Welcome"),
+        WizardStep.Engine => Key("Engine"),
+        WizardStep.Fixtures => Key("Your Fixtures"),
+        WizardStep.Network => Key("DMX Output"),
+        WizardStep.Rig => Key("Rig"),
+        WizardStep.Director => Key("Director"),
+        WizardStep.Review => Key("Review"),
+        _ => Key("Done"),
     };
 
     /// -wizardStep network (testing): by its title or its name.
     public static WizardStep? Parse(string? raw) =>
-        raw is null ? null : All.Cast<WizardStep?>().FirstOrDefault(s => s!.Value.Title().ToLowerInvariant() == raw || s.Value.ToString().ToLowerInvariant() == raw.ToLowerInvariant());
+        raw is null ? null : All.Cast<WizardStep?>().FirstOrDefault(s => s!.Value.English().ToLowerInvariant() == raw || s.Value.ToString().ToLowerInvariant() == raw.ToLowerInvariant());
 }
 
 /// What the wizard needs from the app.
@@ -265,7 +269,7 @@ public sealed class WizardModel : Observable
         {
             Nodes = await api.Discover();
             if (ChosenNodes.Count == 0 && Nodes.FirstOrDefault() is { } first) ChosenNodes = [first];
-            if (Nodes.Count == 0) DiscoverError = "No Art-Net nodes answered. Check the cable and that the node is powered.";
+            if (Nodes.Count == 0) DiscoverError = L("No Art-Net nodes answered. Check the cable and that the node is powered.");
         }
         catch (Exception e) when (IsApiError(e)) { DiscoverError = e.Message; }
         finally { Discovering = false; }
@@ -303,11 +307,11 @@ public sealed class WizardModel : Observable
 
     public string OutputText => OutputKind switch
     {
-        Output.Visualiser => "Visualiser only",
-        Output.Usb => $"USB ENTTEC Pro → {(UsbPort == "auto" ? "first one found" : RigFile.LastPathComponent(UsbPort))}",
+        Output.Visualiser => L("Visualiser only"),
+        Output.Usb => UsbPort == "auto" ? L("USB ENTTEC Pro → first one found") : $"USB ENTTEC Pro → {RigFile.LastPathComponent(UsbPort)}",
         Output.Node when ChosenNodes.Count > 1 =>
-            $"{(Sacn ? "sACN" : "Art-Net")} → {ChosenNodes.Count} nodes ({string.Join(", ", ChosenNodes.Select(n => n.Ip))})",
-        _ => Sacn ? $"sACN → {(Multicast ? "multicast" : ArtnetIP)}" : $"Art-Net → {ArtnetIP}",
+            L("{0} → {1} nodes ({2})", Sacn ? "sACN" : "Art-Net", ChosenNodes.Count, string.Join(", ", ChosenNodes.Select(n => n.Ip))),
+        _ => Sacn ? (Multicast ? L("sACN → multicast") : $"sACN → {ArtnetIP}") : $"Art-Net → {ArtnetIP}",
     };
 
     public string ArtnetIP => OutputKind switch
@@ -332,15 +336,15 @@ public sealed class WizardModel : Observable
         var rig = UseExistingRig ? ExistingRig : Safe(RigName);
         try
         {
-            Progress = "Starting the engine’s setup service…";
+            Progress = L("Starting the engine’s setup service…");
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             if (host.Sets.Any(s => s.Name == setName))
-                throw SetupAPIException.Server($"A set called “{setName}” already exists. Choose another name.");
+                throw SetupAPIException.Server(L("A set called “{0}” already exists. Choose another name.", setName));
             if (!UseExistingRig && host.Rigs.Any(r => r.Name == rig))
-                throw SetupAPIException.Server($"A rig called “{rig}” already exists. Choose another name, or use it.");
-            Progress = "1/3 · The set…";
+                throw SetupAPIException.Server(L("A rig called “{0}” already exists. Choose another name, or use it.", rig));
+            Progress = L("1/3 · The set…");
             await api.CreateSet(setName);
-            Progress = "2/3 · The rig…";
+            Progress = L("2/3 · The rig…");
             if (UseExistingRig) await api.MakeDefaultRig(rig);
             else await api.CreateRig(rig, Template.RawValue(), Width, Height, Depth, LedWall);
             var layout = await api.Rig(rig, setName);
@@ -348,24 +352,24 @@ public sealed class WizardModel : Observable
             var starts = new List<int?>();
             foreach (var p in _planned)
             {
-                Progress = $"Adding {p.Count}× {p.Entry.Model}…";
+                Progress = L("Adding {0}× {1}…", p.Count, p.Entry.Model);
                 var key = p.Entry.IsLocal ? p.Entry.Key : await api.AddToLibrary(p.Entry.Key);
                 for (var i = 0; i < p.Count; i++)
                     items.Add(JSONValue.Of(new Dictionary<string, JSONValue> { ["fixture"] = key, ["mode"] = p.Mode, ["universe"] = 1 }));
                 starts.AddRange(p.Addresses);
             }
-            Progress = "Patching addresses…";
+            Progress = L("Patching addresses…");
             Compose(layout, WithStarts(await Autopatch(api, items), starts));
             if (OutputKind != Output.Visualiser)
             {
-                Progress = "Adding your DMX devices…";
+                Progress = L("Adding your DMX devices…");
                 if (await AddDevices(api, Universes(layout.GetValueOrDefault("fixtures")?.Array ?? [])) is { } dmx)
                     layout["dmx"] = JSONValue.Of(dmx);
             }
             await api.SaveRig(layout, rig, setName);
             if (AutoMount)
             {
-                Progress = $"3/3 · Mounting the fixtures on {rig}…";
+                Progress = L("3/3 · Mounting the fixtures on {0}…", rig);
                 await api.Automount(rig, setName);
             }
             host.ReloadSets();
@@ -478,16 +482,16 @@ public sealed class WizardModel : Observable
         var api = host.Api;
         try
         {
-            Progress = "Starting the engine’s setup service…";
+            Progress = L("Starting the engine’s setup service…");
             if (!await host.EnsureSetupService()) throw SetupAPIException.NotRunningError();
             var saved = new List<string>();
             if (_planned.Count == 0)
             {
                 if (OutputKind != Output.Visualiser)
                 {
-                    Progress = "Adding your DMX devices…";
+                    Progress = L("Adding your DMX devices…");
                     await AddDevices(api, []);
-                    saved.Add($"Your DMX output ({OutputText}) is on the **DMX Output** page.");
+                    saved.Add(L("Your DMX output ({0}) is on the **DMX Output** page.", OutputText));
                 }
             }
             else
@@ -495,19 +499,19 @@ public sealed class WizardModel : Observable
                 var setName = Safe(Name);
                 var i = 1;
                 while (host.Sets.Any(s => s.Name == setName)) { i++; setName = $"{Safe(Name)}-{i}"; }
-                Progress = "The set…";
+                Progress = L("The set…");
                 await api.CreateSet(setName);
                 var items = new List<JSONValue>();
                 var starts = new List<int?>();
                 foreach (var p in _planned)
                 {
-                    Progress = $"Adding {p.Count}× {p.Entry.Model}…";
+                    Progress = L("Adding {0}× {1}…", p.Count, p.Entry.Model);
                     var key = p.Entry.IsLocal ? p.Entry.Key : await api.AddToLibrary(p.Entry.Key);
                     for (var n = 0; n < p.Count; n++)
                         items.Add(JSONValue.Of(new Dictionary<string, JSONValue> { ["fixture"] = key, ["mode"] = p.Mode, ["universe"] = 1 }));
                     starts.AddRange(p.Addresses);
                 }
-                Progress = "Patching addresses…";
+                Progress = L("Patching addresses…");
                 var placement = RigDocument.PlacementKeys.ToHashSet();
                 var fixtures = WithStarts(await Autopatch(api, items), starts).Select(v => v.Object).OfType<IReadOnlyDictionary<string, JSONValue>>()
                     .Select(o => JSONValue.Of(o.Where(p => !placement.Contains(p.Key)))).ToList();
@@ -516,17 +520,18 @@ public sealed class WizardModel : Observable
                 layout["description"] = $"{FixtureCount} fixtures, made with the Windows app";
                 if (OutputKind != Output.Visualiser)
                 {
-                    Progress = "Adding your DMX devices…";
+                    Progress = L("Adding your DMX devices…");
                     if (await AddDevices(api, Universes(fixtures)) is { } dmx) layout["dmx"] = JSONValue.Of(dmx);
                 }
                 await api.SaveSet(layout, setName);
                 host.ReloadSets();
                 host.Edit(setName);
-                saved.Add($"Your set **{setName}** ({FixtureCount} fixtures) is on the **Sets** page"
-                          + (OutputKind == Output.Visualiser ? "." : ", its DMX output on the **DMX Output** page."));
-                saved.Add("To hang it: the **Rigs** page, pick or make a rig (New Rig…) and **Place a Set**.");
+                saved.Add(OutputKind == Output.Visualiser
+                    ? L("Your set **{0}** ({1} fixtures) is on the **Sets** page.", setName, FixtureCount)
+                    : L("Your set **{0}** ({1} fixtures) is on the **Sets** page, its DMX output on the **DMX Output** page.", setName, FixtureCount));
+                saved.Add(L("To hang it: the **Rigs** page, pick or make a rig (New Rig…) and **Place a Set**."));
             }
-            saved.Add("Or start over any time with **File › New Set…**.");
+            saved.Add(L("Or start over any time with **File › New Set…**."));
             return string.Join("\n\n", saved);
         }
         catch (Exception e) when (IsApiError(e))

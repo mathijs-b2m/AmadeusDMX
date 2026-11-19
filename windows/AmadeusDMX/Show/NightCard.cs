@@ -48,7 +48,7 @@ public sealed class NightCard(AppModel model)
                 _chevron),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-        }.Borderless().Tooltip("The night: its stage, countdown and the knobs the show arc turns");
+        }.Borderless().Tooltip(L("The night: its stage, countdown and the knobs the show arc turns"));
         header.Padding = new Thickness(0);
         header.Click += (_, _) =>
         {
@@ -82,15 +82,15 @@ public sealed class NightCard(AppModel model)
         _title.Text = Night.Title(arc);
         _pin.Visible(arc.Locked);
         _hand.Visible(arc.Manual.Count > 0).Tooltip(Night.HeldHelp(arc));
-        _fog.Visible(arc.Haze is not null).Tooltip("You push the haze");
-        _sparkles.Visible(arc.Lightshow == true).Tooltip("Lightshow: every track played as a show piece");
-        _star.Visible(arc.NamedShow is not null).Tooltip(arc.NamedShow is { } named ? $"Named show: {named.Title}" : "");
+        _fog.Visible(arc.Haze is not null).Tooltip(L("You push the haze"));
+        _sparkles.Visible(arc.Lightshow == true).Tooltip(L("Lightshow: every track played as a show piece"));
+        _star.Visible(arc.NamedShow is not null).Tooltip(arc.NamedShow is { } named ? L("Named show: {0}", named.Title) : "");
         _clock.Text = Night.Clock(arc);
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
         _countdown.Text = left ?? "";
         _countdown.Foreground(Night.Over(arc) ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorPrimaryBrush"));
-        _countdown.Tooltip(Night.Over(arc) ? "Over the night's length" : "Left of the night");
+        _countdown.Tooltip(Night.Over(arc) ? L("Over the night's length") : L("Left of the night"));
     }
 
     void BuildBody(ArcStatus arc)
@@ -120,7 +120,7 @@ public sealed class NightCard(AppModel model)
         }
         if (arc.Hazers > 0)
         {
-            _body.Children.Add(UI.Text("HAZE", Font.Caption2).Bold().Secondary().Margin(0, 2, 0, 0).Leading());
+            _body.Children.Add(UI.Text(L("HAZE"), Font.Caption2).Bold().Secondary().Margin(0, 2, 0, 0).Leading());
             _body.Children.Add(HazeRow());
             _body.Children.Add(UI.Divider());
         }
@@ -134,7 +134,7 @@ public sealed class NightCard(AppModel model)
         var draft = new KnobDraft();
         var value = UI.Text("", Font.Caption).Secondary().Frame(width: 34);
         value.TextAlignment = TextAlignment.Right;
-        var auto = UI.Button("Auto", () => Send(ArcMessage.Auto(knob.Id))).Borderless().Font(Font.Caption);
+        var auto = UI.Button(L("Auto"), () => Send(ArcMessage.Auto(knob.Id))).Borderless().Font(Font.Caption);
         FrameworkElement control;
         if (knob.Toggle)
         {
@@ -175,7 +175,7 @@ public sealed class NightCard(AppModel model)
             auto.IsEnabled = manual;
             auto.FontWeight = manual ? FontWeights.Normal : FontWeights.SemiBold;
             auto.Foreground(manual ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Accent));
-            auto.Tooltip(manual ? "Give this knob back to the show arc" : "The show arc turns this knob");
+            auto.Tooltip(manual ? L("Give this knob back to the show arc") : L("The show arc turns this knob"));
             row.Tooltip(Night.KnobHelp(knob, arc));
         });
         return row;
@@ -199,7 +199,7 @@ public sealed class NightCard(AppModel model)
             status.Foreground(tint);
             icon.Foreground(tint);
         });
-        var title = UI.Text("Lightshow", Font.Callout).Bold();
+        var title = UI.Text(L("Lightshow"), Font.Callout).Bold();
         // the line wraps (it is longer while on), so the switch stays in the card
         return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow(), toggle)
             .Tooltip(Night.LightshowHelp);
@@ -212,11 +212,11 @@ public sealed class NightCard(AppModel model)
     {
         var icon = UI.Icon("star.circle").Frame(width: 18);
         var status = UI.Text("", Font.Caption);
-        var label = UI.Text("None", Font.Caption);
+        var label = UI.Text(L("None"), Font.Caption);
         var picker = UI.MenuButton(label, () =>
         {
             var named = Arc?.Named ?? "";
-            var menu = UI.Menu(UI.Choice("None", "named", named == "", () => Send(ArcMessage.Named(""))));
+            var menu = UI.Menu(UI.Choice(L("None"), "named", named == "", () => Send(ArcMessage.Named(""))));
             foreach (var genre in Night.NamedShowGenres(shows))
             {
                 menu.Items.Add(UI.Separator());
@@ -228,13 +228,13 @@ public sealed class NightCard(AppModel model)
         }).Small();
         _updates.Add(a =>
         {
-            label.Text = a.NamedShow?.Title ?? "None";
+            label.Text = a.NamedShow?.Title ?? L("None");
             status.Text = Night.NamedShowStatus(a);
             var tint = Night.NamedShowPlaying(a) ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush");
             status.Foreground(tint);
             icon.Foreground(tint);
         });
-        var title = UI.Text("Named Show", Font.Callout).Bold();
+        var title = UI.Text(L("Named Show"), Font.Callout).Bold();
         return UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow(), picker)
             .Tooltip(Night.NamedShowHelp);
     }
@@ -257,9 +257,9 @@ public sealed class NightCard(AppModel model)
         }, step: 5);
         var output = UI.HStack(8,
             UI.Icon("cloud.fog").Secondary().Frame(width: 18),
-            UI.Text("Output", Font.Callout).Frame(width: 110),
+            UI.Text(L("Output"), Font.Callout).Frame(width: 110),
             slider.Grow(),
-            pct).Tooltip("How hard the hazers run while you push: a level at which yours make haze");
+            pct).Tooltip(L("How hard the hazers run while you push: a level at which yours make haze"));
         var stepper = Form.Stepper(seconds, 5, 600, n => $"{n} s", n =>
         {
             seconds = n;
@@ -267,29 +267,29 @@ public sealed class NightCard(AppModel model)
         }, step: 5);
         var time = UI.HStack(8,
             UI.Icon("timer").Secondary().Frame(width: 18),
-            UI.Text("For", Font.Callout).Frame(width: 110),
-            stepper.Grow()).Tooltip("How long the push runs: long enough to fill the room");
+            UI.Text(L("For"), Font.Callout).Frame(width: 110),
+            stepper.Grow()).Tooltip(L("How long the push runs: long enough to fill the room"));
         var everyStepper = Form.Stepper(every, 10, 600, n => $"{n} s", n =>
         {
             every = n;
             Defaults.Standard.Set("hazePushEvery", n);
         }, step: 5);
-        var push = UI.Button("Push", () => Send(ArcMessage.Haze(level / 100, seconds, every))).Small()
-            .Tooltip("Run the hazers at this output this long, then keep the room that hazy");
+        var push = UI.Button(L("Push"), () => Send(ArcMessage.Haze(level / 100, seconds, every))).Small()
+            .Tooltip(L("Run the hazers at this output this long, then keep the room that hazy"));
         var again = UI.HStack(8,
             UI.Icon("repeat").Secondary().Frame(width: 18),
-            UI.Text("Then every", Font.Callout).Frame(width: 110),
+            UI.Text(L("Then every"), Font.Callout).Frame(width: 110),
             everyStepper.Grow(),
-            push).Tooltip("How often a short burst at this output tops the haze up: shorter when the room loses it fast");
+            push).Tooltip(L("How often a short burst at this output tops the haze up: shorter when the room loses it fast"));
         var status = UI.Text("", Font.Caption);
-        var auto = UI.Button("Auto", () => Send(ArcMessage.HazeAuto())).Borderless().Font(Font.Caption);
+        var auto = UI.Button(L("Auto"), () => Send(ArcMessage.HazeAuto())).Borderless().Font(Font.Caption);
         _updates.Add(a =>
         {
             status.Text = Night.HazeStatus(a);
             status.Foreground(a.Haze is null ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Orange));
-            push.Content = a.Haze is null ? "Push" : "Push Again";
+            push.Content = a.Haze is null ? L("Push") : L("Push Again");
             auto.IsEnabled = a.Haze is not null;
-            auto.Tooltip(a.Haze is null ? "The show hazes by itself" : "Give the haze back to the show");
+            auto.Tooltip(a.Haze is null ? L("The show hazes by itself") : L("Give the haze back to the show"));
         });
         return UI.VStack(6, output, time, again, UI.HStack(status, UI.Spacer(), auto));
     }
@@ -320,15 +320,15 @@ public sealed class NightCard(AppModel model)
                 var now = key == a.Stage;
                 label.FontWeight = now ? FontWeights.Bold : FontWeights.Normal;
                 b.Background(now ? Tint.Brush(Tint.Accent, 0.35) : ShowUI.Brush(Tone.Secondary, 0.12));  // the same colour: left alone (UI.Background)
-                b.Tooltip(now ? "The music is here" : "Go to this stage now (the arc carries on from there)");
+                b.Tooltip(now ? L("The music is here") : L("Go to this stage now (the arc carries on from there)"));
             });
         }
         var held = UI.Text("", Font.Caption).Secondary();
-        var hold = new ToggleButton { Content = "Hold" }.Small().Tooltip("Keep the night in this stage until you let go");
+        var hold = new ToggleButton { Content = L("Hold") }.Small().Tooltip(L("Keep the night in this stage until you let go"));
         hold.Click += (_, _) => Send(ArcMessage.Lock(hold.IsChecked == true));
         _updates.Add(a =>
         {
-            held.Text = a.Locked ? "Held: the arc stays in this stage" : "The music decides the stage";
+            held.Text = a.Locked ? L("Held: the arc stays in this stage") : L("The music decides the stage");
             hold.IsChecked = a.Locked;
         });
         return UI.VStack(6, strip, UI.HStack(held, UI.Spacer(), hold));
@@ -344,7 +344,7 @@ public sealed class NightCard(AppModel model)
         var bpm = UI.Text("", Font.Caption).Secondary();
         var row = UI.HStack(8,
             UI.Icon("thermometer.medium").Secondary().Frame(width: 18),
-            UI.Text("Music heat", Font.Callout).Frame(width: 110),
+            UI.Text(L("Music heat"), Font.Callout).Frame(width: 110),
             heat.Grow(),
             trend,
             bpm);
@@ -365,20 +365,20 @@ public sealed class NightCard(AppModel model)
     {
         var events = arc.Events.Select(e => (Key: e.Count > 0 ? e[0] : "", Title: e.Count > 0 ? e[^1] : "")).ToList();
         var picker = UI.Picker(events, events.FirstOrDefault(e => e.Key == arc.Event), e => e.Title, e => Send(ArcMessage.Event(e.Key)));
-        var eventRow = UI.HStack(8, UI.Text("Event", Font.Callout), picker.Grow())
-            .Tooltip("What kind of night: it names the stages, sets where in the night they may come, and the character (a wedding: fewer lasers, less smoke)");
+        var eventRow = UI.HStack(8, UI.Text(L("Event"), Font.Callout), picker.Grow())
+            .Tooltip(L("What kind of night: it names the stages, sets where in the night they may come, and the character (a wedding: fewer lasers, less smoke)"));
 
         var length = UI.Text("", Font.Body).Frame(width: 48);
         length.TextAlignment = TextAlignment.Center;
         var minus = UI.IconButton("minus", "", () => { if (Arc is { } a) Send(ArcMessage.Length(a.Length - Night.Step)); }).Borderless();
         var plus = UI.IconButton("plus", "", () => { if (Arc is { } a) Send(ArcMessage.Length(a.Length + Night.Step)); }).Borderless();
-        var lengthRow = UI.HStack(8, UI.Text("Length", Font.Callout), UI.Spacer(), minus, length, plus)
-            .Tooltip("How long the night is: the countdown, and where the warm-up and the finale belong (a quarter of an hour per click)");
+        var lengthRow = UI.HStack(8, UI.Text(L("Length"), Font.Callout), UI.Spacer(), minus, length, plus)
+            .Tooltip(L("How long the night is: the countdown, and where the warm-up and the finale belong (a quarter of an hour per click)"));
 
-        var on = UI.Check("Show arc", arc.On, v => Send(ArcMessage.Enabled(v))).Tooltip("Off: the lights play every track as the director made it, at full");
-        var allAuto = UI.Button("All Auto", () => Send(ArcMessage.Auto("all"))).Small();
-        var newNight = UI.Button("New Night", () => Send(ArcMessage.Reset())).Small()
-            .Tooltip("Start again: the clock waits for the music, the night begins with the warm-up");
+        var on = UI.Check(L("Show arc"), arc.On, v => Send(ArcMessage.Enabled(v))).Tooltip(L("Off: the lights play every track as the director made it, at full"));
+        var allAuto = UI.Button(L("All Auto"), () => Send(ArcMessage.Auto("all"))).Small();
+        var newNight = UI.Button(L("New Night"), () => Send(ArcMessage.Reset())).Small()
+            .Tooltip(L("Start again: the clock waits for the music, the night begins with the warm-up"));
         var onRow = UI.HStack(8, on, UI.Spacer(), allAuto, newNight);
 
         _updates.Add(a =>

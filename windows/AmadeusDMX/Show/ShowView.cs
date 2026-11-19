@@ -23,7 +23,7 @@ public sealed class ShowView(AppModel model)
             c.Content = renders == true ? StageHost.Create(model, Stage) : new PerformBoard(model).Build();
         });
 
-        var noSet = UI.Unavailable("square.stack.3d.up.slash", "No Set", "Create a set to see the rig here.");
+        var noSet = UI.Unavailable("square.stack.3d.up.slash", L("No Set"), L("Create a set to see the rig here."));
         void NoSet(FrameworkElement e) => e.Visible(model.Mode.Renders3D() && model.StageInput() is null);
         noSet.Bind(model, [nameof(AppModel.Mode), nameof(AppModel.SelectedSet), nameof(AppModel.SelectedRig), nameof(AppModel.ConfigVersion)], NoSet)
              .Bind(feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.State)], NoSet);
@@ -57,8 +57,8 @@ public sealed class ShowView(AppModel model)
         var key = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
         void Key(ContentControl c) => c.Content = model.AiKeyWarning is { } warning ? ShowUI.Glass(UI.HStack(10,
             Form.Note("key", warning, Tint.Orange).Grow(),
-            UI.Button("Open Settings…", () => { model.SettingsTab = "director"; model.Section = Section.Settings; })
-                .Tooltip("Settings › Director: enter a new OpenAI API key")), 10, 10) : null;
+            UI.Button(L("Open Settings…"), () => { model.SettingsTab = "director"; model.Section = Section.Settings; })
+                .Tooltip(L("Settings › Director: enter a new OpenAI API key"))), 10, 10) : null;
         key.Bind(feed, nameof(LiveFeed.AiKey), Key).Bind(model, nameof(AppModel.AiKeyChecked), Key);
 
         var cards = UI.VStack(12, key, top, UI.Spacer(), bottom).Padding(16);

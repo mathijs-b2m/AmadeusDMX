@@ -15,10 +15,10 @@ public sealed class SetMenu(AppModel model)
             var combos = model.Combinations;
             var current = new AppModel.Combination(model.SelectedRig, model.SelectedSet);
             var items = new List<MenuFlyoutItemBase>();
-            if (combos.Count == 0) items.Add(UI.Note("No set is placed on a rig yet"));
+            if (combos.Count == 0) items.Add(UI.Note(L("No set is placed on a rig yet")));
             else items.AddRange(combos.Select(c => UI.Choice(c.Label, "show", c == current, () => model.ChooseShow(c))));
             items.Add(UI.Separator());
-            items.Add(UI.Item("Place Sets on Rigs…", () =>
+            items.Add(UI.Item(L("Place Sets on Rigs…"), () =>
             {
                 model.EditingRig = model.SelectedRig;
                 model.EditingRigSet = model.SelectedSet;
@@ -28,10 +28,10 @@ public sealed class SetMenu(AppModel model)
         });
         return button.Bind(model, [nameof(AppModel.Combinations), nameof(AppModel.ShowLabel), nameof(AppModel.EngineRunning)], b =>
         {
-            b.Content = UI.Label("square.split.bottomrightquarter", model.Combinations.Count == 0 ? "No Combination" : model.ShowLabel);
+            b.Content = UI.Label("square.split.bottomrightquarter", model.Combinations.Count == 0 ? L("No Combination") : model.ShowLabel);
             b.IsEnabled = !model.EngineRunning;
-            b.Tooltip(model.EngineRunning ? "A show runs with this set on this rig; stop it to switch"
-                : "The set on the rig the show runs with: the combinations made on the Rigs page");
+            b.Tooltip(model.EngineRunning ? L("A show runs with this set on this rig; stop it to switch")
+                : L("The set on the rig the show runs with: the combinations made on the Rigs page"));
         });
     }
 }
@@ -81,9 +81,9 @@ public sealed class DirectorMenu(AppModel model)
 
     string Short => _current switch
     {
-        "" or "rules" => "Rules",
-        var d when d.StartsWith("ollama:", StringComparison.Ordinal) => "AI · " + d[7..],
-        _ => "AI",
+        "" or "rules" => L("Rules"),
+        var d when d.StartsWith("ollama:", StringComparison.Ordinal) => L("AI · {0}", d[7..]),
+        _ => L("AI"),
     };
 
     public FrameworkElement Build()
@@ -92,7 +92,7 @@ public sealed class DirectorMenu(AppModel model)
         {
             var items = _options.Select(d =>
             {
-                var i = UI.Choice(d.Available ? d.Label : $"{d.Label} ({d.Note ?? "not available"})", "director", d.Value == _current,
+                var i = UI.Choice(d.Available ? d.Label : $"{d.Label} ({d.Note ?? L("not available")})", "director", d.Value == _current,
                                   () => Choose(d.Value));
                 i.IsEnabled = d.Available;
                 return (MenuFlyoutItemBase)i;
@@ -110,7 +110,7 @@ public sealed class DirectorMenu(AppModel model)
         if (_button is null) return;
         _button.Content = UI.Label(_current is "rules" or "" ? "list.bullet.rectangle" : "sparkles", Short);
         _button.IsEnabled = model.SelectedSet.Length > 0;
-        _button.Tooltip($"Decision model of this set: {_options.FirstOrDefault(o => o.Value == _current)?.Label ?? _current}");
+        _button.Tooltip(L("Decision model of this set: {0}", _options.FirstOrDefault(o => o.Value == _current)?.Label ?? _current));
     }
 
     async Task Load()
@@ -142,7 +142,7 @@ public sealed class DirectorMenu(AppModel model)
         catch (Exception e) when (e is HttpRequestException or SetupAPIException or TaskCanceledException or System.Text.Json.JsonException)
         {
             _current = before;
-            _problem = $"Couldn't switch: {e.Message}";
+            _problem = L("Couldn't switch: {0}", e.Message);
         }
         Show();
     }
@@ -169,8 +169,8 @@ public sealed class EngineButton(AppModel model, MainWindow window)
     UIElement Content()
     {
         if (model.EngineRunning)
-            return UI.Button("Stop", model.StopShow, "stop.fill").Tooltip("Stop the show (the lights black out) Ctrl+R");
-        var start = new SplitButton { Content = UI.Label("play.fill", "Start") };
+            return UI.Button(L("Stop"), model.StopShow, "stop.fill").Tooltip(L("Stop the show (the lights black out) Ctrl+R"));
+        var start = new SplitButton { Content = UI.Label("play.fill", L("Start")) };
         start.Click += (_, _) => model.StartLive();
         var flyout = new MenuFlyout();
         flyout.Opening += (_, _) =>
@@ -178,19 +178,19 @@ public sealed class EngineButton(AppModel model, MainWindow window)
             flyout.Items.Clear();
             foreach (var dj in model.Workspace?.DJSources() ?? [])
             {
-                var untested = dj.Verified.StartsWith("not yet", StringComparison.Ordinal) ? ", untested" : "";
-                flyout.Items.Add(UI.Item($"Start Live Show ({dj.App}{untested})", () => model.StartLive(source: dj.Name), "dot.radiowaves.left.and.right"));
+                var untested = dj.Verified.StartsWith("not yet", StringComparison.Ordinal);
+                flyout.Items.Add(UI.Item(untested ? L("Start Live Show ({0}, untested)", dj.App) : L("Start Live Show ({0})", dj.App), () => model.StartLive(source: dj.Name), "dot.radiowaves.left.and.right"));
             }
-            flyout.Items.Add(UI.Item("Start with a DJ Laptop…", () => DJLinkSheet.Present(model, window), "laptopcomputer.and.arrow.down"));
-            flyout.Items.Add(UI.Item("Play a Track…", () => PlayPanel.Choose(model, window), "music.note"));
-            flyout.Items.Add(UI.Item("Play a Track as Lightshow…", () => PlayPanel.Choose(model, window, lightshow: true), "sparkles"));
+            flyout.Items.Add(UI.Item(L("Start with a DJ Laptop…"), () => DJLinkSheet.Present(model, window), "laptopcomputer.and.arrow.down"));
+            flyout.Items.Add(UI.Item(L("Play a Track…"), () => PlayPanel.Choose(model, window), "music.note"));
+            flyout.Items.Add(UI.Item(L("Play a Track as Lightshow…"), () => PlayPanel.Choose(model, window, lightshow: true), "sparkles"));
         };
         start.Flyout = flyout;
         return start.Bind(model, [nameof(AppModel.Workspace), nameof(AppModel.SelectedSet), nameof(AppModel.ShowState)], b =>
         {
             b.IsEnabled = model.Workspace is not null && model.SelectedSet.Length > 0 && model.ShowState.Kind != ShowStateKind.Attached;
-            b.Tooltip(model.ShowState.Kind == ShowStateKind.Attached ? "An engine is already running outside the app"
-                : $"Start the live show: the lights follow {model.NextSourceName} Ctrl+R");
+            b.Tooltip(model.ShowState.Kind == ShowStateKind.Attached ? L("An engine is already running outside the app")
+                : L("Start the live show: the lights follow {0} Ctrl+R", model.NextSourceName));
         });
     }
 }

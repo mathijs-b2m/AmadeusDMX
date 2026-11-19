@@ -53,7 +53,7 @@ public sealed class StageRoom : Observable
         set { if (Set(ref _on, value)) Defaults.Standard.Set("stageInRoom", value); }
     }
 
-    public const string Help = "Inside the room: show the walls and the ceiling and keep the camera between them (Plan still looks from above; an open-air stage has neither). The room's size is in the rig editor, under Venue.";
+    public static string Help => L("Inside the room: show the walls and the ceiling and keep the camera between them (Plan still looks from above; an open-air stage has neither). The room's size is in the rig editor, under Venue.");
 }
 
 public sealed partial class StageRenderer

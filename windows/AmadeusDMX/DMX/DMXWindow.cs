@@ -36,10 +36,10 @@ public sealed class DMXPage(AppModel model)
         grid.Children.Add(universes);
 
         // Save (Ctrl+S), in the page: the main window's toolbar is the app's
-        var save = UI.Button("Save", () => _ = Save()).Prominent().Shortcut(VirtualKey.S)
+        var save = UI.Button(L("Save"), () => _ = Save()).Prominent().Shortcut(VirtualKey.S)
             .Bind(_dmx, [nameof(DMXModel.HasChanges), nameof(DMXModel.Saving)], b =>
             {
-                b.Content = _dmx.Saving ? "Saving…" : "Save";
+                b.Content = _dmx.Saving ? L("Saving…") : L("Save");
                 b.IsEnabled = _dmx.HasChanges && !_dmx.Saving;
             });
         var bar = UI.HStack(8, UI.Spacer(), save).Padding(16, 10);
@@ -75,18 +75,18 @@ public sealed class DMXPage(AppModel model)
 
     FrameworkElement DevicesPane()
     {
-        var add = UI.MenuButton(UI.Label("plus", "Add"), () => UI.Menu(
-            UI.Item("Art-Net Node", () => _dmx.Add(DMXModel.NewArtNet())),
-            UI.Item("sACN Node / Multicast", () => _dmx.Add(DMXModel.NewSACN())),
-            UI.Item("USB Interface", () => _dmx.Add(DMXModel.NewUSB()))));
-        var search = UI.Button("Search", () => _ = _dmx.Search(_model.Api), "antenna.radiowaves.left.and.right")
-            .Tooltip("Look for Art-Net nodes on the network and USB DMX interfaces on this computer")
+        var add = UI.MenuButton(UI.Label("plus", L("Add")), () => UI.Menu(
+            UI.Item(L("Art-Net Node"), () => _dmx.Add(DMXModel.NewArtNet())),
+            UI.Item(L("sACN Node / Multicast"), () => _dmx.Add(DMXModel.NewSACN())),
+            UI.Item(L("USB Interface"), () => _dmx.Add(DMXModel.NewUSB()))));
+        var search = UI.Button(L("Search"), () => _ = _dmx.Search(_model.Api), "antenna.radiowaves.left.and.right")
+            .Tooltip(L("Look for Art-Net nodes on the network and USB DMX interfaces on this computer"))
             .Bind(_dmx, nameof(DMXModel.Searching), b =>
             {
-                b.Content = UI.Label("antenna.radiowaves.left.and.right", _dmx.Searching ? "Searching…" : "Search");
+                b.Content = UI.Label("antenna.radiowaves.left.and.right", _dmx.Searching ? L("Searching…") : L("Search"));
                 b.IsEnabled = !_dmx.Searching;
             });
-        var header = UI.HStack(8, UI.Text("Your DMX Devices", Font.Headline), UI.Spacer(), add, search).Padding(12);
+        var header = UI.HStack(8, UI.Text(L("Your DMX Devices"), Font.Headline), UI.Spacer(), add, search).Padding(12);
 
         _list.SelectionChanged += (_, _) =>
         {
@@ -100,7 +100,7 @@ public sealed class DMXPage(AppModel model)
         _editor.Bind(_dmx, nameof(DMXModel.Selection), _ => ShowEditor());
 
         var lists = UI.VStack(8,
-            UI.Text("Devices", Font.Subheadline).Secondary().Bold().Margin(12, 0, 0, 0),
+            UI.Text(L("Devices"), Font.Subheadline).Secondary().Bold().Margin(12, 0, 0, 0),
             _devices,
             _found);
         var grid = new Grid();
@@ -133,7 +133,7 @@ public sealed class DMXPage(AppModel model)
             if (_dmx.Devices.Count == 0)
                 _list.Items.Add(new ListViewItem
                 {
-                    Content = UI.Text("No devices yet: add one, or search the network.").Secondary().Wrap(), IsEnabled = false,
+                    Content = UI.Text(L("No devices yet: add one, or search the network.")).Secondary().Wrap(), IsEnabled = false,
                 });
             _list.SelectedItem = _list.Items.OfType<ListViewItem>().FirstOrDefault(i => i.Tag as string == _dmx.Selection);
         }
@@ -148,13 +148,13 @@ public sealed class DMXPage(AppModel model)
         var rows = new List<UIElement?>();
         foreach (var n in nodes)
             rows.Add(Form.Row(UI.VStack(2, UI.Text(n.LongName is { Length: > 0 } l ? l : n.Name),
-                                         UI.Text($"Art-Net · {n.Ip} · {n.Outputs ?? 0} outputs", Font.Caption).Secondary()),
-                              UI.Button("Add", () => _dmx.AddNode(n))));
+                                         UI.Text(L("Art-Net · {0} · {1} outputs", n.Ip, n.Outputs ?? 0), Font.Caption).Secondary()),
+                              UI.Button(L("Add"), () => _dmx.AddNode(n))));
         foreach (var i in usb)
-            rows.Add(Form.Row(UI.VStack(2, UI.Text(i.Description ?? "USB DMX interface"),
+            rows.Add(Form.Row(UI.VStack(2, UI.Text(i.Description ?? L("USB DMX interface")),
                                          UI.Text($"USB · {i.Port}", Font.Caption).Secondary()),
-                              UI.Button("Add", () => _dmx.AddUSB(i))));
-        return Form.Section("Found", rows).Padding(12, 0);
+                              UI.Button(L("Add"), () => _dmx.AddUSB(i))));
+        return Form.Section(L("Found"), rows).Padding(12, 0);
     }
 
     void ShowEditor()
@@ -176,7 +176,7 @@ public sealed class DMXPage(AppModel model)
     UIElement Universes()
     {
         var rows = new List<UIElement?>();
-        var none = new DMXDevice("", "Not sent", "");
+        var none = new DMXDevice("", L("Not sent"), "");
         foreach (var (universe, fixtures) in _dmx.Universes)
         {
             var r = _dmx.RouteOf(universe);
@@ -186,20 +186,20 @@ public sealed class DMXPage(AppModel model)
                 d => _dmx.SetRoute(universe, new DMXModel.Route(d.Id.Length == 0 ? null : d.Id, r.Output)));
             UIElement? output = null;
             if (_dmx.Device(r.Device) is { OutputCount: > 1 } dev)
-                output = UI.Picker(Enumerable.Range(1, dev.OutputCount).ToList(), r.Output, o => $"Output {o}",
+                output = UI.Picker(Enumerable.Range(1, dev.OutputCount).ToList(), r.Output, o => L("Output {0}", o),
                     o => _dmx.SetRoute(universe, new DMXModel.Route(r.Device, o)));
-            var detail = $"{fixtures} fixture{(fixtures == 1 ? "" : "s")}" + (_dmx.Target(universe) is { } t ? $" · {t}" : "");
-            rows.Add(Form.Row(Form.Labeled($"Universe {universe}", detail), UI.HStack(8, device, output)));
+            var detail = (fixtures == 1 ? L("1 fixture") : L("{0} fixtures", fixtures)) + (_dmx.Target(universe) is { } t ? $" · {t}" : "");
+            rows.Add(Form.Row(Form.Labeled(L("Universe {0}", universe), detail), UI.HStack(8, device, output)));
         }
         if (_dmx.Universes.Count == 0 && !_dmx.Loading)
-            rows.Add(UI.Text("This set has no fixtures yet.").Secondary());
+            rows.Add(UI.Text(L("This set has no fixtures yet.")).Secondary());
         return UI.VStack(12,
             UI.VStack(4,
-                UI.Text($"Set “{_model.SelectedSet}”", Font.Headline),
-                UI.Text("Where each universe of the set goes. Change the devices or the venue: only this changes, the patch stays.", Font.Callout)
+                UI.Text(L("Set “{0}”", _model.SelectedSet), Font.Headline),
+                UI.Text(L("Where each universe of the set goes. Change the devices or the venue: only this changes, the patch stays."), Font.Callout)
                     .Secondary().Wrap()),
             _dmx.Legacy is { } legacy
-                ? Form.Note("info.circle", $"Now: {legacy} (the set’s own settings). Choose a device per universe to use your devices instead.")
+                ? Form.Note("info.circle", L("Now: {0} (the set’s own settings). Choose a device per universe to use your devices instead.", legacy))
                 : null,
             Form.Section(null, rows),
             UI.VStack(4, [.. _dmx.Problems.Select(p => (UIElement)Form.Note("exclamationmark.triangle.fill", p, Tint.Orange))]),
@@ -215,8 +215,8 @@ public sealed class DeviceEditor(DMXDevice device, IReadOnlyList<USBInterface> u
 
     public FrameworkElement Build()
     {
-        var name = UI.Field("Name", device.Name, v => { device.Name = v; changed(); });
-        var kinds = new[] { ("artnet", "Art-Net node"), ("sacn", "sACN (E1.31)"), ("enttec_pro", "USB interface (DMX USB Pro)") };
+        var name = UI.Field(L("Name"), device.Name, v => { device.Name = v; changed(); });
+        var kinds = new[] { ("artnet", L("Art-Net node")), ("sacn", "sACN (E1.31)"), ("enttec_pro", L("USB interface (DMX USB Pro)")) };
         var kind = UI.Picker(kinds, kinds.FirstOrDefault(k => k.Item1 == device.Type), k => k.Item2, k =>
         {
             device.Type = k.Item1;
@@ -224,11 +224,11 @@ public sealed class DeviceEditor(DMXDevice device, IReadOnlyList<USBInterface> u
             _kind.Content = KindRows();
         });
         _kind.Content = KindRows();
-        var removeButton = UI.Button("Remove Device", remove).Foreground(Tint.Red);
+        var removeButton = UI.Button(L("Remove Device"), remove).Foreground(Tint.Red);
         return Form.Section(null,
             [
-                Form.Row("Name", name.MinWidth(180)),
-                Form.Row("Kind", kind),
+                Form.Row(L("Name"), name.MinWidth(180)),
+                Form.Row(L("Kind"), kind),
                 _kind,
                 UI.HStack(UI.Spacer(), removeButton),
             ]);
@@ -243,13 +243,13 @@ public sealed class DeviceEditor(DMXDevice device, IReadOnlyList<USBInterface> u
                 var ports = new List<string> { "auto" };
                 ports.AddRange(usb.Select(i => i.Port));
                 if (device.Port is { } p && !ports.Contains(p)) ports.Add(p);
-                rows.Children.Add(Form.Row("Port", UI.Picker(ports, device.Port ?? "auto", x => x == "auto" ? "The first one found" : LastPart(x),
+                rows.Children.Add(Form.Row(L("Port"), UI.Picker(ports, device.Port ?? "auto", x => x == "auto" ? L("The first one found") : LastPart(x),
                     x => { device.Port = x; changed(); })));
                 break;
             case "sacn":
-                var ip = UI.Field("Node IP address", device.Ip ?? "", v => { if (device.Ip is not null) { device.Ip = v; changed(); } });
-                var ipRow = Form.Row("Node IP address", ip.MinWidth(160)).Visible(device.Ip is not null);
-                rows.Children.Add(Form.Row("Multicast (every sACN node listens)", UI.Toggle("", device.Ip is null, on =>
+                var ip = UI.Field(L("Node IP address"), device.Ip ?? "", v => { if (device.Ip is not null) { device.Ip = v; changed(); } });
+                var ipRow = Form.Row(L("Node IP address"), ip.MinWidth(160)).Visible(device.Ip is not null);
+                rows.Children.Add(Form.Row(L("Multicast (every sACN node listens)"), UI.Toggle("", device.Ip is null, on =>
                 {
                     device.Ip = on ? null : "2.0.0.10";
                     ip.Text = device.Ip ?? "";
@@ -257,12 +257,12 @@ public sealed class DeviceEditor(DMXDevice device, IReadOnlyList<USBInterface> u
                     changed();
                 })));
                 rows.Children.Add(ipRow);
-                rows.Children.Add(Form.Stepper(device.Priority ?? 100, 0, 200, v => $"Priority {v}", v => { device.Priority = v; changed(); }, 10));
+                rows.Children.Add(Form.Stepper(device.Priority ?? 100, 0, 200, v => L("Priority {0}", v), v => { device.Priority = v; changed(); }, 10));
                 Numbering(rows, 1);
                 break;
             default:
-                rows.Children.Add(Form.Row("Node IP address",
-                    UI.Field("Node IP address", device.Ip ?? "", v => { device.Ip = v; changed(); }).MinWidth(160)));
+                rows.Children.Add(Form.Row(L("Node IP address"),
+                    UI.Field(L("Node IP address"), device.Ip ?? "", v => { device.Ip = v; changed(); }).MinWidth(160)));
                 Numbering(rows, 0);
                 break;
         }
@@ -271,10 +271,10 @@ public sealed class DeviceEditor(DMXDevice device, IReadOnlyList<USBInterface> u
 
     void Numbering(Stack rows, int first)
     {
-        rows.Children.Add(Form.Stepper(device.OutputCount, 1, 64, v => $"Outputs: {v}", v => { device.Outputs = v; changed(); }));
-        rows.Children.Add(Form.Row("Its first output is", UI.Picker([0, 1], device.FirstUniverse ?? first, u => $"Universe {u}",
+        rows.Children.Add(Form.Stepper(device.OutputCount, 1, 64, v => L("Outputs: {0}", v), v => { device.Outputs = v; changed(); }));
+        rows.Children.Add(Form.Row(L("Its first output is"), UI.Picker([0, 1], device.FirstUniverse ?? first, u => L("Universe {0}", u),
                 u => { device.FirstUniverse = u; changed(); })
-            .Tooltip("How the device counts: most Art-Net nodes call their first output universe 0, sACN starts at 1.")));
+            .Tooltip(L("How the device counts: most Art-Net nodes call their first output universe 0, sACN starts at 1."))));
     }
 
     /// "\\.\COM3" → "COM3"

@@ -12,6 +12,10 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
   </ItemGroup>
   <ItemGroup>
+    <!-- the words in other languages (Strings.cs): {"English": "translation"}, one file per language -->
+    <EmbeddedResource Include="Strings\*.json" LogicalName="AmadeusKit.Strings.%(Filename).json" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="AmadeusKit.Tests" />
   </ItemGroup>
 </Project>

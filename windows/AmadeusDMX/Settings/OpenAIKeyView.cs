@@ -9,7 +9,7 @@ public sealed class OpenAIKeyView(AppModel model)
 {
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
 
-    readonly PasswordBox _entry = new() { PlaceholderText = "Paste your key: sk-…" };
+    readonly PasswordBox _entry = new() { PlaceholderText = L("Paste your key: sk-…") };
     KeySource _source = KeySource.Current(Keychain.OpenAIKey, model.Workspace);
     (bool Ok, string Text)? _check;
     bool _checking;
@@ -34,19 +34,19 @@ public sealed class OpenAIKeyView(AppModel model)
     void Refresh()
     {
         var t = Trimmed;
-        var save = UI.Button("Save", Save).Disabled(!t.StartsWith("sk-", StringComparison.Ordinal));
+        var save = UI.Button(L("Save"), Save).Disabled(!t.StartsWith("sk-", StringComparison.Ordinal));
         if (t.StartsWith("sk-", StringComparison.Ordinal)) save.Prominent();
-        var check = UI.Button(_checking ? "Checking…" : "Check Key", () => _ = Verify())
+        var check = UI.Button(_checking ? L("Checking…") : L("Check Key"), () => _ = Verify())
             .Disabled(_checking || (t.Length == 0 && _source.Where == KeySource.Kind.None));
         _inUse.Content = UI.VStack(10, InUse(), model.AiKeyWarning is { } refused ? Form.Note("key", refused, Tint.Orange) : null);
         _warning.Content = t.Length > 0 && !t.StartsWith("sk-", StringComparison.Ordinal)
-            ? Form.Note("exclamationmark.triangle", "OpenAI keys start with sk-", Tint.Orange) : null;
+            ? Form.Note("exclamationmark.triangle", L("OpenAI keys start with sk-"), Tint.Orange) : null;
         _buttons.Content = UI.HStack(8,
             save,
             check,
-            _source.Where == KeySource.Kind.Stored ? UI.Button("Remove", Remove).Foreground(Tint.Red) : null,
+            _source.Where == KeySource.Kind.Stored ? UI.Button(L("Remove"), Remove).Foreground(Tint.Red) : null,
             UI.Spacer(),
-            UI.Link("Get a key", () => Dialogs.OpenURL("https://platform.openai.com/api-keys")).Font(Font.Callout));
+            UI.Link(L("Get a key"), () => Dialogs.OpenURL("https://platform.openai.com/api-keys")).Font(Font.Callout));
         _result.Content = UI.VStack(6,
             _check is { } c ? Form.Note(c.Ok ? "checkmark.circle.fill" : "xmark.octagon.fill", c.Text, c.Ok ? Tint.Green : Tint.Red) : null,
             _note is { } n ? UI.Text(n, Font.Callout).Secondary().Wrap() : null);
@@ -54,9 +54,9 @@ public sealed class OpenAIKeyView(AppModel model)
 
     UIElement InUse() => _source.Where switch
     {
-        KeySource.Kind.Stored => Form.Note("key.fill", $"In use: your key {KeySource.Masked(_source.Key)}, from Windows Credential Manager", null, Font.Body),
-        KeySource.Kind.EnvFile => Form.Note("doc.text", "In use: the key in the engine folder's .env. A key saved here is used instead.", null, Font.Body),
-        _ => Form.Note("key", "No key: the rule-based director lights the show. Add a key to let the AI decide.", null, Font.Body),
+        KeySource.Kind.Stored => Form.Note("key.fill", L("In use: your key {0}, from Windows Credential Manager", KeySource.Masked(_source.Key)), null, Font.Body),
+        KeySource.Kind.EnvFile => Form.Note("doc.text", L("In use: the key in the engine folder's .env. A key saved here is used instead."), null, Font.Body),
+        _ => Form.Note("key", L("No key: the rule-based director lights the show. Add a key to let the AI decide."), null, Font.Body),
     };
 
     void Save()
@@ -64,14 +64,14 @@ public sealed class OpenAIKeyView(AppModel model)
         if (!Trimmed.StartsWith("sk-", StringComparison.Ordinal)) return;
         Keychain.OpenAIKey = Trimmed;
         _entry.Password = "";
-        Changed("Saved.");
+        Changed(L("Saved."));
         _ = Verify(Keychain.OpenAIKey);
     }
 
     void Remove()
     {
         Keychain.OpenAIKey = null;
-        Changed(model.Workspace?.HasEnvKey == true ? "Removed. The engine folder's .env key is used again." : "Removed.");
+        Changed(model.Workspace?.HasEnvKey == true ? L("Removed. The engine folder's .env key is used again.") : L("Removed."));
     }
 
     void Changed(string text)
@@ -79,7 +79,7 @@ public sealed class OpenAIKeyView(AppModel model)
         _source = KeySource.Current(Keychain.OpenAIKey, model.Workspace);
         _check = null;
         _ = model.RestartSetupService();  // the setup page shows which directors can run: the new key
-        _note = text + (model.EngineRunning ? " The running show keeps the old key until it is started again." : "");
+        _note = model.EngineRunning ? text + " " + L("The running show keeps the old key until it is started again.") : text;
         Refresh();
     }
 
@@ -87,7 +87,7 @@ public sealed class OpenAIKeyView(AppModel model)
     async Task Verify(string? given = null)
     {
         var key = given ?? (Trimmed.Length == 0 ? (_source.Where == KeySource.Kind.Stored ? _source.Key : null) : Trimmed);
-        if (key is null) { _check = (false, "The .env key is checked when the engine uses it."); Refresh(); return; }
+        if (key is null) { _check = (false, L("The .env key is checked when the engine uses it.")); Refresh(); return; }
         _checking = true;
         Refresh();
         try
@@ -97,15 +97,15 @@ public sealed class OpenAIKeyView(AppModel model)
             using var resp = await Http.SendAsync(req);
             _check = (int)resp.StatusCode switch
             {
-                200 => (true, "OpenAI accepts this key."),
-                401 => (false, "OpenAI doesn't accept this key (wrong, revoked, or from another account)."),
-                429 => (true, "The key works, but its quota or rate limit is reached for now."),
-                var code => (false, $"OpenAI answered {code}. Try again later."),
+                200 => (true, L("OpenAI accepts this key.")),
+                401 => (false, L("OpenAI doesn't accept this key (wrong, revoked, or from another account).")),
+                429 => (true, L("The key works, but its quota or rate limit is reached for now.")),
+                var code => (false, L("OpenAI answered {0}. Try again later.", code)),
             };
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            _check = (false, $"Couldn't reach OpenAI: {e.Message}");
+            _check = (false, L("Couldn't reach OpenAI: {0}", e.Message));
         }
         _checking = false;
         Refresh();

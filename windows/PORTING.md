@@ -83,4 +83,12 @@ models (and in AmadeusKit when it isn't UI). Amadeus Link compiles the same `Sha
 - No ban2media traces, no personal names or paths; bundle-like ids are `io.github.amadeusdmx.*`.
 - Every string the Mac app shows keeps its wording on Windows, with Windows terms (Settings, Ctrl, File
   Explorer, the notification area).
+- Shown words go through `L("…")` (AmadeusKit/Strings.cs): the English is the key, translations are in
+  `AmadeusKit/Strings/<language>.json` (Latin American Spanish, `es-419`, so far). A sentence with values is one
+  string with holes, `L("{0} m tall", h)`, never pieces glued together; numbers shown in it follow the language,
+  numbers in files and on the wire stay InvariantCulture (never set CurrentCulture). A new or reworded `L("…")`
+  needs its translation in the same change: StringsTests lists what is missing or no longer used. One word
+  with two meanings carries the one meant after a bar, `L("Show|verb")`; English kept for matching but shown
+  translated is marked `Key("…")`. Not translated yet: text the engine sends (problems, notes, decisions) and
+  Amadeus Link.
 - Never write into the installed program folder; user data goes to `%LOCALAPPDATA%\Amadeus DMX`.

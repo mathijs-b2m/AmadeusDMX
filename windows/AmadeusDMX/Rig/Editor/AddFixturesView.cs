@@ -16,20 +16,20 @@ public sealed class AddFixturesView(AppModel model, RigEditorModel editor)
 
     async Task Show(XamlRoot root)
     {
-        var query = new TextBox { PlaceholderText = "Search: sharpy, katana, pixbar, atomic…" };
+        var query = new TextBox { PlaceholderText = L("Search: sharpy, katana, pixbar, atomic…") };
         var list = new ListView { Height = 200, SelectionMode = ListViewSelectionMode.Single };
         var modes = new ComboBox { MinWidth = 160, Visibility = Visibility.Collapsed };
         var count = new NumberBox { Value = 4, Minimum = 1, Maximum = 48, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline,
-                                    Header = "Count", Visibility = Visibility.Collapsed };
+                                    Header = L("Count"), Visibility = Visibility.Collapsed };
         var note = UI.Text("", Font.Caption).Wrap();
         var error = UI.Text("", Font.Caption).Foreground(Tint.Red).Wrap();
         var spinner = UI.Spinner().Visible(false);
         var dialog = new ContentDialog
         {
-            XamlRoot = root, Title = "Add Fixtures", PrimaryButtonText = "Add", CloseButtonText = "Cancel", IsPrimaryButtonEnabled = false,
+            XamlRoot = root, Title = L("Add Fixtures"), PrimaryButtonText = L("Add"), CloseButtonText = L("Cancel"), IsPrimaryButtonEnabled = false,
             DefaultButton = ContentDialogButton.Primary,
             Content = UI.VStack(12,
-                UI.Text(IsOnTruss ? "They’re spread along the selected truss." : "They’re placed on the stage floor; drag them onto a truss.", Font.Caption)
+                UI.Text(IsOnTruss ? L("They’re spread along the selected truss.") : L("They’re placed on the stage floor; drag them onto a truss."), Font.Caption)
                     .Secondary().Wrap(),
                 query, list, UI.HStack(12, modes, count), note, error, spinner).Frame(width: 380),
         };
@@ -47,7 +47,7 @@ public sealed class AddFixturesView(AppModel model, RigEditorModel editor)
             list.Items.Clear();
             foreach (var r in _results)
             {
-                var detail = string.Join(" · ", new[] { r.Type, r.IsLocal ? "in your library" : r.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0));
+                var detail = string.Join(" · ", new[] { r.Type, r.IsLocal ? L("in your library") : r.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0));
                 list.Items.Add(new ListViewItem { Content = UI.VStack(0, UI.Text($"{r.Manufacturer} {r.Model}"), UI.Text(detail, Font.Caption).Secondary()), Tag = r });
             }
         };
@@ -59,7 +59,7 @@ public sealed class AddFixturesView(AppModel model, RigEditorModel editor)
             {
                 var k = e.IsLocal ? e.Key : await model.Api.AddToLibrary(e.Key);  // QLC+/OFL → our library
                 _key = k;
-                if (editor.Definition(k) is not { } def) { error.Text = $"Couldn’t read {k}"; return; }
+                if (editor.Definition(k) is not { } def) { error.Text = L("Couldn’t read {0}", k); return; }
                 note.Text = def.AddingNote ?? "";
                 note.Foreground(def.Warning is not null ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Tint.Red) : Theme.Brush("TextFillColorSecondaryBrush"));
                 modes.Items.Clear();

@@ -9,47 +9,55 @@ public sealed class RigStep(AppModel model, WizardModel w)
 {
     public UIElement Build() =>
         UI.VStack(14,
-            StepHeader.Build("square.split.bottomrightquarter", "Where Do They Hang?",
-                "A rig is the venue: the stage and what your fixtures hang on. You can have one per venue and mount the same set on each."),
+            StepHeader.Build("square.split.bottomrightquarter", L("Where Do They Hang?"),
+                L("A rig is the venue: the stage and what your fixtures hang on. You can have one per venue and mount the same set on each.")),
             UI.Live(w, Body, nameof(WizardModel.UseExistingRig), nameof(WizardModel.Template), nameof(WizardModel.AutoMount)));
 
     UIElement Body()
     {
         var s = UI.VStack(14);
         if (model.Rigs.Count > 0)
-            s.Children.Add(UI.Segmented([false, true], w.UseExistingRig, v => v ? "A rig I have" : "A new rig", v => w.UseExistingRig = v));
+            s.Children.Add(UI.Segmented([false, true], w.UseExistingRig, v => v ? L("A rig I have") : L("A new rig"), v => w.UseExistingRig = v));
         if (w.UseExistingRig)
         {
             if (w.ExistingRig.Length == 0) w.ExistingRig = model.SelectedRig;
-            s.Children.Add(Form.Row("Rig", UI.Picker(model.Rigs.Select(r => r.Name).ToList(), w.ExistingRig,
+            s.Children.Add(Form.Row(L("Rig"), UI.Picker(model.Rigs.Select(r => r.Name).ToList(), w.ExistingRig,
                 n => model.Rigs.FirstOrDefault(r => r.Name == n) is { } r ? $"{r.Name} — {r.Summary}" : n, n => w.ExistingRig = n)));
         }
         else
         {
-            var cards = UI.HStack(8);
+            // two rows: nine in one left about 30 px for a name ("Two Stands" cut short, worse in Spanish)
+            const int perRow = 5;
+            var cards = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+            for (var c = 0; c < perRow; c++) cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var i = 0;
             foreach (var t in RigTemplates.All)
             {
                 var card = ChoiceCard.Build(UI.VStack(4, Sketch.Build(t).Frame(height: 44), UI.Text(t.Title(), Font.Caption).Bold().Wrap(2)),
                                             () => w.Template = t, selected: w.Template == t).Tooltip(t.Detail());
                 card.MinHeight = 90;
                 card.VerticalContentAlignment = VerticalAlignment.Top;
-                cards.Children.Add(card.Grow());
+                if (i / perRow >= cards.RowDefinitions.Count) cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetRow(card, i / perRow);
+                Grid.SetColumn(card, i % perRow);
+                cards.Children.Add(card);
+                i++;
             }
             s.Children.Add(cards);
             var rows = new List<UIElement?>
             {
-                Form.Row("Rig name", UI.Field("Rig name", w.RigName, v => w.RigName = v).MinWidth(200)),
-                SizeRow.Build("Stage width", w.Width, 2, 30, 0.5, v => w.Width = v),
-                w.Template != RigTemplate.Floor ? SizeRow.Build("Truss height", w.Height, 2, 12, 0.5, v => w.Height = v) : null,
-                Form.Row("LED wall behind the DJ", UI.Toggle("", w.LedWall, v => w.LedWall = v)),
+                Form.Row(L("Rig name"), UI.Field(L("Rig name"), w.RigName, v => w.RigName = v).MinWidth(200)),
+                SizeRow.Build(L("Stage width"), w.Width, 2, 30, 0.5, v => w.Width = v),
+                w.Template != RigTemplate.Floor ? SizeRow.Build(L("Truss height"), w.Height, 2, 12, 0.5, v => w.Height = v) : null,
+                Form.Row(L("LED wall behind the DJ"), UI.Toggle("", w.LedWall, v => w.LedWall = v)),
             };
             s.Children.Add(Form.Section(null, rows));
         }
-        s.Children.Add(Form.Row(UI.Text("Your fixtures on it"),
-            Form.Radio([true, false], w.AutoMount, v => v ? "Auto-mount them" : "I’ll place them myself", v => w.AutoMount = v)));
+        s.Children.Add(Form.Row(UI.Text(L("Your fixtures on it")),
+            Form.Radio([true, false], w.AutoMount, v => v ? L("Auto-mount them") : L("I’ll place them myself"), v => w.AutoMount = v)));
         s.Children.Add(UI.Text(w.AutoMount
-                ? "Heads under the trusses, lasers high at the back, bars on the floor: a sensible start you can change in the rig editor."
-                : "They wait on the floor in front of the stage; drag them onto the trusses in the rig editor.", Font.Caption).Secondary().Wrap());
+                ? L("Heads under the trusses, lasers high at the back, bars on the floor: a sensible start you can change in the rig editor.")
+                : L("They wait on the floor in front of the stage; drag them onto the trusses in the rig editor."), Font.Caption).Secondary().Wrap());
         return s;
     }
 
@@ -148,7 +156,7 @@ public static class SizeRow
     public static FrameworkElement Build(string title, double value, double min, double max, double step, Action<double> changed)
     {
         static string Text(double v, double step) =>
-            step < 1 ? $"{v.ToString("0.0", System.Globalization.CultureInfo.CurrentCulture)} m" : $"{(int)v} m";
+            step < 1 ? $"{Strings.Number(v, "0.0")} m" : $"{(int)v} m";
         var label = UI.Text(Text(value, step)).Frame(width: 56);
         label.TextAlignment = TextAlignment.Right;
         var slider = UI.Slider(value, min, max, v => { label.Text = Text(v, step); changed(v); }, step).MinWidth(160);

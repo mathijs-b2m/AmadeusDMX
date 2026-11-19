@@ -8,6 +8,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using static AmadeusKit.Strings;
 
 namespace AmadeusKit;
 
@@ -92,7 +93,7 @@ public sealed class SetupAPIException(string message, bool notRunning = false) :
 {
     public bool NotRunning { get; } = notRunning;
     public static SetupAPIException Server(string s) => new(s);
-    public static SetupAPIException NotRunningError() => new("The engine's setup service is not running.", true);
+    public static SetupAPIException NotRunningError() => new(L("The engine's setup service is not running."), true);
 }
 
 public sealed class SetupAPI
@@ -318,7 +319,7 @@ public sealed class SetupAPI
         if (resp.Content.Headers.ContentType?.MediaType?.StartsWith("text/html", StringComparison.Ordinal) != true)
         {
             Decode(data, AnyObject);  // throws the engine's error
-            throw SetupAPIException.Server("The engine sent no hang sheet.");
+            throw SetupAPIException.Server(L("The engine sent no hang sheet."));
         }
         return data;
     }
@@ -477,7 +478,7 @@ public sealed class SetupAPI
         if (type?.StartsWith("application/pdf", StringComparison.Ordinal) != true)
         {
             Decode(data, AnyObject);  // throws the engine's error
-            throw SetupAPIException.Server("The engine sent no page.");
+            throw SetupAPIException.Server(L("The engine sent no page."));
         }
         return data;
     }
@@ -820,9 +821,9 @@ public sealed record LightTest
         {
             var first = Channels.Count > 0 ? Channels[0] : 0;
             var last = Channels.Count > 0 ? Channels[^1] : first;
-            var s = new StringBuilder($"universe {Universe}, channels {first}–{last} · {Output}");
-            if (WireUniverse is { } w) s.Append($" (universe {w} on the wire)");
-            return s.ToString();
+            return WireUniverse is { } w
+                ? L("universe {0}, channels {1}–{2} · {3} (universe {4} on the wire)", Universe, first, last, Output, w)
+                : L("universe {0}, channels {1}–{2} · {3}", Universe, first, last, Output);
         }
     }
 }
@@ -856,8 +857,8 @@ public sealed record DMXDevice
 
     public string AddressText => Type switch
     {
-        "sacn" => Ip ?? "multicast",
-        "enttec_pro" => Port is { } p ? (p == "auto" ? "first one found" : RigFile.LastPathComponent(p)) : "auto",
+        "sacn" => Ip ?? L("multicast"),
+        "enttec_pro" => Port is { } p ? (p == "auto" ? L("first one found") : RigFile.LastPathComponent(p)) : "auto",
         _ => Ip ?? "–",
     };
 

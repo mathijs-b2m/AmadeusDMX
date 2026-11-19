@@ -31,8 +31,8 @@ public sealed class UndoManager : Observable
     public string RedoActionName => _redo.Count > 0 ? _redo[^1].Name : "";
 
     /// "Undo Move Truss" / "Undo".
-    public string UndoMenuTitle => UndoActionName.Length > 0 ? $"Undo {UndoActionName}" : "Undo";
-    public string RedoMenuTitle => RedoActionName.Length > 0 ? $"Redo {RedoActionName}" : "Redo";
+    public string UndoMenuTitle => UndoActionName.Length > 0 ? L("Undo {0}", UndoActionName) : L("Undo");
+    public string RedoMenuTitle => RedoActionName.Length > 0 ? L("Redo {0}", RedoActionName) : L("Redo");
 
     public void BeginUndoGrouping()
     {

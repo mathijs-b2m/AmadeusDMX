@@ -29,16 +29,16 @@ public sealed class EngineView(AppModel model)
         _scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
         _scroll.HorizontalScrollMode = ScrollMode.Auto;
 
-        var which = UI.Segmented([0, 1], _which, i => i == 0 ? "Show Engine" : "Setup Service", i => { _which = i; Watch(); });
-        var filter = new AutoSuggestBox { PlaceholderText = "Filter", QueryIcon = new SymbolIcon(Symbol.Find), Width = 220 };
+        var which = UI.Segmented([0, 1], _which, i => i == 0 ? L("Show Engine") : L("Setup Service"), i => { _which = i; Watch(); });
+        var filter = new AutoSuggestBox { PlaceholderText = L("Filter"), QueryIcon = new SymbolIcon(Symbol.Find), Width = 220 };
         filter.TextChanged += (_, _) => { _filter = filter.Text; Sync(); };
         // Ctrl+F: to the filter (the Mac's search field in the toolbar, ⌘F)
         var find = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = Windows.System.VirtualKey.F, Modifiers = Windows.System.VirtualKeyModifiers.Control };
         find.Invoked += (_, e) => { filter.Focus(FocusState.Keyboard); e.Handled = true; };
-        var follow = new ToggleButton { Content = UI.Label("arrow.down.to.line", "Follow"), IsChecked = _follow }.Tooltip("Keep scrolling to the newest line");
+        var follow = new ToggleButton { Content = UI.Label("arrow.down.to.line", L("Follow")), IsChecked = _follow }.Tooltip(L("Keep scrolling to the newest line"));
         follow.Click += (_, _) => { _follow = follow.IsChecked == true; if (_follow) ScrollToEnd(); };
-        var copy = UI.Button("Copy", Copy, "doc.on.doc");
-        var clear = UI.Button("Clear", () => Proc.ClearLog(), "trash");
+        var copy = UI.Button(L("Copy"), Copy, "doc.on.doc");
+        var clear = UI.Button(L("Clear"), () => Proc.ClearLog(), "trash");
         var bar = UI.HStack(8, which, UI.Spacer(), filter, follow, copy, clear).Padding(16, 8);
 
         _empty = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, IsTabStop = false };

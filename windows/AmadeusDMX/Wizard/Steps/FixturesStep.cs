@@ -4,7 +4,7 @@ namespace AmadeusDMX;
 
 public sealed class FixturesStep(AppModel model, WizardModel w)
 {
-    readonly TextBox _query = new() { PlaceholderText = "e.g. beamz fuze, mac encore, laserworld", BorderThickness = new Thickness(0) };
+    readonly TextBox _query = new() { PlaceholderText = L("e.g. beamz fuze, mac encore, laserworld"), BorderThickness = new Thickness(0) };
     CancellationTokenSource? _typing;
 
     public UIElement Build()
@@ -19,8 +19,8 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
             CornerRadius = new CornerRadius(9), Background = Theme.Brush("ControlFillColorSecondaryBrush"),
         };
         return UI.VStack(14,
-            StepHeader.Build("light.overhead.right.fill", "Your Fixtures",
-                "The gear you bring to every gig: your set. Search our library, QLC+, the Open Fixture Library and DMXControl by brand or model. Where they hang comes next."),
+            StepHeader.Build("light.overhead.right.fill", L("Your Fixtures"),
+                L("The gear you bring to every gig: your set. Search our library, QLC+, the Open Fixture Library and DMXControl by brand or model. Where they hang comes next.")),
             field,
             UI.Live(w, Results, nameof(WizardModel.Results)),
             UI.Live(w, Planned, nameof(WizardModel.Planned), nameof(WizardModel.Results)));
@@ -46,9 +46,9 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
                 UI.Icon(AddToSetSheet.Icon(e)).Secondary().Frame(width: 22),
                 UI.VStack(1,
                     UI.Text($"{e.Manufacturer} {e.Model}"),
-                    UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? "in your library" : e.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0)),
+                    UI.Text(string.Join(" · ", new[] { e.Type, e.Look, e.IsLocal ? L("in your library") : e.Source?.ToUpperInvariant() }.OfType<string>().Where(t => t.Length > 0)),
                             Font.Caption).Secondary()).Grow(),
-                UI.Button("Add", () =>
+                UI.Button(L("Add"), () =>
                 {
                     _ = w.Add(e, model.Api);
                     _typing?.Cancel();
@@ -62,7 +62,7 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
 
     UIElement? Planned()
     {
-        if (w.Planned.Count == 0) return w.Results.Count == 0 ? UI.Text("No fixtures yet.").Secondary() : null;
+        if (w.Planned.Count == 0) return w.Results.Count == 0 ? UI.Text(L("No fixtures yet.")).Secondary() : null;
         var list = UI.VStack(8, [.. w.Planned.Select(p =>
         {
             var row = UI.HStack(10,
@@ -71,10 +71,10 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
                 p.Modes.Count > 1 ? UI.Picker(p.Modes, p.Mode, m => m, m => { p.Mode = m; w.PlannedChanged(); }).Frame(width: 110) : null,
                 Form.Stepper(p.Count, 1, 120, v => $"{v}×", v => { p.Count = v; w.PlannedChanged(); }).Frame(width: 120),
                 Start(p),
-                UI.IconButton("minus.circle.fill", "Remove", () => w.Remove(p)));
+                UI.IconButton("minus.circle.fill", L("Remove"), () => w.Remove(p)));
             return (UIElement)UI.Card(row, padding: 10);
         })]);
-        list.Children.Add(UI.Text("Addresses are optional here: type the one set on the first fixture of a row, or leave it empty and give them later on the Sets page. Fixtures without one play in the visualiser only.",
+        list.Children.Add(UI.Text(L("Addresses are optional here: type the one set on the first fixture of a row, or leave it empty and give them later on the Sets page. Fixtures without one play in the visualiser only."),
                                   Font.Callout).Secondary().Wrap());
         if (Capacity() is { } c) list.Children.Add(c);
         return list;
@@ -83,9 +83,9 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
     /// The start address set on the first of a row (the others follow one after another); empty: given later.
     static UIElement Start(PlannedFixture p)
     {
-        var t = new TextBox { PlaceholderText = "address", Text = p.Start, Width = 64, MinWidth = 0, TextAlignment = TextAlignment.Right };
+        var t = new TextBox { PlaceholderText = L("address"), Text = p.Start, Width = 64, MinWidth = 0, TextAlignment = TextAlignment.Right };
         t.TextChanged += (_, _) => p.Start = t.Text;
-        return t.Tooltip("The start address set on the first of them; the others follow one after another. Empty: give them later on the Sets page.");
+        return t.Tooltip(L("The start address set on the first of them; the others follow one after another. Empty: give them later on the Sets page."));
     }
 
     /// The universes the fixtures take against what the DMX output carries.
@@ -94,11 +94,14 @@ public sealed class FixturesStep(AppModel model, WizardModel w)
         var need = w.UniversesNeeded;
         if (w.UniversesAvailable is { } have && need > have)
             return Form.Note("exclamationmark.triangle.fill",
-                $"{need} universes needed, {w.OutputText} carries {have}. The fixtures past universe {have} stay dark: take fewer, a smaller mode, or go back and tick another node.",
+                L("{0} universes needed, {1} carries {2}. The fixtures past universe {2} stay dark: take fewer, a smaller mode, or go back and tick another node.", need, w.OutputText, have),
                 Tint.Orange);
         if (need > 0)
-            return Form.Note("cable.connector", $"{need} universe{(need == 1 ? "" : "s")}"
-                + (w.UniversesAvailable is { } a ? $" of the {a} on {w.OutputText}" : w.OutputKind == WizardModel.Output.Visualiser ? " (visualiser only)" : ""));
+            return Form.Note("cable.connector", w.UniversesAvailable is { } a
+                ? need == 1 ? L("1 universe of the {0} on {1}", a, w.OutputText) : L("{0} universes of the {1} on {2}", need, a, w.OutputText)
+                : w.OutputKind == WizardModel.Output.Visualiser
+                    ? need == 1 ? L("1 universe (visualiser only)") : L("{0} universes (visualiser only)", need)
+                    : need == 1 ? L("1 universe") : L("{0} universes", need));
         return null;
     }
 }

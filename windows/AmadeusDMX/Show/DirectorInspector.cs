@@ -32,7 +32,7 @@ public sealed class DirectorInspector(AppModel model)
     }
 
     static FrameworkElement NoShow() =>
-        UI.Unavailable("wand.and.stars", "No Show Running", "The director's decisions appear here, phrase by phrase.").Margin(0, 80, 0, 0);
+        UI.Unavailable("wand.and.stars", L("No Show Running"), L("The director's decisions appear here, phrase by phrase.")).Margin(0, 80, 0, 0);
 
     void Pin(int? i)
     {
@@ -49,57 +49,57 @@ public sealed class DirectorInspector(AppModel model)
         var back = UI.IconButton("chevron.left", "", () => Pin(Math.Max(0, i - 1))).Borderless().Disabled(i == 0);
         var forward = UI.IconButton("chevron.right", "", () => Pin(Math.Min(h.Plan.Count - 1, i + 1))).Borderless().Disabled(i == h.Plan.Count - 1);
         var title = UI.VStack(2,
-            UI.Text($"Phrase {i + 1} of {h.Plan.Count}", Font.Headline).Center(),
+            UI.Text(L("Phrase {0} of {1}", i + 1, h.Plan.Count), Font.Headline).Center(),
             UI.Text($"{TimeString(d.Start)} – {TimeString(d.End)}", Font.Caption).Secondary().Center());
         title.Alignment = 0.5;
         var sections = new List<UIElement?>
         {
             ShowUI.FormSection(null,
                 UI.HStack(back, title.Grow(), forward),
-                _pinned is null ? null : UI.Button("Follow the Show", () => Pin(null)).Align(HorizontalAlignment.Stretch)),
-            ShowUI.FormSection("Moment",
-                ShowUI.Labeled("Section", UI.HStack(6,
+                _pinned is null ? null : UI.Button(L("Follow the Show"), () => Pin(null)).Align(HorizontalAlignment.Stretch)),
+            ShowUI.FormSection(L("Moment"),
+                ShowUI.Labeled(L("Section"), UI.HStack(6,
                     new Border { Width = 9, Height = 9, CornerRadius = new CornerRadius(4.5), Background = ShowUI.Section(d.Section) },
                     UI.Text(Capitalized(d.Section)).Secondary(),
                     d.DropScore >= Timeline.DropScore ? UI.Icon("bolt.fill").Foreground(Tint.Yellow) : null,
                     Confidence(d, "section"))),
-                ShowUI.Labeled("Intensity", IntensityPips.Build(d.Intensity)),
-                ShowUI.Labeled("Palette", UI.HStack(4, [
+                ShowUI.Labeled(L("Intensity"), IntensityPips.Build(d.Intensity)),
+                ShowUI.Labeled(L("Palette"), UI.HStack(4, [
                     UI.Text(Capitalized(d.Palette)).Secondary(),
                     .. Palettes.Colors(d.Palette).Select(c => (UIElement)new Border
                     {
                         Width = 12, Height = 12, CornerRadius = new CornerRadius(3), Background = Tint.Brush(Tint.From(c)),
                     })])),
-                ShowUI.Labeled("Decided by", Director.Source(d.Source))),
-            ShowUI.FormSection("Pars",
-                Row("Between hits", d, "par_base"),
-                Row("On a hit", d, "par_accent"),
-                Row("A hit is", d, "trigger")),
-            ShowUI.FormSection("Moving Heads",
-                Row("Light", d, "head_light"),
-                Row("Path", d, "movement"),
-                Row("Formation", d, "formation"),
-                Row("Aim", d, "aim"),
-                Row("Colour", d, "head_color"),
-                Row("Beam", d, "beam_fx"),
-                Row("Gobos", d, "gobo_style"),
-                Row("Dynamics", d, "dynamics")),
+                ShowUI.Labeled(L("Decided by"), Director.Source(d.Source))),
+            ShowUI.FormSection(L("Pars"),
+                Row(L("Between hits"), d, "par_base"),
+                Row(L("On a hit"), d, "par_accent"),
+                Row(L("A hit is"), d, "trigger")),
+            ShowUI.FormSection(L("Moving Heads"),
+                Row(L("Light"), d, "head_light"),
+                Row(L("Path"), d, "movement"),
+                Row(L("Formation"), d, "formation"),
+                Row(L("Aim"), d, "aim"),
+                Row(L("Colour"), d, "head_color"),
+                Row(L("Beam"), d, "beam_fx"),
+                Row(L("Gobos"), d, "gobo_style"),
+                Row(L("Dynamics"), d, "dynamics")),
         };
         if (hasGroups)
-            sections.Add(ShowUI.FormSection("Groups",
-                Row("Together", d, "grouping"),
-                Director.ShowsFeatured(d) ? Row("Featured", d, "featured") : null,
-                Row("Layering", d, "layer_split"),
-                Row("Base glow", d, "base_glow")));
+            sections.Add(ShowUI.FormSection(L("Groups"),
+                Row(L("Together"), d, "grouping"),
+                Director.ShowsFeatured(d) ? Row(L("Featured"), d, "featured") : null,
+                Row(L("Layering"), d, "layer_split"),
+                Row(L("Base glow"), d, "base_glow")));
         if (hasLasers)
-            sections.Add(ShowUI.FormSection("Lasers",
-                Row("Look", d, "laser_look"),
-                d["laser_look"] != "off" ? Row("Movement", d, "laser_move") : null,
-                d["laser_look"] != "off" ? Row("Colour", d, "laser_color") : null));
+            sections.Add(ShowUI.FormSection(L("Lasers"),
+                Row(L("Look"), d, "laser_look"),
+                d["laser_look"] != "off" ? Row(L("Movement"), d, "laser_move") : null,
+                d["laser_look"] != "off" ? Row(L("Colour"), d, "laser_color") : null));
         if (h.Screen)
-            sections.Add(ShowUI.FormSection("LED Wall", Row("Shows", d, "screen")));
+            sections.Add(ShowUI.FormSection(L("LED Wall"), Row(L("Shows"), d, "screen")));
         if (Director.BestProbabilities(d) is { } probs)
-            sections.Add(ShowUI.FormSection($"How Sure: {probs.Title}", [.. probs.Values.Select(v => (UIElement)UI.HStack(8,
+            sections.Add(ShowUI.FormSection(L("How Sure: {0}", probs.Title), [.. probs.Values.Select(v => (UIElement)UI.HStack(8,
                 UI.Text(v.Key.Replace('_', ' '), Font.Callout).Frame(width: 110),
                 UI.Progress(v.P).Grow(),
                 UI.Text(Num.Pct(v.P), Font.Callout).Secondary().Frame(width: 38).AlignRight()))]));
@@ -108,7 +108,7 @@ public sealed class DirectorInspector(AppModel model)
         if (d.Prompt.Length > 0)
             sections.Add(ShowUI.FormSection(null, new Expander
             {
-                Header = "What the AI was told",
+                Header = L("What the AI was told"),
                 Content = UI.Text(d.Prompt, Font.MonoCaption).Wrap().Selectable(),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,

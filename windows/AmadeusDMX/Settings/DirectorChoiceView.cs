@@ -19,7 +19,7 @@ public sealed class DirectorChoiceSection(AppModel model)
 
     public FrameworkElement Build()
     {
-        var section = Form.Section(UI.Text("Who decides the show", Font.Subheadline).Secondary().Bold(), [_body], _footer);
+        var section = Form.Section(UI.Text(L("Who decides the show"), Font.Subheadline).Secondary().Bold(), [_body], _footer);
         Show();
         // read again whenever the show's set or rig changes (SwiftUI's .task(id:))
         return section.Bind(model, [nameof(AppModel.SelectedRig), nameof(AppModel.SelectedSet)], c => { _ = Load(); });
@@ -27,8 +27,8 @@ public sealed class DirectorChoiceSection(AppModel model)
 
     void Show()
     {
-        _footer.Text = model.SelectedSet.Length == 0 ? "Choose a set first."
-            : $"For the set {model.SelectedSet} on the rig {model.SelectedRig}, like the director menu in the toolbar. A running show switches at once; tracks already decided keep their plan until they are decided again. Rules: instant, offline. OpenAI: needs the key below, ~1 s per phrase. Local: free and offline in Ollama, slower (~7 s per phrase on a laptop).";
+        _footer.Text = model.SelectedSet.Length == 0 ? L("Choose a set first.")
+            : L("For the set {0} on the rig {1}, like the director menu in the toolbar. A running show switches at once; tracks already decided keep their plan until they are decided again. Rules: instant, offline. OpenAI: needs the key below, ~1 s per phrase. Local: free and offline in Ollama, slower (~7 s per phrase on a laptop).", model.SelectedSet, model.SelectedRig);
         var kinds = UI.Segmented(DirectorKinds.All, Kind, k => k.Title(), Pick);
         foreach (var b in kinds.Children.OfType<Control>()) b.IsEnabled = model.SelectedSet.Length > 0 && !_loading;
         var rows = new List<UIElement?> { kinds };
@@ -36,19 +36,19 @@ public sealed class DirectorChoiceSection(AppModel model)
         {
             var local = Local;
             var picker = UI.Picker(local, local.FirstOrDefault(o => o.Value == _current) ?? local.FirstOrDefault()!,
-                                   o => o.Value[7..] + (o.Available ? "" : $" ({o.Note ?? "not available"})"), o => Choose(o.Value));
-            rows.Add(Form.Row("Model", picker));
+                                   o => o.Value[7..] + (o.Available ? "" : $" ({o.Note ?? L("not available")})"), o => Choose(o.Value));
+            rows.Add(Form.Row(L("Model"), picker));
             var host = Form.Submit("localhost:11434", _host, h => { _host = h; _ = SaveHost(); });
             host.MinWidth = 220;
-            rows.Add(Form.Row("Ollama address", host));
+            rows.Add(Form.Row(L("Ollama address"), host));
         }
         UIElement? status = null;
         if (_problem is { } p) status = Form.Note("exclamationmark.triangle", p, Tint.Orange);
         else if (Option is { } o)
             status = Form.Note(o.Available ? "checkmark.circle" : "exclamationmark.triangle", o.Note ?? o.Label, o.Available ? null : Tint.Orange);
-        rows.Add(UI.HStack(8, status?.Grow() ?? UI.Spacer(), UI.Button(_loading ? "Refreshing…" : "Refresh", () => _ = Load()).Disabled(_loading)));
+        rows.Add(UI.HStack(8, status?.Grow() ?? UI.Spacer(), UI.Button(_loading ? L("Refreshing…") : L("Refresh"), () => _ = Load()).Disabled(_loading)));
         if (Kind == DirectorKind.Local && Local.Any(o => !o.Available && o.Note?.StartsWith("no decision", StringComparison.Ordinal) == true))
-            rows.Add(UI.Text("Models without decision support are listed but can't be chosen: the director needs one that gives probabilities per option (ollama pull nimble).", Font.Callout).Secondary().Wrap());
+            rows.Add(UI.Text(L("Models without decision support are listed but can't be chosen: the director needs one that gives probabilities per option (ollama pull nimble)."), Font.Callout).Secondary().Wrap());
         _body.Content = UI.VStack(12, [.. rows]);
     }
 
@@ -59,7 +59,7 @@ public sealed class DirectorChoiceSection(AppModel model)
         Show();
         try
         {
-            if (!await model.EnsureSetupService()) { _problem = "The engine's setup service doesn't start."; return; }
+            if (!await model.EnsureSetupService()) { _problem = L("The engine's setup service doesn't start."); return; }
             try { _options = await model.Api.Directors(); }
             catch (Exception e) when (IsApiError(e)) { _options = []; }
             try
@@ -89,7 +89,7 @@ public sealed class DirectorChoiceSection(AppModel model)
                 else
                 {
                     _current = Local.FirstOrDefault()?.Value ?? "ollama:nimble";
-                    _problem = Local.FirstOrDefault()?.Note ?? "No local decision model found.";
+                    _problem = Local.FirstOrDefault()?.Note ?? L("No local decision model found.");
                     Show();
                 }
                 break;
@@ -101,7 +101,7 @@ public sealed class DirectorChoiceSection(AppModel model)
         if (value == _current && _problem is null) return;
         if (_options.FirstOrDefault(o => o.Value == value) is { Available: false } o)
         {
-            _problem = o.Note ?? "Not available right now.";
+            _problem = o.Note ?? L("Not available right now.");
             Show();
             return;
         }
@@ -116,7 +116,7 @@ public sealed class DirectorChoiceSection(AppModel model)
         catch (Exception e) when (IsApiError(e))
         {
             _current = before;
-            _problem = $"Couldn't switch: {e.Message}";
+            _problem = L("Couldn't switch: {0}", e.Message);
         }
         Show();
     }
