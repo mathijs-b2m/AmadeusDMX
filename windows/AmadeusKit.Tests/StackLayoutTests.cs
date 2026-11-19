@@ -30,6 +30,18 @@ public class StackLayoutTests
     }
 
     [Fact]
+    public void AGrowingChildKeepsItsLeastLengthAndTextGivesWay()
+    {
+        // a long label (180), a slider growing from 120, a value (62) in 300 with 8 between: the label wraps, the slider keeps 120
+        var l = StackLayout.Lengths([new C(180, Shrinks: true), new C(120, Grows: true), new C(62)], 8, 300);
+        Assert.Equal(120, l[1], 6);
+        Assert.Equal(62, l[2]);
+        Assert.Equal(300 - 16 - 120 - 62, l[0], 6);
+        // with room to spare the slider takes all of it
+        Assert.Equal([100, 222, 62], StackLayout.Lengths([new C(100, Shrinks: true), new C(120, Grows: true), new C(62)], 8, 400));
+    }
+
+    [Fact]
     public void WithoutALimitEveryoneGetsWhatTheyWant()
     {
         Assert.Equal([40, 7, 30], StackLayout.Lengths([new C(40), new C(7, true), new C(30)], 8, double.PositiveInfinity));

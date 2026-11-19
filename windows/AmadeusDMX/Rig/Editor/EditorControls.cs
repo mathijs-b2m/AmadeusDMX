@@ -52,7 +52,8 @@ public static class EditorUI
             var snapped = Math.Round(v / step, MidpointRounding.AwayFromZero) * step;
             if (Math.Abs(snapped - get()) > 1e-9) set(snapped);
         }, step).MinWidth(120);
-        var row = UI.HStack(8, UI.Text(title), UI.Spacer(), slider.Grow(), value);
+        // no spacer: the slider takes all the room the label leaves, and a long label wraps rather than squeeze it under its MinWidth
+        var row = UI.HStack(8, UI.Text(title).Wrap(), slider.Grow(), value);
         return row.Bind(editor, Follow, _ =>
         {
             following = true;
