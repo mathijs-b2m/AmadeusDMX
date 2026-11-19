@@ -272,8 +272,9 @@ class Engine(
             k = _ease((t - d.start) / XFADE)
             states = self._wheel_colours({fid: prev[fid].blend(s, k) for fid, s in states.items()}, states)
         up = {eid: dataclasses.replace(states[eid]) for eid in self.uplight_ids}
-        self._roll(t, states, skip={e["id"] for e in self.heads} if ahead is not None else frozenset())
-        self._kick_return(t, states)
+        dark = self._dark_heads(d)  # heads the look keeps dark wait for their moment through rolls and returns
+        self._roll(t, states, skip={e["id"] for e in self.heads} if ahead is not None else dark)
+        self._kick_return(t, states, skip=dark)
         self._drop_moment(t, states)
         states.update(up)  # the wall uplighters keep to their run: no roll, kick return or drop flash lights them
         return i, self._finish(states, t, peek)

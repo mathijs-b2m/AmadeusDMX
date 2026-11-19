@@ -22,7 +22,7 @@ RULE_LOOKS = {
         ("dim", "pulse", "kick", "steady", "figure8", "mirror", "crowd", "accent", "steady"),
         ("full", "color_pop", "kick", "steady", "step_on_beat", "sync", "crowd", "white", "steady"),
         ("off", "chase", "hats", "steady", "circle", "focus", "crowd", "base", "steady"),
-        ("dim", "alternate", "backbeat", "pulse", "sweep", "wave", "stage", "accent", "steady"),
+        ("dim", "alternate", "backbeat", "pulse", "sweep", "wave", "stage", "sides", "steady"),
         ("full", "none", "kick", "pulse", "step_on_beat", "fan", "crowd", "cycle", "steady"),
         ("dim", "color_pop", "backbeat", "steady", "sweep", "cross", "crowd", "white", "steady"),
         ("full", "none", "kick", "flick", "bounce", "sync", "crowd", "white", "steady"),
@@ -35,24 +35,28 @@ RULE_LOOKS = {
         ("dim", "pulse", "kick", "steady", "scissor", "sync", "crowd", "accent", "steady"),
         ("off", "chase", "hats", "steady", "knot", "mirror", "crowd", "base", "steady"),
         ("full", "none", "kick", "flick", "zigzag", "mirror", "crowd", "white", "steady"),
-        ("dim", "alternate", "backbeat", "steady", "pendulum", "mirror", "crowd", "accent", "steady"),
+        ("dim", "alternate", "backbeat", "steady", "pendulum", "mirror", "crowd", "sides", "steady"),
         ("off", "pulse", "synth", "pulse", "rose", "fan", "crowd", "white", "steady"),
     ],
     "buildup": [
         ("dim", "pulse", "roll", "pulse", "nod", "fan", "sky", "white", "rise"),
+        # the heads wait dark and the pars build alone: the beams come in at the drop (rigs without pars: engine)
+        ("full", "chase", "kick", "off", "still", "fan", "sky", "white", "rise"),
         ("off", "chase", "hats", "steady", "circle", "focus", "sky", "white", "rise"),
         ("dim", "pulse", "roll", "pulse", "spiral", "fan", "sky", "white", "rise"),
     ],
     "drop": [
         ("off", "pulse", "kick", "steady", "ballyhoo", "mirror", "crowd", "white", "impact"),
-        ("full", "color_pop", "kick", "pulse", "step_on_beat", "cross", "crowd", "accent", "impact"),
+        ("sides", "color_pop", "kick", "pulse", "step_on_beat", "cross", "crowd", "sides", "impact"),
+        # the pars hold a steady colour wash, the white beams play the kick over it
+        ("full", "none", "kick", "pulse", "swing", "fan", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "flick", "bounce", "mirror", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "random", "tilt_wave", "wave", "crowd", "white", "impact"),
         ("full", "color_pop", "kick", "steady", "tilt_wave", "mirror", "sky", "accent", "impact"),
         ("off", "pulse", "kick", "steady", "pour", "sync", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "strobe", "swing", "mirror", "crowd", "white", "impact"),
         ("off", "pulse", "kick", "flick", "zigzag", "wave", "crowd", "white", "impact"),
-        ("full", "color_pop", "kick", "pulse", "scissor", "mirror", "crowd", "accent", "impact"),
+        ("full", "color_pop", "kick", "pulse", "scissor", "mirror", "crowd", "sides", "impact"),
     ],
     "breakdown": [
         ("dim", "none", "accents", "breathe", "circle", "wave", "sky", "base", "steady"),
@@ -74,7 +78,7 @@ RULE_LOOKS = {
     ],
     "chorus": [
         ("full", "color_pop", "backbeat", "steady", "swing", "fan", "crowd", "white", "steady"),
-        ("full", "pulse", "kick", "pulse", "sweep", "mirror", "crowd", "accent", "steady"),
+        ("sides", "pulse", "kick", "pulse", "sweep", "mirror", "crowd", "sides", "steady"),
         ("full", "color_pop", "kick", "steady", "circle", "cross", "sky", "white", "steady"),
         ("full", "alternate", "backbeat", "pulse", "step_on_beat", "fan", "crowd", "accent", "steady"),
         ("full", "pulse", "kick", "steady", "scissor", "sync", "crowd", "white", "steady"),
@@ -131,6 +135,9 @@ RULE_GROUPING = {  # rotated per section, like RULE_LOOKS (rigs with several hea
     "chorus": ["unison", "split", "per_group"],
     "bridge": ["solo", "individual"],
 }
+
+
+SINGLE_SOLO = {"intro", "breakdown", "bridge"}  # one group of heads: sections where every other phrase is a solo
 
 
 PER_BEAT = {"step_on_beat", "bounce", "swing", "sway", "ballyhoo", "tilt_wave", "pour", "zigzag"}
@@ -276,8 +283,14 @@ def apply_lasers(d: Decision, lasers: list | None, n_before: int):
 
 
 def apply_groups(d: Decision, groups: list[dict] | None, n_before: int):
-    """Rule-based grouping for multi-group rigs (also the fallback for refused group answers)."""
-    if not groups or len(groups) <= 1:
+    """Rule-based grouping for multi-group rigs (also the fallback for refused group answers). A rig with one
+    group of heads gets a solo now and then in the calm parts: one mirrored pair lit, the rest dark (the engine
+    picks the pair; with fewer than two pairs it plays as one)."""
+    if not groups:
+        return
+    if len(groups) == 1:
+        if d.section in SINGLE_SOLO and (n_before + d.phrase) % 2 == 0:
+            d.grouping = "solo"
         return
     from amadeus.rig.groups import classes
 

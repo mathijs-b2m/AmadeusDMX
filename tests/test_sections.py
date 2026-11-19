@@ -116,7 +116,12 @@ def test_mirrored_lights_play_alike(show, par_accent, head_light, layers):
     for t in np.arange(1.0, a.duration - 1, 0.37):
         i, s = e.render(float(t))
         was = max(i - 1, 0) if t - plan[i].start < L.XFADE else i  # (fading out of the phrase before)
-        if "sides" in (e._kick_pattern(plan[i], float(t)), e._kick_pattern(plan[was], float(t))):
+        if "sides" in (
+            e._kick_pattern(plan[i], float(t)),
+            e._kick_pattern(plan[was], float(t)),
+            plan[i].par_base,
+            plan[was].par_base,
+        ):
             continue  # (left against right on purpose)
         for left, right in MIRRORS:
             assert s[left].lit == pytest.approx(s[right].lit, abs=0.02), (left, right, t)

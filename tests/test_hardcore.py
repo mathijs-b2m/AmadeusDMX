@@ -160,12 +160,20 @@ def test_a_kick_on_half_the_beats_is_a_break_in_hardcore():
     assert (d.par_accent, d.trigger, d.aim) == (PIANO_BREAK["par_accent"], "lead", "sky")
 
 
+LOOK_FIELDS = ("par_base", "par_accent", "trigger", "head_light", "movement", "formation", "aim", "head_color",
+               "dynamics")  # fmt: skip
+
+
 @pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
 @pytest.mark.parametrize("bpm", [170.0, 195.0])
 def test_no_more_flicker_than_edm(path, bpm):
     """Hardcore used to be lit as edm: its own faces hit the kick harder, yet chop no more."""
     a, rig = synthetic_analysis(bpm=bpm), load_rig(path)
-    base = flicker(Engine(a, _plan(a, rig, STYLES["edm"]), rig), rig, a)
+    hard = dict(zip(LOOK_FIELDS, ("off", "pulse", "kick", "flick", "bounce", "mirror", "crowd", "white", "impact")))
+    edm = [replace(d, **hard) if d.section == "drop" and d.par_accent == "none" else
+           replace(d, par_base="full") if d.par_base == "sides" else d
+           for d in _plan(a, rig, STYLES["edm"])]  # (edm's wash and split drops count as its older looks)  # fmt: skip
+    base = flicker(Engine(a, edm, rig), rig, a)
     for style in (STYLES["hardcore"], HAPPY_HARDCORE):
         assert flicker(Engine(a, _plan(a, rig, style), rig), rig, a) <= base
 

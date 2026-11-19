@@ -223,8 +223,10 @@ def test_strobe_free_plays_the_roll_in_steps(rolled):
         assert not len(e.flash_t)
         ts, tr, _ = _trace(e, rig, a.beats[first] - 0.5, drop + 4, kinds=("head", "par"))
         assert sum(fast_cycles(np.interp(np.arange(ts[0], ts[-1], 1 / 40), ts, c)) for c in tr.T) == 0, path.stem
-        _, st, ids = _trace(e, rig, a.beats[first] - 0.5, drop - 0.01, kinds=("strobe",))
-        assert not len(ids) or st.max() == 0  # (the drop's one hit is no strobe)
+        ts, st, ids = _trace(e, rig, a.beats[first] - 0.5, drop - 0.01, kinds=("strobe",))
+        if len(ids):  # no flashes (the drop's one hit is no strobe); a colour strobe may hold the pars' steady wash
+            assert sum(fast_cycles(np.interp(np.arange(ts[0], ts[-1], 1 / 40), ts, c)) for c in st.T) == 0, path.stem
+            assert e._strobe_rgb >= {i for i, c in zip(ids, st.T) if c.max() > 0}, path.stem  # (white ones stay dark)
 
 
 def test_dark_for_the_pause_then_the_drop_hits(rolled):

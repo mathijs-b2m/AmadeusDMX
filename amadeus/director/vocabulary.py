@@ -95,6 +95,11 @@ PAR_BASE = [
     ("dim", "Pars glow softly in the base colour between hits."),
     ("full", "Pars stay bright in the base colour; hits change the colour rather than the brightness."),
     ("fade", "Pars slowly cross-fade through the palette: calm, no hard edges."),
+    (
+        "sides",
+        "Pars split down the middle: stage left glows in the base colour, stage right in the accent; a hit "
+        "turns each side to the other's colour.",
+    ),
 ]
 
 PAR_ACCENT = [
@@ -276,6 +281,7 @@ HEAD_COLOR = [
     ("accent", "The accent colour: contrast between heads and pars."),
     ("white", "Open white beams: crisp, cut through the colour."),
     ("cycle", "A new palette colour every bar."),
+    ("sides", "Stage left in the base colour, stage right in the accent: the rig split down the middle."),
 ]
 
 BEAM_FX = [  # what the moving heads' beam itself looks like (gobo wheel, prism, frost)
@@ -332,7 +338,7 @@ GROUPINGS = [  # only asked when the rig has several groups of heads (overhead, 
     ),
     (
         "solo",
-        "Only the FEATURED groups perform; all other heads are dimmed and still. Sparse, focused; great "
+        "Only the FEATURED groups perform; all other heads are dark and still. Sparse, focused; great "
         "for intros, breakdowns and to reveal parts of the rig one by one.",
     ),
     (
