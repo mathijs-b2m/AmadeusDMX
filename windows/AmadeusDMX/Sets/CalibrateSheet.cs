@@ -1,10 +1,12 @@
 // Calibrate: the fixtures of one model put right on the real rig when they behave oddly (a head that goes the
-// wrong way, a bar that runs backwards), one at a time. Each fixture is lit as it hangs on the rig: a head straight
-// out to the audience, then the check after hanging's way (does it pan the right way round?), each with a picture
-// of where its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that doesn't do
-// as its picture gets another calibration at a press (its pan home a quarter on, its pan the other way), until it
-// does. Every press puts the fixture right at once (its calibration in the set, a bar's `reverse` on the rig) and
-// lights it again to see (mac/Sources/AmadeusDMX/Sets/CalibrateSheet.swift).
+// wrong way, a bar that runs backwards), by going through one of them: the others of the model get the same
+// calibration. It stays with the fixture it was opened on (another one is chosen at the top, for one that behaves
+// differently). First whether the head hangs or stands; then it is lit as it is placed on the rig: straight out to
+// the audience, then the check after hanging's way (does it pan the right way round?), each with a picture of the
+// head and where its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that
+// doesn't do as its picture gets another calibration at a press (its pan home a quarter on, its pan the other
+// way), until it does. Every press puts the fixture right at once (its calibration in the set, its placing on the
+// rig) and lights it again to see (mac/Sources/AmadeusDMX/Sets/CalibrateSheet.swift).
 namespace AmadeusDMX;
 
 /// `Fixtures`: in the set's order; `Start`: the one to begin with.
@@ -12,7 +14,7 @@ public sealed record CalibrateTarget(string Key, string Name, IReadOnlyList<stri
 
 public sealed class CalibrateSheet
 {
-    enum Step { Front, Check, Cells }
+    enum Step { Mount, Front, Check, Cells }
 
     readonly AppModel _model;
     readonly CalibrateTarget _target;
@@ -36,6 +38,11 @@ public sealed class CalibrateSheet
     List<string> _wayNames = [];
     Dictionary<string, JSONValue> _wayBase = [];   // the fixture as it came
     int _way;
+    bool _finished;                  // this fixture is through its steps
+    List<string> _followers = [];    // the others of the model its calibration went to
+
+    /// What a head's calibration is made of: copied to the others of its model when it is through.
+    static readonly string[] Calibration = ["pan_home_deg", "pan_invert", "tilt_invert"];
     readonly HashSet<string> _confirmed = [];   // said right, or put right on its own: siblings' fixes pass it by
     string? _note;
     string? _error;
@@ -79,7 +86,7 @@ public sealed class CalibrateSheet
             SwitchOff();
             _saved();
         };
-        var grid = new Grid { MinWidth = 580, Height = 580 };
+        var grid = new Grid { MinWidth = 600, Height = 620 };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -116,8 +123,11 @@ public sealed class CalibrateSheet
                 UI.Text(L("Calibrate"), Font.Title2).Bold(),
                 UI.Text(_target.Name).Secondary(),
                 UI.Spacer(),
-                _target.Fixtures.Count > 0 ? UI.Text(L("{0} of {1}", _index + 1, _target.Fixtures.Count)).Secondary() : null),
-            UI.Text(L("Stand where the audience would be, facing the stage. Each one lights as it hangs on {0}, with a picture of what it should do. When the real one does something else, press until it matches: it is put right, and the others of this model with it (except those you already went through).", _rig),
+                _target.Fixtures.Count > 1 && Id is { } now
+                    ? UI.Picker(_target.Fixtures, now, f => f, f => { if (!_busy) Go(_target.Fixtures.ToList().IndexOf(f)); else Header(); })
+                        .Tooltip(L("The fixture you go through. One is enough: the others of this model get its calibration. Choose another one only when it behaves differently"))
+                    : null),
+            UI.Text(L("Go through one fixture of this model: the others get the same calibration. Stand where the audience would be, facing the stage. It lights as it is placed on {0}, with a picture of what it should do. When the real one does something else, press until it matches.", _rig),
                     Font.Callout).Secondary().Wrap(),
             UI.Text(HangCheckPanel.Sides, Font.Callout).Secondary().Wrap()
         ).Margin(0, 0, 0, 12);
@@ -136,6 +146,8 @@ public sealed class CalibrateSheet
         if (Unplaced(id))
             panel.Children.Add(Form.Note("exclamationmark.triangle.fill",
                 L("Not placed on {0} yet: place it on the Rigs page first, so the calibration knows how it hangs.", _rig), Tint.Orange, Font.Body));
+        else if (_finished)
+            foreach (var part in FinishedView(id)) panel.Children.Add(part);
         else if (_step is { } step)
             foreach (var part in StepView(id, step)) panel.Children.Add(part);
         if (_fixed.TryGetValue(id, out var done) && done.Count > 0)
@@ -155,9 +167,19 @@ public sealed class CalibrateSheet
     {
         switch (step)
         {
+            case Step.Mount:
+                var hangs = Hangs(id);
+                yield return Form.Note("questionmark.circle", L("How is the real {0} mounted?", id), null, Font.Callout).Bold();
+                var answers = UI.HStack(12, MountButton(id, true, hangs), MountButton(id, false, !hangs));
+                answers.HorizontalAlignment = HorizontalAlignment.Left;
+                yield return answers;
+                yield return UI.Text(hangs ? L("On {0} it is placed hanging. The pictures that follow show it the way you say here.", _rig)
+                                           : L("On {0} it is placed standing. The pictures that follow show it the way you say here.", _rig),
+                                     Font.Caption).Secondary().Wrap();
+                break;
             case Step.Front:
                 yield return Form.Note("light.beacon.max",
-                    L("Its beam should point straight out at the audience, a little down (up when it stands on the floor), as in the picture."),
+                    L("Its beam should point straight out at the audience, as in the picture. Only the direction counts: level, or a little up or down, is all fine."),
                     null, Font.Callout).Bold();
                 foreach (var part in MatchView(id)) yield return part;
                 break;
@@ -189,6 +211,44 @@ public sealed class CalibrateSheet
                 .Tooltip(L("The head is tried another way round (its pan home a quarter on, its pan the other way). Press until the real beam goes where the picture’s does")));
         if (_ways.Count > 1) row.Children.Add(UI.Text(L("Way {0} of {1}", _way + 1, _ways.Count), Font.Callout).Secondary());
         yield return row;
+        yield return UI.Text(L("Nothing lights up or moves? Then {0} is not connected, or its address is not {1}.", id,
+                               _checks.GetValueOrDefault(id)?.Dmx ?? L("the one in the set")), Font.Caption).Secondary().Wrap();
+    }
+
+    bool Hangs(string id) => Fixture(id)?.GetValueOrDefault("mount")?.String == "hang";
+
+    /// One of the two answers to how the head is mounted: a drawing of it, the way it is placed on the rig marked.
+    Button MountButton(string id, bool hanging, bool placed)
+    {
+        var stack = UI.VStack(4,
+            BeamPicture.Icon(hanging),
+            UI.Text(hanging ? L("Hanging") : L("Standing"), Font.Headline),
+            UI.Text(hanging ? L("Under a truss or a bar") : L("On the floor, or on top of something"), Font.Caption).Secondary(),
+            UI.Text(placed ? L("As placed on {0}", _rig) : " ", Font.Caption2).Foreground(Tint.Accent));
+        var b = new Button { Content = stack, Width = 230, Padding = new Thickness(10), HorizontalContentAlignment = HorizontalAlignment.Center };
+        if (placed)
+        {
+            b.BorderBrush = Tint.Brush(Tint.Accent);
+            b.BorderThickness = new Thickness(2);
+        }
+        b.Click += (_, _) => { if (placed) Advance(); else SetMount(id, hanging); };
+        return b.Disabled(_busy);
+    }
+
+    /// The fixture is through: what was done, and what happens to the others of its model.
+    IEnumerable<UIElement> FinishedView(string id)
+    {
+        var title = UI.Label("checkmark.seal.fill", L("{0} is calibrated.", id), Font.Title3).Foreground(Tint.Green);
+        yield return title;
+        if (_followers.Count > 0)
+        {
+            yield return UI.Text(L("The other {0} of this model use the same calibration now: {1}. Mounted the same way round, they are right too; there is no need to go through them.",
+                                   _followers.Count, string.Join(", ", _followers)), Font.Callout).Wrap();
+            yield return UI.Text(L("One of them does behave differently? Choose it at the top right and go through it on its own."), Font.Callout).Secondary().Wrap();
+        }
+        yield return UI.Text(L("Colours, gobos or a prism that come out wrong are not put right here: that is Check Channels, on the Sets page."),
+                             Font.Callout).Secondary().Wrap();
+        yield return Buttons(UI.Button(L("Done"), () => _dialog.Hide()).Prominent());
     }
 
     FlowPanel Buttons(params Button[] buttons)
@@ -202,9 +262,6 @@ public sealed class CalibrateSheet
     void Footer()
     {
         _footer.Content = UI.HStack(8,
-            UI.Button(L("Previous"), () => Go(_index - 1), "chevron.left").Disabled(_index == 0 || _busy),
-            UI.Button(L("Skip"), () => Go(_index + 1), "chevron.right").Disabled(_index + 1 >= _target.Fixtures.Count || _busy)
-                .Tooltip(L("On to the next one, without finishing this one")),
             UI.Spacer()
         ).Margin(0, 12, 0, 0);
     }
@@ -217,6 +274,8 @@ public sealed class CalibrateSheet
         var out_ = new List<Step>();
         if (d.IsMoving)
         {
+            // hanging or standing is asked of a head on the floor, under or on top of a truss (not one on a truss's side)
+            if ((f.GetValueOrDefault("truss_side")?.String ?? "under") is "under" or "top") out_.Add(Step.Mount);
             out_.Add(Step.Front);
             if (_checks.GetValueOrDefault(id) is { Faults.Count: > 0 }) out_.Add(Step.Check);
         }
@@ -237,8 +296,48 @@ public sealed class CalibrateSheet
             Render();
             _ = Light();
         }
-        else if (_index + 1 < _target.Fixtures.Count) { _confirmed.Add(id); Go(_index + 1); }
-        else { _confirmed.Add(id); _dialog.Hide(); }   // Closed: switched off, saved()
+        else Finish(id);
+    }
+
+    /// The fixture is through its steps: its calibration goes to the others of its model (those not gone through on
+    /// their own), and the sheet stays with it.
+    async void Finish(string id)
+    {
+        SetBusy(true);
+        try
+        {
+            _followers = _definition is { IsMoving: true } ? await Update(id, Calibration, _ => { }) : [];
+            _confirmed.Add(id);
+            SwitchOff();
+            _beam = null;
+            _finished = true;
+        }
+        catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
+        finally { SetBusy(false); }
+    }
+
+    /// The real head is mounted the other way than it is placed on the rig: its placing put right (under or on top
+    /// of its truss), this one only.
+    async void SetMount(string id, bool hanging)
+    {
+        _note = null;
+        SetBusy(true);
+        var done = false;
+        try
+        {
+            await Update(id, [], f =>
+            {
+                f["mount"] = JSONValue.Of(hanging ? "hang" : "stand");
+                if (!f.ContainsKey("truss")) return;
+                f["truss_side"] = JSONValue.Of(hanging ? "under" : "top");
+                f.Remove("mount_roll_deg");
+            });
+            Fixed(id, Step.Mount, hanging ? L("it hangs") : L("it stands"));
+            done = true;
+        }
+        catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
+        finally { SetBusy(false); }
+        if (done) Advance();
     }
 
     void Go(int i)
@@ -248,6 +347,7 @@ public sealed class CalibrateSheet
         _note = null;
         _ways = [];
         _way = 0;
+        _finished = false;
         var all = Steps(_target.Fixtures[i]);
         _step = all.Count > 0 ? all[0] : null;
         Render();
@@ -302,7 +402,7 @@ public sealed class CalibrateSheet
             _lit = id;
             _output = r.Summary;
             _order = r.Order;
-            _beam = step != Step.Cells && r is { Dir: { } d, Pos: { } p, Stage: { } st } ? new Beam(p, d, st) : null;
+            _beam = step is Step.Front or Step.Check && r is { Dir: { } d, Pos: { } p, Stage: { } st } ? new Beam(p, d, st, Hangs(id)) : null;
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _output = e.Message; _beam = null; }
         if (_closed) { SwitchOff(); return; }
