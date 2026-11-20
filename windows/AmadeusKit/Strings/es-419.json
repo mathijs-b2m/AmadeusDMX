@@ -667,7 +667,6 @@
   "its cells the other way round": "sus celdas al revés",
   "Channel {0} of {1}": "Canal {0} de {1}",
   "now: {0}": "ahora: {0}",
-  "Watch the fixture: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?": "Mira el fixture: este canal recorre lentamente de 0 a 255, los demás mantienen la luz encendida y la cabeza en el centro. ¿Qué hace?",
   "Finish Check": "Terminar revisión",
   "Next Channel": "Siguiente canal",
   "Sweeping": "Recorriendo",
@@ -707,7 +706,6 @@
   "Mode {0}": "Modo {0}",
   "The show plays it": "El show lo usa",
   "The show plays nothing in this mode yet": "El show todavía no usa nada en este modo",
-  "Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong.": "Creado a partir de una distribución común: revísalo canal por canal en el fixture, los manuales de estos suelen estar mal.",
   "Import Manual": "Importar manual",
   "Choose a PDF or Picture…": "Elegir un PDF o una imagen…",
   "Paste from Clipboard": "Pegar del portapapeles",
@@ -810,7 +808,6 @@
   "Map Channels…": "Mapear canales…",
   "Check Channels…": "Revisar canales…",
   "Channels…": "Canales…",
-  "The DMX mapper: what each channel does, by hand, with the values tried on the real fixture": "El mapeador DMX: qué hace cada canal, a mano, con los valores probados en el fixture real",
   "One behaves oddly (goes the wrong way, a bar runs backwards)? Light each on the real rig and say what it does: it is put right": "¿Alguno se comporta raro (va hacia el lado equivocado, una barra corre al revés)? Enciende cada uno en el rig real y di qué hace: se corrige",
   "On": "Encendido",
   "Test": "Probar",
@@ -1421,5 +1418,13 @@
   "Harder: the heads hit the kick, drops flash": "Más fuerte: las cabezas golpean con el bombo, los drops destellan",
   "Drops hammer, builds strobe, faster heads": "Los drops martillan, los builds estroban, cabezas más rápidas",
   "All out: every look harder, fast heads, waves": "A tope: cada look más fuerte, cabezas rápidas, olas",
-  "How hard the show plays, whatever the knobs say: 2 is the show as designed, 1 a step gentler, 5 really intense (a lot of strobing, every look harder, the heads twice as fast, very fast waves now and then). Within the set's flash limit. Re-plans the tracks in a few seconds": "Qué tan fuerte toca el show, digan lo que digan las perillas: 2 es el show tal como fue diseñado, 1 un paso más suave, 5 realmente intenso (mucho estrobo, cada look más fuerte, las cabezas el doble de rápidas, olas muy rápidas de vez en cuando). Dentro del límite de destellos del set. Vuelve a planear los temas en unos segundos"
+  "How hard the show plays, whatever the knobs say: 2 is the show as designed, 1 a step gentler, 5 really intense (a lot of strobing, every look harder, the heads twice as fast, very fast waves now and then). Within the set's flash limit. Re-plans the tracks in a few seconds": "Qué tan fuerte toca el show, digan lo que digan las perillas: 2 es el show tal como fue diseñado, 1 un paso más suave, 5 realmente intenso (mucho estrobo, cada look más fuerte, las cabezas el doble de rápidas, olas muy rápidas de vez en cuando). Dentro del límite de destellos del set. Vuelve a planear los temas en unos segundos",
+  "On|tried": "En",
+  "On {0}|tried": "En {0}",
+  "The fixture the values and the check go to": "El fixture al que van los valores y la revisión",
+  "The fixture the values and the check go to. What you map is for the model: the other one of it in this set plays by it too.": "El fixture al que van los valores y la revisión. Lo que mapeas es para el modelo: el otro de este set también toca así.",
+  "The fixture the values and the check go to. What you map is for the model: the {0} others of it in this set play by it too.": "El fixture al que van los valores y la revisión. Lo que mapeas es para el modelo: los otros {0} de este set también tocan así.",
+  "Made from a common layout: check it channel by channel on {0}, manuals of these are often wrong. What you find holds for every one of this model.": "Creado a partir de una distribución común: revísalo canal por canal en {0}, los manuales de estos suelen estar mal. Lo que encuentres vale para todos los de este modelo.",
+  "Watch {0}: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?": "Mira {0}: este canal recorre lentamente de 0 a 255, los demás mantienen la luz encendida y la cabeza en el centro. ¿Qué hace?",
+  "The DMX mapper: what each channel does, by hand, with the values tried on the selected fixture (or the first). It is for the model: every one of them plays by it": "El mapeador DMX: qué hace cada canal, a mano, con los valores probados en el fixture seleccionado (o el primero). Es para el modelo: todos ellos tocan así"
 }

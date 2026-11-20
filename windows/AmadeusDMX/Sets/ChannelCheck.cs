@@ -16,7 +16,8 @@ public sealed class ChannelCheckState : Observable
     public bool Sweeping { get => _sweeping; set => Set(ref _sweeping, value); }
 }
 
-public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action finish)
+/// `fixture`: the one it runs on (the mapping is for every one of its model).
+public sealed class ChannelCheck(string fixture, MapperModel m, ChannelCheckState s, Action finish)
 {
     readonly ContentControl _host = new()
     {
@@ -57,7 +58,7 @@ public sealed class ChannelCheck(MapperModel m, ChannelCheckState s, Action fini
                 UI.Text(L("Channel {0} of {1}", ch.N, Mapping.Channels.Count), Font.Title3).Bold(),
                 UI.Text(L("now: {0}", Now)).Secondary(),
                 UI.Spacer()),
-            UI.Text(L("Watch the fixture: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?"))
+            UI.Text(L("Watch {0}: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?", fixture))
                 .Secondary().Wrap(),
             Probing(s),
             answers,

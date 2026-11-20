@@ -11,8 +11,9 @@
 // (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
 namespace AmadeusDMX;
 
-/// `Fixture`: the one tried on the lights; `Address` null: it has no start address yet (nothing can be tried).
-public sealed record MapTarget(string Key, string Mode, string Fixture, int? Address, int Universe)
+/// `Fixture`: the one tried on the lights first (the selected one, if any); `Fixtures`: every one of this model and mode
+/// in the set, any of which can be picked to try on.
+public sealed record MapTarget(string Key, string Mode, string Fixture, IReadOnlyList<PlacedFixture> Fixtures)
 {
     public string Id => $"{Key}|{Mode}";
 }
@@ -21,7 +22,11 @@ public sealed class MapperSheet
 {
     readonly AppModel _model;
     readonly MapTarget _target;
-    readonly string? _tryRefusal;   // why it can't be tried on the lights now (nil: it can)
+    readonly string? _setRefusal;   // why nothing of the set can be tried on the lights now (nil: it can)
+    string _on;                     // the fixture tried on the lights (any of this model and mode)
+    PlacedFixture? Tried => _target.Fixtures.FirstOrDefault(f => f.Id == _on);
+    /// Why it can't be tried on the lights now (nil: it can).
+    string? _tryRefusal => _setRefusal ?? (Tried?.Address is null ? L("Give {0} a start address to try values on it", _on) : null);
     readonly Action _saved;
     readonly MapperModel _m = new();
     readonly ContentDialog _dialog = new();
@@ -50,7 +55,8 @@ public sealed class MapperSheet
     {
         _model = model;
         _target = target;
-        _tryRefusal = tryRefusal;
+        _on = target.Fixture;
+        _setRefusal = tryRefusal;
         _saved = saved;
     }
 
@@ -129,14 +135,14 @@ public sealed class MapperSheet
             });
             tryIt.IsEnabled = _tryRefusal is null && _m.Editable;
             if (_trying) tryIt.Foreground(Tint.Yellow);
-            tryIt.Tooltip(_tryRefusal ?? L("Send these values as they are to {0} (the rest of the set dark, a running show paused), to see what each channel does", _target.Fixture));
+            tryIt.Tooltip(_tryRefusal ?? L("Send these values as they are to {0} (the rest of the set dark, a running show paused), to see what each channel does", _on));
         }
         var check = UI.Button(_checking ? L("Stop Checking") : L("Check Channels"), () =>
         {
             if (_checking) StopCheck(); else StartCheck();
         }, _checking ? "stop.fill" : "checklist")
             .Disabled(_tryRefusal is not null || !_m.Editable || _colours is not null)
-            .Tooltip(_tryRefusal ?? L("Go through the channels one by one on {0}: each sweeps while you say what the fixture does", _target.Fixture));
+            .Tooltip(_tryRefusal ?? L("Go through the channels one by one on {0}: each sweeps while you say what the fixture does", _on));
         if (_m.NeedsCheck && !_checking) check.Foreground(Tint.Orange);
         Button? manual = null;
         if (_hasKey && !_checking && _colours is null)
@@ -154,6 +160,7 @@ public sealed class MapperSheet
         }
         var line = UI.HStack(14,
             UI.Text(L("Mode {0}", _target.Mode), Font.Callout).Secondary(),
+            FixturePicker(),
             m is null ? null
                 : m.Plays ? UI.Label("checkmark.circle", L("The show plays it"), Font.Callout).Secondary()
                 : UI.Label("exclamationmark.triangle.fill", L("The show plays nothing in this mode yet"), Font.Callout).Foreground(Tint.Orange),
@@ -164,12 +171,48 @@ public sealed class MapperSheet
         UIElement note = m?.Manual is { } read && !_checking && !_checkedAll
             ? Form.Note("doc.text.magnifyingglass", L("Filled in from {0}, the manual's mode “{1}”. Check it, then save.", read.File, read.Mode), Tint.Orange)
             : _m.NeedsCheck && !_checkedAll && !_checking
-            ? Form.Note("exclamationmark.triangle.fill", L("Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong."), Tint.Orange)
+            ? Form.Note("exclamationmark.triangle.fill", L("Made from a common layout: check it channel by channel on {0}, manuals of these are often wrong. What you find holds for every one of this model.", _on), Tint.Orange)
             : _checkedAll && !_checking
                 ? Form.Note("checkmark.circle.fill", L("Every channel checked: save it."), Tint.Green)
                 : UI.Text(L("Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every {0} in your sets plays by it.", m?.Name ?? L("fixture of this model")),
                           Font.Caption).Secondary().Wrap();
         _header.Content = UI.VStack(8, title, line, note).Margin(0, 0, 0, 10);
+    }
+
+    /// Which fixture the values and the check go to. The mapping itself is the model's: every one plays by it.
+    UIElement FixturePicker()
+    {
+        var label = (PlacedFixture f) => $"{f.Id} · {f.PatchText}";
+        if (_target.Fixtures.Count < 2)
+            return UI.Label("lightbulb", L("On {0}|tried", Tried is { } t ? label(t) : _on), Font.Callout).Secondary()
+                .Tooltip(L("The fixture the values and the check go to"));
+        var others = _target.Fixtures.Count - 1;
+        return UI.HStack(6,
+            UI.Label("lightbulb", L("On|tried"), Font.Callout).Secondary(),
+            UI.Picker(_target.Fixtures, Tried ?? _target.Fixtures[0], label, f => SwitchTo(f.Id)))
+            .Tooltip(others == 1
+                ? L("The fixture the values and the check go to. What you map is for the model: the other one of it in this set plays by it too.")
+                : L("The fixture the values and the check go to. What you map is for the model: the {0} others of it in this set play by it too.", others));
+    }
+
+    /// Another fixture picked: the one before goes dark, the new one takes over what was being tried or checked.
+    void SwitchTo(string id)
+    {
+        if (id == _on) return;
+        var (old, rig, set) = (_on, _model.SelectedRig, _model.EditingSet);
+        var lit = _trying || _checkLoop is not null;
+        _on = id;
+        if (lit)
+            _ = Task.Run(async () =>
+            {
+                try { await _model.Api.TestLight(old, false, rig: rig, set: set); }
+                catch (Exception e) when (SetView.IsApiError(e)) { }
+            });
+        if (_tryRefusal is not null) { StopTrying(); _colours = null; StopCheck(); }
+        else if (_checkLoop is not null) StartProbing();
+        else if (_trying) Send();
+        Header();
+        Body();
     }
 
     void Body()
@@ -191,7 +234,7 @@ public sealed class MapperSheet
             if (m.Refusal.Length > 0) { _body.Content = UI.Unavailable("exclamationmark.triangle", L("Not Mapped Here"), m.Refusal); return; }
             if (_checking)
             {
-                _body.Content = new ChannelCheck(_m, _check, () =>
+                _body.Content = new ChannelCheck(_on, _m, _check, () =>
                 {
                     _checkedAll = true;
                     StopCheck();
@@ -208,7 +251,7 @@ public sealed class MapperSheet
             {
                 if (i > 0) list.Children.Add(UI.Divider());
                 var at = i;
-                var row = new ChannelRow(_m, i, _target.Address + i, _target.Universe, ValuesChanged,
+                var row = new ChannelRow(_m, i, Tried?.Address + i, Tried?.Universe ?? 1, ValuesChanged,
                                          _tryRefusal is null ? () => OpenColours(at) : null).Build().Padding(4, 6);
                 if (i % 2 == 1) row.Background(Theme.Brush("SubtleFillColorSecondaryBrush"));
                 list.Children.Add(row);
@@ -366,7 +409,7 @@ public sealed class MapperSheet
         var cts = _checkLoop = new CancellationTokenSource();
         Header();
         Body();
-        var (id, rig, set) = (_target.Fixture, _model.SelectedRig, _model.EditingSet);
+        var (id, rig, set) = (_on, _model.SelectedRig, _model.EditingSet);
         var up = true;
         while (!cts.IsCancellationRequested && (_checking ? _check.Index : _colours) is { } i && _m.Mapping is { } m)
         {
@@ -399,7 +442,7 @@ public sealed class MapperSheet
         _checking = false;
         _checkLoop?.Cancel();
         _checkLoop = null;
-        var (id, rig, set) = (_target.Fixture, _model.SelectedRig, _model.EditingSet);
+        var (id, rig, set) = (_on, _model.SelectedRig, _model.EditingSet);
         _ = Task.Run(async () =>
         {
             try { await _model.Api.TestLight(id, false, rig: rig, set: set); }
@@ -422,7 +465,7 @@ public sealed class MapperSheet
         if (!_trying) return;
         _trying = false;
         _sending?.Cancel();
-        var (id, rig, set) = (_target.Fixture, _model.SelectedRig, _model.EditingSet);
+        var (id, rig, set) = (_on, _model.SelectedRig, _model.EditingSet);
         _ = Task.Run(async () =>
         {
             try { await _model.Api.TestLight(id, false, rig: rig, set: set); }
@@ -437,7 +480,7 @@ public sealed class MapperSheet
     {
         _sending?.Cancel();
         var cts = _sending = new CancellationTokenSource();
-        var (values, lit, id, rig, set) = (_m.Raw, _m.Light, _target.Fixture, _model.SelectedRig, _model.EditingSet);
+        var (values, lit, id, rig, set) = (_m.Raw, _m.Light, _on, _model.SelectedRig, _model.EditingSet);
         try { await Task.Delay(50, cts.Token); }
         catch (TaskCanceledException) { return; }
         if (!_trying) return;

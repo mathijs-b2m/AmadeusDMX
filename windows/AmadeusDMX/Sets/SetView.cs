@@ -248,7 +248,8 @@ public sealed class SetView(AppModel model, MainWindow window)
     {
         var d = g.Definition;
         var f = g.Fixtures.FirstOrDefault();
-        var tried = g.Fixtures.FirstOrDefault(x => x.Address is not null) ?? f;  // the mapper tries its values on a patched one
+        // the mapper tries its values on the selected one, else a patched one (looked up on the click: the selection moves)
+        PlacedFixture? Tried() => g.Fixtures.FirstOrDefault(x => _selection.Contains(x.Id)) ?? g.Fixtures.FirstOrDefault(x => x.Address is not null) ?? f;
         var row = UI.HStack(8,
             UI.Icon(FixtureIcon.Symbol(d?.Kind)).Foreground(Tint.Accent),
             UI.Text(L("{0}× {1}", g.Fixtures.Count, d?.Name ?? g.Key), Font.Headline),
@@ -263,10 +264,10 @@ public sealed class SetView(AppModel model, MainWindow window)
             else if (d.NeedsCheck)
                 row.Children.Add(UI.Label("exclamationmark.triangle.fill", L("Not checked yet"), Font.Caption).Foreground(Tint.Orange)
                     .Tooltip(L("Made from a common layout: check its channels one by one on the fixture")));
-            var b = UI.Button(dark ? L("Map Channels…") : d.NeedsCheck ? L("Check Channels…") : L("Channels…"), () => MapChannels(tried), "slider.vertical.3")
+            var b = UI.Button(dark ? L("Map Channels…") : d.NeedsCheck ? L("Check Channels…") : L("Channels…"), () => MapChannels(Tried()), "slider.vertical.3")
                 .Font(Font.Caption).Padding(8, 3)
                 .Disabled(model.EngineRunning)
-                .Tooltip(L("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture"));
+                .Tooltip(L("The DMX mapper: what each channel does, by hand, with the values tried on the selected fixture (or the first). It is for the model: every one of them plays by it"));
             if (dark || d.NeedsCheck) b.Foreground(Tint.Orange);
             row.Children.Add(b);
             if (Calibrates(g))
@@ -421,13 +422,15 @@ public sealed class SetView(AppModel model, MainWindow window)
 
     void ShowAdd() => AddToSetSheet.Present(model, Root, () => model.ReloadSets());
 
-    /// The DMX mapper for this fixture's model and mode (tried on this fixture).
+    /// The DMX mapper for this fixture's model and mode (tried on this fixture; any other of them can be picked in it).
     void MapChannels(PlacedFixture? f)
     {
         if (f is null) return;
         SwitchOffTests();
-        var target = new MapTarget(f.Key, f.Mode, f.Id, f.Address, f.Universe);
-        MapperSheet.Present(model, Root, target, target.Address is null ? L("Give {0} a start address to try values on it", target.Fixture) : TryRefusal, () =>
+        var same = (_doc?.Fixtures ?? []).Where(x => x.Key == f.Key && x.Mode == f.Mode)
+            .OrderBy(x => x.Universe).ThenBy(x => x.Address ?? 513).ToList();
+        var target = new MapTarget(f.Key, f.Mode, f.Id, same.Count == 0 ? [f] : same);
+        MapperSheet.Present(model, Root, target, TryRefusal, () =>
         {
             _names[target.Key] = model.Workspace?.Definition(target.Key);
             model.ReloadSets();
