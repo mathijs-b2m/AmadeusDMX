@@ -384,6 +384,11 @@ public sealed class SetupAPI
     public Task<HangCheckStep[]> HangCheck(IReadOnlyDictionary<string, JSONValue> layout, CancellationToken ct = default) =>
         Post("api/hangcheck", new { rig = layout }, c => J.Req(c, "steps", J.ArrayOf(HangCheckStep.From)), ct: ct);
 
+    /// A lit fixture's minute started again (the calibration: someone is still looking at it). False: it had gone
+    /// dark already.
+    public Task<bool> KeepLight(string fixture, CancellationToken ct = default) =>
+        Post("api/test-light", new { fixture, keep = true }, c => J.Req(c, "on", J.Bool), ct: ct);
+
     /// The calibration that puts a head right the check found hung wrong ("mirrored", "turned", "both"), or the rig
     /// editor's front test saw its beam go "left", "right" or "back" instead.
     public Task<Dictionary<string, JSONValue>> HangCheckFix(IReadOnlyDictionary<string, JSONValue> layout, string fixture, string fix,
@@ -803,6 +808,8 @@ public sealed record LightTest
     public int? WireUniverse { get; init; }           // the Art-Net / sACN universe it goes out as
     public IReadOnlyList<int> Channels { get; init; } = [];  // first and last DMX channel (empty: no start address)
     public Vector3? Dir { get; init; }                // a pointed head: where its beam goes (world, as the feed's)
+    public Vector3? Pos { get; init; }                // a pointed head: where it is (metres, as the feed's)
+    public Vector2? Stage { get; init; }              // the stage's width and height, metres
     public string Order { get; init; } = "";          // a bar's cells lit in colours: which end red should be at, in words
 
     public static LightTest From(JsonElement c) => new()
@@ -811,6 +818,8 @@ public sealed record LightTest
         Universe = J.Req(c, "universe", J.Int), WireUniverse = J.Val(c, "wire_universe", J.Int),
         Channels = J.Ref(c, "channels", J.ArrayOf(J.Int)) ?? [],  // null: no start address (switching off one)
         Dir = J.Ref(c, "dir", J.ArrayOf(J.Float)) is { Length: >= 3 } d ? new Vector3(d[0], d[1], d[2]) : null,
+        Pos = J.Ref(c, "pos", J.ArrayOf(J.Float)) is { Length: >= 3 } at ? new Vector3(at[0], at[1], at[2]) : null,
+        Stage = J.Ref(c, "stage", J.ArrayOf(J.Float)) is { Length: >= 2 } st ? new Vector2(st[0], st[1]) : null,
         Order = J.Ref(c, "order", J.String) ?? "",
     };
 

@@ -1,9 +1,10 @@
 // Calibrate: the fixtures of one model put right on the real rig when they behave oddly (a head that goes the
-// wrong way, a bar that runs backwards), one at a time, as `amadeus test` asks in the terminal. Each fixture is lit
-// as it hangs on the rig: a head straight out to the audience (where does it really point?), then the check after
-// hanging's way (does it pan the right way round?); a bar's cells red, green, blue, white along it (reversed?).
-// Every answer puts the fixture right at once (its calibration in the set, a bar's `reverse` on the rig) and lights
-// it again to see (mac/Sources/AmadeusDMX/Sets/CalibrateSheet.swift).
+// wrong way, a bar that runs backwards), one at a time. Each fixture is lit as it hangs on the rig: a head straight
+// out to the audience, then the check after hanging's way (does it pan the right way round?), each with a picture
+// of where its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that doesn't do
+// as its picture gets another calibration at a press (its pan home a quarter on, its pan the other way), until it
+// does. Every press puts the fixture right at once (its calibration in the set, a bar's `reverse` on the rig) and
+// lights it again to see (mac/Sources/AmadeusDMX/Sets/CalibrateSheet.swift).
 namespace AmadeusDMX;
 
 /// `Fixtures`: in the set's order; `Start`: the one to begin with.
@@ -27,8 +28,14 @@ public sealed class CalibrateSheet
     Step? _step;
     string _order = "";          // which end of the bar red should be at
     string _output = "";
-    readonly Dictionary<string, List<string>> _fixed = [];   // what was put right, per fixture
-    readonly Dictionary<string, HashSet<string>> _fixedAs = [];   // the ones whose fix each was put right with
+    // what was put right, per fixture and step (`From`: put right as that one was, a sibling's fix)
+    readonly Dictionary<string, Dictionary<Step, (string What, string? From)>> _fixed = [];
+    Beam? _beam;                 // where the lit head's beam should go
+    // the calibrations a head is tried with in this step, a press at a time: [0] the one it came with (nothing changed)
+    List<Dictionary<string, JSONValue>> _ways = [];
+    List<string> _wayNames = [];
+    Dictionary<string, JSONValue> _wayBase = [];   // the fixture as it came
+    int _way;
     readonly HashSet<string> _confirmed = [];   // said right, or put right on its own: siblings' fixes pass it by
     string? _note;
     string? _error;
@@ -72,7 +79,7 @@ public sealed class CalibrateSheet
             SwitchOff();
             _saved();
         };
-        var grid = new Grid { MinWidth = 580, Height = 420 };
+        var grid = new Grid { MinWidth = 580, Height = 580 };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -89,6 +96,7 @@ public sealed class CalibrateSheet
         _dialog.Content = grid;
         Render();
         _ = Load();
+        _ = KeepLit();
         await Dialogs.Show(_dialog);
     }
 
@@ -109,8 +117,9 @@ public sealed class CalibrateSheet
                 UI.Text(_target.Name).Secondary(),
                 UI.Spacer(),
                 _target.Fixtures.Count > 0 ? UI.Text(L("{0} of {1}", _index + 1, _target.Fixtures.Count)).Secondary() : null),
-            UI.Text(L("Stand where the audience would be, facing the stage. Each one lights as it hangs on {0}; say what the real one does and it is put right, and the others of this model with it (except those you already went through).", _rig),
-                    Font.Callout).Secondary().Wrap()
+            UI.Text(L("Stand where the audience would be, facing the stage. Each one lights as it hangs on {0}, with a picture of what it should do. When the real one does something else, press until it matches: it is put right, and the others of this model with it (except those you already went through).", _rig),
+                    Font.Callout).Secondary().Wrap(),
+            UI.Text(HangCheckPanel.Sides, Font.Callout).Secondary().Wrap()
         ).Margin(0, 0, 0, 12);
     }
 
@@ -130,9 +139,12 @@ public sealed class CalibrateSheet
         else if (_step is { } step)
             foreach (var part in StepView(id, step)) panel.Children.Add(part);
         if (_fixed.TryGetValue(id, out var done) && done.Count > 0)
+        {
+            var said = string.Join(", ", done.OrderBy(kv => kv.Key).Select(kv => kv.Value.What));
             panel.Children.Add(Form.Note("checkmark.circle.fill", SiblingNote(id) is { } others
-                ? L("Put right: {0}. Saved, and for {1} too.", string.Join(", ", done), others)
-                : L("Put right: {0}. Saved.", string.Join(", ", done)), Tint.Green));
+                ? L("Put right: {0}. Saved, and for {1} too.", said, others)
+                : L("Put right: {0}. Saved.", said), Tint.Green));
+        }
         if (_note is { } n) panel.Children.Add(UI.Text(n, Font.Callout).Foreground(Tint.Orange).Wrap());
         if (_output.Length > 0) panel.Children.Add(UI.Text(_output, Font.Caption).Secondary().Lines(1));
         panel.Alignment = 0;
@@ -145,29 +157,17 @@ public sealed class CalibrateSheet
         {
             case Step.Front:
                 yield return Form.Note("light.beacon.max",
-                    L("Its beam should point straight out at the audience, a little down (up when it stands on the floor). Where does the real one point?"),
+                    L("Its beam should point straight out at the audience, a little down (up when it stands on the floor), as in the picture."),
                     null, Font.Callout).Bold();
-                yield return Buttons(
-                    UI.Button(L("At the Audience"), Advance, "checkmark").Prominent(),
-                    UI.Button(L("Left"), () => Fix(id, "left", L("its pan home turned")), "arrow.left"),
-                    UI.Button(L("Right"), () => Fix(id, "right", L("its pan home turned")), "arrow.right"),
-                    UI.Button(L("Back at the Stage"), () => Fix(id, "back", L("turned round")), "arrow.uturn.down"),
-                    UI.Button(L("Up or Down"), () =>
-                    {
-                        _note = L("A head that points at the ceiling or the floor here is placed the wrong way up: on the Rigs page, put it hanging under the truss or standing, as it really is.");
-                        Body();
-                    })
-                ).Tooltip(L("Left and right as you see it, facing the stage. Pressed the wrong one, it ends up the other way: press that one"));
+                foreach (var part in MatchView(id)) yield return part;
                 break;
             case Step.Check:
                 var c = _checks.GetValueOrDefault(id);
-                yield return Form.Note("light.beacon.max", c is { Expect.Length: > 0 } ? c.Expect : L("Its beam points to one side."), null, Font.Callout).Bold();
+                yield return Form.Note("light.beacon.max",
+                    c is { Expect.Length: > 0 } ? L("{0}, as in the picture.", c.Expect.TrimEnd('.')) : L("Its beam points to one side, as in the picture."),
+                    null, Font.Callout).Bold();
                 yield return UI.Text(L("This catches a head that pans the other way: pointing straight out, that looks right."), Font.Caption).Secondary().Wrap();
-                yield return Buttons([
-                    UI.Button(L("Yes, There"), Advance, "checkmark").Prominent(),
-                    .. (c?.Faults ?? []).Select(f => UI.Button(L("No, it points {0}", f.Seen),
-                                                               () => Fix(id, f.Fix, HangCheckPanel.Cause.GetValueOrDefault(f.Fix) ?? f.Fix))),
-                ]);
+                foreach (var part in MatchView(id)) yield return part;
                 break;
             case Step.Cells:
                 yield return Form.Note("light.strip.2", _order.Length == 0 ? L("Its cells light red, green, blue, white along it.") : _order,
@@ -179,7 +179,19 @@ public sealed class CalibrateSheet
         }
     }
 
-    FrameworkElement Buttons(params Button[] buttons)
+    /// The picture of where the beam should go, and the two answers: it does, or try the next calibration.
+    IEnumerable<UIElement> MatchView(string id)
+    {
+        if (_beam is { } beam) yield return BeamPicture.Build(beam);
+        var row = Buttons(
+            UI.Button(L("Like the Picture"), Advance, "checkmark").Prominent(),
+            UI.Button(L("Not Like It: Try Another Way"), () => TryNext(id), "arrow.triangle.2.circlepath")
+                .Tooltip(L("The head is tried another way round (its pan home a quarter on, its pan the other way). Press until the real beam goes where the picture’s does")));
+        if (_ways.Count > 1) row.Children.Add(UI.Text(L("Way {0} of {1}", _way + 1, _ways.Count), Font.Callout).Secondary());
+        yield return row;
+    }
+
+    FlowPanel Buttons(params Button[] buttons)
     {
         var row = new FlowPanel { Spacing = 8, LineSpacing = 8 };
         foreach (var b in buttons) row.Children.Add(b.Disabled(_busy));
@@ -216,6 +228,8 @@ public sealed class CalibrateSheet
     {
         if (Id is not { } id) return;
         _note = null;
+        _ways = [];
+        _way = 0;
         var all = Steps(id);
         if (_step is { } s && all.IndexOf(s) is var i and >= 0 && i + 1 < all.Count)
         {
@@ -232,6 +246,8 @@ public sealed class CalibrateSheet
         if (i < 0 || i >= _target.Fixtures.Count) return;
         _index = i;
         _note = null;
+        _ways = [];
+        _way = 0;
         var all = Steps(_target.Fixtures[i]);
         _step = all.Count > 0 ? all[0] : null;
         Render();
@@ -277,7 +293,7 @@ public sealed class CalibrateSheet
             catch (Exception e) when (SetView.IsApiError(e)) { }
         }
         _lit = null;
-        if (_step is not { } step || Unplaced(id)) { _output = ""; Body(); return; }
+        if (_step is not { } step || Unplaced(id)) { _output = ""; _beam = null; Body(); return; }
         try
         {
             var r = await _model.Api.TestLight(id, true, _layout,
@@ -286,10 +302,26 @@ public sealed class CalibrateSheet
             _lit = id;
             _output = r.Summary;
             _order = r.Order;
+            _beam = step != Step.Cells && r is { Dir: { } d, Pos: { } p, Stage: { } st } ? new Beam(p, d, st) : null;
         }
-        catch (Exception e) when (SetView.IsApiError(e)) { _output = e.Message; }
+        catch (Exception e) when (SetView.IsApiError(e)) { _output = e.Message; _beam = null; }
         if (_closed) { SwitchOff(); return; }
         Body();
+    }
+
+    /// The engine's light test goes dark after a minute: kept lit for as long as it is looked at.
+    async Task KeepLit()
+    {
+        while (!_closed)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(20));
+            if (_closed || _busy || _lit is not { } id) continue;
+            try
+            {
+                if (!await _model.Api.KeepLight(id) && !_closed && !_busy && _lit == id) await Light();
+            }
+            catch (Exception e) when (SetView.IsApiError(e)) { }
+        }
     }
 
     void SwitchOff()
@@ -304,23 +336,63 @@ public sealed class CalibrateSheet
         });
     }
 
-    /// The head's calibration put right for what was seen (the rig editor's front test, the hang check's faults),
-    /// saved, and lit again to see.
-    async void Fix(string id, string seen, string what)
+    /// The real head doesn't do as its picture: the next calibration it could have, saved, and lit again to see.
+    /// Straight out: its pan home a quarter on, a press at a time (the rig editor's front test's fixes); the check's
+    /// way: the hang check's faults. Round again, it is back as it came.
+    async void TryNext(string id)
     {
+        if (_step is not { } step || Fixture(id) is not { } fixture) return;
         _note = null;
         SetBusy(true);
         try
         {
-            var fields = await _model.Api.HangCheckFix(_layout, id, seen);
-            var also = await Update(id, [.. fields.Keys], f => { foreach (var (k, v) in fields) f[k] = v; });
-            Fixed(id, what);
-            foreach (var o in also) Fixed(o, L("{0} (as {1})", what, id), id);
+            if (_ways.Count == 0)
+            {
+                (string Fix, string Name)[] options = step == Step.Front
+                    ? [("left", L("its pan home turned")), ("back", L("turned round")), ("right", L("its pan home turned"))]
+                    : [.. (_checks.GetValueOrDefault(id)?.Faults ?? []).Select(f => (f.Fix, HangCheckPanel.Cause.GetValueOrDefault(f.Fix) ?? f.Fix))];
+                var found = new List<Dictionary<string, JSONValue>> { new() };
+                var names = new List<string> { "" };
+                foreach (var (fix, name) in options)
+                {
+                    Dictionary<string, JSONValue> fields;
+                    try { fields = await _model.Api.HangCheckFix(_layout, id, fix); }
+                    catch (Exception e) when (SetView.IsApiError(e)) { continue; }   // no calibration points that way
+                    if (fields.Count == 0 || found.Any(o => Same(o, fields))) continue;
+                    found.Add(fields);
+                    names.Add(name);
+                }
+                if (found.Count < 2)
+                {
+                    _note = L("There is no other way to try this head. If it doesn’t do as the picture, it is placed differently here than it really hangs or stands: put that right on the Rigs page.");
+                    return;
+                }
+                _ways = found;
+                _wayNames = names;
+                _wayBase = new(fixture);
+                _way = 0;
+            }
+            var next = (_way + 1) % _ways.Count;
+            string[] keys = [.. _ways.SelectMany(o => o.Keys).Distinct()];
+            Dictionary<string, JSONValue> to = _ways[next], from = _wayBase;
+            var also = await Update(id, keys, f =>
+            {
+                foreach (var k in keys)
+                    if (to.TryGetValue(k, out var v) || from.TryGetValue(k, out v)) f[k] = v; else f.Remove(k);
+            });
+            _way = next;
+            Fixed(id, step, next == 0 ? null : _wayNames[next]);
+            foreach (var o in also) Fixed(o, step, next == 0 ? null : L("{0} (as {1})", _wayNames[next], id), id);
+            if (next == 0)
+                _note = L("That was every way, and it is back as it came. If none looked like the picture, it is placed differently here than it really hangs or stands (hanging or standing, or on another side of the truss): put that right on the Rigs page. Or its mode or address is off: see Check Channels.");
             await Light();
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
         finally { SetBusy(false); }
     }
+
+    static bool Same(Dictionary<string, JSONValue> a, Dictionary<string, JSONValue> b) =>
+        a.Count == b.Count && a.All(kv => b.TryGetValue(kv.Key, out var v) && kv.Value.Equals(v));
 
     /// The bar runs the other way on the real rig: its `reverse` (where it hangs, on the rig) flipped.
     async void Reverse(string id)
@@ -333,22 +405,20 @@ public sealed class CalibrateSheet
             {
                 if (f.GetValueOrDefault("reverse")?.Bool ?? false) f.Remove("reverse"); else f["reverse"] = JSONValue.True;
             });
-            Fixed(id, L("its cells the other way round"));
-            foreach (var o in also) Fixed(o, L("{0} (as {1})", L("its cells the other way round"), id), id);
+            var was = _fixed.GetValueOrDefault(id)?.ContainsKey(Step.Cells) ?? false;   // pressed again: back as it came
+            Fixed(id, Step.Cells, was ? null : L("its cells the other way round"));
+            foreach (var o in also) Fixed(o, Step.Cells, was ? null : L("{0} (as {1})", L("its cells the other way round"), id), id);
             await Light();
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
         finally { SetBusy(false); }
     }
 
-    /// `from`: put right as that one was (a sibling's fix).
-    void Fixed(string id, string what, string? from = null)
+    /// What a step put right (null: nothing after all, it is back as it came); `from`: as that one was (a sibling's fix).
+    void Fixed(string id, Step step, string? what, string? from = null)
     {
-        if (!_fixed.TryGetValue(id, out var l)) _fixed[id] = l = [];
-        l.Add(what);
-        if (from is null) return;
-        if (!_fixedAs.TryGetValue(id, out var s)) _fixedAs[id] = s = [];
-        s.Add(from);
+        if (!_fixed.TryGetValue(id, out var steps)) _fixed[id] = steps = [];
+        if (what is null) steps.Remove(step); else steps[step] = (what, from);
     }
 
     void SetBusy(bool busy)
@@ -387,7 +457,7 @@ public sealed class CalibrateSheet
     /// The siblings a fix of this one went to, listed (null: none).
     string? SiblingNote(string id)
     {
-        var others = _target.Fixtures.Where(o => o != id && (_fixedAs.GetValueOrDefault(o)?.Contains(id) ?? false)).ToList();
+        var others = _target.Fixtures.Where(o => o != id && (_fixed.GetValueOrDefault(o)?.Values.Any(v => v.From == id) ?? false)).ToList();
         return others.Count == 0 ? null : string.Join(", ", others);
     }
 
