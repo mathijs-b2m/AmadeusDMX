@@ -1,6 +1,9 @@
 // The calibration's picture: a moving head as the software expects it, and where its beam goes, drawn twice, as you
 // see it from the audience and from above. The real head is then turned (its calibration, a press at a time) until
-// it does the same. Both are drawn as the audience sees the stage: stage left (x = 0) on the right.
+// it does the same. Both are drawn as the audience sees the stage: stage left (x = 0) on the right. The pan test's
+// picture moves: the head turns from `dir` to `to` and back, held at each end, as the engine's sweep does (not in
+// step with the real one, only the same way round), the far end drawn faint.
+import simd
 import SwiftUI
 
 struct BeamPicture: View {
@@ -9,7 +12,11 @@ struct BeamPicture: View {
         var dir: SIMD3<Float>
         var stage: SIMD2<Float>   // width, height
         var hanging = true        // its base above it (under a truss), or below (standing)
+        var to: SIMD3<Float>?     // the pan test: it turns from `dir` to here and back
     }
+
+    /// The engine's sweep (web/rig.py SWEEP_HOLD_S, SWEEP_MOVE_S): held, turned, held, turned back.
+    static let hold = 1.5, move = 2.0
 
     let beam: Beam
 
@@ -24,7 +31,15 @@ struct BeamPicture: View {
 
     private func panel(_ title: String, above: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Canvas { g, size in draw(&g, size, above: above) }
+            Group {
+                if beam.to != nil {
+                    TimelineView(.animation) { tl in
+                        Canvas { g, size in draw(&g, size, above: above, at: Self.sweep(tl.date.timeIntervalSinceReferenceDate)) }
+                    }
+                } else {
+                    Canvas { g, size in draw(&g, size, above: above) }
+                }
+            }
                 .frame(width: 270, height: 170)
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
                 .clipShape(.rect(cornerRadius: 8))
@@ -35,7 +50,28 @@ struct BeamPicture: View {
     /// The beam's length in the picture, in metres.
     private var reach: CGFloat { max(1.5, CGFloat(beam.stage.x) * 0.4) }
 
-    private func draw(_ g: inout GraphicsContext, _ size: CGSize, above: Bool) {
+    /// How far along the pan test's turn (0: `dir`, 1: `to`), eased, at time `t` in seconds.
+    static func sweep(_ t: Double) -> Float {
+        let cycle = 2 * (hold + move), x = t.truncatingRemainder(dividingBy: cycle)
+        let k = x < hold ? 0 : x < hold + move ? (x - hold) / move : x < 2 * hold + move ? 1 : 1 - (x - 2 * hold - move) / move
+        return Float(k * k * (3 - 2 * k))
+    }
+
+    private func draw(_ g: inout GraphicsContext, _ size: CGSize, above: Bool, at k: Float = 0) {
+        var turned = beam
+        if let to = beam.to {   // the far end faint, then the head where it is now
+            turned.dir = to
+            turned.to = nil
+            var faint = g
+            faint.opacity = 0.3
+            BeamPicture(beam: turned).drawOne(&faint, size, above: above)
+            turned.dir = simd_normalize(beam.dir * (1 - k) + to * k)
+        }
+        BeamPicture(beam: turned).drawOne(&g, size, above: above)
+    }
+
+    /// The picture with the head pointing `beam.dir`.
+    private func drawOne(_ g: inout GraphicsContext, _ size: CGSize, above: Bool) {
         let w = max(CGFloat(beam.stage.x), 1), p = beam.pos, d = beam.dir
         // the world box in the picture's own metres: h from the left (stage right's edge), v down
         let top: CGFloat, height: CGFloat, at: CGPoint, to: CGVector

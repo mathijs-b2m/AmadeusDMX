@@ -422,11 +422,12 @@ public struct SetupAPI: Sendable {
     }
 
     /// The calibration on the Sets page: one fixture of a layout lit, a moving head pointed `point` ("front": straight
-    /// out to the audience, "check": the check after hanging's way, nil: centred), with `cells` a bar's cells red,
+    /// out to the audience, "pan": from there turning to one side and back (the reply's `to` and `side`), "check": the
+    /// check after hanging's way, nil: centred), with `cells` a bar's cells red,
     /// green, blue, white along it (the reply's `order` says which end red should be at).
     public func testLight(fixture: String, on: Bool, layout: [String: Any], point: String?, cells: Bool) async throws -> LightTest {
         var body: [String: Any] = ["fixture": fixture, "rig": layout, "on": on, "cells": cells]
-        if let point { body["point"] = point == "front" ? "front" as Any : true as Any }
+        if let point { body["point"] = ["front", "pan"].contains(point) ? point as Any : true as Any }
         return try await post("api/test-light", body)
     }
 
@@ -779,9 +780,11 @@ public struct LightTest: Decodable, Sendable {
     public var pos: SIMD3<Float>?       // a pointed head: where it is (metres, as the feed's)
     public var stage: SIMD2<Float>?     // the stage's width and height, metres
     public var order = ""               // a bar's cells lit in colours: which end red should be at, in words
+    public var to: SIMD3<Float>?        // the pan test: where its beam turns to from `dir`, and back
+    public var side = ""                // the pan test: that turn is to the audience's "left" or "right" ("": none)
 
     enum CodingKeys: String, CodingKey {
-        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir, pos, stage, order
+        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir, pos, stage, order, to, side
     }
 
     public init(from decoder: Decoder) throws {
@@ -796,6 +799,8 @@ public struct LightTest: Decodable, Sendable {
         pos = try c.decodeIfPresent([Float].self, forKey: .pos).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
         stage = try c.decodeIfPresent([Float].self, forKey: .stage).flatMap { $0.count >= 2 ? SIMD2($0[0], $0[1]) : nil }
         order = try c.decodeIfPresent(String.self, forKey: .order) ?? ""
+        to = try c.decodeIfPresent([Float].self, forKey: .to).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
+        side = try c.decodeIfPresent(String.self, forKey: .side) ?? ""
     }
 
     /// "universe 1, channels 43–50 · Art-Net → 192.168.2.18:6454 (universe 1 on the wire)"

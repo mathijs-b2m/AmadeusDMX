@@ -1,7 +1,9 @@
 // The calibration's picture: a moving head as the software expects it, and where its beam goes, drawn twice, as you
 // see it from the audience and from above. The real head is then turned (its calibration, a press at a time) until
 // it does the same. Both are drawn as the audience sees the stage: stage left (x = 0) on the right
-// (mac/Sources/AmadeusDMX/Sets/BeamPicture.swift).
+// (mac/Sources/AmadeusDMX/Sets/BeamPicture.swift). The pan test's picture moves: the head turns from `Dir` to `To`
+// and back, held at each end, as the engine's sweep does (not in step with the real one, only the same way round),
+// the far end drawn faint.
 using System.Numerics;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
@@ -10,12 +12,23 @@ using Windows.Foundation;
 namespace AmadeusDMX;
 
 /// `Pos`: metres, x from stage left, y towards the audience from the stage's front edge, z up; `Stage`: width, height;
-/// `Hanging`: its base above it (under a truss), or below (standing).
-public sealed record Beam(Vector3 Pos, Vector3 Dir, Vector2 Stage, bool Hanging = true);
+/// `Hanging`: its base above it (under a truss), or below (standing); `To`: the pan test, it turns from `Dir` to here
+/// and back.
+public sealed record Beam(Vector3 Pos, Vector3 Dir, Vector2 Stage, bool Hanging = true, Vector3? To = null);
 
 public static class BeamPicture
 {
     const double W = 270, H = 170;
+    /// The engine's sweep (amadeus/web/rig.py SWEEP_HOLD_S, SWEEP_MOVE_S): held, turned, held, turned back.
+    const double Hold = 1.5, Move = 2.0;
+
+    /// How far along the pan test's turn (0: `Dir`, 1: `To`), eased, at time `t` in seconds.
+    public static float Sweep(double t)
+    {
+        double cycle = 2 * (Hold + Move), x = t % cycle;
+        var k = x < Hold ? 0 : x < Hold + Move ? (x - Hold) / Move : x < 2 * Hold + Move ? 1 : 1 - (x - 2 * Hold - Move) / Move;
+        return (float)(k * k * (3 - 2 * k));
+    }
 
     public static FrameworkElement Build(Beam beam)
     {
@@ -28,8 +41,31 @@ public static class BeamPicture
     {
         var canvas = new Canvas { Width = W, Height = H, IsHitTestVisible = false };
         canvas.Clip = new RectangleGeometry { Rect = new Rect(0, 0, W, H) };
-        Draw(canvas, beam, above);
-        var box = new Border { Child = canvas, CornerRadius = new CornerRadius(8), Background = ShowUI.Quaternary, Width = W, Height = H };
+        FrameworkElement child = canvas;
+        if (beam.To is { } to)
+        {
+            // the far end faint underneath, the head where it is now redrawn on a timer while the picture shows
+            var faint = new Canvas { Width = W, Height = H, IsHitTestVisible = false, Opacity = 0.3 };
+            Draw(faint, beam with { Dir = to, To = null }, above);
+            var grid = new Grid { Width = W, Height = H, Clip = new RectangleGeometry { Rect = new Rect(0, 0, W, H) } };
+            grid.Children.Add(faint);
+            grid.Children.Add(canvas);
+            child = grid;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            void Frame()
+            {
+                var k = Sweep(clock.Elapsed.TotalSeconds);
+                canvas.Children.Clear();
+                Draw(canvas, beam with { Dir = Vector3.Normalize(beam.Dir * (1 - k) + to * k), To = null }, above);
+            }
+            Frame();
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+            timer.Tick += (_, _) => Frame();
+            grid.Loaded += (_, _) => timer.Start();
+            grid.Unloaded += (_, _) => timer.Stop();
+        }
+        else Draw(canvas, beam, above);
+        var box = new Border { Child = child, CornerRadius = new CornerRadius(8), Background = ShowUI.Quaternary, Width = W, Height = H };
         var stack = UI.VStack(4, box, UI.Text(title, Font.Caption).Secondary());
         stack.Alignment = 0;
         return stack;

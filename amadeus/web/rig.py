@@ -305,17 +305,20 @@ def hang_check(req):
 def hang_check_fix(req):
     """{"rig": <combined dict>, "fixture": id, "fix": "mirrored"|"turned"|"both"}: the calibration fields that put
     that head right (they go into the set). "fix": "left"|"right"|"back": the rig editor's front test went there
-    instead (hangsheet.fix_front)."""
+    instead (hangsheet.fix_front). "fix": "pan": the calibration's pan test turned the other way (hangsheet.flip_pan:
+    straight out stays right; {} when its pan has no room for that)."""
     from amadeus.rig import hangsheet
     from amadeus.rig.loader import load_rig_dict
 
     b = req.body()
-    if b.get("fix") in hangsheet.SEEN:
+    if b.get("fix") in hangsheet.SEEN or b.get("fix") == "pan":  # these need the head as it is placed
         rig = load_rig_dict(b["rig"])
         fx = next((f for f in rig["fixtures"] if f["id"] == b["fixture"]), None)
         if fx is None:
             return {"error": f"The set has no fixture called {b['fixture']}"}, 400
         try:
+            if b["fix"] == "pan":
+                return {"fields": hangsheet.flip_pan(fx, fxlib.get(fx["fixture"]))}
             return {"fields": hangsheet.fix_front(fx, fxlib.get(fx["fixture"]), b["fix"])}
         except ValueError as e:
             return {"error": str(e)}, 400
@@ -410,10 +413,12 @@ def test_light(req):
     mapper: what does this channel do?); "light": [channel index, …] the ones it plays light on, kept under the
     brightness limiter with the definition's own. With "point": true a moving head points its beam the way the
     check after hanging says (rig/hangsheet.py check_aim) instead of straight out; "point": "front" straight out to
-    the audience (front_aim: the rig editor's test). Then "dir" says where the beam goes (world, as the feed's),
-    "pos" where the head is (metres, as the feed's) and "stage" the stage's width and height: the calibration's
-    picture of what to see. {"fixture": id, "keep": true} starts a lit fixture's minute again (someone is still
-    looking at it: the calibration), and says whether it was still lit ("on").
+    the audience (front_aim: the rig editor's test); "point": "pan" from straight out its pan alone turns to one side
+    and back, again and again (hangsheet.pan_sweep: does it turn the way the software thinks?), "to" where it turns
+    to and "side" which way that is for the audience ("left"/"right"). Then "dir" says where the beam goes (world,
+    as the feed's), "pos" where the head is (metres, as the feed's) and "stage" the stage's width and height: the
+    calibration's picture of what to see. {"fixture": id, "keep": true} starts a lit fixture's minute again (someone
+    is still looking at it: the calibration), and says whether it was still lit ("on").
     With "cells": true a bar's cells light red, green, blue, white along it as it is placed, and "order" says which
     end red should be at (the calibration: is the real one reversed?)."""
     from amadeus.dmx import outputs
@@ -440,7 +445,8 @@ def test_light(req):
         return {"error": refusal}, 400
     if on and not fxlib.patched(fx):
         return {"error": f"{fixture_id} has no start address yet: give it one first"}, 400
-    pointed = at = None  # where a pointed head's beam goes, and where the head is
+    pointed = at = turned = None  # where a pointed head's beam goes, and where the head is
+    side = ""
     with _test_lock:
         ids = {f["id"] for f in rig["fixtures"]}
         _test["lit"] = {fid: until for fid, until in _test["lit"].items() if fid in ids}  # another set's: dark
@@ -455,8 +461,13 @@ def test_light(req):
             if body.get("point") and fxlib.is_moving(defn):  # the check after hanging: its beam a known way
                 from amadeus.rig import hangsheet
 
-                aim = (hangsheet.front_aim if body["point"] == "front" else hangsheet.check_aim)(fx, defn)
-                _test["aim"][fixture_id] = aim
+                if body["point"] == "pan":  # the calibration's pan test: from straight out to one side and back
+                    aim, other, side = hangsheet.pan_sweep(fx, defn)
+                    _test["aim"][fixture_id] = {"sweep": (aim, other), "t0": time.monotonic()}
+                    turned = [round(float(v), 3) for v in geometry.fk(fx, defn, *other)]
+                else:
+                    aim = (hangsheet.front_aim if body["point"] == "front" else hangsheet.check_aim)(fx, defn)
+                    _test["aim"][fixture_id] = aim
                 pointed = [round(float(v), 3) for v in geometry.fk(fx, defn, *aim)]
                 el = next((e for e in rig["elements"] if e["fixture"] == fixture_id), None)
                 if el is not None:
@@ -486,10 +497,34 @@ def test_light(req):
         "wire_universe": outputs.wire_universe(rig, fx["universe"]),
         "channels": [fx["address"], fx["address"] + fxlib.footprint(fx) - 1] if fxlib.patched(fx) else None,
         "dir": pointed,
+        "to": turned,
+        "side": side,
         "pos": at,
         "stage": [st["width_m"], st["ceiling_m"]],
         "order": order,
     }
+
+
+SWEEP_HOLD_S, SWEEP_MOVE_S = 1.5, 2.0  # the pan test: held straight out, turned, held there, turned back
+
+
+def _aim_now(aim, now: float):
+    """A lit head's pan and tilt now: as it was given, or along the pan test's sweep (eased, motor degrees)."""
+    if not isinstance(aim, dict):
+        return aim
+    (p0, t0), (p1, t1) = aim["sweep"]
+    cycle = 2 * (SWEEP_HOLD_S + SWEEP_MOVE_S)
+    t = (now - aim["t0"]) % cycle
+    if t < SWEEP_HOLD_S:
+        k = 0.0
+    elif t < SWEEP_HOLD_S + SWEEP_MOVE_S:
+        k = (t - SWEEP_HOLD_S) / SWEEP_MOVE_S
+    elif t < 2 * SWEEP_HOLD_S + SWEEP_MOVE_S:
+        k = 1.0
+    else:
+        k = 1.0 - (t - 2 * SWEEP_HOLD_S - SWEEP_MOVE_S) / SWEEP_MOVE_S
+    k = k * k * (3 - 2 * k)
+    return p0 + (p1 - p0) * k, t0 + (t1 - t0) * k
 
 
 def _test_loop():
@@ -521,7 +556,7 @@ def _test_loop():
                 if f["id"] in raw:  # as they are: the mapper tries what a channel does
                     fxlib.test_raw(buf, f, *raw[f["id"]])
                 elif f["id"] in lit:
-                    fxlib.test_light(buf, f, aim=aim.get(f["id"]), colors=cells.get(f["id"]))
+                    fxlib.test_light(buf, f, aim=_aim_now(aim.get(f["id"]), now), colors=cells.get(f["id"]))
                 else:  # dark, and heads where a blackout leaves them (DMX 0): they don't move on every test
                     fxlib.patch(buf, f, {e["id"]: State(pan=0.0, tilt=0.0) for e in fxlib.expand(f)})
             sender.send(unis)
