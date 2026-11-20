@@ -80,8 +80,8 @@ MIN_STABS = 3  # a phrase needs this many stabs before lights are given to them
 
 # The heads' strobe (head light "strobe"): white flashes on the beat grid, as fine as the section asks (notes per
 # beat) and the set's flash limit allows (max_flash_hz; allow_fast_strobe: up to FAST_STROBE_HZ; strobe_free: the
-# heads pulse on the kick instead). A head with a strobe channel strobes on it at the grid's rate, its dimmer open
-# (library/fixtures.py patch); the others flash on their dimmer.
+# heads pulse on the kick instead). These flashes are on the beat: every head plays them on its dimmer, gated on the
+# grid, also one with a strobe channel (only a strobe faster than library/strobe.py DIMMER_FLASH_HZ goes there).
 HEAD_STROBE_DIV = {"drop": 4, "groove": 2, "chorus": 2, "buildup": 2}  # elsewhere: on the beat
 HEAD_STROBE_ON_S = 0.05  # a flash: two DMX frames
 FAST_STROBE_HZ = 10.0

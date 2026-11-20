@@ -1,4 +1,4 @@
-"""A fixture with a strobe channel strobes on it, its dimmer open; the others flash on their dimmer."""
+"""Beat flashes play on the dimmer, on the grid; only a real fast strobe uses a fixture's strobe channel."""
 
 import copy
 from dataclasses import replace
@@ -76,12 +76,65 @@ def test_a_rate_is_never_faster_than_asked():
     assert 64 <= strobe.value({"strobe_range": [64, 95]}, 2.0) < 70  # unknown speeds: on the slow side
 
 
+FAST = 15.0  # a real fast strobe, above strobe.DIMMER_FLASH_HZ
+
+
 def test_the_strobe_channel_flashes_and_the_dimmer_stays_open(monkeypatch):
     defn = _defn({"attr": "dimmer"}, CHAN)
     for gate in (1.0, 0.0):
-        buf = _patch(monkeypatch, defn, {"h": State(dimmer=0.8, strobe_hz=4.0, gate=gate)})
+        buf = _patch(monkeypatch, defn, {"h": State(dimmer=0.8, strobe_hz=FAST, gate=gate)})
         assert buf[DIM] == round(0.8 * 255) and 64 <= buf[SHUTTER] <= 95
     assert _patch(monkeypatch, defn, {"h": State(dimmer=0.8)})[SHUTTER] == 40  # not strobing: back to quiet
+
+
+# fx1 in the studio: a beam spot (generic/180w-beam-spot-zoom-led-moving-head, 14ch) with a strobe channel of
+# unknown speeds. The drop's flashes on the beat went to that channel, free-running, and did not flash at all
+FX1 = _defn({"attr": "dimmer"}, {"attr": "strobe", "default": 0, "strobe_range": [11, 255]})
+
+
+@pytest.mark.parametrize("hz", [2.0, 3.0, 4.0, 8.5, 10.0])
+def test_a_beat_flash_plays_on_the_dimmer_and_the_strobe_channel_stays_closed(monkeypatch, hz):
+    on = _patch(monkeypatch, FX1, {"h": State(dimmer=0.8, strobe_hz=hz, gate=1.0)})
+    off = _patch(monkeypatch, FX1, {"h": State(dimmer=0.8, strobe_hz=hz, gate=0.0)})
+    assert (on[DIM], on[SHUTTER]) == (round(0.8 * 255), 0)
+    assert (off[DIM], off[SHUTTER]) == (0, 0)
+
+
+def test_a_real_fast_strobe_uses_the_strobe_channel(monkeypatch):
+    buf = _patch(monkeypatch, FX1, {"h": State(dimmer=0.8, strobe_hz=FAST, gate=0.0)})
+    assert buf[DIM] == round(0.8 * 255) and 11 <= buf[SHUTTER] <= 255
+
+
+def test_every_flash_the_shows_play_is_slow_enough_for_the_dimmer():
+    from amadeus.engine import looks
+
+    assert looks.FAST_STROBE_HZ <= strobe.DIMMER_FLASH_HZ
+
+
+def test_a_drops_head_strobe_gates_the_dimmer_exactly_on_the_beat(track, monkeypatch):
+    rig = load_rig(SETS[0])
+    rig["safety"].update(max_flash_hz=4.0, allow_fast_strobe=False, strobe_free=False)
+    plan = direct(track, RuleDirector(head_groups(rig), laser_list(rig), bool(rig.get("screen"))), verbose=False)
+    drop = next(d for d in plan if d.section == "drop")
+    plan = [replace(d, head_light="strobe", grouping="unison", layer_split="none") if d is drop else d for d in plan]
+    e = Engine(track, plan, rig)
+    head = next(x["id"] for x in rig["elements"] if x["kind"] == "head")
+    assert 2.0 <= e.head_strobe_rate(drop) <= 4.0 + 1e-6
+    dims, frames = [], np.arange(drop.start + 1.0, drop.start + 3.0, 1 / 40)
+    for t in frames:
+        s = e.render(float(t))[1][head]
+        if s.strobe_hz <= 0 or s.dimmer <= 0:
+            continue
+        buf = _patch(monkeypatch, FX1, {"h": s})
+        assert buf[SHUTTER] == 0  # the strobe channel stays closed
+        dims.append((float(t), buf[DIM] > 0))
+    assert any(lit for _, lit in dims) and any(not lit for _, lit in dims)  # the dimmer flashes
+    for t, lit in dims:  # and only on the grid: every lit frame is within a flash of a grid line
+        if lit:
+            beat, phase, period = e.beat_info(t)
+            div = e._strobe_notes(drop, period, e._head_strobe_hz())
+            since = (phase * div % 1.0) / div * period
+            assert since < 0.05 + 1 / 40 or since > period / div - 1 / 40
 
 
 def test_a_dark_light_does_not_strobe(monkeypatch):
@@ -90,7 +143,7 @@ def test_a_dark_light_does_not_strobe(monkeypatch):
 
 
 def test_the_limiter_holds_a_strobing_light(monkeypatch):
-    buf = _patch(monkeypatch, _defn({"attr": "dimmer"}, CHAN), {"h": State(dimmer=1.0, strobe_hz=4.0)}, limit=0.5)
+    buf = _patch(monkeypatch, _defn({"attr": "dimmer"}, CHAN), {"h": State(dimmer=1.0, strobe_hz=FAST)}, limit=0.5)
     assert buf[DIM] == round(0.5 * 255)
 
 
@@ -101,16 +154,16 @@ def test_without_a_strobe_channel_it_flashes_on_the_dimmer(monkeypatch):
 
 
 def test_too_fast_a_strobe_channel_leaves_it_to_the_dimmer(monkeypatch):
-    defn = _defn({"attr": "dimmer"}, {**CHAN, "strobe_hz": [8.0, 25.0]})
-    buf = _patch(monkeypatch, defn, {"h": State(dimmer=0.8, strobe_hz=4.0, gate=0.0)})
+    defn = _defn({"attr": "dimmer"}, {**CHAN, "strobe_hz": [20.0, 25.0]})
+    buf = _patch(monkeypatch, defn, {"h": State(dimmer=0.8, strobe_hz=FAST, gate=0.0)})
     assert (buf[DIM], buf[SHUTTER]) == (0, 40)
 
 
 def test_a_shared_channel_waits_for_all_its_cells(monkeypatch):
     defn = _defn({"attr": "dimmer", "head": 0}, {"attr": "dimmer", "head": 1}, CHAN)
-    both = {"a": State(dimmer=1.0, strobe_hz=4.0, gate=0.0), "b": State(dimmer=1.0, strobe_hz=4.0, gate=0.0)}
+    both = {"a": State(dimmer=1.0, strobe_hz=FAST, gate=0.0), "b": State(dimmer=1.0, strobe_hz=FAST, gate=0.0)}
     assert 64 <= _patch(monkeypatch, defn, both)[2] <= 95
-    one = {"a": State(dimmer=1.0, strobe_hz=4.0, gate=0.0), "b": State(dimmer=1.0)}
+    one = {"a": State(dimmer=1.0, strobe_hz=FAST, gate=0.0), "b": State(dimmer=1.0)}
     buf = _patch(monkeypatch, defn, one)
     assert (buf[0], buf[1], buf[2]) == (0, 255, 40)  # the steady cell stays steady, the other flashes on its dimmer
 
