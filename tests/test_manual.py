@@ -248,6 +248,18 @@ def test_the_endpoint_takes_a_pasted_picture(library, monkeypatch):
     assert fake.sent[0][0]["content"][1]["type"] == "input_image"
 
 
+def test_the_add_fixtures_sheet_makes_a_new_fixture_from_a_pasted_chart(library, monkeypatch):
+    """No fixture key sent (the apps' Add Fixtures › From Manual): a new fixture in its largest mode, chosen next."""
+    import openai
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    monkeypatch.setattr(openai, "OpenAI", lambda *a, **k: FakeOpenAI())
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n chart").decode()
+    r = web_library.read_manual(Req({"name": "Pasted picture.png", "data": png}))
+    assert r["mode"] == "13ch" and r["manual"]["file"] == "Pasted picture.png"
+    assert fxlib.get(r["key"])["made"]["checked"] is False
+
+
 def test_the_endpoint_fills_the_mapper_and_a_refused_key_is_the_warning(library, monkeypatch):
     import openai
 

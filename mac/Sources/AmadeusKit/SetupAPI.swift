@@ -473,6 +473,12 @@ public struct SetupAPI: Sendable {
                        timeout: 300)
     }
 
+    /// A new fixture in your library made from its manual (a PDF, or a picture of its DMX chart), read with AI and
+    /// your own OpenAI key: the manual's largest mode. Its key and mode, or the problems. Takes up to a few minutes.
+    public func fixtureFromManual(name: String, data: Data) async throws -> NewFixture {
+        try await post("api/fixture/manual", ["name": name, "data": data.base64EncodedString()], timeout: 300)
+    }
+
     /// A fixture's lens and light as its manual gives them, into your copy of it; returns the problems (nothing saved if any).
     public func saveLens(key: String, beamDeg: Double, zoomTo: Double?, lumens: Double?) async throws -> [String] {
         var body: [String: Any] = ["key": key, "beam_deg": beamDeg]
