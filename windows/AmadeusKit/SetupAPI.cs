@@ -408,8 +408,14 @@ public sealed class SetupAPI
         return r.Problems ?? [];
     }
 
+    /// Reads a fixture's manual (a PDF) with AI, your own OpenAI key: the mode's mapping filled from the manual's
+    /// DMX chart, to check and save in the mapper. Nothing is saved by it. Takes up to a few minutes.
+    public Task<FixtureMapping> ReadManual(string key, string mode, string name, byte[] data, CancellationToken ct = default) =>
+        Post("api/fixture/manual", new { key, mode, name, data = Convert.ToBase64String(data) }, FixtureMapping.From, timeout: 300, ct: ct);
+
     /// SaveMapping's body: `checked`: every channel was checked on the fixture; `wheel`, `ring`: the colour wheel's or
-    /// the ring's colours were named (saved with it, as they are after a check too).
+    /// the ring's colours were named (saved with it, as they are after a check too). A mapping read from a manual sends
+    /// the wheel and the chart's names and ranges along: the gobos, the prism and the strobe are read from those.
     internal static Dictionary<string, object?> MappingBody(FixtureMapping m, bool @checked, bool wheel, bool ring = false)
     {
         var chans = m.Channels.Select(c => new { role = c.Role, cell = c.Cell, value = c.Value, attr = c.Attr }).ToList();
@@ -417,10 +423,20 @@ public sealed class SetupAPI
         {
             ["key"] = m.Key, ["mode"] = m.Mode, ["kind"] = m.Kind, ["channels"] = chans, ["checked"] = @checked,
         };
-        if ((@checked || wheel) && m.Channels.Any(c => c.Role == "color_wheel") && m.Wheel.Count > 0)
+        var read = m.Manual is not null;
+        if ((@checked || wheel || read) && m.Channels.Any(c => c.Role == "color_wheel") && m.Wheel.Count > 0)
             body["wheel"] = m.Wheel.Select(w => new { name = w.Name, from = w.From, to = w.To, rgb = w.Rgb }).ToList();
-        if ((@checked || ring) && m.Channels.Any(c => c.Role == "ring_color") && m.Ring.Count > 0)
+        if ((@checked || ring || read) && m.Channels.Any(c => c.Role == "ring_color") && m.Ring.Count > 0)
             body["ring"] = m.Ring.Select(w => new { name = w.Name, from = w.From, to = w.To, rgb = w.Rgb }).ToList();
+        if (m.Manual is { } manual)
+            body["manual"] = new Dictionary<string, object?>
+            {
+                ["file"] = manual.File,
+                ["channels"] = m.Channels.Select(c => new
+                {
+                    name = c.Name, ranges = c.Ranges.Select(r => new object[] { r.Lo, r.Hi, r.What }).ToList(),
+                }).ToList(),
+            };
         return body;
     }
 
@@ -678,6 +694,21 @@ public sealed record FixtureMapping
     public IReadOnlyList<Slot> Wheel { get; init; } = [];
     public IReadOnlyList<Slot> Ring { get; init; } = [];   // the colours of an LED ring or strip round the lens (a ring_color channel)
 
+    /// Filled from the fixture's manual, read with AI (amadeus/library/manual.py): which file, and which of the
+    /// manual's modes was used. Saved with the mapping: the chart's names and ranges are kept with the fixture.
+    public sealed record ManualSource(string File, string Mode, IReadOnlyList<ManualSource.ModeInfo> Modes)
+    {
+        public sealed record ModeInfo(string Name, int Channels)
+        {
+            public static ModeInfo From(JsonElement c) => new(J.Req(c, "name", J.String), J.Req(c, "channels", J.Int));
+        }
+
+        public static ManualSource From(JsonElement c) =>
+            new(J.Req(c, "file", J.String), J.Req(c, "mode", J.String), J.Ref(c, "modes", J.ArrayOf(ModeInfo.From)) ?? []);
+    }
+
+    public ManualSource? Manual { get; init; }
+
     public static FixtureMapping From(JsonElement c) => new()
     {
         Key = J.Req(c, "key", J.String), Name = J.Req(c, "name", J.String), Mode = J.Req(c, "mode", J.String),
@@ -687,6 +718,7 @@ public sealed record FixtureMapping
         Made = J.Val(c, "made", J.Bool) ?? false, Checked = J.Val(c, "checked", J.Bool) ?? true,
         Check = J.Ref(c, "check", J.ArrayOf(Answer.From)) ?? [], Wheel = J.Ref(c, "wheel", J.ArrayOf(Slot.Decode)) ?? [],
         Ring = J.Ref(c, "ring", J.ArrayOf(Slot.Decode)) ?? [],
+        Manual = J.Ref(c, "manual", ManualSource.From),
     };
 
     /// The values sent while channel `probe` is checked at `value`: the others hold the light on and the head in

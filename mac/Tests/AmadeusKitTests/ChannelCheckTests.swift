@@ -58,3 +58,17 @@ private func mapping() throws -> FixtureMapping {
     let m = try JSONDecoder().decode(FixtureMapping.self, from: Data(json.utf8))
     #expect(!m.made && m.checked && m.check.isEmpty && m.roles[0].check == nil && m.ring.isEmpty)
 }
+
+@Test func aMappingReadFromAManualSavesItsChartAndWheel() throws {
+    var m = try mapping()
+    #expect(m.manual == nil && m.saveBody()["manual"] == nil && m.saveBody()["wheel"] == nil)
+    let json = #"{"file":"mini.pdf","mode":"9 channel","modes":[{"name":"9 channel","channels":9},{"name":"11 channel","channels":11}]}"#
+    m.manual = try JSONDecoder().decode(FixtureMapping.Manual.self, from: Data(json.utf8))
+    let body = m.saveBody()
+    let manual = try #require(body["manual"] as? [String: Any])
+    let chart = try #require(manual["channels"] as? [[String: Any]])
+    #expect(manual["file"] as? String == "mini.pdf" && chart.count == 5 && chart[2]["name"] as? String == "Colour wheel")
+    let range = try #require((chart[2]["ranges"] as? [[Any]])?.first)
+    #expect(range[0] as? Int == 0 && range[1] as? Int == 9 && range[2] as? String == "open / white")
+    #expect((body["wheel"] as? [[String: Any]])?.count == 2)  // the manual's colours go along, unasked
+}

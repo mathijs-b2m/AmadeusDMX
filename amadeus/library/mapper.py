@@ -139,19 +139,27 @@ def apply(
     wheel: list[dict] | None = None,
     checked: bool = False,
     ring: list[dict] | None = None,
+    manual: dict | None = None,
 ) -> list[str]:
     """Save a mode's channels ({"role", "cell", "value"} per channel, in order; a held one may get its "attr",
     what the check found it does) into your copy of the definition. `wheel`: the colour wheel's slots as named in
     the check; `ring`: the ring colour channel's colours, the same way; `checked`: every channel was checked on the
-    fixture. Returns the problems (nothing saved if any)."""
+    fixture; `manual`: the chart came from the fixture's manual (manual.py): {"file", "channels": [{"name",
+    "ranges"}]}, kept with the definition, its strobe, gobos, prism and frost read from those words. Returns the
+    problems (nothing saved if any)."""
     defn = copy.deepcopy(fxlib.get(key))
     defn.pop("key", None)
     if refusal(defn):
         return [refusal(defn)]
     old = fxlib.channels(defn, mode)
     names = source_channels(defn, mode) or []
+    chart = list((manual or {}).get("channels") or [])
+    if chart:
+        names = [c if isinstance(c, dict) else None for c in chart]
     names += [None] * (len(old) - len(names))
     problems = []
+    if chart and len(chart) != len(old):
+        problems.append(f"The manual's chart has {len(chart)} channels, the mode {len(old)}")
     if len(channels) != len(old):
         problems.append(f"The mode has {len(old)} channels, not {len(channels)}")
     if kind not in KINDS:
@@ -174,9 +182,11 @@ def apply(
         else:
             problems.append(f"Channel {n + 1}: unknown role '{role}'")
             continue
-        if role == HOLD and names[n] and "strobe_range" not in o:  # a strobe channel, by the chart's own words
-            strobe.mark(spec, [tuple(r) for r in names[n].get("ranges", [])])
-        for k in ("range", "tight", "wide", "on_from", "strobe_range", "strobe_hz", "_note"):  # what the converter knew
+        if role == HOLD and names[n] and (chart or "strobe_range" not in o):  # a strobe channel, by the chart's words
+            strobe.mark(spec, [tuple(r) for r in names[n].get("ranges") or []])
+        kept = ("range", "tight", "wide", "on_from") if chart else (
+            "range", "tight", "wide", "on_from", "strobe_range", "strobe_hz", "_note")  # fmt: skip
+        for k in kept:  # what the converter knew (a manual's chart has its own word on the strobe)
             if k in o and o["attr"] == spec["attr"]:
                 spec[k] = o[k]
         new.append(spec)
@@ -203,11 +213,34 @@ def apply(
     mapped = defn.setdefault("mapped", {"modes": []})
     mapped["modes"] = sorted(set(mapped["modes"]) | {mode})
     mapped["_note"] = "Channels mapped by hand in the DMX mapper (Set page)."
+    if chart:
+        from amadeus.library import manual as manuals
+
+        if "made" in defn:
+            defn["made"]["channels"][mode] = [{"name": c["name"], "ranges": c["ranges"]} for c in _chart(chart)]
+        manuals.keep(defn, mode, _chart(chart), str((manual or {}).get("file") or "")[:120])
     fxlib.save(key, defn)
     return []
 
 
 ATTR = re.compile(r"[a-z][a-z0-9_]{0,40}")
+
+
+def _chart(chart: list) -> list[dict]:
+    """A manual's chart as it is kept: a name and [[from, to, what]] per channel, whatever was sent."""
+    out = []
+    for c in chart:
+        c = c if isinstance(c, dict) else {}
+        ranges = []
+        for r in c.get("ranges") or []:
+            try:
+                lo, hi, what = int(r[0]), int(r[1]), str(r[2] if len(r) > 2 else "")[:120]
+            except (TypeError, ValueError, IndexError, KeyError):
+                continue
+            if 0 <= lo <= hi <= 255:
+                ranges.append([lo, hi, what])
+        out.append({"name": str(c.get("name") or "")[:60], "ranges": ranges})
+    return out
 
 
 def _slots(wheel: list[dict], problems: list[str]) -> list[dict]:
@@ -281,6 +314,8 @@ def source_channels(defn: dict, mode: str) -> list[dict] | None:
     """[{"name", "ranges": [[lo, hi, what]]}] per channel of the mode, from the QLC+ or OFL file it was
     converted from; None when that file isn't at hand (or the fixture is hand-made)."""
     try:
+        if mode in defn.get("manual", {}).get("channels", {}):  # read from its manual: the last word
+            return defn["manual"]["channels"][mode]
         if "made" in defn:
             return defn["made"].get("channels", {}).get(mode)
         if "qlc" in defn:

@@ -98,17 +98,57 @@ def get_mapping(req):
 
 def save_mapping(req):
     """{"key", "mode", "kind", "channels": [{"role", "cell", "value"}]}, optionally "wheel" and "ring" (the colour
-    wheel's and the ring's named colours) and "checked": save a hand mapping (nothing saved if there are problems)."""
+    wheel's and the ring's named colours), "checked", and "manual" ({"file", "channels": [{"name", "ranges"}]}: the
+    chart came from the fixture's manual, kept with it): save a hand mapping (nothing saved if there are problems)."""
     from amadeus.library import mapper
 
     b = req.body()
     checked = bool(b.get("checked"))
     problems = mapper.apply(
-        b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])), b.get("wheel"), checked, b.get("ring")
-    )
+        b["key"], b["mode"], b.get("kind", "par"), list(b.get("channels", [])), b.get("wheel"), checked, b.get("ring"),
+        b.get("manual") or None,
+    )  # fmt: skip
     if not problems:
         event(f"{req.client} mapped {b['key']} {b['mode']} by hand{' (checked on the fixture)' if checked else ''}")
     return {"saved": not problems, "problems": problems}
+
+
+def read_manual(req):
+    """{"name", "data": base64 of the manual: a PDF, or a picture of its DMX chart (PNG, JPEG, WebP, GIF)}, or
+    "files": [{"name", "data"}] for several, and {"key", "mode"}: the mapper's view of that mode filled from
+    the manual's DMX chart, read with AI (your own OpenAI key), with "manual": {"file", "mode" (the manual's mode
+    used), "modes"}; nothing is saved. Without "key": a new fixture made from it ("channels": how many, else the
+    manual's largest mode; "manufacturer", "model" to name it): {"key", "mode", "manual"} or {"problems"}."""
+    import base64
+    import binascii
+
+    from amadeus import aikey
+    from amadeus.library import manual
+
+    b = req.body()
+    sent = b.get("files") or [{"name": b.get("name"), "data": b.get("data")}]
+    name = ", ".join(str(f.get("name") or "manual") for f in sent)[:120]
+    try:
+        answer = manual.read([(str(f.get("name") or "manual"), base64.b64decode(f.get("data") or "")) for f in sent])
+    except (ValueError, binascii.Error) as e:
+        return {"error": str(e)}, 400
+    except Exception as e:  # noqa: BLE001 - OpenAI's refusal is the app's warning, anything else is shown
+        aikey.note(e)
+        return {"error": aikey.classify(e) or f"The manual couldn't be read ({e.__class__.__name__}: {e})"}, 502
+    if not b.get("key"):
+        r = manual.create(answer, int(b.get("channels") or 0), name, str(b.get("manufacturer") or ""),
+                          str(b.get("model") or ""))  # fmt: skip
+        if "key" in r:
+            event(f"{req.client} made {r['key']} ({r['mode']}) from the manual {name}")
+        return r
+    try:
+        r = manual.mapping(b["key"], b["mode"], answer, name)
+    except SystemExit as e:  # an unknown fixture or mode
+        return {"error": str(e)}, 400
+    if "error" in r:
+        return r, 422
+    event(f"{req.client} read {name} for {b['key']} {b['mode']}: the manual's mode {r['manual']['mode']}")
+    return r
 
 
 def save_lens(req):
@@ -195,6 +235,7 @@ POST = {
     "/api/rig/add": add_to_rig,
     "/api/label": identify_label,
     "/api/fixture/map": save_mapping,
+    "/api/fixture/manual": read_manual,
     "/api/fixture/new": new_fixture,
     "/api/fixture/lens": save_lens,
 }

@@ -21,6 +21,9 @@ GET  /api/fixture/templates?type=spot&channels=9   common layouts to make a fixt
 POST /api/fixture/new        {"manufacturer", "model", "template", "channels", …}: make it in your library
 POST /api/fixture/lens       {"key", "beam_deg", "beam_deg_max"?, "lumens"?}: its lens and light, as the manual says
 POST /api/fixture/gdtf       {"name", "data": base64 .gdtf}: convert a GDTF file into your library (key, mode)
+POST /api/fixture/manual     {"name", "data": base64 PDF or picture, "key", "mode"}: the mode's mapping filled from
+                             the manual's DMX chart, read with AI (your own OpenAI key); nothing saved. Without "key":
+                             a new fixture made from it
 GET  /api/directors          decision models available right now (rules, OpenAI, local Ollama decision models)
 GET  /api/ai-key             {"problem"}: the warning when OpenAI refuses the key, else null
 POST /api/director           {"director": "..."}: switch the decision model (saved in the rig file on its own)
