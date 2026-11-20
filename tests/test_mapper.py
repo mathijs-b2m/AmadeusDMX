@@ -54,7 +54,7 @@ def test_saving_what_it_shows_changes_nothing(library, key):
     defn = fxlib.get(key)
     mode = fxlib.default_mode(defn)
     before = json.loads(json.dumps(defn))
-    problems = mapper.apply(key, mode, defn["kind"] if defn["kind"] in mapper.KINDS else "par", _as_shown(key, mode))
+    problems = mapper.apply(key, mode, defn["kind"], _as_shown(key, mode))  # the kind as shown, a moving bar's too
     if defn["kind"] == "laser":
         assert problems and "Lasers" in problems[0]
         return
