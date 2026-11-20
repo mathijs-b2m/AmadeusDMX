@@ -193,6 +193,24 @@ def test_a_new_fixture_is_made_from_the_manual(library):
     assert manual.create(ANSWER, 7)["problems"]
 
 
+def test_a_pasted_picture_of_the_chart_is_read_like_the_pdf(library):
+    client = FakeOpenAI()
+    png, jpg = b"\x89PNG\r\n\x1a\n chart", b"\xff\xd8\xff\xe0 more of it"
+    answer = manual.read([("Pasted picture.png", png), ("page 2.jpg", jpg)], client=client)
+    sent = client.sent[0][0]["content"]
+    assert [c["type"] for c in sent] == ["input_text", "input_image", "input_image"]
+    assert sent[1]["image_url"].startswith("data:image/png;base64,") and sent[2]["image_url"].startswith(
+        "data:image/jpeg"
+    )
+    assert base64.b64decode(sent[1]["image_url"].split(",", 1)[1]) == png
+    assert manual.mapping("test/mini-beam", "11ch", answer, "Pasted picture.png")["manual"]["mode"] == "11 channel"
+    with pytest.raises(ValueError, match="PDF or a picture"):
+        manual.read(b"BM a bitmap", "chart.bmp", client)
+    with pytest.raises(ValueError, match="No manual"):
+        manual.read([], client=client)
+    assert len(client.sent) == 1  # nothing sent for those
+
+
 class Req:
     client = "test"
 
@@ -214,6 +232,20 @@ def test_the_endpoint_needs_a_key_and_a_pdf(library, monkeypatch):
     assert status == 400 and "OpenAI API key" in r["error"]
     r, status = web_library.read_manual(Req({"name": "x.txt", "data": base64.b64encode(b"hello").decode()}))
     assert status == 400 and "PDF" in r["error"]
+
+
+def test_the_endpoint_takes_a_pasted_picture(library, monkeypatch):
+    import openai
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    fake = FakeOpenAI()
+    monkeypatch.setattr(openai, "OpenAI", lambda *a, **k: fake)
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n chart").decode()
+    r = web_library.read_manual(
+        Req({"name": "Pasted picture.png", "data": png, "key": "test/mini-beam", "mode": "13ch"})
+    )
+    assert r["manual"] == {**r["manual"], "file": "Pasted picture.png", "mode": "13 channel"}
+    assert fake.sent[0][0]["content"][1]["type"] == "input_image"
 
 
 def test_the_endpoint_fills_the_mapper_and_a_refused_key_is_the_warning(library, monkeypatch):

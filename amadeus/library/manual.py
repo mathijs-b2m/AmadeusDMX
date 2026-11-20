@@ -1,13 +1,14 @@
-"""A fixture's manual (a PDF) read with AI (your own OpenAI key): the DMX chart of the mode the fixture runs in,
-as the DMX mapper shows and saves it (mapper.py), so nobody has to map a cheap head's channels by eye.
+"""A fixture's manual read with AI (your own OpenAI key): the DMX chart of the mode the fixture runs in, as the
+DMX mapper shows and saves it (mapper.py), so nobody has to map a cheap head's channels by eye. The manual is a
+PDF, or pictures of its DMX chart (a screenshot pasted from the clipboard, a photo of the page).
 
-The whole PDF goes to OpenAI in one request (the Responses API, the answer in a fixed JSON form, cached like the
-document import's, rig/importer/pdf.py): every mode the manual lists, channel by channel, with what the channel
-does, the value where it leaves the light alone, its value ranges in the manual's words, and the colours of a
-colour wheel. A manual lists several modes: the one with the fixture's channel count is used (by name when two
-have that count) and the answer says which. Nothing is saved here: the mapper is filled, checked by the user and
-saved as usual; the chart's names and ranges are saved with it, and the gobos, the prism, the frost and the
-strobe are read from those words (beam_ranges.py, strobe.py).
+The whole PDF (or every picture) goes to OpenAI in one request (the Responses API, the answer in a fixed JSON
+form, cached like the document import's, rig/importer/pdf.py): every mode the manual lists, channel by channel,
+with what the channel does, the value where it leaves the light alone, its value ranges in the manual's words,
+and the colours of a colour wheel. A manual lists several modes: the one with the fixture's channel count is
+used (by name when two have that count) and the answer says which. Nothing is saved here: the mapper is filled,
+checked by the user and saved as usual; the chart's names and ranges are saved with it, and the gobos, the
+prism, the frost and the strobe are read from those words (beam_ranges.py, strobe.py).
 """
 
 from __future__ import annotations
@@ -19,7 +20,9 @@ from amadeus.library import beam_ranges, mapper
 from amadeus.library import fixtures as fxlib
 
 NO_KEY = "Reading a manual needs your own OpenAI API key (Settings › Director); nothing was sent."
-NOT_PDF = "{name} isn't a PDF."
+NOT_READABLE = "{name} isn't a PDF or a picture (PNG, JPEG, WebP, GIF)."
+NOTHING = "No manual to read."
+PICTURES = {b"\x89PNG": "image/png", b"\xff\xd8\xff": "image/jpeg", b"GIF8": "image/gif"}
 
 # what a channel does, as the manual is asked: the mapper's roles, and the ones the show holds or plays by name
 HELD = {
@@ -93,7 +96,8 @@ SCHEMA = _obj(
 )
 
 PROMPT = (
-    "This is the user manual of a DMX lighting fixture. Read its DMX channel charts. List every DMX mode the "
+    "This is the user manual of a DMX lighting fixture: a PDF, or pictures of the pages with its DMX chart "
+    "(several pictures are parts of one manual, in order). Read its DMX channel charts. List every DMX mode the "
     "manual gives (e.g. '9 channel', '13CH', 'Basic', 'Extended'), each with all its channels in order, channel 1 "
     "first: a mode with 13 channels has exactly 13 entries. Where the manual prints one table with a column per "
     "mode, work out each mode's own channel order from its column. Per channel: its name; what it does (function); "
@@ -108,30 +112,46 @@ PROMPT = (
     "reset (reset, lamp on/off, special or control functions); other (anything else). A channel that combines "
     "dimmer and strobe is a dimmer if it mostly dims, else a shutter.\n"
     "Copy DMX values exactly as printed; a table printed in percent is converted to 0–255. Never invent a mode, "
-    "a channel or a range the manual doesn't give. If the PDF has no DMX chart, return no modes."
+    "a channel or a range the manual doesn't give. If there is no DMX chart in it, return no modes."
 )
 
 
-def read(data: bytes, name: str = "manual.pdf", client=None) -> dict:
-    """The manual's own answer: {"manufacturer", "model", "type", "modes": [{"name", "channels": […]}]}."""
+def _kind(data: bytes) -> str:
+    """What a file is, by how it starts: "application/pdf", a picture's type, '' for anything else."""
+    head = data.lstrip()[:16] if data[:1].isspace() else data[:16]
+    if head.startswith(b"%PDF"):
+        return "application/pdf"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return next((kind for magic, kind in PICTURES.items() if head.startswith(magic)), "")
+
+
+def read(data: bytes | list[tuple[str, bytes]], name: str = "manual.pdf", client=None) -> dict:
+    """The manual's own answer: {"manufacturer", "model", "type", "modes": [{"name", "channels": […]}]}. `data`: a
+    PDF or a picture, or several as [(name, bytes)] (a chart over two screenshots): all in one request."""
     from amadeus.rig.importer import pdf
 
-    if not data.lstrip()[:5].startswith(b"%PDF"):
-        raise ValueError(NOT_PDF.format(name=name or "The file"))
+    files = data if isinstance(data, list) else [(name, data)]
+    if not files or not any(d for _, d in files):
+        raise ValueError(NOTHING)
+    content = [{"type": "input_text", "text": PROMPT}]
+    for n, d in files:
+        kind = _kind(d)
+        url = f"data:{kind};base64," + base64.b64encode(d).decode()
+        if kind == "application/pdf":
+            content.append(
+                {"type": "input_file", "filename": re.sub(r"[^\w.-]+", "-", n) or "manual.pdf", "file_data": url}
+            )
+        elif kind:
+            content.append({"type": "input_image", "image_url": url, "detail": "high"})
+        else:
+            raise ValueError(NOT_READABLE.format(name=n or "The file"))
     if client is None:
         if not pdf.has_key():
             raise ValueError(NO_KEY)
         from openai import OpenAI
 
         client = OpenAI()
-    content = [
-        {"type": "input_text", "text": PROMPT},
-        {
-            "type": "input_file",
-            "filename": re.sub(r"[^\w.-]+", "-", name) or "manual.pdf",
-            "file_data": "data:application/pdf;base64," + base64.b64encode(data).decode(),
-        },
-    ]
     return pdf._ask(client, content, SCHEMA, "manual")
 
 

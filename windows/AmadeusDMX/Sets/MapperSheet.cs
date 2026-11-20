@@ -5,8 +5,9 @@
 // ranges are shown where QLC+ or the Open Fixture Library has them. "Check Channels" goes through them one by one on
 // the fixture (ChannelCheck.cs); a colour wheel's "Colours…" names its colours there on their own. Saved into your
 // copy of the definition (amadeus/library/mapper.py): every fixture of that model plays by it. With an OpenAI key in
-// the app, "Import Manual…" reads the fixture's manual (a PDF) with AI and fills the channels from its DMX chart for
-// this mode (amadeus/library/manual.py); it is shown to check and correct, and saved like any mapping
+// the app, "Import Manual" reads the fixture's manual with AI (a PDF, or a picture of its DMX chart: chosen, or pasted
+// from the clipboard, also with Ctrl+V) and fills the channels from its DMX chart for this mode
+// (amadeus/library/manual.py); it is shown to check and correct, and saved like any mapping
 // (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
 namespace AmadeusDMX;
 
@@ -86,6 +87,16 @@ public sealed class MapperSheet
         grid.Children.Add(_header);
         grid.Children.Add(_body);
         grid.Children.Add(_problems);
+        // Ctrl+V anywhere in the sheet reads what is on the clipboard (a text box keeps its own paste)
+        var pasteKey = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+        pasteKey.Invoked += (_, e) =>
+        {
+            if (Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) is TextBox or NumberBox or PasswordBox) return;
+            e.Handled = true;
+            PasteManual(false);
+        };
+        grid.KeyboardAccelerators.Add(pasteKey);
+        grid.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;
         _dialog.Content = grid;
         _body.Content = UI.Spinner(32);
         Header();
@@ -127,11 +138,20 @@ public sealed class MapperSheet
             .Disabled(_tryRefusal is not null || !_m.Editable || _colours is not null)
             .Tooltip(_tryRefusal ?? L("Go through the channels one by one on {0}: each sweeps while you say what the fixture does", _target.Fixture));
         if (_m.NeedsCheck && !_checking) check.Foreground(Tint.Orange);
-        var manual = _hasKey && !_checking && _colours is null
-            ? UI.Button(L("Import Manual…"), ImportManual, "doc.text.magnifyingglass")
+        Button? manual = null;
+        if (_hasKey && !_checking && _colours is null)
+        {
+            var menu = new MenuFlyout();
+            var choose = new MenuFlyoutItem { Text = L("Choose a PDF or Picture…") };
+            choose.Click += (_, _) => ChooseManual();
+            var paste = new MenuFlyoutItem { Text = L("Paste from Clipboard") };
+            paste.Click += (_, _) => PasteManual(true);
+            menu.Items.Add(choose);
+            menu.Items.Add(paste);
+            manual = new Button { Content = UI.Label("doc.text.magnifyingglass", L("Import Manual")), Flyout = menu }
                 .Disabled(!_m.Editable || _reading is not null)
-                .Tooltip(L("Read the fixture's manual (a PDF) with AI and fill in the channels of this mode from its DMX chart. The whole PDF is sent to OpenAI with your own key. Nothing is saved until you save."))
-            : null;
+                .Tooltip(L("Read the fixture's manual with AI and fill in the channels of this mode from its DMX chart: a PDF, or a picture of the chart (copy a screenshot and paste it here with Ctrl+V). It is sent to OpenAI with your own key. Nothing is saved until you save."));
+        }
         var line = UI.HStack(14,
             UI.Text(L("Mode {0}", _target.Mode), Font.Callout).Secondary(),
             m is null ? null
@@ -251,12 +271,34 @@ public sealed class MapperSheet
 
     /// A PDF of the fixture's manual, read with AI: the channels of this mode, the colour wheel's colours and the
     /// held values are filled in from its DMX chart. Shown to check and correct; saving is the user's.
-    async void ImportManual()
+    async void ChooseManual()
     {
         if (Dialogs.WindowOf(_header) is not { } id) return;
         var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(id) { CommitButtonText = L("Read") };
-        picker.FileTypeFilter.Add(".pdf");
+        foreach (var ext in ManualFile.Extensions) picker.FileTypeFilter.Add(ext);
         if (await picker.PickSingleFileAsync() is not { } file) return;
+        try { await Read(new ManualFile(Path.GetFileName(file.Path), await File.ReadAllBytesAsync(file.Path))); }
+        catch (IOException x) { _problemList = [x.Message]; Footer(); }
+    }
+
+    /// The picture (a screenshot of the chart), or the copied PDF or picture file, on the clipboard. `asked`: from
+    /// the menu (Ctrl+V with nothing to read says nothing).
+    async void PasteManual(bool asked)
+    {
+        if (!_hasKey || _reading is not null || _checking || _colours is not null || !_m.Editable) return;
+        ManualFile? file = null;
+        try { file = await ManualFile.Pasted(); }
+        catch (Exception x) when (x is IOException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException) { }
+        if (file is not null) await Read(file);
+        else if (asked)
+        {
+            _problemList = [L("There is no picture or PDF on the clipboard. Copy a screenshot of the DMX chart first.")];
+            Footer();
+        }
+    }
+
+    async Task Read(ManualFile file)
+    {
         StopTrying();
         _problemList = [];
         var reading = _reading = new CancellationTokenSource();
@@ -266,8 +308,7 @@ public sealed class MapperSheet
         try
         {
             if (!await _model.EnsureSetupService()) throw SetupAPIException.NotRunningError();
-            var read = await _model.Api.ReadManual(_target.Key, _target.Mode, Path.GetFileName(file.Path),
-                                                   await File.ReadAllBytesAsync(file.Path, reading.Token), reading.Token);
+            var read = await _model.Api.ReadManual(_target.Key, _target.Mode, file.Name, file.Data, reading.Token);
             if (!reading.IsCancellationRequested)
             {
                 _m.Mapping = read;
@@ -275,7 +316,7 @@ public sealed class MapperSheet
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception x) when (SetView.IsApiError(x) || x is IOException) { if (!reading.IsCancellationRequested) _problemList = [x.Message]; }
+        catch (Exception x) when (SetView.IsApiError(x)) { if (!reading.IsCancellationRequested) _problemList = [x.Message]; }
         finally
         {
             if (_reading == reading) _reading = null;
@@ -511,5 +552,34 @@ public sealed class ChannelRow(MapperModel m, int index, int? address, int unive
         }
         finally { _quiet = false; }
         changed();
+    }
+}
+
+/// A manual to read: a PDF, or a picture of its DMX chart in a form OpenAI takes (PNG, JPEG, GIF, WebP).
+public sealed record ManualFile(string Name, byte[] Data)
+{
+    public static readonly IReadOnlyList<string> Extensions = [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+    /// What is on the clipboard: a copied PDF or picture file, else the picture itself (a screenshot) as a PNG.
+    public static async Task<ManualFile?> Pasted()
+    {
+        var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+        if (content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+            foreach (var item in await content.GetStorageItemsAsync())
+                if (item is Windows.Storage.StorageFile f && Extensions.Contains(Path.GetExtension(f.Path).ToLowerInvariant()))
+                    return new(f.Name, await File.ReadAllBytesAsync(f.Path));
+        if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Bitmap)) return null;
+        var reference = await content.GetBitmapAsync();
+        using var source = await reference.OpenReadAsync();
+        var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(source);
+        using var bitmap = await decoder.GetSoftwareBitmapAsync();
+        using var png = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+        var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, png);
+        encoder.SetSoftwareBitmap(bitmap);
+        await encoder.FlushAsync();
+        png.Seek(0);
+        var data = new byte[png.Size];
+        await png.AsStreamForRead().ReadExactlyAsync(data);
+        return new(L("Pasted picture") + ".png", data);
     }
 }

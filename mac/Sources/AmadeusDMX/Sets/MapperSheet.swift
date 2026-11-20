@@ -4,8 +4,9 @@
 // the values as they are to one fixture of the set, so you can find what a channel does; the library's names and
 // ranges are shown where QLC+ or the Open Fixture Library has them. Saved into your copy of the definition
 // (amadeus/library/mapper.py): every fixture of that model plays by it. With an OpenAI key in the app, "Import
-// Manual…" reads the fixture's manual (a PDF) with AI and fills the channels from its DMX chart for this mode
-// (amadeus/library/manual.py); it is shown to check and correct, and saved like any mapping.
+// Manual" reads the fixture's manual with AI (a PDF, or a picture of its DMX chart: chosen, or pasted from the
+// clipboard, also with ⌘V) and fills the channels from its DMX chart for this mode (amadeus/library/manual.py); it
+// is shown to check and correct, and saved like any mapping.
 import AmadeusKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -43,6 +44,7 @@ struct MapperSheet: View {
     @State private var loadedRing: [FixtureMapping.Slot] = []
     @State private var hasKey = false        // an OpenAI key in the app: manuals can be read
     @State private var reading: Task<Void, Never>?   // a manual is being read with AI
+    @State private var pasteKey: Any?        // ⌘V while the sheet is open: a picture on the clipboard is read
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,8 +84,15 @@ struct MapperSheet: View {
         }
         .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 640)
         .task { await load() }
-        .onAppear { hasKey = KeySource.current(model.workspace) != .none }
-        .onDisappear { stopTrying(); stopCheck(); closeColours(); reading?.cancel() }
+        .onAppear {
+            hasKey = KeySource.current(model.workspace) != .none
+            watchPaste()
+        }
+        .onDisappear {
+            stopTrying(); stopCheck(); closeColours(); reading?.cancel()
+            if let pasteKey { NSEvent.removeMonitor(pasteKey) }
+            pasteKey = nil
+        }
     }
 
     // MARK: parts
@@ -111,10 +120,15 @@ struct MapperSheet: View {
                 }
                 Spacer()
                 if hasKey && checking == nil && colours == nil {
-                    Button("Import Manual…", systemImage: "doc.text.magnifyingglass") { importManual() }
-                        .buttonStyle(.bordered)
-                        .disabled(mapping == nil || !(mapping?.refusal.isEmpty ?? false) || reading != nil)
-                        .help("Read the fixture's manual (a PDF) with AI and fill in the channels of this mode from its DMX chart. The whole PDF is sent to OpenAI with your own key. Nothing is saved until you save.")
+                    Menu {
+                        Button("Choose a PDF or Picture…") { chooseManual() }
+                        Button("Paste from Clipboard") { pasteManual() }
+                    } label: {
+                        Label("Import Manual", systemImage: "doc.text.magnifyingglass")
+                    }
+                    .menuStyle(.button).buttonStyle(.bordered).fixedSize()
+                    .disabled(mapping == nil || !(mapping?.refusal.isEmpty ?? false) || reading != nil)
+                    .help("Read the fixture's manual with AI and fill in the channels of this mode from its DMX chart: a PDF, or a picture of the chart (copy a screenshot and paste it here with ⌘V). It is sent to OpenAI with your own key. Nothing is saved until you save.")
                 }
                 if checking == nil && colours == nil {
                     Toggle(isOn: Binding(get: { trying }, set: { $0 ? startTrying() : stopTrying() })) {
@@ -218,21 +232,47 @@ struct MapperSheet: View {
 
     /// A PDF of the fixture's manual, read with AI: the channels of this mode, the colour wheel's colours and the
     /// held values are filled in from its DMX chart. Shown to check and correct; saving is the user's.
-    private func importManual() {
+    private func chooseManual() {
         let p = NSOpenPanel()
         p.canChooseDirectories = false
-        p.allowedContentTypes = [.pdf]
-        p.message = "Choose the fixture's manual (a PDF). It is sent to OpenAI with your own key."
+        p.allowedContentTypes = [.pdf, .image]
+        p.message = "Choose the fixture's manual (a PDF) or a picture of its DMX chart. It is sent to OpenAI with your own key."
         p.prompt = "Read"
         guard p.runModal() == .OK, let url = p.url else { return }
+        guard let file = ManualFile(url: url) else { problems = ["Couldn’t read \(url.lastPathComponent)"]; return }
+        read(file)
+    }
+
+    /// The picture (a screenshot of the chart), PDF or file on the clipboard.
+    private func pasteManual() {
+        guard let file = ManualFile.pasted() else {
+            problems = ["There is no picture or PDF on the clipboard. Copy a screenshot of the DMX chart first."]
+            return
+        }
+        read(file)
+    }
+
+    /// ⌘V anywhere in the sheet reads what is on the clipboard, unless text is being typed (then it pastes there).
+    private func watchPaste() {
+        guard pasteKey == nil else { return }
+        pasteKey = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  event.charactersIgnoringModifiers == "v",
+                  hasKey, reading == nil, checking == nil, colours == nil, mapping?.refusal.isEmpty == true,
+                  !(NSApp.keyWindow?.firstResponder is NSText), ManualFile.pasted() != nil else { return event }
+            pasteManual()
+            return nil
+        }
+    }
+
+    private func read(_ file: ManualFile) {
         stopTrying()
         problems = []
         reading = Task {
             defer { reading = nil }
             do {
                 guard await model.ensureSetupService() else { throw SetupAPIError.notRunning }
-                let read = try await model.api.readManual(key: target.key, mode: target.mode, name: url.lastPathComponent,
-                                                          data: try Data(contentsOf: url))
+                let read = try await model.api.readManual(key: target.key, mode: target.mode, name: file.name, data: file.data)
                 guard !Task.isCancelled else { return }
                 mapping = read
                 checkedAll = false
@@ -337,6 +377,42 @@ struct MapperSheet: View {
             do { _ = try await model.api.testLight(fixture: id, on: true, raw: values, light: lit, rig: rig, set: set) }
             catch { trying = false; problems = [error.localizedDescription] }
         }
+    }
+}
+
+/// A manual to read: a PDF, or a picture of its DMX chart in a form OpenAI takes (PNG, JPEG, GIF, WebP; any other
+/// picture is made a PNG).
+struct ManualFile {
+    var name: String
+    var data: Data
+
+    init(name: String, data: Data) { self.name = name; self.data = data }
+
+    init?(url: URL) {
+        let type = UTType(filenameExtension: url.pathExtension)
+        if type?.conforms(to: .pdf) == true || ["png", "jpg", "jpeg", "gif", "webp"].contains(url.pathExtension.lowercased()) {
+            guard let d = try? Data(contentsOf: url) else { return nil }
+            self.init(name: url.lastPathComponent, data: d)
+        } else if type?.conforms(to: .image) == true, let image = NSImage(contentsOf: url), let png = Self.png(image) {
+            self.init(name: url.deletingPathExtension().lastPathComponent + ".png", data: png)
+        } else {
+            return nil
+        }
+    }
+
+    /// What is on the clipboard: a copied PDF or picture file, else the picture itself (a screenshot).
+    static func pasted(_ board: NSPasteboard = .general) -> ManualFile? {
+        if let urls = board.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let file = urls.lazy.compactMap({ ManualFile(url: $0) }).first { return file }
+        if let d = board.data(forType: .png) { return ManualFile(name: "Pasted picture.png", data: d) }
+        if let image = NSImage(pasteboard: board), let png = png(image) { return ManualFile(name: "Pasted picture.png", data: png) }
+        if let d = board.data(forType: .pdf) { return ManualFile(name: "Pasted page.pdf", data: d) }
+        return nil
+    }
+
+    static func png(_ image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 }
 

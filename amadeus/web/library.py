@@ -114,7 +114,8 @@ def save_mapping(req):
 
 
 def read_manual(req):
-    """{"name", "data": base64 of the manual's PDF} and {"key", "mode"}: the mapper's view of that mode filled from
+    """{"name", "data": base64 of the manual: a PDF, or a picture of its DMX chart (PNG, JPEG, WebP, GIF)}, or
+    "files": [{"name", "data"}] for several, and {"key", "mode"}: the mapper's view of that mode filled from
     the manual's DMX chart, read with AI (your own OpenAI key), with "manual": {"file", "mode" (the manual's mode
     used), "modes"}; nothing is saved. Without "key": a new fixture made from it ("channels": how many, else the
     manual's largest mode; "manufacturer", "model" to name it): {"key", "mode", "manual"} or {"problems"}."""
@@ -125,9 +126,10 @@ def read_manual(req):
     from amadeus.library import manual
 
     b = req.body()
-    name = str(b.get("name") or "manual.pdf")
+    sent = b.get("files") or [{"name": b.get("name"), "data": b.get("data")}]
+    name = ", ".join(str(f.get("name") or "manual") for f in sent)[:120]
     try:
-        answer = manual.read(base64.b64decode(b.get("data") or ""), name)
+        answer = manual.read([(str(f.get("name") or "manual"), base64.b64decode(f.get("data") or "")) for f in sent])
     except (ValueError, binascii.Error) as e:
         return {"error": str(e)}, 400
     except Exception as e:  # noqa: BLE001 - OpenAI's refusal is the app's warning, anything else is shown
