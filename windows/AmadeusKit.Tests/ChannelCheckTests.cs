@@ -56,6 +56,23 @@ public class ChannelCheckTests
     }
 
     [Fact]
+    public void AMappingReadFromAManualSavesItsChartAndWheel()
+    {
+        var m = Mapping();
+        Assert.Null(m.Manual);
+        Assert.False(SetupAPI.MappingBody(m, false, false).ContainsKey("manual"));
+        var read = m with { Manual = new("mini.pdf", "9 channel", [new("9 channel", 9), new("11 channel", 11)]) };
+        var body = SetupAPI.MappingBody(read, false, false);
+        Assert.True(body.ContainsKey("wheel"));   // the manual's colours go along, unasked
+        var json = System.Text.Json.JsonSerializer.Serialize(body["manual"]);
+        Assert.Contains("\"file\":\"mini.pdf\"", json);
+        Assert.Equal(m.Channels.Count, System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("channels").GetArrayLength());
+        var decoded = J.DecodeOrThrow(J.Utf8("""{"file":"a.pdf","mode":"13CH","modes":[{"name":"13CH","channels":13}]}"""),
+                                      FixtureMapping.ManualSource.From);
+        Assert.Equal(("a.pdf", "13CH", 13), (decoded.File, decoded.Mode, decoded.Modes[0].Channels));
+    }
+
+    [Fact]
     public void NamedColoursAreSavedWithoutTheCheck()
     {
         var m = Mapping();

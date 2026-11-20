@@ -461,16 +461,15 @@ public struct SetupAPI: Sendable {
     /// every channel was checked on the fixture; `wheel`, `ring`: the colour wheel's or the ring's colours were named
     /// (saved with it, as they are after a check too).
     public func saveMapping(_ m: FixtureMapping, checked: Bool = false, wheel: Bool = false, ring: Bool = false) async throws -> [String] {
-        let chans = m.channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value, "attr": $0.attr] as [String: Any] }
-        var body: [String: Any] = ["key": m.key, "mode": m.mode, "kind": m.kind, "channels": chans, "checked": checked]
-        if checked || wheel, m.channels.contains(where: { $0.role == "color_wheel" }), !m.wheel.isEmpty {
-            body["wheel"] = m.wheel.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
-        }
-        if checked || ring, m.channels.contains(where: { $0.role == "ring_color" }), !m.ring.isEmpty {
-            body["ring"] = m.ring.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
-        }
-        let r: SaveResult = try await post("api/fixture/map", body)
+        let r: SaveResult = try await post("api/fixture/map", m.saveBody(checked: checked, wheel: wheel, ring: ring))
         return r.problems ?? []
+    }
+
+    /// Reads a fixture's manual (a PDF) with AI, your own OpenAI key: the mode's mapping filled from the manual's
+    /// DMX chart, to check and save in the mapper. Nothing is saved by it. Takes up to a few minutes.
+    public func readManual(key: String, mode: String, name: String, data: Data) async throws -> FixtureMapping {
+        try await post("api/fixture/manual", ["key": key, "mode": mode, "name": name, "data": data.base64EncodedString()],
+                       timeout: 300)
     }
 
     /// A fixture's lens and light as its manual gives them, into your copy of it; returns the problems (nothing saved if any).
@@ -652,9 +651,21 @@ public struct FixtureMapping: Decodable, Sendable {
     public var check: [Answer]
     public var wheel: [Slot]
     public var ring: [Slot]              // the colours of an LED ring or strip round the lens (a ring_color channel)
+    /// Filled from the fixture's manual, read with AI (amadeus/library/manual.py): which file, and which of the
+    /// manual's modes was used. Saved with the mapping: the chart's names and ranges are kept with the fixture.
+    public struct Manual: Decodable, Sendable, Hashable {
+        public struct Mode: Decodable, Sendable, Hashable {
+            public var name: String
+            public var channels: Int
+        }
+        public var file: String
+        public var mode: String
+        public var modes: [Mode]
+    }
+    public var manual: Manual?
 
     enum CodingKeys: String, CodingKey {
-        case key, name, mode, kind, kinds, roles, channels, plays, mapped, refusal, made, checked, check, wheel, ring
+        case key, name, mode, kind, kinds, roles, channels, plays, mapped, refusal, made, checked, check, wheel, ring, manual
     }
 
     public init(from decoder: Decoder) throws {
@@ -674,6 +685,28 @@ public struct FixtureMapping: Decodable, Sendable {
         check = try c.decodeIfPresent([Answer].self, forKey: .check) ?? []
         wheel = try c.decodeIfPresent([Slot].self, forKey: .wheel) ?? []
         ring = try c.decodeIfPresent([Slot].self, forKey: .ring) ?? []
+        manual = try c.decodeIfPresent(Manual.self, forKey: .manual)
+    }
+
+    /// What saving sends (POST /api/fixture/map). `checked`: every channel was checked on the fixture; `wheel`,
+    /// `ring`: the colour wheel's or the ring's colours were named. A mapping read from a manual sends the wheel
+    /// and the chart's names and ranges along: the gobos, the prism and the strobe are read from those.
+    public func saveBody(checked: Bool = false, wheel: Bool = false, ring: Bool = false) -> [String: Any] {
+        let chans = channels.map { ["role": $0.role, "cell": $0.cell, "value": $0.value, "attr": $0.attr] as [String: Any] }
+        var body: [String: Any] = ["key": key, "mode": mode, "kind": kind, "channels": chans, "checked": checked]
+        if checked || wheel || manual != nil, channels.contains(where: { $0.role == "color_wheel" }), !self.wheel.isEmpty {
+            body["wheel"] = self.wheel.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
+        }
+        if checked || ring || manual != nil, channels.contains(where: { $0.role == "ring_color" }), !self.ring.isEmpty {
+            body["ring"] = self.ring.map { ["name": $0.name, "from": $0.from, "to": $0.to, "rgb": $0.rgb] as [String: Any] }
+        }
+        if let manual {
+            body["manual"] = [
+                "file": manual.file,
+                "channels": channels.map { ["name": $0.name, "ranges": $0.ranges.map { [$0.lo, $0.hi, $0.what] as [Any] }] as [String: Any] },
+            ] as [String: Any]
+        }
+        return body
     }
 
     /// The values sent while channel `probe` is checked at `value`: the others hold the light on and the head in

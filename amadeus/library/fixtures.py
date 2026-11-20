@@ -145,6 +145,8 @@ def _strobes_from_catalogue(d: dict):
             fresh = shadow.get(f"{source}:{d[source].get('key', '')}") or {}
             for mode, chans in d.get("modes", {}).items():
                 new = fresh.get("modes", {}).get(mode, [])
+                if mode in d.get("manual", {}).get("channels", {}):
+                    continue  # read from its manual (library/manual.py): the manual's word on the strobe stays
                 for c, n in zip(chans, new if len(new) == len(chans) else [], strict=False):
                     if c["attr"] == n["attr"] and "default" in c and "strobe_range" in n:
                         c.update({k: n[k] for k in ("strobe_range", "strobe_hz") if k in n})
@@ -165,8 +167,8 @@ def _wheels_from_catalogue(d: dict):
         return
     for mode, chans in d.get("modes", {}).items():
         new = fresh.get("modes", {}).get(mode, [])
-        if len(new) != len(chans):
-            continue
+        if len(new) != len(chans) or mode in d.get("manual", {}).get("channels", {}):
+            continue  # (a mode read from its manual keeps the manual's channels)
         for c, n in zip(chans, new, strict=False):
             if (
                 c["attr"] != n["attr"]

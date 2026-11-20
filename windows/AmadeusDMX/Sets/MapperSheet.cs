@@ -4,7 +4,9 @@
 // the values as they are to one fixture of the set, so you can find what a channel does; the library's names and
 // ranges are shown where QLC+ or the Open Fixture Library has them. "Check Channels" goes through them one by one on
 // the fixture (ChannelCheck.cs); a colour wheel's "Colours…" names its colours there on their own. Saved into your
-// copy of the definition (amadeus/library/mapper.py): every fixture of that model plays by it
+// copy of the definition (amadeus/library/mapper.py): every fixture of that model plays by it. With an OpenAI key in
+// the app, "Import Manual…" reads the fixture's manual (a PDF) with AI and fills the channels from its DMX chart for
+// this mode (amadeus/library/manual.py); it is shown to check and correct, and saved like any mapping
 // (mac/Sources/AmadeusDMX/Sets/MapperSheet.swift).
 namespace AmadeusDMX;
 
@@ -35,6 +37,8 @@ public sealed class MapperSheet
     int? _colours;                       // the colour wheel (or ring colour) channel whose colours are being named
     IReadOnlyList<FixtureMapping.Slot> _loadedWheel = [];   // the wheel as loaded: saved again only when changed
     IReadOnlyList<FixtureMapping.Slot> _loadedRing = [];
+    bool _hasKey;                        // an OpenAI key in the app: manuals can be read
+    CancellationTokenSource? _reading;   // a manual is being read with AI
 
     static ContentControl Host() => new()
     {
@@ -70,7 +74,8 @@ public sealed class MapperSheet
             try { if (await Save()) _dialog.Hide(); }
             finally { deferral.Complete(); }
         };
-        _dialog.Closed += (_, _) => { StopTrying(); _colours = null; StopCheck(); };
+        _dialog.Closed += (_, _) => { StopTrying(); _colours = null; StopCheck(); _reading?.Cancel(); };
+        _hasKey = KeySource.Current(Keychain.OpenAIKey, _model.Workspace).Where != KeySource.Kind.None;
         var grid = new Grid { MinWidth = 760, Height = 540 };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -122,15 +127,23 @@ public sealed class MapperSheet
             .Disabled(_tryRefusal is not null || !_m.Editable || _colours is not null)
             .Tooltip(_tryRefusal ?? L("Go through the channels one by one on {0}: each sweeps while you say what the fixture does", _target.Fixture));
         if (_m.NeedsCheck && !_checking) check.Foreground(Tint.Orange);
+        var manual = _hasKey && !_checking && _colours is null
+            ? UI.Button(L("Import Manual…"), ImportManual, "doc.text.magnifyingglass")
+                .Disabled(!_m.Editable || _reading is not null)
+                .Tooltip(L("Read the fixture's manual (a PDF) with AI and fill in the channels of this mode from its DMX chart. The whole PDF is sent to OpenAI with your own key. Nothing is saved until you save."))
+            : null;
         var line = UI.HStack(14,
             UI.Text(L("Mode {0}", _target.Mode), Font.Callout).Secondary(),
             m is null ? null
                 : m.Plays ? UI.Label("checkmark.circle", L("The show plays it"), Font.Callout).Secondary()
                 : UI.Label("exclamationmark.triangle.fill", L("The show plays nothing in this mode yet"), Font.Callout).Foreground(Tint.Orange),
             UI.Spacer(),
+            manual,
             tryIt,
             check);
-        UIElement note = _m.NeedsCheck && !_checkedAll && !_checking
+        UIElement note = m?.Manual is { } read && !_checking && !_checkedAll
+            ? Form.Note("doc.text.magnifyingglass", L("Filled in from {0}, the manual's mode “{1}”. Check it, then save.", read.File, read.Mode), Tint.Orange)
+            : _m.NeedsCheck && !_checkedAll && !_checking
             ? Form.Note("exclamationmark.triangle.fill", L("Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong."), Tint.Orange)
             : _checkedAll && !_checking
                 ? Form.Note("checkmark.circle.fill", L("Every channel checked: save it."), Tint.Green)
@@ -141,6 +154,18 @@ public sealed class MapperSheet
 
     void Body()
     {
+        if (_reading is not null)
+        {
+            var wait = UI.VStack(12,
+                UI.Spinner(32),
+                UI.Text(L("Reading the manual with AI…")),
+                UI.Text(L("This can take a minute or two."), Font.Callout).Secondary(),
+                UI.Button(L("Cancel"), () => _reading?.Cancel()));
+            wait.HorizontalAlignment = HorizontalAlignment.Center;
+            wait.VerticalAlignment = VerticalAlignment.Center;
+            _body.Content = wait;
+            return;
+        }
         if (_m.Mapping is { } m)
         {
             if (m.Refusal.Length > 0) { _body.Content = UI.Unavailable("exclamationmark.triangle", L("Not Mapped Here"), m.Refusal); return; }
@@ -220,6 +245,44 @@ public sealed class MapperSheet
             Footer();
         }
         return false;
+    }
+
+    // MARK: the manual
+
+    /// A PDF of the fixture's manual, read with AI: the channels of this mode, the colour wheel's colours and the
+    /// held values are filled in from its DMX chart. Shown to check and correct; saving is the user's.
+    async void ImportManual()
+    {
+        if (Dialogs.WindowOf(_header) is not { } id) return;
+        var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(id) { CommitButtonText = L("Read") };
+        picker.FileTypeFilter.Add(".pdf");
+        if (await picker.PickSingleFileAsync() is not { } file) return;
+        StopTrying();
+        _problemList = [];
+        var reading = _reading = new CancellationTokenSource();
+        Header();
+        Body();
+        Footer();
+        try
+        {
+            if (!await _model.EnsureSetupService()) throw SetupAPIException.NotRunningError();
+            var read = await _model.Api.ReadManual(_target.Key, _target.Mode, Path.GetFileName(file.Path),
+                                                   await File.ReadAllBytesAsync(file.Path, reading.Token), reading.Token);
+            if (!reading.IsCancellationRequested)
+            {
+                _m.Mapping = read;
+                _checkedAll = false;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception x) when (SetView.IsApiError(x) || x is IOException) { if (!reading.IsCancellationRequested) _problemList = [x.Message]; }
+        finally
+        {
+            if (_reading == reading) _reading = null;
+            Header();
+            Body();
+            Footer();
+        }
     }
 
     // MARK: the check
