@@ -614,7 +614,6 @@
   "Make Fixture": "Crear fixture",
   "Add to the Set": "Agregar al set",
   "Add {0} to the Set": "Agregar {0} al set",
-  "Not in any library? Import the maker's GDTF file, or make it from a common layout.": "¿No está en ninguna biblioteca? Importa el archivo GDTF del fabricante o créalo a partir de una distribución común.",
   "Made for you: once added, give it its start address and check its channels on the fixture once.": "Creado para ti: una vez agregado, dale su dirección inicial y revisa sus canales en el fixture una vez.",
   "Couldn’t import {0}": "No se pudo importar {0}",
   "DMX mode": "Modo DMX",
@@ -640,8 +639,6 @@
   "One of them does behave differently? Choose it at the top right and go through it on its own.": "¿Alguno sí se comporta distinto? Elígelo arriba a la derecha y revísalo por separado.",
   "Colours, gobos or a prism that come out wrong are not put right here: that is Check Channels, on the Sets page.": "Los colores, gobos o un prisma que salen mal no se corrigen aquí: eso es Revisar canales, en la página Sets.",
   "Its beam should point straight out at the audience, as in the picture. Only the direction counts: level, or a little up or down, is all fine.": "Su beam debería apuntar de frente al público, como en el dibujo. Solo cuenta la dirección: nivelado, o un poco hacia arriba o hacia abajo, todo está bien.",
-  "{0}, as in the picture.": "{0}, como en el dibujo.",
-  "Its beam points to one side, as in the picture.": "Su beam apunta hacia un lado, como en el dibujo.",
   "Like the Picture": "Como en el dibujo",
   "Not Like It: Try Another Way": "No es así: probar de otra forma",
   "The head is tried another way round (its pan home a quarter or half a turn on). Press until the real beam goes where the picture’s does": "El moving head se prueba de otra forma (su pan home un cuarto o media vuelta más). Presiona hasta que el beam real vaya adonde va el del dibujo",
@@ -658,7 +655,6 @@
   "Put right: {0}. Saved.": "Corregido: {0}. Guardado.",
   "its pan home turned": "su posición inicial de pan girada",
   "turned round": "girado al revés",
-  "This catches a head that pans the other way: pointing straight out, that looks right.": "Esto detecta un moving head que hace pan al revés: apuntando de frente, eso parece correcto.",
   "From straight out it turns slowly to your left and back, again and again, as in the picture. Does the real one turn that way?": "Desde de frente gira despacio hacia tu izquierda y vuelve, una y otra vez, como en el dibujo. ¿El real gira hacia ese lado?",
   "From straight out it turns slowly to your right and back, again and again, as in the picture. Does the real one turn that way?": "Desde de frente gira despacio hacia tu derecha y vuelve, una y otra vez, como en el dibujo. ¿El real gira hacia ese lado?",
   "Pointing straight out, a head that pans the other way round can look right; the show then sends it the wrong way. Watch which way it goes, not how far.": "Apuntando de frente, un moving head que hace pan al revés puede parecer correcto; el show luego lo manda hacia el otro lado. Fíjate hacia qué lado va, no cuánto.",
@@ -1434,5 +1430,12 @@
   "The fixture the values and the check go to. What you map is for the model: the {0} others of it in this set play by it too.": "El fixture al que van los valores y la revisión. Lo que mapeas es para el modelo: los otros {0} de este set también tocan así.",
   "Made from a common layout: check it channel by channel on {0}, manuals of these are often wrong. What you find holds for every one of this model.": "Creado a partir de una distribución común: revísalo canal por canal en {0}, los manuales de estos suelen estar mal. Lo que encuentres vale para todos los de este modelo.",
   "Watch {0}: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?": "Mira {0}: este canal recorre lentamente de 0 a 255, los demás mantienen la luz encendida y la cabeza en el centro. ¿Qué hace?",
-  "The DMX mapper: what each channel does, by hand, with the values tried on the selected fixture (or the first). It is for the model: every one of them plays by it": "El mapeador DMX: qué hace cada canal, a mano, con los valores probados en el fixture seleccionado (o el primero). Es para el modelo: todos ellos tocan así"
+  "The DMX mapper: what each channel does, by hand, with the values tried on the selected fixture (or the first). It is for the model: every one of them plays by it": "El mapeador DMX: qué hace cada canal, a mano, con los valores probados en el fixture seleccionado (o el primero). Es para el modelo: todos ellos tocan así",
+  "From Manual": "Desde el manual",
+  "Read the fixture's manual with AI and make the fixture from its DMX chart: a PDF, or a picture of the chart (copy a screenshot and paste it here with Ctrl+V). It is sent to OpenAI with your own key.": "Lee el manual del fixture con IA y crea el fixture a partir de su tabla DMX: un PDF o una imagen de la tabla (copia una captura de pantalla y pégala aquí con Ctrl+V). Se envía a OpenAI con tu propia clave.",
+  "Reading the manual with AI: this takes up to a few minutes.": "Leyendo el manual con IA: tarda hasta unos minutos.",
+  "Not in any library? Make it from its manual: a PDF, or a screenshot of its DMX chart (paste it with Ctrl+V). Or import the maker's GDTF file, or start from a common layout.": "¿No está en ninguna biblioteca? Créalo a partir de su manual: un PDF o una captura de pantalla de su tabla DMX (pégala con Ctrl+V). O importa el archivo GDTF del fabricante, o parte de una distribución común.",
+  "Made for you from {0}: once added, give it its start address and check its channels on the fixture once.": "Creado para ti a partir de {0}: una vez agregado, dale su dirección inicial y revisa sus canales en el fixture una vez.",
+  "Couldn’t make a fixture from {0}": "No se pudo crear un fixture a partir de {0}",
+  "Reading a manual needs your own OpenAI API key (Settings › Director)": "Leer un manual necesita tu propia clave de API de OpenAI (Configuración › Director)"
 }

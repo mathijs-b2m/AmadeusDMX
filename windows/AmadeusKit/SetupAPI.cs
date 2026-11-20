@@ -414,6 +414,11 @@ public sealed class SetupAPI
     public Task<FixtureMapping> ReadManual(string key, string mode, string name, byte[] data, CancellationToken ct = default) =>
         Post("api/fixture/manual", new { key, mode, name, data = Convert.ToBase64String(data) }, FixtureMapping.From, timeout: 300, ct: ct);
 
+    /// A new fixture in your library made from its manual (a PDF, or a picture of its DMX chart), read with AI and
+    /// your own OpenAI key: the manual's largest mode. Its key and mode, or the problems. Takes up to a few minutes.
+    public Task<AmadeusKit.NewFixture> FixtureFromManual(string name, byte[] data, CancellationToken ct = default) =>
+        Post("api/fixture/manual", new { name, data = Convert.ToBase64String(data) }, AmadeusKit.NewFixture.From, timeout: 300, ct: ct);
+
     /// SaveMapping's body: `checked`: every channel was checked on the fixture; `wheel`, `ring`: the colour wheel's or
     /// the ring's colours were named (saved with it, as they are after a check too). A mapping read from a manual sends
     /// the wheel and the chart's names and ranges along: the gobos, the prism and the strobe are read from those.
