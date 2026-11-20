@@ -1,10 +1,12 @@
-// Calibrate: the fixtures of one model put right on the real rig when they behave oddly (a head that goes the
-// wrong way, a bar that runs backwards), one at a time. Each fixture is lit as it hangs on the rig: a head straight
-// out to the audience, then the check after hanging's way (does it pan the right way round?), each with a picture
-// of where its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that doesn't do
-// as its picture gets another calibration at a press (its pan home a quarter on, its pan the other way), until it
-// does. Every press puts the fixture right at once (its calibration in the set, a bar's `reverse` on the rig) and
-// lights it again to see.
+// Calibrate: a model's fixtures put right on the real rig when they behave oddly (a head that goes the wrong way,
+// a bar that runs backwards), by going through one of them: the others of the model get the same calibration. It
+// stays with the fixture it was opened on (another one is chosen at the top, for one that behaves differently).
+// First whether the head hangs or stands; then it is lit as it is placed on the rig: straight out to the audience,
+// then the check after hanging's way (does it pan the right way round?), each with a picture of the head and where
+// its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that doesn't do as its
+// picture gets another calibration at a press (its pan home a quarter on, its pan the other way), until it does.
+// Every press puts the fixture right at once (its calibration in the set, its placing on the rig) and lights it
+// again to see.
 import AmadeusKit
 import SwiftUI
 
@@ -25,7 +27,7 @@ struct CalibrateSheet: View {
     let set: String
     let saved: () -> Void
 
-    enum Step: String, Hashable, CaseIterable { case front, check, cells }
+    enum Step: String, Hashable, CaseIterable { case mount, front, check, cells }
 
     @State private var layout: [String: Any] = [:]   // the set on the rig, calibrations and all
     @State private var checks: [String: HangCheckStep] = [:]
@@ -40,6 +42,11 @@ struct CalibrateSheet: View {
     @State private var wayNames: [String] = []
     @State private var wayBase: [String: Any] = [:]   // the fixture as it came
     @State private var way = 0
+    @State private var finished = false          // this fixture is through its steps
+    @State private var followers: [String] = []  // the others of the model its calibration went to
+
+    /// What a head's calibration is made of: copied to the others of its model when it is through.
+    static let calibration = ["pan_home_deg", "pan_invert", "tilt_invert"]
     @State private var note: String?
     @State private var error: String?
     @State private var busy = false
@@ -86,11 +93,15 @@ struct CalibrateSheet: View {
                 Text("Calibrate").font(.title2.weight(.semibold))
                 Text(target.name).foregroundStyle(.secondary)
                 Spacer()
-                if !target.fixtures.isEmpty {
-                    Text("\(index + 1) of \(target.fixtures.count)").foregroundStyle(.secondary).monospacedDigit()
+                if target.fixtures.count > 1 {
+                    Picker("Fixture", selection: Binding(get: { index }, set: { go($0) })) {
+                        ForEach(target.fixtures.indices, id: \.self) { Text(target.fixtures[$0]).tag($0) }
+                    }
+                    .labelsHidden().fixedSize().disabled(busy)
+                    .help("The fixture you go through. One is enough: the others of this model get its calibration. Choose another one only when it behaves differently")
                 }
             }
-            Text("Stand where the audience would be, facing the stage. Each one lights as it hangs on \(rig), with a picture of what it should do. When the real one does something else, press until it matches: it is put right, and the others of this model with it (except those you already went through).")
+            Text("Go through one fixture of this model: the others get the same calibration. Stand where the audience would be, facing the stage. It lights as it is placed on \(rig), with a picture of what it should do. When the real one does something else, press until it matches.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text(HangCheckPanel.sides)
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -110,6 +121,8 @@ struct CalibrateSheet: View {
                 Label("Not placed on \(rig) yet: place it on the Rigs page first, so the calibration knows how it hangs.",
                       systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            } else if finished {
+                finishedView(id)
             } else if let step {
                 stepView(id, step)
             }
@@ -130,8 +143,19 @@ struct CalibrateSheet: View {
     @ViewBuilder
     private func stepView(_ id: String, _ step: Step) -> some View {
         switch step {
+        case .mount:
+            let hangs = fixture(id)?["mount"] as? String == "hang"
+            Label("How is the real \(id) mounted?", systemImage: "questionmark.circle")
+                .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                mountButton(id, hanging: true, placed: hangs)
+                mountButton(id, hanging: false, placed: !hangs)
+            }
+            .disabled(busy)
+            Text("On \(rig) it is placed \(hangs ? "hanging" : "standing"). The pictures that follow show it the way you say here.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         case .front:
-            Label("Its beam should point straight out at the audience, a little down (up when it stands on the floor), as in the picture.",
+            Label("Its beam should point straight out at the audience, as in the picture. Only the direction counts: level, or a little up or down, is all fine.",
                   systemImage: "light.beacon.max")
                 .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
             matchView(id)
@@ -171,15 +195,50 @@ struct CalibrateSheet: View {
             }
         }
         .disabled(busy)
+        Text("Nothing lights up or moves? Then \(id) is not connected, or its address is not \(checks[id]?.dmx ?? "the one in the set").")
+            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// One of the two answers to how the head is mounted: a drawing of it, the way it is placed on the rig marked.
+    private func mountButton(_ id: String, hanging: Bool, placed: Bool) -> some View {
+        Button {
+            if placed { advance() } else { setMount(id, hanging: hanging) }
+        } label: {
+            VStack(spacing: 4) {
+                MovingHeadIcon(hanging: hanging)
+                Text(hanging ? "Hanging" : "Standing").font(.headline)
+                Text(hanging ? "Under a truss or a bar" : "On the floor, or on top of something")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text(placed ? "As placed on \(rig)" : " ").font(.caption2).foregroundStyle(.tint)
+            }
+            .padding(10)
+            .frame(width: 210)
+            .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(placed ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear), lineWidth: 2))
+            .contentShape(.rect(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The fixture is through: what was done, and what happens to the others of its model.
+    @ViewBuilder
+    private func finishedView(_ id: String) -> some View {
+        Label("\(id) is calibrated.", systemImage: "checkmark.seal.fill")
+            .font(.title3.weight(.semibold)).foregroundStyle(.green)
+        if !followers.isEmpty {
+            Text("The other \(followers.count) of this model use the same calibration now: \(followers.joined(separator: ", ")). Mounted the same way round, they are right too; there is no need to go through them.")
+                .font(.callout).fixedSize(horizontal: false, vertical: true)
+            Text("One of them does behave differently? Choose it at the top right and go through it on its own.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        Text("Colours, gobos or a prism that come out wrong are not put right here: that is Check Channels, on the Sets page.")
+            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        Button("Done") { switchOff(); saved(); dismiss() }
+            .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
     }
 
     private var footer: some View {
         HStack {
-            Button("Previous", systemImage: "chevron.left") { go(index - 1) }
-                .disabled(index == 0 || busy)
-            Button("Skip", systemImage: "chevron.right") { go(index + 1) }
-                .disabled(index + 1 >= target.fixtures.count || busy)
-                .help("On to the next one, without finishing this one")
             Spacer()
             Button("Done") { switchOff(); saved(); dismiss() }
                 .keyboardShortcut(.cancelAction)
@@ -193,6 +252,8 @@ struct CalibrateSheet: View {
         guard let f = fixture(id), let d = definition else { return [] }
         var out: [Step] = []
         if d.isMoving {
+            // hanging or standing is asked of a head on the floor, under or on top of a truss (not one on a truss's side)
+            if ["under", "top"].contains(f["truss_side"] as? String ?? "under") { out.append(.mount) }
             out.append(.front)
             if !(checks[id]?.faults.isEmpty ?? true) { out.append(.check) }
         }
@@ -209,14 +270,45 @@ struct CalibrateSheet: View {
         if let s = step, let i = all.firstIndex(of: s), i + 1 < all.count {
             step = all[i + 1]
             Task { await light() }
-        } else if index + 1 < target.fixtures.count {
-            confirmed.insert(id)
-            go(index + 1)
         } else {
-            confirmed.insert(id)
-            switchOff()
-            saved()
-            dismiss()
+            finish(id)
+        }
+    }
+
+    /// The fixture is through its steps: its calibration goes to the others of its model (those not gone through on
+    /// their own), and the sheet stays with it.
+    private func finish(_ id: String) {
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                followers = definition?.isMoving == true ? try await update(id, keys: Self.calibration) { _ in } : []
+                confirmed.insert(id)
+                switchOff()
+                beam = nil
+                finished = true
+            } catch { note = error.localizedDescription }
+        }
+    }
+
+    /// The real head is mounted the other way than it is placed on the rig: its placing put right (under or on top
+    /// of its truss), this one only.
+    private func setMount(_ id: String, hanging: Bool) {
+        note = nil
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await update(id, keys: []) { f in
+                    f["mount"] = hanging ? "hang" : "stand"
+                    if f["truss"] != nil {
+                        f["truss_side"] = hanging ? "under" : "top"
+                        f["mount_roll_deg"] = nil
+                    }
+                }
+                fixed[id, default: [:]][Step.mount.rawValue] = hanging ? "it hangs" : "it stands"
+                advance()
+            } catch { note = error.localizedDescription }
         }
     }
 
@@ -226,6 +318,7 @@ struct CalibrateSheet: View {
         note = nil
         ways = []
         way = 0
+        finished = false
         step = steps(target.fixtures[i]).first
         Task { await light() }
     }
@@ -261,7 +354,10 @@ struct CalibrateSheet: View {
             lit = id
             output = r.summary
             order = r.order
-            beam = step == .cells ? nil : r.dir.flatMap { d in r.pos.flatMap { p in r.stage.map { BeamPicture.Beam(pos: p, dir: d, stage: $0) } } }
+            beam = step == .cells ? nil : r.dir.flatMap { d in r.pos.flatMap { p in r.stage.map {
+                BeamPicture.Beam(pos: p, dir: d, stage: $0, hanging: fixture(id)?["mount"] as? String == "hang")
+            } } }
+            if step == .mount { beam = nil }
         } catch {
             output = error.localizedDescription
             beam = nil

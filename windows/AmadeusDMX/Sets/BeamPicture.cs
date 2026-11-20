@@ -1,6 +1,6 @@
-// The calibration's picture: where the software expects a head's beam to go, drawn twice, as you see it from the
-// audience and from above. The real head is then turned (its calibration, a press at a time) until it does the same.
-// Both are drawn as the audience sees the stage: stage left (x = 0) on the right
+// The calibration's picture: a moving head as the software expects it, and where its beam goes, drawn twice, as you
+// see it from the audience and from above. The real head is then turned (its calibration, a press at a time) until
+// it does the same. Both are drawn as the audience sees the stage: stage left (x = 0) on the right
 // (mac/Sources/AmadeusDMX/Sets/BeamPicture.swift).
 using System.Numerics;
 using Microsoft.UI.Xaml.Media;
@@ -9,12 +9,13 @@ using Windows.Foundation;
 
 namespace AmadeusDMX;
 
-/// `Pos`: metres, x from stage left, y towards the audience from the stage's front edge, z up; `Stage`: width, height.
-public sealed record Beam(Vector3 Pos, Vector3 Dir, Vector2 Stage);
+/// `Pos`: metres, x from stage left, y towards the audience from the stage's front edge, z up; `Stage`: width, height;
+/// `Hanging`: its base above it (under a truss), or below (standing).
+public sealed record Beam(Vector3 Pos, Vector3 Dir, Vector2 Stage, bool Hanging = true);
 
 public static class BeamPicture
 {
-    const double W = 250, H = 140;
+    const double W = 270, H = 170;
 
     public static FrameworkElement Build(Beam beam)
     {
@@ -54,7 +55,7 @@ public static class BeamPicture
             ax = w - p.X; ay = h - p.Z;
             dx = -d.X; dy = -d.Z;
         }
-        const double pad = 16;
+        const double pad = 22;
         var s = Math.Min((W - 2 * pad) / w, (H - 2 * pad) / height);
         double ox = (W - w * s) / 2, oy = (H - height * s) / 2;
         Point Pt(double h, double v) => new(ox + h * s, oy + v * s);
@@ -94,29 +95,91 @@ public static class BeamPicture
         Word("SR", 4, 40, TextAlignment.Left, H - 16, bold: true);
         Word("SL", W - 44, 40, TextAlignment.Right, H - 16, bold: true);
 
-        // the beam: a cone from the head, widening; seen end-on it is short, and a glow says it comes at you
-        var a = Pt(ax, ay);
-        var flat = Math.Sqrt(dx * dx + dy * dy);
-        if (flat > 0.05)
+        Head(c, Pt(ax, ay), above ? null : (0, beam.Hanging ? -1 : 1), dx, dy, above ? 0 : d.Y, reach * s);
+    }
+
+    /// The moving head hanging under a truss or standing on the floor: the calibration's first question.
+    public static FrameworkElement Icon(bool hanging)
+    {
+        const double w = 120, h = 84;
+        var c = new Canvas { Width = w, Height = h, IsHitTestVisible = false };
+        var rail = hanging ? 12.0 : h - 8;
+        c.Children.Add(new Line
         {
-            double len = reach * s * flat, ux = dx / flat, uy = dy / flat;
-            var b = new Point(a.X + ux * len, a.Y + uy * len);
-            var half = 3 + len * 0.12;
-            var cone = new Polygon { Fill = Tint.Brush(Tint.Yellow, 0.45) };
-            cone.Points.Add(a);
-            cone.Points.Add(new Point(b.X - uy * half, b.Y + ux * half));
-            cone.Points.Add(new Point(b.X + uy * half, b.Y - ux * half));
-            c.Children.Add(cone);
-            Stroke(a, b, Tint.Brush(Tint.Yellow), 1.5);
-        }
-        void Dot(double r, Brush fill)
+            X1 = 6, Y1 = rail, X2 = w - 6, Y2 = rail, Stroke = Theme.Brush("TextFillColorSecondaryBrush"), StrokeThickness = hanging ? 5 : 2,
+            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+        });
+        Head(c, new Point(w / 2, hanging ? rail + 8 : rail - 6), (0, hanging ? -1 : 1), 0.62, hanging ? 0.62 : -0.62, 0, 34);
+        return c;
+    }
+
+    /// A moving head: its base (at `mount`, the yoke hanging from it or standing on it along -`up`; null: seen from
+    /// above, the base under the head), the head turned to the aim (the beam's direction as this view sees it: shorter
+    /// the more it points at or away from you, `towards` > 0 at you), and `beam` points of beam from its lens.
+    static void Head(Canvas c, Point mount, (double X, double Y)? up, double aimX, double aimY, double towards, double beam)
+    {
+        var body = Tint.Brush(Windows.UI.Color.FromArgb(255, 209, 209, 209));
+        var dark = Tint.Brush(Windows.UI.Color.FromArgb(255, 64, 64, 64));
+        // a rounded box in its own coordinates, turned and moved by (a, b, c, d, tx, ty) as CGAffineTransform's
+        void Box(double x, double y, double w, double h, double radius, Brush fill, double a, double b, double cc, double d, double tx, double ty) =>
+            c.Children.Add(new Rectangle
+            {
+                Width = w, Height = h, RadiusX = radius, RadiusY = radius, Fill = fill,
+                RenderTransform = new MatrixTransform { Matrix = new Matrix(a, b, cc, d, a * x + cc * y + tx, b * x + d * y + ty) },
+            });
+        void Disc(Point at, double r, Brush? fill, Brush? stroke = null, double thickness = 0)
         {
-            var e = new Ellipse { Width = 2 * r, Height = 2 * r, Fill = fill };
-            Canvas.SetLeft(e, a.X - r);
-            Canvas.SetTop(e, a.Y - r);
+            var e = new Ellipse { Width = 2 * r, Height = 2 * r, Fill = fill, Stroke = stroke, StrokeThickness = thickness };
+            Canvas.SetLeft(e, at.X - r);
+            Canvas.SetTop(e, at.Y - r);
             c.Children.Add(e);
         }
-        if (!above && d.Y > 0.3) Dot(6 + 12 * d.Y, Tint.Brush(Tint.Yellow, 0.3));   // towards you
-        Dot(4, Theme.Brush("TextFillColorPrimaryBrush"));
+        var pivot = mount;
+        if (up is { } u)
+        {
+            // the base, and the yoke's two arms from it to the head's pivot
+            double bx = -u.Y, by = u.X;   // across the base
+            pivot = new Point(mount.X - u.X * 24, mount.Y - u.Y * 24);
+            Box(-17, -5, 34, 10, 3, body, bx, by, u.X, u.Y, mount.X, mount.Y);
+            foreach (var o in new[] { -14.0, 14.0 })
+                c.Children.Add(new Line
+                {
+                    X1 = mount.X + bx * o, Y1 = mount.Y + by * o, X2 = pivot.X + bx * o, Y2 = pivot.Y + by * o, Stroke = body, StrokeThickness = 4,
+                    StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+                });
+        }
+        else
+        {
+            var plate = new Rectangle { Width = 30, Height = 30, RadiusX = 5, RadiusY = 5, Stroke = body, StrokeThickness = 2 };
+            Canvas.SetLeft(plate, mount.X - 15);
+            Canvas.SetTop(plate, mount.Y - 15);
+            c.Children.Add(plate);
+        }
+        var flat = Math.Sqrt(aimX * aimX + aimY * aimY);
+        if (flat > 0.35)   // the head from its side: a barrel, its lens at the front
+        {
+            double ux = aimX / flat, uy = aimY / flat, length = 16 + 12 * flat;   // shorter when it points partly at you
+            var lens = new Point(pivot.X + ux * (length - 10), pivot.Y + uy * (length - 10));
+            if (beam > 0)
+            {
+                double len = beam * flat, half = 4 + len * 0.12;
+                var end = new Point(lens.X + ux * len, lens.Y + uy * len);
+                var cone = new Polygon { Fill = Tint.Brush(Tint.Yellow, 0.45) };
+                cone.Points.Add(new Point(lens.X - uy * 5, lens.Y + ux * 5));
+                cone.Points.Add(new Point(end.X - uy * half, end.Y + ux * half));
+                cone.Points.Add(new Point(end.X + uy * half, end.Y - ux * half));
+                cone.Points.Add(new Point(lens.X + uy * 5, lens.Y - ux * 5));
+                c.Children.Add(cone);
+            }
+            Box(-10, -9, length, 18, 5, body, ux, uy, -uy, ux, pivot.X, pivot.Y);
+            Box(length - 13, -7, 3, 14, 0, Tint.Brush(Tint.Yellow), ux, uy, -uy, ux, pivot.X, pivot.Y);
+            Disc(pivot, 2.5, dark);
+        }
+        else               // end-on: its round front (the lens lit, at you) or its back
+        {
+            if (towards > 0 && beam > 0) Disc(pivot, 24, Tint.Brush(Tint.Yellow, 0.3));
+            Disc(pivot, 11, body);
+            if (towards > 0) Disc(pivot, 7, Tint.Brush(Tint.Yellow)); else Disc(pivot, 5, null, dark, 1.5);
+        }
     }
 }

@@ -1,6 +1,6 @@
-// The calibration's picture: where the software expects a head's beam to go, drawn twice, as you see it from the
-// audience and from above. The real head is then turned (its calibration, a press at a time) until it does the same.
-// Both are drawn as the audience sees the stage: stage left (x = 0) on the right.
+// The calibration's picture: a moving head as the software expects it, and where its beam goes, drawn twice, as you
+// see it from the audience and from above. The real head is then turned (its calibration, a press at a time) until
+// it does the same. Both are drawn as the audience sees the stage: stage left (x = 0) on the right.
 import SwiftUI
 
 struct BeamPicture: View {
@@ -8,6 +8,7 @@ struct BeamPicture: View {
         var pos: SIMD3<Float>     // metres: x from stage left, y towards the audience from the stage's front edge, z up
         var dir: SIMD3<Float>
         var stage: SIMD2<Float>   // width, height
+        var hanging = true        // its base above it (under a truss), or below (standing)
     }
 
     let beam: Beam
@@ -24,7 +25,7 @@ struct BeamPicture: View {
     private func panel(_ title: String, above: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Canvas { g, size in draw(&g, size, above: above) }
-                .frame(width: 250, height: 140)
+                .frame(width: 270, height: 170)
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
                 .clipShape(.rect(cornerRadius: 8))
             Text(title).font(.caption).foregroundStyle(.secondary)
@@ -49,7 +50,7 @@ struct BeamPicture: View {
             at = CGPoint(x: w - CGFloat(p.x), y: h - CGFloat(p.z))
             to = CGVector(dx: -CGFloat(d.x), dy: -CGFloat(d.z))
         }
-        let pad: CGFloat = 16
+        let pad: CGFloat = 22
         let s = min((size.width - 2 * pad) / w, (size.height - 2 * pad) / height)
         let ox = (size.width - w * s) / 2, oy = (size.height - height * s) / 2
         func pt(_ h: CGFloat, _ v: CGFloat) -> CGPoint { CGPoint(x: ox + h * s, y: oy + v * s) }
@@ -68,25 +69,84 @@ struct BeamPicture: View {
         g.draw(Text("SR").font(.caption2.weight(.semibold)).foregroundStyle(.secondary), at: CGPoint(x: 4, y: size.height - 2), anchor: .bottomLeading)
         g.draw(Text("SL").font(.caption2.weight(.semibold)).foregroundStyle(.secondary), at: CGPoint(x: size.width - 4, y: size.height - 2), anchor: .bottomTrailing)
 
-        // the beam: a cone from the head, widening; seen end-on it is short, and a glow says it comes at you
-        let a = pt(at.x, at.y), flat = hypot(to.dx, to.dy)
-        let beamColor = Color.yellow
-        if flat > 0.05 {
-            let len = reach * s * flat, ux = to.dx / flat, uy = to.dy / flat
-            let b = CGPoint(x: a.x + ux * len, y: a.y + uy * len), half = 3 + len * 0.12
-            let cone = Path {
-                $0.move(to: a)
-                $0.addLine(to: CGPoint(x: b.x - uy * half, y: b.y + ux * half))
-                $0.addLine(to: CGPoint(x: b.x + uy * half, y: b.y - ux * half))
-                $0.closeSubpath()
+        let a = pt(at.x, at.y)
+        Self.head(&g, mount: a, base: above ? nil : CGVector(dx: 0, dy: beam.hanging ? -1 : 1), aim: to,
+                  towards: above ? 0 : CGFloat(d.y), beam: reach * s)
+    }
+
+    /// A moving head: its base (at `mount`, the yoke hanging from it or standing on it along -`base`; nil: seen from
+    /// above, the base under the head), the head turned to `aim` (the beam's direction as this view sees it: shorter
+    /// the more it points at or away from you, `towards` > 0 at you), and `beam` points of beam from its lens.
+    static func head(_ g: inout GraphicsContext, mount: CGPoint, base: CGVector?, aim: CGVector, towards: CGFloat,
+                     beam: CGFloat, unit u: CGFloat = 1) {
+        let body = GraphicsContext.Shading.color(Color(white: 0.82)), dark = GraphicsContext.Shading.color(Color(white: 0.25))
+        let yellow = Color.yellow
+        var pivot = mount
+        if let base {
+            // the base, and the yoke's two arms from it to the head's pivot
+            let drop = 24 * u, bx = -base.dy, by = base.dx   // across the base
+            pivot = CGPoint(x: mount.x - base.dx * drop, y: mount.y - base.dy * drop)
+            var plate = Path()
+            plate.addRoundedRect(in: CGRect(x: -17 * u, y: -5 * u, width: 34 * u, height: 10 * u), cornerSize: CGSize(width: 3 * u, height: 3 * u))
+            let turn = CGAffineTransform(a: bx, b: by, c: base.dx, d: base.dy, tx: mount.x, ty: mount.y)
+            g.fill(plate.applying(turn), with: body)
+            for side in [-1.0, 1.0] {
+                let o = CGFloat(side) * 14 * u
+                g.stroke(Path {
+                    $0.move(to: CGPoint(x: mount.x + bx * o, y: mount.y + by * o))
+                    $0.addLine(to: CGPoint(x: pivot.x + bx * o, y: pivot.y + by * o))
+                }, with: body, style: StrokeStyle(lineWidth: 4 * u, lineCap: .round))
             }
-            g.fill(cone, with: .color(beamColor.opacity(0.45)))
-            g.stroke(Path { $0.move(to: a); $0.addLine(to: b) }, with: .color(beamColor), lineWidth: 1.5)
+        } else {
+            var plate = Path()
+            plate.addRoundedRect(in: CGRect(x: mount.x - 15 * u, y: mount.y - 15 * u, width: 30 * u, height: 30 * u),
+                                 cornerSize: CGSize(width: 5 * u, height: 5 * u))
+            g.stroke(plate, with: body, lineWidth: 2 * u)
         }
-        if !above, d.y > 0.3 {   // towards you
-            let r = 6 + 12 * CGFloat(d.y)
-            g.fill(Path(ellipseIn: CGRect(x: a.x - r, y: a.y - r, width: 2 * r, height: 2 * r)), with: .color(beamColor.opacity(0.3)))
+        let flat = hypot(aim.dx, aim.dy)
+        if flat > 0.35 {   // the head from its side: a barrel, its lens at the front
+            let ux = aim.dx / flat, uy = aim.dy / flat
+            let turn = CGAffineTransform(a: ux, b: uy, c: -uy, d: ux, tx: pivot.x, ty: pivot.y)
+            let long = (16 + 12 * flat) * u   // shorter when it points partly at you
+            let lens = CGPoint(x: pivot.x + ux * (long - 10 * u), y: pivot.y + uy * (long - 10 * u))
+            if beam > 0 {
+                let len = beam * flat, half = 4 * u + len * 0.12
+                let end = CGPoint(x: lens.x + ux * len, y: lens.y + uy * len)
+                g.fill(Path {
+                    $0.move(to: CGPoint(x: lens.x - uy * 5 * u, y: lens.y + ux * 5 * u))
+                    $0.addLine(to: CGPoint(x: end.x - uy * half, y: end.y + ux * half))
+                    $0.addLine(to: CGPoint(x: end.x + uy * half, y: end.y - ux * half))
+                    $0.addLine(to: CGPoint(x: lens.x + uy * 5 * u, y: lens.y - ux * 5 * u))
+                    $0.closeSubpath()
+                }, with: .color(yellow.opacity(0.45)))
+            }
+            var barrel = Path()
+            barrel.addRoundedRect(in: CGRect(x: -10 * u, y: -9 * u, width: long, height: 18 * u), cornerSize: CGSize(width: 5 * u, height: 5 * u))
+            g.fill(barrel.applying(turn), with: body)
+            g.fill(Path(CGRect(x: long - 13 * u, y: -7 * u, width: 3 * u, height: 14 * u)).applying(turn), with: .color(yellow))
+            g.fill(Path(ellipseIn: CGRect(x: pivot.x - 2.5 * u, y: pivot.y - 2.5 * u, width: 5 * u, height: 5 * u)), with: dark)
+        } else {           // end-on: its round front (the lens lit, at you) or its back
+            func disc(_ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: pivot.x - r, y: pivot.y - r, width: 2 * r, height: 2 * r)) }
+            if towards > 0, beam > 0 { g.fill(disc(24 * u), with: .color(yellow.opacity(0.3))) }
+            g.fill(disc(11 * u), with: body)
+            if towards > 0 { g.fill(disc(7 * u), with: .color(yellow)) } else { g.stroke(disc(5 * u), with: dark, lineWidth: 1.5 * u) }
         }
-        g.fill(Path(ellipseIn: CGRect(x: a.x - 4, y: a.y - 4, width: 8, height: 8)), with: .color(.primary))
+    }
+}
+
+/// A moving head hanging under a truss or standing on the floor: the calibration's first question.
+struct MovingHeadIcon: View {
+    let hanging: Bool
+
+    var body: some View {
+        Canvas { g, size in
+            let rail = hanging ? 12.0 : size.height - 8
+            g.stroke(Path { $0.move(to: CGPoint(x: 6, y: rail)); $0.addLine(to: CGPoint(x: size.width - 6, y: rail)) },
+                     with: .color(.secondary), style: StrokeStyle(lineWidth: hanging ? 5 : 2, lineCap: .round))
+            BeamPicture.head(&g, mount: CGPoint(x: size.width / 2, y: hanging ? rail + 8 : rail - 6),
+                             base: CGVector(dx: 0, dy: hanging ? -1 : 1),
+                             aim: CGVector(dx: 0.62, dy: hanging ? 0.62 : -0.62), towards: 0, beam: 34)
+        }
+        .frame(width: 120, height: 84)
     }
 }
