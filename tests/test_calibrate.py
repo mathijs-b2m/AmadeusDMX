@@ -111,3 +111,87 @@ def test_a_pointed_head_says_where_it_is_and_stays_lit_while_looked_at(monkeypat
         while web_rig._test["thread"] is not None and time.monotonic() < deadline:
             time.sleep(0.01)
         sock.close()
+
+
+# ---- the pan test: does the head turn the way the software thinks? ------------------------------------------------
+
+
+def _head(**placing):
+    from amadeus.library import fixtures as fxlib
+
+    rig = json.loads((ROOT / "tests" / "sets" / "small.json").read_text(encoding="utf-8"))
+    hid = next(f["id"] for f in rig["fixtures"] if fxlib.is_moving(fxlib.get(f["fixture"])))
+    rig = load_rig_dict({**rig, "fixtures": [f | placing if f["id"] == hid else f for f in rig["fixtures"]]})
+    fx = next(f for f in rig["fixtures"] if f["id"] == hid)
+    return fx, fxlib.get(fx["fixture"])
+
+
+def _deg(a, b) -> float:
+    import math
+
+    import numpy as np
+
+    return math.degrees(math.acos(max(-1.0, min(1.0, float(np.dot(a, b))))))
+
+
+def test_the_pan_test_turns_to_the_audiences_left():
+    from amadeus.rig import geometry
+
+    fx, defn = _head()
+    a, b, side = hangsheet.pan_sweep(fx, defn)
+    da, db = geometry.fk(fx, defn, *a), geometry.fk(fx, defn, *b)
+    assert side == "left" and db[0] > da[0] + 0.5  # +x: stage right, the audience's left
+    assert abs(a[1] - b[1]) < 1e-9  # its pan alone
+    assert abs(_deg(da, db) - hangsheet.PAN_SWEEP_DEG) < 15
+
+
+def test_turning_the_pan_the_other_way_keeps_straight_out():
+    from amadeus.rig import geometry
+
+    for placing in ({}, {"rot_deg": 85}, {"rot_deg": 180, "pan_invert": True}, {"mount": "stand", "rot_deg": 270}):
+        fx, defn = _head(**placing)
+        fields = hangsheet.flip_pan(fx, defn)
+        assert fields["pan_invert"] is (not fx.get("pan_invert", False))
+        aim = hangsheet.front_aim(fx, defn)
+        assert _deg(geometry.fk(fx, defn, *aim), geometry.fk({**fx, **fields}, defn, *aim)) < 0.5, placing
+        _, b, _ = hangsheet.pan_sweep(fx, defn)  # and the turn now goes the other way
+        assert _deg(geometry.fk(fx, defn, *b), geometry.fk({**fx, **fields}, defn, *b)) > 90, placing
+
+
+def test_a_mirrored_head_turned_a_quarter_comes_out_right_everywhere():
+    """fx1 on the studio rig: standing, turned 85°, its pan really running the other way. Straight out alone was
+    put "right" by half a turn of its pan home, and the show then sent it the opposite way. The front step's half
+    turn plus the pan test's flip makes the software's head the real one, in every direction."""
+    import numpy as np
+
+    from amadeus.rig import geometry
+
+    fx, defn = _head(mount="stand", rot_deg=85)
+    real = {**fx, "pan_invert": not fx.get("pan_invert", False)}  # how it really turns
+    front = hangsheet.front_aim(fx, defn)
+    assert _deg(geometry.fk(real, defn, *front), geometry.fk(fx, defn, *front)) > 140  # it pointed elsewhere
+    cal = {**fx, **hangsheet.fix_front(fx, defn, "back")}  # "Not like it" until straight out looked right …
+    front = hangsheet.front_aim(cal, defn)
+    assert _deg(geometry.fk(real, defn, *front), geometry.fk(cal, defn, *front)) < 15
+    a, b, _ = hangsheet.pan_sweep(cal, defn)  # … but the pan test turns it the wrong way
+    turn = geometry.fk(cal, defn, *b) - geometry.fk(cal, defn, *a)
+    seen = geometry.fk(real, defn, *b) - geometry.fk(real, defn, *a)
+    assert float(np.dot(turn[:2], seen[:2])) < 0
+    cal = {**cal, **hangsheet.flip_pan(cal, defn)}  # "It turns the other way"
+    for az in range(-150, 181, 30):
+        for el in (-40, 0, 30):
+            d = geometry.direction(az, el)
+            p, t = geometry.to_dmx(cal, defn, *geometry.ik(cal, defn, d, None))
+            assert _deg(geometry.fk(real, defn, p, t), geometry.fk(cal, defn, p, t)) < 12, (az, el)
+
+
+def test_the_pan_test_sweeps_out_and_back():
+    from amadeus.web import rig as web_rig
+
+    aim = {"sweep": ((0.2, 0.5), (0.4, 0.5)), "t0": 100.0}
+    hold, move = web_rig.SWEEP_HOLD_S, web_rig.SWEEP_MOVE_S
+    assert web_rig._aim_now(aim, 100.0) == (0.2, 0.5)
+    assert abs(web_rig._aim_now(aim, 100.0 + hold + move / 2)[0] - 0.3) < 1e-9
+    assert abs(web_rig._aim_now(aim, 100.0 + hold + move + 0.1)[0] - 0.4) < 1e-9
+    assert abs(web_rig._aim_now(aim, 100.0 + 2 * (hold + move))[0] - 0.2) < 1e-9
+    assert web_rig._aim_now((0.5, 0.5), 3.0) == (0.5, 0.5)

@@ -631,6 +631,43 @@ def check_aim(fx: dict, defn: dict) -> tuple[float, float]:
     return geometry.to_dmx(fx, defn, phi, theta)
 
 
+PAN_SWEEP_DEG = 60.0  # how far the calibration's pan test turns a head from straight out
+
+
+def pan_sweep(fx: dict, defn: dict) -> tuple[tuple[float, float], tuple[float, float], str]:
+    """The calibration's pan test: the front pose (front_aim), and from there its pan alone turned PAN_SWEEP_DEG
+    towards the audience's left (stage right, +x), or their right when the motor has no room that way. Returns the
+    two poses (pan and tilt, 0..1, as DMX) and "left" or "right", as the audience sees it ("" with no room either
+    way). A head that pans the other way round goes the other way: straight out alone can't tell (on a head turned
+    a quarter, a mirrored pan looks like one turned round there)."""
+    phi, theta = geometry.ik(fx, defn, front_dir(fx), None)
+    P, _, ph, _ = geometry._ranges(fx, defn)
+    lo, hi = (-(P - ph), ph) if fx.get("pan_invert") else (-ph, P - ph)
+    a = geometry.to_dmx(fx, defn, phi, theta)
+    if P and geometry.mount_roll(fx) is None:  # (on a truss's face its pan isn't left and right)
+        for step, side in ((PAN_SWEEP_DEG, "left"), (-PAN_SWEEP_DEG, "right")):
+            if lo - 1e-6 <= phi + step <= hi + 1e-6:
+                return a, geometry.to_dmx(fx, defn, phi + step, theta), side
+    return a, a, ""
+
+
+def flip_pan(fx: dict, defn: dict) -> dict:
+    """The calibration for a head that pans the other way round than its calibration says, keeping what the front
+    pose already showed right: pan_invert the other way, and its pan home moved so the very same DMX still points
+    straight out (the head isn't moved on the rig, only told which way it turns). {} when the pan has no room."""
+    P, _, ph, _ = geometry._ranges(fx, defn)
+    if not P:
+        return {}
+    p0, _ = front_aim(fx, defn)
+    # front: s·(p0·P − ph) − rot; flipped: −s·(p0·P − ph') − rot; the same mod 360 → ph' = 2·p0·P − ph + 360k
+    base = 2 * p0 * P - ph
+    homes = [base + 360.0 * k for k in range(-4, 5) if -1e-6 <= base + 360.0 * k <= P + 1e-6]
+    if not homes:
+        return {}
+    home = min(homes, key=lambda h: abs(h - P / 2))
+    return {"pan_invert": not fx.get("pan_invert", False), "pan_home_deg": round(min(max(home, 0.0), P), 1)}
+
+
 def beam_words(d) -> str:
     return f"{'up' if d[2] > 0 else 'down'} towards {toward(float(d[0]), float(d[1]))}"
 
@@ -709,8 +746,10 @@ def fix_front(fx: dict, defn: dict, seen: str) -> dict:
 def fix(fx: dict, defn: dict, what: str) -> dict:
     """The calibration that puts a head right that the check found "mirrored" (its pan the other way), "turned"
     (turned round, or its tilt the wrong way) or "both". Returns the set's fields to change on the fixture."""
+    if what == "pan":  # the calibration's pan test: it turned the other way (straight out stays as it was)
+        return flip_pan(fx, defn)
     if what not in FIXES:
-        raise ValueError(f"fix: one of {', '.join(FIXES)}")
+        raise ValueError(f"fix: one of {', '.join(FIXES)}, pan")
     P, _, ph, _ = geometry._ranges(fx, defn)
     out: dict = {}
     if what in ("mirrored", "both") and P:

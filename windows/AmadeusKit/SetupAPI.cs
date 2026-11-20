@@ -370,13 +370,14 @@ public sealed class SetupAPI
         Post("api/test-light", new { fixture, rig = layout, on, point = "front" }, LightTest.From, ct: ct);
 
     /// The calibration on the Sets page: one fixture of a layout lit, a moving head pointed `point` ("front": straight
-    /// out to the audience, "check": the check after hanging's way, null: centred), with `cells` a bar's cells red,
+    /// out to the audience, "pan": from there turning to one side and back (the reply's `To` and `Side`), "check": the
+    /// check after hanging's way, null: centred), with `cells` a bar's cells red,
     /// green, blue, white along it (the reply's `Order` says which end red should be at).
     public Task<LightTest> TestLight(string fixture, bool on, IReadOnlyDictionary<string, JSONValue> layout, string? point, bool cells,
                                      CancellationToken ct = default)
     {
         var body = new Dictionary<string, object?> { ["fixture"] = fixture, ["rig"] = layout, ["on"] = on, ["cells"] = cells };
-        if (point is not null) body["point"] = point == "front" ? "front" : true;
+        if (point is not null) body["point"] = point is "front" or "pan" ? (object)point : true;
         return Post("api/test-light", body, LightTest.From, ct: ct);
     }
 
@@ -843,6 +844,8 @@ public sealed record LightTest
     public Vector3? Pos { get; init; }                // a pointed head: where it is (metres, as the feed's)
     public Vector2? Stage { get; init; }              // the stage's width and height, metres
     public string Order { get; init; } = "";          // a bar's cells lit in colours: which end red should be at, in words
+    public Vector3? To { get; init; }                 // the pan test: where its beam turns to from `Dir`, and back
+    public string Side { get; init; } = "";           // the pan test: that turn is to the audience's "left" or "right" ("": none)
 
     public static LightTest From(JsonElement c) => new()
     {
@@ -853,6 +856,8 @@ public sealed record LightTest
         Pos = J.Ref(c, "pos", J.ArrayOf(J.Float)) is { Length: >= 3 } at ? new Vector3(at[0], at[1], at[2]) : null,
         Stage = J.Ref(c, "stage", J.ArrayOf(J.Float)) is { Length: >= 2 } st ? new Vector2(st[0], st[1]) : null,
         Order = J.Ref(c, "order", J.String) ?? "",
+        To = J.Ref(c, "to", J.ArrayOf(J.Float)) is { Length: >= 3 } t ? new Vector3(t[0], t[1], t[2]) : null,
+        Side = J.Ref(c, "side", J.String) ?? "",
     };
 
     /// "universe 1, channels 43–50 · Art-Net → 2.0.0.10:6454 (universe 1 on the wire)"

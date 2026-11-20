@@ -2,11 +2,13 @@
 // wrong way, a bar that runs backwards), by going through one of them: the others of the model get the same
 // calibration. It stays with the fixture it was opened on (another one is chosen at the top, for one that behaves
 // differently). First whether the head hangs or stands; then it is lit as it is placed on the rig: straight out to
-// the audience, then the check after hanging's way (does it pan the right way round?), each with a picture of the
-// head and where its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that
-// doesn't do as its picture gets another calibration at a press (its pan home a quarter on, its pan the other
-// way), until it does. Every press puts the fixture right at once (its calibration in the set, its placing on the
-// rig) and lights it again to see (mac/Sources/AmadeusDMX/Sets/CalibrateSheet.swift).
+// the audience (a head that doesn't gets its pan home a quarter on at a press, until it does), then from there
+// turning slowly to one side and back (one that turns the other way gets its pan the other way round, straight out
+// kept as it was: straight out alone can't tell a mirrored pan from a head turned round, and the show then sent it
+// the wrong way), each with a picture of the head and where its beam should go; a bar's cells red, green, blue,
+// white along it (reversed?). One step never undoes another's. Every press puts the fixture right at once (its
+// calibration in the set, its placing on the rig) and lights it again to see
+// (mac/Sources/AmadeusDMX/Sets/CalibrateSheet.swift).
 namespace AmadeusDMX;
 
 /// `Fixtures`: in the set's order; `Start`: the one to begin with.
@@ -14,7 +16,7 @@ public sealed record CalibrateTarget(string Key, string Name, IReadOnlyList<stri
 
 public sealed class CalibrateSheet
 {
-    enum Step { Mount, Front, Check, Cells }
+    enum Step { Mount, Front, Pan, Cells }
 
     readonly AppModel _model;
     readonly CalibrateTarget _target;
@@ -29,6 +31,7 @@ public sealed class CalibrateSheet
     int _index;
     Step? _step;
     string _order = "";          // which end of the bar red should be at
+    string _side = "";           // the pan test turns to the audience's left or right
     string _output = "";
     // what was put right, per fixture and step (`From`: put right as that one was, a sibling's fix)
     readonly Dictionary<string, Dictionary<Step, (string What, string? From)>> _fixed = [];
@@ -183,13 +186,20 @@ public sealed class CalibrateSheet
                     null, Font.Callout).Bold();
                 foreach (var part in MatchView(id)) yield return part;
                 break;
-            case Step.Check:
-                var c = _checks.GetValueOrDefault(id);
-                yield return Form.Note("light.beacon.max",
-                    c is { Expect.Length: > 0 } ? L("{0}, as in the picture.", c.Expect.TrimEnd('.')) : L("Its beam points to one side, as in the picture."),
+            case Step.Pan:
+                yield return Form.Note("arrow.left.and.right",
+                    _side == "right" ? L("From straight out it turns slowly to your right and back, again and again, as in the picture. Does the real one turn that way?")
+                                     : L("From straight out it turns slowly to your left and back, again and again, as in the picture. Does the real one turn that way?"),
                     null, Font.Callout).Bold();
-                yield return UI.Text(L("This catches a head that pans the other way: pointing straight out, that looks right."), Font.Caption).Secondary().Wrap();
-                foreach (var part in MatchView(id)) yield return part;
+                yield return UI.Text(L("Pointing straight out, a head that pans the other way round can look right; the show then sends it the wrong way. Watch which way it goes, not how far."),
+                                     Font.Caption).Secondary().Wrap();
+                if (_beam is { } turning) yield return BeamPicture.Build(turning);
+                yield return Buttons(
+                    UI.Button(L("Turns That Way"), Advance, "checkmark").Prominent(),
+                    UI.Button(L("Turns the Other Way"), () => FlipPan(id), "arrow.uturn.left")
+                        .Tooltip(L("Its pan the other way round. Straight out stays as you just saw it; it now turns the other way. Press again to put it back")));
+                yield return UI.Text(L("Nothing lights up or moves? Then {0} is not connected, or its address is not {1}.", id,
+                                       _checks.GetValueOrDefault(id)?.Dmx ?? L("the one in the set")), Font.Caption).Secondary().Wrap();
                 break;
             case Step.Cells:
                 yield return Form.Note("light.strip.2", _order.Length == 0 ? L("Its cells light red, green, blue, white along it.") : _order,
@@ -208,7 +218,7 @@ public sealed class CalibrateSheet
         var row = Buttons(
             UI.Button(L("Like the Picture"), Advance, "checkmark").Prominent(),
             UI.Button(L("Not Like It: Try Another Way"), () => TryNext(id), "arrow.triangle.2.circlepath")
-                .Tooltip(L("The head is tried another way round (its pan home a quarter on, its pan the other way). Press until the real beam goes where the picture’s does")));
+                .Tooltip(L("The head is tried another way round (its pan home a quarter or half a turn on). Press until the real beam goes where the picture’s does")));
         if (_ways.Count > 1) row.Children.Add(UI.Text(L("Way {0} of {1}", _way + 1, _ways.Count), Font.Callout).Secondary());
         yield return row;
         yield return UI.Text(L("Nothing lights up or moves? Then {0} is not connected, or its address is not {1}.", id,
@@ -277,7 +287,8 @@ public sealed class CalibrateSheet
             // hanging or standing is asked of a head on the floor, under or on top of a truss (not one on a truss's side)
             if ((f.GetValueOrDefault("truss_side")?.String ?? "under") is "under" or "top") out_.Add(Step.Mount);
             out_.Add(Step.Front);
-            if (_checks.GetValueOrDefault(id) is { Faults.Count: > 0 }) out_.Add(Step.Check);
+            // its pan's way round (a moving bar only tilts; on a truss's face its pan isn't left and right)
+            if (d.Kind == "moving_head" && (f.GetValueOrDefault("mount_roll_deg")?.Number ?? 0) == 0) out_.Add(Step.Pan);
         }
         if (d.Cells(f.GetValueOrDefault("mode")?.String ?? "") > 1) out_.Add(Step.Cells);
         return out_;
@@ -397,12 +408,15 @@ public sealed class CalibrateSheet
         try
         {
             var r = await _model.Api.TestLight(id, true, _layout,
-                                               step == Step.Front ? "front" : step == Step.Check ? "check" : null,
+                                               step == Step.Front ? "front" : step == Step.Pan ? "pan" : null,
                                                step == Step.Cells);
             _lit = id;
             _output = r.Summary;
             _order = r.Order;
-            _beam = step is Step.Front or Step.Check && r is { Dir: { } d, Pos: { } p, Stage: { } st } ? new Beam(p, d, st, Hangs(id)) : null;
+            _side = r.Side;
+            _beam = step is Step.Front or Step.Pan && r is { Dir: { } d, Pos: { } p, Stage: { } st }
+                ? new Beam(p, d, st, Hangs(id), step == Step.Pan ? r.To : null) : null;
+            if (step == Step.Pan && r.Side.Length == 0) { Advance(); return; }   // its pan has no room to turn: nothing to see
         }
         catch (Exception e) when (SetView.IsApiError(e)) { _output = e.Message; _beam = null; }
         if (_closed) { SwitchOff(); return; }
@@ -436,9 +450,34 @@ public sealed class CalibrateSheet
         });
     }
 
-    /// The real head doesn't do as its picture: the next calibration it could have, saved, and lit again to see.
-    /// Straight out: its pan home a quarter on, a press at a time (the rig editor's front test's fixes); the check's
-    /// way: the hang check's faults. Round again, it is back as it came.
+    /// The real head turns the other way than its picture: its pan the other way round, its pan home moved so
+    /// straight out stays as it was seen (the engine's "pan" fix), saved, and lit again to see. Pressed again: back.
+    async void FlipPan(string id)
+    {
+        _note = null;
+        SetBusy(true);
+        try
+        {
+            var fields = await _model.Api.HangCheckFix(_layout, id, "pan");
+            if (fields.Count == 0)
+            {
+                _note = L("Its pan has no room to turn the other way round and still point straight out. Check its pan range on the Fixtures page.");
+                return;
+            }
+            string[] keys = [.. fields.Keys];
+            var also = await Update(id, keys, f => { foreach (var (k, v) in fields) f[k] = v; });
+            var was = _fixed.GetValueOrDefault(id)?.ContainsKey(Step.Pan) ?? false;   // pressed again: back as it came
+            Fixed(id, Step.Pan, was ? null : L("its pan the other way round"));
+            foreach (var o in also) Fixed(o, Step.Pan, was ? null : L("{0} (as {1})", L("its pan the other way round"), id), id);
+            await Light();
+        }
+        catch (Exception e) when (SetView.IsApiError(e)) { _note = e.Message; }
+        finally { SetBusy(false); }
+    }
+
+    /// The real head doesn't point straight out like its picture: the next calibration it could have, saved, and lit
+    /// again to see: its pan home a quarter on, a press at a time (the rig editor's front test's fixes). Round again,
+    /// it is back as it came.
     async void TryNext(string id)
     {
         if (_step is not { } step || Fixture(id) is not { } fixture) return;
@@ -448,9 +487,7 @@ public sealed class CalibrateSheet
         {
             if (_ways.Count == 0)
             {
-                (string Fix, string Name)[] options = step == Step.Front
-                    ? [("left", L("its pan home turned")), ("back", L("turned round")), ("right", L("its pan home turned"))]
-                    : [.. (_checks.GetValueOrDefault(id)?.Faults ?? []).Select(f => (f.Fix, HangCheckPanel.Cause.GetValueOrDefault(f.Fix) ?? f.Fix))];
+                (string Fix, string Name)[] options = [("left", L("its pan home turned")), ("back", L("turned round")), ("right", L("its pan home turned"))];
                 var found = new List<Dictionary<string, JSONValue>> { new() };
                 var names = new List<string> { "" };
                 foreach (var (fix, name) in options)
