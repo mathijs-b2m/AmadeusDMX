@@ -554,8 +554,9 @@ def patched(fx: dict) -> bool:
 
 def _strobing(chans: list[dict], els: dict) -> dict:
     """Which strobe channels flash this frame: {"values": {channel offset: DMX value}, "held": the states they
-    flash, whose dimmers stay open}. A channel shared by the cells flashes only when every lit cell strobes; one
-    that can't strobe that slowly stays quiet. The lights it doesn't reach flash on their dimmer."""
+    flash, whose dimmers stay open}. Only a real fast strobe (strobe.on_channel) plays on the channel: a flash on
+    the beat grid gates the dimmer, exactly on the beat. A channel shared by the cells flashes only when every lit
+    cell strobes; one that can't strobe that slowly stays quiet. The lights it doesn't reach flash on their dimmer."""
     values, held = {}, set()
     for off, c in enumerate(chans):
         if "strobe_range" not in c:
@@ -563,7 +564,7 @@ def _strobing(chans: list[dict], els: dict) -> dict:
         cells = [els[c["head"]]] if c.get("head") in els else list(els.values())
         lit = [s for s in cells if s.dimmer > 0]
         hz = min((getattr(s, "strobe_hz", 0.0) for s in lit), default=0.0)
-        v = strobe.value(c, hz) if hz > 0 else None
+        v = strobe.value(c, hz) if strobe.on_channel(hz) else None
         if v is not None:
             values[off] = v
             held.update(id(s) for s in lit)

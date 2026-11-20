@@ -23,8 +23,9 @@ class State:
     spin: float = 0.0  # lasers: rotation -1..1 (0 = still)
     lcolor: str = ""  # lasers: colour mode (base/accent/white/cycle: one colour; multi/rainbow: per beam)
     phase: float = -1.0  # lasers: ripple position across the fan 0..1 (-1: all beams lit)
-    strobe_hz: float = 0.0  # strobing this fast (0: not): a fixture with a strobe channel flashes on it, its dimmer
-    # open at `dimmer` (library/strobe.py). Everything that dims or darkens a light works on `dimmer`, so it holds here
+    strobe_hz: float = 0.0  # strobing this fast (0: not): above strobe.DIMMER_FLASH_HZ a fixture with a strobe channel
+    # flashes on it, its dimmer open at `dimmer` (library/strobe.py); a beat flash, slower, gates the dimmer. Everything
+    # that dims or darkens a light works on `dimmer`, so it holds here
     gate: float = 1.0  # the flash on the beat grid: how much of `dimmer` is lit now. A light without a strobe channel
     # flashes with it on its dimmer, and the visualisers show it (`lit`); the show arc holds a head steady at gate 1
     dmx_pan: float | None = None  # pan/tilt sent as DMX (the target, slightly ahead); pan/tilt above is the

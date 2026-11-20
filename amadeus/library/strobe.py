@@ -1,9 +1,12 @@
 """A fixture's own strobe: which values of a channel make it strobe, and how fast.
 
 A channel that can strobe says so with "strobe_range": [slowest value, fastest value] (the two can be either way
-round) and, when its source gives the speeds, "strobe_hz": [slowest, fastest]. While the engine strobes a light
-that has one, its dimmer stays open and this channel flashes it; everywhere else the channel keeps its quiet
-"default". Only the steady strobe counts: random strobes, pulses and ramps are not what the show asks for.
+round) and, when its source gives the speeds, "strobe_hz": [slowest, fastest]. Only a real fast strobe plays on
+it (faster than DIMMER_FLASH_HZ): then the dimmer stays open and this channel flashes it on the fixture's own clock.
+Everything slower, the shows' flashes on the beat grid, flashes on the dimmer, gated exactly on the beat: a channel
+free-running on its own clock drifts off the beat and does not flash at all on many fixtures at these slow rates.
+Everywhere else the channel keeps its quiet "default". Only the steady strobe counts: random strobes, pulses and
+ramps are not what the show asks for.
 
 Without known speeds the range is taken to run over ASSUMED_HZ, on the high side: a fixture that really tops out
 lower plays slower than asked, not faster, so the set's flash limit holds.
@@ -14,6 +17,8 @@ from __future__ import annotations
 import re
 
 ASSUMED_HZ = (1.0, 25.0)
+DIMMER_FLASH_HZ = 10.0  # up to this fast a flash plays on the dimmer, on the beat (40 fps: two frames on, two off);
+# faster, a strobe channel takes it. Every flash the shows play on the beat grid stays at or below it
 CHANNEL = re.compile(r"shutter|strobe|flash|^rate$", re.I)  # what a channel that can strobe is called
 STROBE = re.compile(r"strob|flash rate|flashes|^\s*[\d.]+\s*(hz)?\s*(to|-|–|→)\s*[\d./]+\s*hz", re.I)
 NOT_STROBE = re.compile(
@@ -91,6 +96,11 @@ def mark(spec: dict, ranges: list) -> dict:
             end = 0 if abs(spec["default"] - slow) <= abs(spec["default"] - fast) else 1  # the end it's nearest
             spec["strobe_range"][end] = spec["default"] + (1 if (fast > slow) == (end == 0) else -1)
     return spec
+
+
+def on_channel(hz: float) -> bool:
+    """Does a strobe this fast play on a strobe channel? Only a real fast strobe; a beat flash plays on the dimmer."""
+    return hz > DIMMER_FLASH_HZ + 1e-6
 
 
 def value(c: dict, hz: float) -> int | None:
