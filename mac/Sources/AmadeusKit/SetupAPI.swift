@@ -430,6 +430,14 @@ public struct SetupAPI: Sendable {
         return try await post("api/test-light", body)
     }
 
+    /// A lit fixture's minute started again (the calibration: someone is still looking at it). False: it had gone
+    /// dark already.
+    public func keepLight(fixture: String) async throws -> Bool {
+        struct R: Decodable { var on: Bool }
+        let r: R = try await post("api/test-light", ["fixture": fixture, "keep": true])
+        return r.on
+    }
+
     /// The check after hanging for a layout: its fixtures in the hang sheet's order, with what to see.
     public func hangCheck(layout: [String: Any]) async throws -> [HangCheckStep] {
         struct R: Decodable { var steps: [HangCheckStep] }
@@ -735,10 +743,12 @@ public struct LightTest: Decodable, Sendable {
     public var wireUniverse: Int?       // the Art-Net / sACN universe it goes out as
     public var channels: [Int]          // first and last DMX channel (empty: no start address)
     public var dir: SIMD3<Float>?       // a pointed head: where its beam goes (world, as the feed's)
+    public var pos: SIMD3<Float>?       // a pointed head: where it is (metres, as the feed's)
+    public var stage: SIMD2<Float>?     // the stage's width and height, metres
     public var order = ""               // a bar's cells lit in colours: which end red should be at, in words
 
     enum CodingKeys: String, CodingKey {
-        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir, order
+        case on, seconds, output, universe, wireUniverse = "wire_universe", channels, dir, pos, stage, order
     }
 
     public init(from decoder: Decoder) throws {
@@ -750,6 +760,8 @@ public struct LightTest: Decodable, Sendable {
         wireUniverse = try c.decodeIfPresent(Int.self, forKey: .wireUniverse)
         channels = try c.decodeIfPresent([Int].self, forKey: .channels) ?? []  // null: a fixture without an address
         dir = try c.decodeIfPresent([Float].self, forKey: .dir).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
+        pos = try c.decodeIfPresent([Float].self, forKey: .pos).flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
+        stage = try c.decodeIfPresent([Float].self, forKey: .stage).flatMap { $0.count >= 2 ? SIMD2($0[0], $0[1]) : nil }
         order = try c.decodeIfPresent(String.self, forKey: .order) ?? ""
     }
 

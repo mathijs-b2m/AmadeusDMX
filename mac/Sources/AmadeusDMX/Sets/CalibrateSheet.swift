@@ -1,9 +1,10 @@
 // Calibrate: the fixtures of one model put right on the real rig when they behave oddly (a head that goes the
-// wrong way, a bar that runs backwards), one at a time, as `amadeus test` asks in the terminal. Each fixture is lit
-// as it hangs on the rig: a head straight out to the audience (where does it really point?), then the check after
-// hanging's way (does it pan the right way round?); a bar's cells red, green, blue, white along it (reversed?).
-// Every answer puts the fixture right at once (its calibration in the set, a bar's `reverse` on the rig) and lights
-// it again to see.
+// wrong way, a bar that runs backwards), one at a time. Each fixture is lit as it hangs on the rig: a head straight
+// out to the audience, then the check after hanging's way (does it pan the right way round?), each with a picture
+// of where its beam should go; a bar's cells red, green, blue, white along it (reversed?). A head that doesn't do
+// as its picture gets another calibration at a press (its pan home a quarter on, its pan the other way), until it
+// does. Every press puts the fixture right at once (its calibration in the set, a bar's `reverse` on the rig) and
+// lights it again to see.
 import AmadeusKit
 import SwiftUI
 
@@ -24,7 +25,7 @@ struct CalibrateSheet: View {
     let set: String
     let saved: () -> Void
 
-    enum Step: Hashable { case front, check, cells }
+    enum Step: String, Hashable, CaseIterable { case front, check, cells }
 
     @State private var layout: [String: Any] = [:]   // the set on the rig, calibrations and all
     @State private var checks: [String: HangCheckStep] = [:]
@@ -32,7 +33,13 @@ struct CalibrateSheet: View {
     @State private var step: Step?
     @State private var order = ""         // which end of the bar red should be at
     @State private var output = ""
-    @State private var fixed: [String: [String]] = [:]   // what was put right, per fixture
+    @State private var fixed: [String: [String: String]] = [:]   // what was put right, per fixture and step
+    @State private var beam: BeamPicture.Beam?   // where the lit head's beam should go
+    // the calibrations a head is tried with in this step, a press at a time: [0] the one it came with (nothing changed)
+    @State private var ways: [[String: Any]] = []
+    @State private var wayNames: [String] = []
+    @State private var wayBase: [String: Any] = [:]   // the fixture as it came
+    @State private var way = 0
     @State private var note: String?
     @State private var error: String?
     @State private var busy = false
@@ -58,8 +65,16 @@ struct CalibrateSheet: View {
             Divider()
             footer
         }
-        .frame(minWidth: 720, idealWidth: 760, minHeight: 440, idealHeight: 480)
+        .frame(minWidth: 720, idealWidth: 760, minHeight: 600, idealHeight: 640)
         .task { await load() }
+        .task(id: lit) {   // the engine's light test goes dark after a minute: kept lit for as long as it is looked at
+            guard let id = lit else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(20))
+                if Task.isCancelled { break }
+                if (try? await model.api.keepLight(fixture: id)) == false, !busy { Task { await light() } }
+            }
+        }
         .onDisappear { switchOff() }
     }
 
@@ -75,7 +90,9 @@ struct CalibrateSheet: View {
                     Text("\(index + 1) of \(target.fixtures.count)").foregroundStyle(.secondary).monospacedDigit()
                 }
             }
-            Text("Stand where the audience would be, facing the stage. Each one lights as it hangs on \(rig); say what the real one does and it is put right, and the others of this model with it (except those you already went through).")
+            Text("Stand where the audience would be, facing the stage. Each one lights as it hangs on \(rig), with a picture of what it should do. When the real one does something else, press until it matches: it is put right, and the others of this model with it (except those you already went through).")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(HangCheckPanel.sides)
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
@@ -97,7 +114,8 @@ struct CalibrateSheet: View {
                 stepView(id, step)
             }
             if let done = fixed[id], !done.isEmpty {
-                Label("Put right: \(done.joined(separator: ", ")). Saved\(siblingNote(id)).", systemImage: "checkmark.circle.fill")
+                let said = Step.allCases.compactMap { done[$0.rawValue] }
+                Label("Put right: \(said.joined(separator: ", ")). Saved\(siblingNote(id)).", systemImage: "checkmark.circle.fill")
                     .font(.callout).foregroundStyle(.green).fixedSize(horizontal: false, vertical: true)
             }
             if let note {
@@ -113,41 +131,18 @@ struct CalibrateSheet: View {
     private func stepView(_ id: String, _ step: Step) -> some View {
         switch step {
         case .front:
-            Label("Its beam should point straight out at the audience, a little down (up when it stands on the floor). Where does the real one point?",
+            Label("Its beam should point straight out at the audience, a little down (up when it stands on the floor), as in the picture.",
                   systemImage: "light.beacon.max")
                 .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("At the Audience", systemImage: "checkmark") { advance() }
-                    .fixedSize()
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                Button("Left", systemImage: "arrow.left") { fix(id, "left", "its pan home turned") }
-                Button("Right", systemImage: "arrow.right") { fix(id, "right", "its pan home turned") }
-                Button("Back at the Stage", systemImage: "arrow.uturn.down") { fix(id, "back", "turned round") }
-                    .fixedSize()
-                Button("Up or Down") {
-                    note = "A head that points at the ceiling or the floor here is placed the wrong way up: on the Rigs page, put it hanging under the truss or standing, as it really is."
-                }
-            }
-            .disabled(busy)
-            .help("Left and right as you see it, facing the stage. Pressed the wrong one, it ends up the other way: press that one")
+            matchView(id)
         case .check:
             let c = checks[id]
-            Label(c?.expect.isEmpty == false ? c!.expect : "Its beam points to one side.", systemImage: "light.beacon.max")
+            Label(c?.expect.isEmpty == false ? "\(c!.expect.dropLast(c!.expect.hasSuffix(".") ? 1 : 0)), as in the picture." : "Its beam points to one side, as in the picture.",
+                  systemImage: "light.beacon.max")
                 .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
             Text("This catches a head that pans the other way: pointing straight out, that looks right.")
                 .font(.caption).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 6) {
-                Button("Yes, There", systemImage: "checkmark") { advance() }
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                ForEach(c?.faults ?? [], id: \.self) { f in
-                    Button {
-                        fix(id, f.fix, HangCheckPanel.cause[f.fix] ?? f.fix)
-                    } label: {
-                        Text("No, it points \(f.seen)").fixedSize()
-                    }
-                }
-            }
-            .disabled(busy)
+            matchView(id)
         case .cells:
             Label(order.isEmpty ? "Its cells light red, green, blue, white along it." : order, systemImage: "light.strip.2")
                 .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
@@ -158,6 +153,24 @@ struct CalibrateSheet: View {
             }
             .disabled(busy)
         }
+    }
+
+    /// The picture of where the beam should go, and the two answers: it does, or try the next calibration.
+    @ViewBuilder
+    private func matchView(_ id: String) -> some View {
+        if let beam { BeamPicture(beam: beam) }
+        HStack {
+            Button("Like the Picture", systemImage: "checkmark") { advance() }
+                .fixedSize()
+                .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+            Button("Not Like It: Try Another Way", systemImage: "arrow.triangle.2.circlepath") { tryNext(id) }
+                .fixedSize()
+                .help("The head is tried another way round (its pan home a quarter on, its pan the other way). Press until the real beam goes where the picture’s does")
+            if ways.count > 1 {
+                Text("Way \(way + 1) of \(ways.count)").font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            }
+        }
+        .disabled(busy)
     }
 
     private var footer: some View {
@@ -191,6 +204,8 @@ struct CalibrateSheet: View {
         guard let id else { return }
         note = nil
         let all = steps(id)
+        ways = []
+        way = 0
         if let s = step, let i = all.firstIndex(of: s), i + 1 < all.count {
             step = all[i + 1]
             Task { await light() }
@@ -209,6 +224,8 @@ struct CalibrateSheet: View {
         guard target.fixtures.indices.contains(i) else { return }
         index = i
         note = nil
+        ways = []
+        way = 0
         step = steps(target.fixtures[i]).first
         Task { await light() }
     }
@@ -236,7 +253,7 @@ struct CalibrateSheet: View {
         guard let id else { return }
         if let was = lit, was != id { _ = try? await model.api.testLight(fixture: was, on: false, layout: layout, point: nil, cells: false) }
         lit = nil
-        guard let step, !unplaced(id) else { output = ""; return }
+        guard let step, !unplaced(id) else { output = ""; beam = nil; return }
         do {
             let r = try await model.api.testLight(fixture: id, on: true, layout: layout,
                                                   point: step == .front ? "front" : step == .check ? "check" : nil,
@@ -244,8 +261,10 @@ struct CalibrateSheet: View {
             lit = id
             output = r.summary
             order = r.order
+            beam = step == .cells ? nil : r.dir.flatMap { d in r.pos.flatMap { p in r.stage.map { BeamPicture.Beam(pos: p, dir: d, stage: $0) } } }
         } catch {
             output = error.localizedDescription
+            beam = nil
         }
     }
 
@@ -256,19 +275,48 @@ struct CalibrateSheet: View {
         Task { _ = try? await model.api.testLight(fixture: was, on: false, layout: l, point: nil, cells: false) }
     }
 
-    /// The head's calibration put right for what was seen (the rig editor's front test, the hang check's faults),
-    /// saved, and lit again to see.
-    private func fix(_ id: String, _ seen: String, _ what: String) {
+    /// The real head doesn't do as its picture: the next calibration it could have, saved, and lit again to see.
+    /// Straight out: its pan home a quarter on, a press at a time (the rig editor's front test's fixes); the check's
+    /// way: the hang check's faults. Round again, it is back as it came.
+    private func tryNext(_ id: String) {
+        guard let step, let base = fixture(id) else { return }
         note = nil
         busy = true
         Task {
             defer { busy = false }
             do {
-                let fields = try await model.api.hangCheckFix(layout: layout, fixture: id, fix: seen)
-                let any = try JSONSerialization.jsonObject(with: JSONEncoder().encode(fields)) as? [String: Any] ?? [:]
-                let also = try await update(id, keys: Array(any.keys)) { f in f.merge(any) { _, new in new } }
-                fixed[id, default: []].append(what)
-                for o in also { fixed[o, default: []].append("\(what) (as \(id))") }
+                if ways.isEmpty {
+                    let options: [(String, String)] = step == .front
+                        ? [("left", "its pan home turned"), ("back", "turned round"), ("right", "its pan home turned")]
+                        : (checks[id]?.faults ?? []).map { ($0.fix, HangCheckPanel.cause[$0.fix] ?? $0.fix) }
+                    var found: [[String: Any]] = [[:]], names = [""]
+                    for (option, name) in options {
+                        guard let fields = try? await model.api.hangCheckFix(layout: layout, fixture: id, fix: option),
+                              let any = try JSONSerialization.jsonObject(with: JSONEncoder().encode(fields)) as? [String: Any],
+                              !any.isEmpty, !found.contains(where: { NSDictionary(dictionary: $0).isEqual(to: any) })
+                        else { continue }
+                        found.append(any)
+                        names.append(name)
+                    }
+                    guard found.count > 1 else {
+                        note = "There is no other way to try this head. If it doesn’t do as the picture, it is placed differently here than it really hangs or stands: put that right on the Rigs page."
+                        return
+                    }
+                    ways = found
+                    wayNames = names
+                    wayBase = base
+                    way = 0
+                }
+                let next = (way + 1) % ways.count
+                let keys = Array(Set(ways.flatMap(\.keys)))
+                let to = ways[next], from = wayBase
+                let also = try await update(id, keys: keys) { f in for k in keys { f[k] = to[k] ?? from[k] } }
+                way = next
+                fixed[id, default: [:]][step.rawValue] = next == 0 ? nil : wayNames[next]
+                for o in also { fixed[o, default: [:]][step.rawValue] = next == 0 ? nil : "\(wayNames[next]) (as \(id))" }
+                if next == 0 {
+                    note = "That was every way, and it is back as it came. If none looked like the picture, it is placed differently here than it really hangs or stands (hanging or standing, or on another side of the truss): put that right on the Rigs page. Or its mode or address is off: see Check Channels."
+                }
                 await light()
             } catch { note = error.localizedDescription }
         }
@@ -282,8 +330,9 @@ struct CalibrateSheet: View {
             defer { busy = false }
             do {
                 let also = try await update(id, keys: ["reverse"]) { f in f["reverse"] = (f["reverse"] as? Bool ?? false) ? nil : true }
-                fixed[id, default: []].append("its cells the other way round")
-                for o in also { fixed[o, default: []].append("its cells the other way round (as \(id))") }
+                let was = fixed[id]?[Step.cells.rawValue] != nil   // pressed again: back as it came
+                fixed[id, default: [:]][Step.cells.rawValue] = was ? nil : "its cells the other way round"
+                for o in also { fixed[o, default: [:]][Step.cells.rawValue] = was ? nil : "its cells the other way round (as \(id))" }
                 await light()
             } catch { note = error.localizedDescription }
         }
@@ -315,7 +364,7 @@ struct CalibrateSheet: View {
 
     /// The siblings a fix of this one went to, in words.
     private func siblingNote(_ id: String) -> String {
-        let others = target.fixtures.filter { $0 != id && (fixed[$0] ?? []).contains { $0.hasSuffix("(as \(id))") } }
+        let others = target.fixtures.filter { $0 != id && (fixed[$0] ?? [:]).values.contains { $0.hasSuffix("(as \(id))") } }
         return others.isEmpty ? "" : ", and for \(others.joined(separator: ", ")) too"
     }
 

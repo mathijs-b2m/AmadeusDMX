@@ -12,6 +12,9 @@ public sealed class HangCheckPanel(RigEditorModel editor, IRigEditorHost host)
         ["mirrored"] = L("it pans the other way"), ["turned"] = L("it is turned round"), ["both"] = L("turned round, and pans the other way"),
     };
 
+    /// The crew's short words in the engine's texts ("the SL end", "the audience, SR"), spelt out.
+    public static string Sides => L("SL is stage left and SR is stage right: the performer’s sides. Facing the stage, SL is on your right and SR on your left.");
+
     static string Capitalised(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     /// A fault's menu item: where the beam went (the engine's "left" / "right" / "back") and why.
@@ -61,6 +64,7 @@ public sealed class HangCheckPanel(RigEditorModel editor, IRigEditorHost host)
             c.Fixed.TryGetValue(step.Id, out var done)
                 ? UI.Label("checkmark.circle.fill", L("Put right: {0}. Save to keep it.", done), Font.Callout).Foreground(Tint.Green) : null,
             actions,
+            UI.Text(Sides, Font.Caption).Secondary().Wrap(),
             c.Output.Length > 0 ? UI.Text(c.Output, Font.Caption).Secondary().Lines(1) : null);
         panel.Alignment = 0;
         return new Border

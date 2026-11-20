@@ -65,3 +65,49 @@ def test_the_light_test_lights_the_cells_in_their_colours():
     fxlib.test_light(white, fx)
     assert coloured != white
     assert any(coloured) and fxlib.patched(fx)
+
+
+def test_a_pointed_head_says_where_it_is_and_stays_lit_while_looked_at(monkeypatch, tmp_path):
+    """The calibration's picture: the head's place, its beam and the stage; and its minute started again for as long
+    as the sheet is open (it went dark while the second step was still being looked at)."""
+    import socket
+    import time
+
+    from amadeus.dmx import artnet
+    from amadeus.rig import geometry
+    from amadeus.web import rig as web_rig
+
+    monkeypatch.setattr(artnet, "HOLD_FILE", tmp_path / "dmx-hold")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("127.0.0.1", 0))
+    rig = json.loads((ROOT / "tests" / "sets" / "small.json").read_text(encoding="utf-8"))
+    rig["artnet"] = {"ip": "127.0.0.1", "port": sock.getsockname()[1], "fps": 40}
+    rig.pop("output", None)
+    rig.pop("dmx", None)
+    head = next(f for f in rig["fixtures"] if fxlib.is_moving(fxlib.get(f["fixture"])))
+
+    class Req:
+        def __init__(self, body):
+            self._body = body
+
+        def body(self):
+            return self._body
+
+    try:
+        assert web_rig.test_light(Req({"fixture": head["id"], "keep": True}))["on"] is False  # not lit: nothing kept
+        out = web_rig.test_light(Req({"fixture": head["id"], "rig": rig, "on": True, "point": "front"}))
+        loaded = load_rig_dict(rig)
+        st = geometry.stage(loaded)
+        assert out["stage"] == [st["width_m"], st["ceiling_m"]]
+        assert 0 <= out["pos"][0] <= st["width_m"] and len(out["pos"]) == 3
+        assert out["dir"][1] > 0.9  # straight out at the audience
+        with web_rig._test_lock:
+            web_rig._test["lit"][head["id"]] = time.monotonic() + 1.0  # its minute nearly over
+        assert web_rig.test_light(Req({"fixture": head["id"], "keep": True}))["on"] is True
+        assert web_rig._test["lit"][head["id"]] > time.monotonic() + web_rig.TEST_SECONDS - 5
+    finally:
+        web_rig.test_light(Req({"fixture": head["id"], "rig": rig, "on": False}))
+        deadline = time.monotonic() + 2
+        while web_rig._test["thread"] is not None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        sock.close()

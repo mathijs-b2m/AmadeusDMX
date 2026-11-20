@@ -63,6 +63,7 @@ struct HangCheckPanel: View {
                     .fixedSize()
                     .help("The light came on at another fixture's place: the two swap places here, so you needn't swap them on the truss")
                 }
+                Text(Self.sides).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if !c.output.isEmpty {
                     Text(c.output).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -72,6 +73,9 @@ struct HangCheckPanel: View {
             .glassEffect(.regular, in: .rect(cornerRadius: 16))
         }
     }
+
+    /// The crew's short words in the engine's texts ("the SL end", "the audience, SR"), spelt out.
+    static let sides = "SL is stage left and SR is stage right: the performer’s sides. Facing the stage, SL is on your right and SR on your left."
 
     static let cause = ["mirrored": "it pans the other way", "turned": "it is turned round",
                         "both": "turned round, and pans the other way"]
