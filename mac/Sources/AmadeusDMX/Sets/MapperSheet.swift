@@ -14,9 +14,8 @@ import UniformTypeIdentifiers
 struct MapTarget: Identifiable {
     var key: String
     var mode: String
-    var fixture: String      // the one tried on the lights
-    var address: Int?        // nil: no start address yet (nothing can be tried)
-    var universe: Int
+    var fixture: String               // the one tried on the lights first (the selected one, if any)
+    var fixtures: [PlacedFixture]     // every one of this model and mode in the set: any can be tried
     var id: String { "\(key)|\(mode)" }
 }
 
@@ -24,8 +23,16 @@ struct MapperSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let target: MapTarget
-    let tryRefusal: String?          // why it can't be tried on the lights now (nil: it can)
+    let setRefusal: String?          // why nothing of the set can be tried on the lights now (nil: it can)
     let saved: () -> Void
+
+    @State private var on = ""               // the fixture tried on the lights (any of this model and mode)
+    private var tried: PlacedFixture? { target.fixtures.first { $0.id == on } }
+    /// Why it can't be tried on the lights now (nil: it can).
+    private var tryRefusal: String? {
+        if let setRefusal { return setRefusal }
+        return tried?.address == nil ? "Give \(on) a start address to try values on it" : nil
+    }
 
     @State private var mapping: FixtureMapping?
     @State private var problems: [String] = []
@@ -62,7 +69,7 @@ struct MapperSheet: View {
                 if !m.refusal.isEmpty {
                     ContentUnavailableView("Not Mapped Here", systemImage: "exclamationmark.triangle", description: Text(m.refusal))
                 } else if let i = checking {
-                    ChannelCheck(mapping: Binding(get: { mapping! }, set: { mapping = $0 }),
+                    ChannelCheck(fixture: on, mapping: Binding(get: { mapping! }, set: { mapping = $0 }),
                                  index: Binding(get: { i }, set: { checking = $0 }),
                                  probe: $probe, sweeping: $sweeping) {
                         checkedAll = true
@@ -84,7 +91,9 @@ struct MapperSheet: View {
         }
         .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 640)
         .task { await load() }
+        .onChange(of: on) { old, _ in switchTo(from: old) }
         .onAppear {
+            if on.isEmpty { on = target.fixture }
             hasKey = KeySource.current(model.workspace) != .none
             watchPaste()
         }
@@ -113,6 +122,7 @@ struct MapperSheet: View {
             }
             HStack(spacing: 14) {
                 Text("Mode \(target.mode)").font(.callout).foregroundStyle(.secondary)
+                fixturePicker
                 if let m = mapping {
                     Label(m.plays ? "The show plays it" : "The show plays nothing in this mode yet",
                           systemImage: m.plays ? "checkmark.circle" : "exclamationmark.triangle.fill")
@@ -137,7 +147,7 @@ struct MapperSheet: View {
                     .toggleStyle(.button)
                     .tint(trying ? .yellow : nil)
                     .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false))
-                    .help(tryRefusal ?? "Send these values as they are to \(target.fixture) (the rest of the set dark, a running show paused), to see what each channel does")
+                    .help(tryRefusal ?? "Send these values as they are to \(on) (the rest of the set dark, a running show paused), to see what each channel does")
                 }
                 Button(checking == nil ? "Check Channels" : "Stop Checking",
                        systemImage: checking == nil ? "checklist" : "stop.fill") {
@@ -146,14 +156,14 @@ struct MapperSheet: View {
                 .buttonStyle(.bordered)
                 .tint(needsCheck && checking == nil ? .orange : nil)
                 .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false) || colours != nil)
-                .help(tryRefusal ?? "Go through the channels one by one on \(target.fixture): each sweeps while you say what the fixture does")
+                .help(tryRefusal ?? "Go through the channels one by one on \(on): each sweeps while you say what the fixture does")
             }
             if let manual = mapping?.manual, checking == nil, !checkedAll {
                 Label("Filled in from \(manual.file), the manual's mode “\(manual.mode)”. Check it, then save.",
                       systemImage: "doc.text.magnifyingglass")
                     .font(.callout).foregroundStyle(.orange)
             } else if needsCheck && !checkedAll && checking == nil {
-                Label("Made from a common layout: check it channel by channel on the fixture, manuals of these are often wrong.",
+                Label("Made from a common layout: check it channel by channel on \(on), manuals of these are often wrong. What you find holds for every one of this model.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.callout).foregroundStyle(.orange)
             } else if checkedAll && checking == nil {
@@ -166,10 +176,44 @@ struct MapperSheet: View {
         .padding(16)
     }
 
+    /// Which fixture the values and the check go to. The mapping itself is the model's: every one plays by it.
+    @ViewBuilder private var fixturePicker: some View {
+        let others = target.fixtures.count - 1
+        if target.fixtures.count > 1 {
+            Picker(selection: $on) {
+                ForEach(target.fixtures) { f in Text("\(f.id) · \(f.patchText)").tag(f.id) }
+            } label: {
+                Label("On", systemImage: "lightbulb")
+            }
+            .fixedSize()
+            .help("The fixture the values and the check go to. What you map is for the model: the \(others) other\(others == 1 ? "" : "s") of it in this set play by it too.")
+        } else {
+            Label("On \(on) · \(tried?.patchText ?? "")", systemImage: "lightbulb")
+                .font(.callout).foregroundStyle(.secondary)
+                .help("The fixture the values and the check go to")
+        }
+    }
+
+    /// Another fixture picked: the one before goes dark, the new one takes over what was being tried or checked.
+    private func switchTo(from old: String) {
+        guard !old.isEmpty, old != on else { return }
+        let rig = model.selectedRig, set = model.editingSet
+        if trying || checkLoop != nil {
+            Task { _ = try? await model.api.testLight(fixture: old, on: false, rig: rig, set: set) }
+        }
+        if tryRefusal != nil {
+            stopTrying(); stopCheck(); closeColours()
+        } else if checkLoop != nil {
+            startProbing()
+        } else if trying {
+            send()
+        }
+    }
+
     private func channels(_ m: FixtureMapping) -> some View {
         List {
             ForEach(m.channels.indices, id: \.self) { i in
-                ChannelRow(channel: binding(i), roles: m.roles, address: target.address.map { $0 + i }, universe: target.universe,
+                ChannelRow(channel: binding(i), roles: m.roles, address: tried?.address.map { $0 + i }, universe: tried?.universe ?? 1,
                            colours: tryRefusal == nil ? { openColours(i) } : nil) {
                     valuesChanged()
                 }
@@ -315,7 +359,7 @@ struct MapperSheet: View {
     /// Sends the probed channel's value (sweeping, or as set) with the others holding the light on, ~10 times a second.
     private func startProbing() {
         checkLoop?.cancel()
-        let id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        let id = on, rig = model.selectedRig, set = model.editingSet
         checkLoop = Task {
             var up = true
             while !Task.isCancelled, let i = checking ?? colours, let m = mapping {
@@ -342,7 +386,7 @@ struct MapperSheet: View {
         checking = nil
         checkLoop?.cancel()
         checkLoop = nil
-        let id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        let id = on, rig = model.selectedRig, set = model.editingSet
         Task { _ = try? await model.api.testLight(fixture: id, on: false, rig: rig, set: set) }
     }
 
@@ -361,7 +405,7 @@ struct MapperSheet: View {
         guard trying else { return }
         trying = false
         sending?.cancel()
-        let id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        let id = on, rig = model.selectedRig, set = model.editingSet
         Task { _ = try? await model.api.testLight(fixture: id, on: false, rig: rig, set: set) }
     }
 
@@ -370,7 +414,7 @@ struct MapperSheet: View {
     /// The values to the fixture, at most ~20 times a second while a slider moves.
     private func send() {
         sending?.cancel()
-        let values = raw, lit = light, id = target.fixture, rig = model.selectedRig, set = model.editingSet
+        let values = raw, lit = light, id = on, rig = model.selectedRig, set = model.editingSet
         sending = Task {
             try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled, trying else { return }

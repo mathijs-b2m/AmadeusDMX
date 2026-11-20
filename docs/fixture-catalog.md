@@ -97,6 +97,9 @@ sweeps slowly from 0 to 255 while the others keep the light on and the head in t
 the fixture does (turns, tilts, gets brighter, red, colours change, gobos change, strobes, starts programs,
 nothing). A held channel is then set where the light is on and steady. On a colour wheel you show each
 colour and name it, and put its values right. Finishing the check saves the fixture as checked.
+It runs on the fixture selected on the Set page (or the first patched one of that model), and the mapper's
+**On** picker names it and switches to any other of that model and mode. What is found is for the model: every
+one of it plays by it.
 
 ### Fixtures without a brand: New Fixture
 

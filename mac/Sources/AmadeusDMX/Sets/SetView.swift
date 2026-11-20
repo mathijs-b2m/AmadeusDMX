@@ -75,7 +75,8 @@ struct SetView: View {
                                 }
                             } header: {
                                 GroupHeader(group: g, calibrateRefusal: calibrateRefusal(g),
-                                            map: { mapChannels(g.fixtures.first { $0.address != nil } ?? g.fixtures.first) },
+                                            map: { mapChannels(g.fixtures.first { selection.contains($0.id) }
+                                                               ?? g.fixtures.first { $0.address != nil } ?? g.fixtures.first) },
                                             calibrate: { calibrate(g) })
                             }
                         }
@@ -131,7 +132,7 @@ struct SetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showAdd) { AddToSetSheet { load() }.environment(model) }
         .sheet(item: $mapTarget) { t in
-            MapperSheet(target: t, tryRefusal: t.address == nil ? "Give \(t.fixture) a start address to try values on it" : tryRefusal) {
+            MapperSheet(target: t, setRefusal: tryRefusal) {
                 names[t.key] = model.workspace?.definition(t.key)
                 load()
                 flash("Mapped \(names[t.key]?.name ?? t.key) (\(t.mode)): every one in your sets plays by it")
@@ -245,11 +246,13 @@ struct SetView: View {
         }
     }
 
-    /// The DMX mapper for this fixture's model and mode (tried on this fixture).
+    /// The DMX mapper for this fixture's model and mode (tried on this fixture; any other of them can be picked in it).
     private func mapChannels(_ f: PlacedFixture?) {
         guard let f else { return }
         switchOffTests()
-        mapTarget = MapTarget(key: f.key, mode: f.mode, fixture: f.id, address: f.address, universe: f.universe)
+        let same = (doc?.fixtures ?? []).filter { $0.key == f.key && $0.mode == f.mode }
+            .sorted { ($0.universe, $0.address ?? 513) < ($1.universe, $1.address ?? 513) }
+        mapTarget = MapTarget(key: f.key, mode: f.mode, fixture: f.id, fixtures: same.isEmpty ? [f] : same)
     }
 
     /// Models the calibration has something to ask about: moving heads, and bars (their cells' order).
@@ -508,7 +511,7 @@ private struct GroupHeader: View {
                     .buttonStyle(.bordered)
                     .tint(dark || d.needsCheck ? .orange : nil)
                     .disabled(model.engineRunning)
-                    .help("The DMX mapper: what each channel does, by hand, with the values tried on the real fixture")
+                    .help("The DMX mapper: what each channel does, by hand, with the values tried on the selected fixture (or the first). It is for the model: every one of them plays by it")
                 if SetView.calibrates(group) {
                     Button("Calibrate…", systemImage: "scope", action: calibrate)
                         .controlSize(.small)

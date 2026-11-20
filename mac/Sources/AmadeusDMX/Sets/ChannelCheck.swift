@@ -6,6 +6,7 @@ import AmadeusKit
 import SwiftUI
 
 struct ChannelCheck: View {
+    let fixture: String              // the one it runs on (the mapping is for every one of its model)
     @Binding var mapping: FixtureMapping
     @Binding var index: Int
     @Binding var probe: Int          // the value the checked channel gets now
@@ -23,7 +24,7 @@ struct ChannelCheck: View {
                     Text("now: \(now)").foregroundStyle(.secondary)
                     Spacer()
                 }
-                Text("Watch the fixture: this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?")
+                Text("Watch \(fixture): this channel sweeps slowly from 0 to 255, the others keep the light on and the head in the middle. What does it do?")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Toggle(isOn: $sweeping) { Label(sweeping ? "Sweeping" : "Sweep", systemImage: sweeping ? "pause.fill" : "play.fill") }
