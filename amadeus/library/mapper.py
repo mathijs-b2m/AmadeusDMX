@@ -45,6 +45,9 @@ KEEP = "keep"  # played as the converter or a hand-made file has it (a colour wh
 LIGHT = {"dimmer", "red", "green", "blue", "white", "uv", "cyan", "magenta", "yellow"}
 # What it is, when its channels don't say (pan and tilt make a moving head, cells a bar)
 KINDS = {"par": "Par / wash / effect", "strobe": "Strobe", "blinder": "Blinder", "moving_head": "Moving head"}
+# Kinds the channels make (_set_kind), not picked by hand: the mapper shows them as the fixture's kind, so a save
+# hands them back. They stand for the kind they come from; the channels decide again.
+MADE_KINDS = {"moving_bar": "moving_head", "par_bar": "par"}
 
 # The check, channel by channel on the real fixture (a channel sweeps, the others hold the light on): what it did,
 # and what that makes the channel. A held one gets "attr" (beam effects find a gobo or prism by its name) and the
@@ -162,6 +165,7 @@ def apply(
         problems.append(f"The manual's chart has {len(chart)} channels, the mode {len(old)}")
     if len(channels) != len(old):
         problems.append(f"The mode has {len(old)} channels, not {len(channels)}")
+    shown, kind = kind, MADE_KINDS.get(kind, kind)
     if kind not in KINDS:
         problems.append(f"Unknown kind '{kind}'")
     new = []
@@ -191,7 +195,7 @@ def apply(
                 spec[k] = o[k]
         new.append(spec)
     roles = [s["attr"] for s in new if "default" not in s]
-    if ("pan" in roles) != ("tilt" in roles) and kind == "moving_head":
+    if ("pan" in roles) != ("tilt" in roles) and shown == "moving_head":  # a moving bar tilts alone
         problems.append("A moving head needs both pan and tilt")
     if not any(r in LIGHT for r in roles):
         problems.append("No channel lights it: give one a dimmer or a colour")
