@@ -5,8 +5,9 @@
 - **light**: a run along the walls on the beat grid, one step a beat from the stage to the back of the room (bars
   at the same depth, a mirrored pair across the room, are one step). Each step is a note: on at the beat, held,
   let go gently while the next one comes, so the run flows instead of blinking. The level is the phrase's (the
-  look's intensity), not the loudness from moment to moment, and well under the heads' (a layer behind the show,
-  never the brightest thing in the room: they leave the heads their headroom). Where the beat doesn't drive the
+  look's intensity), not the loudness from moment to moment, and well under the heads' (a layer behind the show:
+  they leave the heads their headroom), except at the peaks (a phrase at full intensity: the drops), where a
+  step lights its cells full. An RGBW bar has no dimmer: at 55% of a saturated colour it hardly showed. Where the beat doesn't drive the
   music (a breakdown, an intro, the kick gone), the run steps once a bar, softer.
 - **cells**: how a bar's cells play each step is the director's pick per phrase (`Decision.wall_cells`,
   director/rules.py; PATTERNS below): one light in calm phrases; in phrases that drive, a pattern along the bar. Each
@@ -35,6 +36,8 @@ from amadeus.rig import geometry
 STEP_GAP_M = 0.75  # bars this close in depth are one step of the run (a mirrored pair across the room)
 HOLD_STEPS, RELEASE_STEPS = 0.5, 1.5  # a step's note: held this many steps, let go over this many
 RUN_LEVEL = 0.55  # a step at its peak: well under the heads, so they keep their headroom
+PEAK_LEVEL = 1.0  # … but full in a phrase at full intensity (the drops): seen next to the heads
+PEAK_INTENSITY = 3  # a look's intensity (0..3) from which a phrase is a peak
 QUIET_LEVEL = 0.35  # a run once a bar (no beat to lock on) is softer
 CELL_HOLD, CELL_RELEASE = 0.1, 0.4  # a cell's note in a pattern, in steps: short, so the pattern travels
 CELL_SPREAD = 0.8  # the pattern runs over the bar in this much of a step (the last cell lights here)
@@ -141,7 +144,7 @@ class UplightsMixin:
         if k < 0 or not n:
             return 0.0
         k0 = min(bisect.bisect_left(grid, d.start - 0.02), k)  # the phrase's first step: the run starts at the stage
-        top = QUIET_LEVEL if quiet else RUN_LEVEL
+        top = QUIET_LEVEL if quiet else PEAK_LEVEL if d.intensity >= PEAK_INTENSITY else RUN_LEVEL
         if pattern == "dark":
             return 0.0
         hold, release = (HOLD_STEPS, RELEASE_STEPS) if pattern == "whole" else (CELL_HOLD, CELL_RELEASE)

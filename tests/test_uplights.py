@@ -162,13 +162,24 @@ def _waterfall(e, d):
     assert 0 < sum(mid[x].dimmer > 0.05 for x in bar) < len(bar)  # only part of the bar lit: it travels
 
 
-def test_they_stay_under_the_heads_but_at_the_surprise(show):
+def test_they_stay_under_the_heads_but_light_full_at_the_peaks(show):
+    """Under the heads in most phrases; in a phrase at full intensity (the drops) a step lights full: an RGBW bar
+    has no dimmer, and at 55% of a saturated colour it hardly showed next to the heads."""
     e, plan = show
-    from amadeus.engine.uplights import RUN_LEVEL
+    from amadeus.engine.uplights import PEAK_INTENSITY, RUN_LEVEL
 
+    peak = 0.0
     for t in np.arange(0.5, e.a.duration - 0.5, 0.29):
-        states = e.render(t)[1]
-        assert max(states[x].dimmer for x in e.uplight_ids) <= RUN_LEVEL + 1e-6, t
+        i = next((i for i, p in enumerate(plan) if p.start <= t < p.end), None)
+        if i is None:
+            continue
+        top = max(e.render(t)[1][x].dimmer for x in e.uplight_ids)
+        near = plan[max(i - 1, 0) : i + 2]  # (a peak crossfades into the phrase after it, or leads in early)
+        if plan[i].intensity >= PEAK_INTENSITY:
+            peak = max(peak, top)
+        elif i != e.surprise and all(p.intensity < PEAK_INTENSITY for p in near):
+            assert top <= RUN_LEVEL + 1e-6, t
+    assert peak > 0.9  # full at the peaks
 
 
 def test_the_director_picks_from_every_pattern_and_keeps_calm_phrases_whole():
