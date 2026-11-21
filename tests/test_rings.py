@@ -101,8 +101,13 @@ def test_focus_is_a_cone_and_cross_a_twister(show):
         d = replace(plan[k], movement="still", formation=f, aim="crowd", grouping="unison")
         ends = np.array([e.head_pos[j] + e._head_dir_v(d, ts, j)[0] * reach for j in range(len(e.heads))])
         spread = np.linalg.norm(ends[:, :2] - ends[:, :2].mean(0), axis=1).mean()
-        if f == "focus":  # the beams close in: a cone
-            assert spread < e.rings[0]["radius"] * 0.6
+        if f == "focus":  # the beams close in: a cone, measured where they come closest (the point they share)
+            dirs = np.array([e._head_dir_v(d, ts, j)[0] for j in range(len(e.heads))])
+            pos = np.array(e.head_pos, dtype=float)
+            proj = [np.eye(3) - np.outer(u, u) for u in dirs]  # (the point nearest all the beams' lines)
+            point = np.linalg.solve(sum(proj), sum(P @ q for P, q in zip(proj, pos, strict=True)))
+            off = [np.linalg.norm(P @ (point - q)) for P, q in zip(proj, pos, strict=True)]
+            assert np.mean(off) < e.rings[0]["radius"] * 0.6
         else:  # the beams cross over and fan out again: an hourglass
             assert spread > e.rings[0]["radius"] * 0.6
             centre = e.rings[0]["centre"][:2]

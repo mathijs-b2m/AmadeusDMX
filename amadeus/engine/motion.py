@@ -188,7 +188,8 @@ def _travel(dist: float, vmax: float, acc: float) -> float:
 
 
 AIMS = {  # direction aims: centre azimuth/elevation and swing; point aims: (y centre, y half-range, z) of a surface
-    "crowd": {"az": 0, "el": -32, "az_amp": 60, "el_amp": 15, "plane": (2.2, 1.5, 0.0)},
+    # over the crowd and a little onto it, not steeply down: at -32 a 2.6 m truss lit the floor 2-4 m out
+    "crowd": {"az": 0, "el": -14, "az_amp": 60, "el_amp": 14, "plane": (2.2, 1.5, 0.0)},
     "stage": {"az": 180, "el": -35, "az_amp": 60, "el_amp": 18, "plane": (-2.2, 1.0, 0.0)},
     "sky": {"az": 0, "el": 60, "az_amp": 50, "el_amp": 20, "plane": (1.0, 2.0, "ceiling")},
     "down": {"az": 0, "el": -70, "az_amp": 40, "el_amp": 12, "plane": (2.2, 1.5, 0.0)},  # a truss over the crowd
