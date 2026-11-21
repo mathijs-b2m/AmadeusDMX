@@ -79,11 +79,13 @@ def _u7(v, n):
 def test_an_existing_midi_port_is_used_as_it_is(tmp_path):
     """Like the IAC bus: a port that is already there (here: a stand-in made by the test) is opened, not created."""
     rtmidi = pytest.importorskip("rtmidi")
+    import os
     import time
 
+    name = f"DL Test Bus {os.getpid()}"  # its own name: test runs in other worktrees make theirs at the same time
     bus = rtmidi.MidiOut()
-    bus.open_virtual_port("DL Test Bus")
-    src = mixxx.Mixxx(port="DL Test Bus", library=str(tmp_path / "none.sqlite"))
+    bus.open_virtual_port(name)
+    src = mixxx.Mixxx(port=name, library=str(tmp_path / "none.sqlite"))
     try:
         assert src.out is None and "MIDI port" in src.name
         body = [0x01, 1, 1, *_u7(2**30 + 12345, 5), *_u7(2 * 44100 * 60, 5), *_u7(44100, 3)]
