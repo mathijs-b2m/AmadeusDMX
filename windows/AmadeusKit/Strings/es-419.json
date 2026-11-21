@@ -675,6 +675,7 @@
   "Next Channel": "Siguiente canal",
   "Sweeping": "Recorriendo",
   "Sweep": "Recorrer",
+  "Held out of the beam: set it where no gobo, prism or frost is in (the show puts them in itself)": "Fijo fuera del haz: ponlo donde no hay gobo, prisma ni frost (el show los pone solo)",
   "Held at a value: set it where the light is on and steady (no strobe, no programs)": "Fijo en un valor: ponlo donde la luz está encendida y estable (sin strobe, sin programas)",
   "held at {0} ({1})": "fijo en {0} ({1})",
   "Ring Colour": "Color del anillo",

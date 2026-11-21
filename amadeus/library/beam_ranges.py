@@ -167,6 +167,59 @@ def _pick(chans: list[dict], names: list[dict | None], rx: re.Pattern, own: str)
     return attr, ranges
 
 
+def _pick_at(chans: list[dict], names: list[dict | None], rx: re.Pattern, own: str) -> tuple[int, list] | None:
+    """As `_pick`, the channel's number in the mode instead of its attr."""
+    picked = _pick(chans, names, rx, own)
+    if not picked:
+        return None
+    n = next((n for n, c in enumerate(chans) if c["attr"] == picked[0]), None)
+    return None if n is None else (n, picked[1])
+
+
+def _out_of_beam(own: str, text: str) -> bool:
+    """Does a range of a wheel's channel leave the beam open (no gobo, prism or frost in)?"""
+    if own == "gobo":
+        return bool(OPEN.search(text)) and not SHAKE.search(text) and not SPIN.search(text) and not COUNT.search(
+            _words(text))  # fmt: skip
+    if own == "prism":
+        return bool(PRISM_OFF.search(text))
+    return bool(FROST_OFF.search(text)) and not NOT_FROST.search(text)
+
+
+def rest(own: str, ranges: list[tuple[int, int, str]], value: int) -> int | None:
+    """Where a held gobo, prism or frost channel rests: None when `value` leaves the beam open (or the chart
+    doesn't say), else the first value the chart gives for the beam open. The show puts a gobo or a prism in
+    itself (beam_fx); held in, every look would carry it. A translated chart calls the prism in "Open prism", and
+    the check asks for the value "where the light is on": a held 8 there put the prism in all night."""
+    inside = [text for lo, hi, text in ranges if lo <= value <= hi]
+    if not inside or any(_out_of_beam(own, text) for text in inside):
+        return None
+    out = [lo for lo, hi, text in ranges if _out_of_beam(own, text)]
+    return out[0] if out else None
+
+
+def rest_open(defn: dict, sources) -> list[str]:
+    """Every held gobo, prism and frost channel of a fixture at rest out of the beam (`rest`), by the chart's
+    ranges (`sources(defn, mode)`, as for `fill`). Returns the channels moved ("mode: attr")."""
+    if defn.get("kind") not in MOVING or defn.get("inert"):
+        return []
+    moved = []
+    for mode, chans in defn.get("modes", {}).items():
+        if not isinstance(chans, list):
+            continue
+        names = (sources(defn, mode) if sources else None) or []
+        for rx, own in ((GOBO, "gobo"), (PRISM, "prism"), (FROST, "frost")):
+            picked = _pick_at(chans, names, rx, own)
+            if not picked or "default" not in chans[picked[0]]:
+                continue
+            c = chans[picked[0]]
+            to = rest(own, picked[1], int(c["default"]))
+            if to is not None:
+                c["default"] = to
+                moved.append(f"{mode}: {c['attr']}")
+    return moved
+
+
 def missing(defn: dict) -> bool:
     """Has a gobo, prism or frost channel the beam effects don't play."""
     table = defn.get("beam_fx", {})

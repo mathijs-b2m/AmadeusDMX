@@ -289,3 +289,18 @@ def test_the_endpoint_fills_the_mapper_and_a_refused_key_is_the_warning(library,
     monkeypatch.setattr(pdfmod, "CACHE", library.parent / "cache2")
     r, status = web_library.read_manual(_upload(key="test/mini-beam", mode="11ch"))
     assert status == 502 and r["error"] == aikey.REJECTED and aikey.problem() == aikey.REJECTED
+
+
+def test_a_gobo_or_prism_held_in_the_beam_is_saved_out_of_it(library):
+    """The check asks for a held channel's value "where the light is on": a gobo or a prism put in there would
+    sit in every look. Saved, it rests out of the beam; the show still puts it in when a look asks."""
+    shown = manual.mapping("test/mini-beam", "11ch", ANSWER, "mini.pdf")
+    shown["channels"][5]["value"] = 20  # gobo 2
+    shown["channels"][8]["value"] = 200  # prism in
+    assert _save(shown) == []
+    chans = fxlib.get("test/mini-beam")["modes"]["11ch"]
+    assert chans[5]["default"] == 0 and chans[8]["default"] == 0
+    rig_fx = {"id": "h", "fixture": "test/mini-beam", "mode": "11ch", "universe": 1, "address": 1, "x": 0.5}
+    buf = bytearray(512)
+    fxlib.patch(buf, rig_fx, {"h": State(dimmer=1.0, r=1.0, g=1.0, b=1.0, pan=0.5, tilt=0.5)})
+    assert buf[5] == 0 and buf[8] == 0  # an open beam

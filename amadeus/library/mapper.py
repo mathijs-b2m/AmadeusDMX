@@ -213,6 +213,10 @@ def apply(
     if "made" in defn:
         _follow_names(defn, mode, old, new, checked)
     defn["modes"][mode] = new
+    from amadeus.library import beam_ranges
+
+    # a gobo, prism or frost held in the beam is out at rest: the show puts them in itself
+    beam_ranges.rest_open(defn, lambda d, m: names if m == mode else None)
     _set_kind(defn, kind, roles, len({s["head"] for s in new if "head" in s}))
     mapped = defn.setdefault("mapped", {"modes": []})
     mapped["modes"] = sorted(set(mapped["modes"]) | {mode})

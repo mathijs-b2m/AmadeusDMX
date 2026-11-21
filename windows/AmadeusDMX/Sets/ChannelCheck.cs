@@ -104,7 +104,9 @@ public sealed class ChannelCheck(string fixture, MapperModel m, ChannelCheckStat
             text.Text = $"{x}";
         }, step: 1);
         return UI.VStack(4,
-            UI.Text(L("Held at a value: set it where the light is on and steady (no strobe, no programs)"), Font.Callout).Wrap(),
+            UI.Text(ch.Attr is "gobo" or "prism" or "frost"
+                ? L("Held out of the beam: set it where no gobo, prism or frost is in (the show puts them in itself)")
+                : L("Held at a value: set it where the light is on and steady (no strobe, no programs)"), Font.Callout).Wrap(),
             UI.HStack(8, slider.Grow(), text),
             ch.Ranges.Count == 0 ? null
                 : UI.Text(string.Join(" · ", ch.Ranges.Select(r => $"{r.Lo}–{r.Hi} {r.What}")), Font.Caption).Secondary().Wrap());
