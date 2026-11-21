@@ -46,7 +46,9 @@ struct ChannelCheck: View {
                 }
                 if channel.role == "hold" {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Held at a value: set it where the light is on and steady (no strobe, no programs)").font(.callout)
+                        Text(["gobo", "prism", "frost"].contains(channel.attr)
+                             ? "Held out of the beam: set it where no gobo, prism or frost is in (the show puts them in itself)"
+                             : "Held at a value: set it where the light is on and steady (no strobe, no programs)").font(.callout)
                         HStack {
                             Slider(value: Binding(get: { Double(channel.value) }, set: { hold(Int($0.rounded())) }), in: 0...255)
                             Text("\(channel.value)").font(.body.monospacedDigit()).frame(width: 34, alignment: .trailing)

@@ -128,3 +128,42 @@ def test_a_qlc_fixture_added_before_reads_its_prism_and_frost_from_the_catalogue
     sharpy = fxlib.get("claypaky/sharpy")  # converter 10: its file has no prism or frost values
     assert sharpy["qlc"]["converter"] < 11
     assert sharpy["beam_fx"]["prism"] == {"prism": 191} and sharpy["beam_fx"]["frost"] == {"frost": 255}
+
+
+# a translated chart (CHEGIT 150W mini beam): "Open prism" is the prism in
+TRANSLATED_PRISM = [(0, 7, "Close prism"), (8, 127, "Open prism"), (128, 255, "Prism rotates from slow to fast")]
+PATTERN_WHEEL = [(0, 7, "White light"), (8, 15, "Pattern 1"), (16, 23, "Pattern 2"),
+                 (64, 73, "Pattern 7 jitter from slow to fast"), (128, 191, "Clockwise automatic color switch")]  # fmt: skip
+
+
+def test_a_wheel_at_rest_in_the_beam_rests_out_of_it():
+    assert beam_ranges.rest("prism", TRANSLATED_PRISM, 8) == 0
+    assert beam_ranges.rest("prism", TRANSLATED_PRISM, 200) == 0
+    assert beam_ranges.rest("prism", TRANSLATED_PRISM, 3) is None  # out already: left alone
+    assert beam_ranges.rest("gobo", PATTERN_WHEEL, 20) == 0
+    assert beam_ranges.rest("gobo", PATTERN_WHEEL, 70) == 0  # a shaking gobo is in the beam too
+    assert beam_ranges.rest("gobo", PATTERN_WHEEL, 5) is None
+    assert beam_ranges.rest("prism", [], 8) is None  # no chart: no word on it
+    assert beam_ranges.rest("frost", [(0, 255, "Frost 0-100%")], 0) is None  # one sweep: no range out to go to
+
+
+def test_a_fixture_file_holding_its_prism_in_plays_an_open_beam(monkeypatch, tmp_path):
+    attrs = ["pan", "tilt", "dimmer", "gobo", "prism"]
+    d = head(attrs, [[], [], [], [list(r) for r in PATTERN_WHEEL], [list(r) for r in TRANSLATED_PRISM]])
+    d["modes"]["8ch"][4]["default"] = 8  # set "where the light is on" in the check, from "Open prism"
+    (tmp_path / "test").mkdir()
+    (tmp_path / "test" / "head.json").write_text(json.dumps(d), encoding="utf-8")
+    monkeypatch.setattr(fxlib, "LIB_DIR", tmp_path)
+    monkeypatch.setattr(fxlib, "USER_DIR", None)
+    fxlib.library.cache_clear()
+    try:
+        buf = bytearray(512)
+        fx = {"id": "h", "fixture": "test/head", "mode": "8ch", "universe": 1, "address": 1, "x": 0.5}
+        fxlib.patch(buf, fx, {"h": State(dimmer=1.0, r=1.0, g=1.0, b=1.0, pan=0.5, tilt=0.5)})
+        assert buf[4] == 0  # prism out
+        s = State(dimmer=1.0, r=1.0, g=1.0, b=1.0, pan=0.5, tilt=0.5)
+        s.fx = "prism"
+        fxlib.patch(buf, fx, {"h": s})
+        assert 8 <= buf[4] <= 127  # and in when a look asks for it
+    finally:
+        fxlib.library.cache_clear()

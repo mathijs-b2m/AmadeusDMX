@@ -191,6 +191,10 @@ def _beam_fx_from_ranges(d: dict):
     converted fixture's come from its converter (the same reading, where the library has no preset)."""
     from amadeus.library import beam_ranges
 
+    def chart(d, mode):  # the chart it was made or mapped from
+        return d.get("made", {}).get("channels", {}).get(mode) or d.get("manual", {}).get("channels", {}).get(mode)
+
+    beam_ranges.rest_open(d, chart)  # its wheels at rest out of the beam, whatever the file holds them at
     if any(k in d for k in ("qlc", "ofl", "gdtf", "ddf")) and "made" not in d:
         return
     if beam_ranges.missing(d):
