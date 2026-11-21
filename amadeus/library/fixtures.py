@@ -460,13 +460,35 @@ def _chroma(rgb):
     return tuple(v / m for v in rgb) if m > 1e-6 else (0.0, 0.0, 0.0)
 
 
+# Per wheel (its slots list): the slots' colours as they were read, their chromas, and the answers given so far.
+# nearest_slot runs for every wheel head every frame, mostly for the same few palette colours.
+_WHEELS: dict[int, tuple[list, tuple, list, dict]] = {}
+
+
+def _wheel(slots: list) -> tuple[list, dict]:
+    rgbs = tuple(tuple(s["rgb"]) for s in slots)
+    w = _WHEELS.get(id(slots))
+    if w is None or w[0] is not slots or w[1] != rgbs:  # new, or the wheel was edited: read it again
+        if len(_WHEELS) > 256:
+            _WHEELS.clear()
+        w = _WHEELS[id(slots)] = (slots, rgbs, [(s, _chroma(s["rgb"])) for s in slots[1:]], {})
+    return w[2], w[3]
+
+
 def nearest_slot(defn: dict, rgb, white: float = 0.0) -> dict:
     """Pick the colour-wheel slot closest to the wanted colour (white flash → open)."""
     slots = defn["color_wheel"]["slots"]
     if white > 0.5 or max(rgb) - min(rgb) < 0.2 or len(slots) < 2:  # unsaturated (or only open) → open/white
         return slots[0]
+    chromas, seen = _wheel(slots)
     want = _chroma(rgb)
-    return min(slots[1:], key=lambda s: sum((a - b) ** 2 for a, b in zip(_chroma(s["rgb"]), want)))
+    best = seen.get(want)
+    if best is None:
+        best = min(chromas, key=lambda sc: sum((a - b) ** 2 for a, b in zip(sc[1], want)))[0]
+        if len(seen) > 4096:  # (a long crossfade passes many colours)
+            seen.clear()
+        seen[want] = best
+    return best
 
 
 def has_wheel(defn: dict) -> bool:

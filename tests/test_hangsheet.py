@@ -114,15 +114,20 @@ def test_the_setup_api_serves_it_for_a_saved_rig_and_for_an_editors_layout():
 
     from amadeus.web.server import serve
 
-    serve(18797, store.Selection(file=Path("tests/sets/small.json")), "127.0.0.1")
-    r = urllib.request.urlopen("http://127.0.0.1:18797/api/hangsheet", timeout=10)
-    assert r.headers["Content-Type"].startswith("text/html")
-    assert b"Hang sheet" in r.read()
-    body = json.dumps({"rig": mounted(Path("tests/sets/ring.json")), "names": ["my-set", "my-rig"]}).encode()
-    req = urllib.request.Request("http://127.0.0.1:18797/api/hangsheet", data=body, method="POST",
-                                 headers={"Content-Type": "application/json"})  # fmt: skip
-    page = urllib.request.urlopen(req, timeout=10).read().decode()
-    assert "Hang sheet: my-set on my-rig" in page and "ring 1" in page
+    # port 0: a free port, so a second test run (another worktree) or a running show doesn't collide
+    httpd = serve(0, store.Selection(file=Path("tests/sets/small.json")), "127.0.0.1")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/api/hangsheet"
+    try:
+        r = urllib.request.urlopen(url, timeout=10)
+        assert r.headers["Content-Type"].startswith("text/html")
+        assert b"Hang sheet" in r.read()
+        body = json.dumps({"rig": mounted(Path("tests/sets/ring.json")), "names": ["my-set", "my-rig"]}).encode()
+        req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
+        page = urllib.request.urlopen(req, timeout=10).read().decode()
+        assert "Hang sheet: my-set on my-rig" in page and "ring 1" in page
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
 
 
 # ---- the check after hanging -----------------------------------------------------------------------------------
