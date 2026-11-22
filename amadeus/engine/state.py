@@ -42,12 +42,23 @@ class State:
         out.fx, out.gobo, out.fx_speed, out.fx_reverse = src.fx, src.gobo, src.fx_speed, src.fx_reverse
         out.size, out.spin, out.lcolor, out.phase = src.size, src.spin, src.lcolor, src.phase
         out.dmx_pan, out.dmx_tilt, out.strobe_hz, out.gate = src.dmx_pan, src.dmx_tilt, src.strobe_hz, src.gate
-        if self.dmx_pan is not None and o.dmx_pan is not None:  # two shows' motors: the head travels, never jumps
+        # two shows' motors: the head travels from one target to the other, but only when both aim on the same turn.
+        # The same aim can sit a whole pan turn away, or with the tilt flipped over; sliding the DMX between those
+        # sweeps the beam round the back of the room, so those switch halfway and the motor takes its one move
+        targets = (self.dmx_pan, o.dmx_pan, self.dmx_tilt, o.dmx_tilt)
+        if (
+            None not in targets
+            and abs(self.dmx_pan - o.dmx_pan) <= BLEND_PAN_MAX
+            and abs(self.dmx_tilt - o.dmx_tilt) <= BLEND_TILT_MAX
+        ):
             out.dmx_pan = self.dmx_pan * (1 - k) + o.dmx_pan * k
-        if self.dmx_tilt is not None and o.dmx_tilt is not None:
             out.dmx_tilt = self.dmx_tilt * (1 - k) + o.dmx_tilt * k
+        if abs(self.pan - o.pan) > BLEND_PAN_MAX or abs(self.tilt - o.tilt) > BLEND_TILT_MAX:  # (the visualiser's too)
+            out.pan, out.tilt = src.pan, src.tilt
         out.zoom = self.zoom * (1 - k) + o.zoom * k
         return out
 
 
 NUMERIC = ("dimmer", "r", "g", "b", "white", "pan", "tilt")
+BLEND_PAN_MAX = 0.2  # DMX: two targets further apart than this are on another turn (a 540° head: 108°), not slid
+BLEND_TILT_MAX = 0.3

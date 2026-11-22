@@ -14,10 +14,23 @@ def test_looking_for_demucs_imports_no_torch():
 
 
 def test_a_crossfade_moves_the_heads_dmx_target_gradually():
-    a, b = State(dmx_pan=0.2, dmx_tilt=0.4), State(dmx_pan=0.8, dmx_tilt=0.6)
+    a, b = State(dmx_pan=0.40, dmx_tilt=0.40), State(dmx_pan=0.55, dmx_tilt=0.60)
     pans = [a.blend(b, k).dmx_pan for k in (0.0, 0.25, 0.5, 0.75, 1.0)]
-    assert pans == sorted(pans) and abs(pans[2] - 0.5) < 1e-9  # travels, never jumps halfway
+    assert pans == sorted(pans) and abs(pans[2] - 0.475) < 1e-9  # travels, never jumps halfway
     assert abs(a.blend(b, 0.5).dmx_tilt - 0.5) < 1e-9
+
+
+def test_a_crossfade_never_slides_a_head_a_whole_turn_round():
+    # the same aim a pan turn apart (a 540° head: 0.347 and 1.0): sliding between them sweeps the beam round the back
+    a, b = (
+        State(pan=0.347, tilt=0.95, dmx_pan=0.347, dmx_tilt=0.95),
+        State(pan=1.0, tilt=1.0, dmx_pan=1.0, dmx_tilt=1.0),
+    )
+    assert [a.blend(b, k).dmx_pan for k in (0.25, 0.49)] == [0.347, 0.347]
+    assert [a.blend(b, k).dmx_pan for k in (0.5, 0.9)] == [1.0, 1.0]
+    assert a.blend(b, 0.3).pan == 0.347  # the visualiser shows no sweep either
+    flipped = State(dmx_pan=0.40, dmx_tilt=0.05)  # the tilt over the other side
+    assert State(dmx_pan=0.42, dmx_tilt=0.95).blend(flipped, 0.3).dmx_tilt == 0.95
 
 
 def test_a_head_without_a_dmx_target_keeps_the_others():

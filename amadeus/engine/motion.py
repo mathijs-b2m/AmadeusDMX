@@ -24,6 +24,8 @@ MOTION_FPS = 50
 
 
 TRAJ_CACHE = paths.CACHE / "trajectories"
+IK_VERSION = 2  # the solver: cached paths made by an older one are made again (2: unreachable aims keep their turn,
+# heads start on the pan turn in the middle of their range)
 
 
 DMX_LEAD_S = 0.12  # pan/tilt targets go out this early, so the head lands on the beat
@@ -606,6 +608,7 @@ class MotionMixin:
                     self.program,  # a program's head pictures depend on its hits
                     [len(self.cine_hits), float(self.cine_hits.t.sum()), self.CINE_VERSION] if self.program else None,
                     [(p.pickup_kind, round(p.pickup_start, 3)) for p in self.a.phrases if p.pickup_beats],
+                    IK_VERSION,
                 ],
                 sort_keys=True,
                 default=str,
@@ -983,6 +986,7 @@ class MotionMixin:
         hi_p = np.where(INVP > 0, PH, P - PH)
         lo_t = np.where(INVT > 0, -(T_ - TH), -TH)
         hi_t = np.where(INVT > 0, TH, T_ - TH)
+        mid_p = (lo_p + hi_p) / 2
         ks = np.array([-2, -1, 0, 1, 2], float) * 360.0
         wp, wt = 1 / VP, 1 / VT
         # IK pieces that don't depend on the motor position, for all frames at once
@@ -1055,8 +1059,8 @@ class MotionMixin:
                 & (ct >= lo_t[:, None] - 1e-6)
                 & (ct <= hi_t[:, None] + 1e-6)
             )
-            if pos is None:
-                cost = np.abs(cp) + np.abs(ct)
+            if pos is None:  # the first frame: the pan's turn nearest the middle of its range (geometry.ik)
+                cost = np.abs(cp - mid_p[:, None]) + np.abs(ct)
             else:
                 cost = np.abs(cp - pos[:, 0:1]) * wp[:, None] + np.abs(ct - pos[:, 1:2]) * wt[:, None]
             cost = np.where(ok, cost, np.inf)
@@ -1064,9 +1068,19 @@ class MotionMixin:
             rows = np.arange(n)
             gp, gt = cp[rows, best], ct[rows, best]
             none = ~ok.any(axis=1)
-            if none.any():  # unreachable: clamp the plain solution into range
-                gp = np.where(none, np.clip(ph, lo_p, hi_p), gp)
-                gt = np.where(none, np.clip(th, lo_t, hi_t), gt)
+            if none.any():  # unreachable: as geometry.ik, the tilt as far as it goes, the pan on a turn near the head
+                pan_ok = (cp >= lo_p[:, None] - 1e-6) & (cp <= hi_p[:, None] + 1e-6)
+                ctc = np.clip(ct, lo_t[:, None], hi_t[:, None])
+                err = np.where(pan_ok, np.abs(ct - ctc), np.inf)
+                near = pan_ok & (err <= err.min(axis=1, keepdims=True) + geometry.UNREACHABLE_SLACK_DEG)
+                if pos is None:
+                    c2 = np.abs(cp - mid_p[:, None]) + np.abs(ctc)
+                else:
+                    c2 = np.abs(cp - pos[:, 0:1]) * wp[:, None] + np.abs(ctc - pos[:, 1:2]) * wt[:, None]
+                b2 = np.argmin(np.where(near, c2, np.inf), axis=1)
+                some = pan_ok.any(axis=1)
+                gp = np.where(none, np.where(some, cp[rows, b2], np.clip(ph, lo_p, hi_p)), gp)
+                gt = np.where(none, np.where(some, ctc[rows, b2], np.clip(th, lo_t, hi_t)), gt)
             if bar.any():
                 gp = np.where(bar, 0.0, gp)
                 gt = np.where(bar, np.clip(bar_theta[s_], lo_t, hi_t), gt)

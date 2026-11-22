@@ -53,6 +53,7 @@ def room_side(st: dict) -> float:
 
 CEILING_RUN_M = (4.0, 10.0)  # a beam going up reaches the ceiling at least the room's depth away (in this range)
 CEILING_CLEAR_M = 0.3  # (measured from this far under the ceiling)
+UNREACHABLE_SLACK_DEG = 0.5  # aims past the tilt's end: solutions this close to the nearest count as equal (ik)
 BACK_Y = 0.2  # a beam may point back at most this much (y of the unit direction; 0.2 ≈ 12° past straight down/up)
 BACK_DOWN_DEG = -55.0  # … unless it points down steeper than this: onto the floor near the fixture
 MOUNTS = {  # default position per mount type: (y, z) in metres
@@ -170,16 +171,28 @@ def ik(
     # reachable phi/theta (relative to home, before inversion): DMX 0..range maps to these
     lo_p, hi_p = (-(P - ph), ph) if fx.get("pan_invert") else (-ph, P - ph)
     lo_t, hi_t = (-(T - th), th) if fx.get("tilt_invert") else (-th, T - th)
-    cands = []
+    cands, near = [], []
     for p0, t0 in ((phi, theta), (phi + 180.0, -theta)):
         for k in (-2, -1, 0, 1, 2):
             p = p0 + 360.0 * k
-            if lo_p - 1e-6 <= p <= hi_p + 1e-6 and lo_t - 1e-6 <= t0 <= hi_t + 1e-6:
-                cands.append((p, t0))
-    if not cands:  # unreachable: clamp the plain solution into range
-        cands = [(min(max(phi, lo_p), hi_p), min(max(theta, lo_t), hi_t))]
+            if lo_p - 1e-6 <= p <= hi_p + 1e-6:
+                tc = min(max(t0, lo_t), hi_t)
+                if abs(tc - t0) <= 1e-6:
+                    cands.append((p, t0))
+                near.append((p, tc, abs(tc - t0)))
+    if not cands:
+        # unreachable (a beam a little past the end of the tilt): the tilt goes as far as it can, the pan stays on a
+        # turn near the head. Clamping the plain pan instead can land a whole turn away, and a head aimed around the
+        # end of its tilt (a wave at the horizon) then spins back and forth on every beat
+        least = min((c[2] for c in near), default=None)
+        cands = [(p, t) for p, t, err in near if err <= least + UNREACHABLE_SLACK_DEG] if near else []
+        cands = cands or [(min(max(phi, lo_p), hi_p), min(max(theta, lo_t), hi_t))]
     if prev is None:
-        return min(cands, key=lambda pt: abs(pt[0]) + abs(pt[1]))
+        # no position yet: the pan's turn nearest the middle of its range. Its home may sit at an end stop (a 540°
+        # head calibrated at 540°: front again at 180°); started there, the first beam across the front would
+        # have to go a whole turn round
+        mid = (lo_p + hi_p) / 2
+        return min(cands, key=lambda pt: abs(pt[0] - mid) + abs(pt[1]))
     return min(cands, key=lambda pt: abs(pt[0] - prev[0]) * w_pan + abs(pt[1] - prev[1]) * w_tilt)
 
 
