@@ -427,6 +427,30 @@ def test_demucs_runs_on_the_graphics_card_and_falls_back_to_the_processor(tmp_pa
     assert stems._separator._device == "cpu" and set(parts) == set(stems.NAMES)
 
 
+def test_separation_runs_on_the_physical_cores_and_leaves_a_show_one(monkeypatch):
+    from amadeus import system
+    from amadeus.audio import stems
+
+    assert system.physical_cores() >= 1
+    monkeypatch.setattr(system, "physical_cores", lambda: 4)
+    assert stems.threads() == 4 and stems.threads(beside_show=True) == 3
+    monkeypatch.setattr(system, "physical_cores", lambda: 1)
+    assert stems.threads(beside_show=True) == 1
+
+
+def test_a_show_tells_its_background_separation_to_leave_it_a_core(tmp_path, monkeypatch):
+    from amadeus.audio import stems
+
+    seen = []
+    monkeypatch.setattr(stems, "STEMS_DIR", tmp_path)
+    monkeypatch.setattr(subprocess, "Popen", lambda cmd, **kw: seen.append(cmd) or type("P", (), {"pid": 1})())
+    track = tmp_path / "t.wav"
+    track.write_bytes(b"x")
+    stems.start_background(track, beside_show=True)
+    stems.start_background(track)
+    assert seen[0][-1] == "--beside-show" and seen[1][-1] == str(track)
+
+
 def test_the_packs_environment_is_only_remade_when_the_app_moved(tmp_path, monkeypatch):
     from amadeus.cli import packs
 
