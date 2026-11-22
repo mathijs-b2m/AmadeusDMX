@@ -24,8 +24,8 @@ MOTION_FPS = 50
 
 
 TRAJ_CACHE = paths.CACHE / "trajectories"
-IK_VERSION = 2  # the solver: cached paths made by an older one are made again (2: unreachable aims keep their turn,
-# heads start on the pan turn in the middle of their range)
+IK_VERSION = 3  # the solver: cached paths made by an older one are made again (2: unreachable aims keep their turn,
+# heads start on the pan turn in the middle of their range; 3: a shared motor follows its middle cell)
 
 
 DMX_LEAD_S = 0.12  # pan/tilt targets go out this early, so the head lands on the beat
@@ -573,16 +573,29 @@ class MotionMixin:
             return None
         return float(np.clip(e["offset_m"] / max(fxlib.bar_length_m(fx, defn) / 2, 1e-6), -1, 1))
 
+    def _motor_leaders(self) -> dict[str, int]:
+        """Per motor (_motor_owner): the head it follows. The cells of a fixture with one motor for all of them (a
+        moving bar, a unit of three heads on one yoke) follow their middle cell; with an even count, the middle cell
+        nearer the stage's centre. Following the first cell, a unit on the left followed its outer end and its
+        mirror twin on the right its inner one: the two played different points of a wave."""
+        cells: dict[str, list[int]] = {}
+        for j in range(len(self.heads)):
+            cells.setdefault(self._motor_owner(j), []).append(j)
+        leaders = {}
+        for owner, js in cells.items():
+            js = sorted(js, key=lambda j: float(self.heads[j].get("x", 0.0)))
+            mid = js[(len(js) - 1) // 2 : len(js) // 2 + 1]  # one cell, or the two in the middle
+            leaders[owner] = min(mid, key=lambda j: abs(float(self.heads[j].get("x", 0.5)) - 0.5))
+        return leaders
+
     def _share_motors(self):
-        """The cells of a moving bar share its one tilt motor: they all follow the first cell."""
-        by_fixture: dict[str, list[str]] = {}
+        """The cells of a fixture with one motor all follow its leading cell (_motor_leaders)."""
+        leaders = self._motor_leaders()
         for j, e in enumerate(self.heads):
-            by_fixture.setdefault(self._motor_owner(j), []).append(e["id"])
-        for ids in by_fixture.values():
-            for eid in ids[1:]:
-                if ids[0] in self.traj:
-                    self.traj[eid] = self.traj[ids[0]]
-                    self.goals[eid] = self.goals[ids[0]]
+            lead = self.heads[leaders[self._motor_owner(j)]]["id"]
+            if lead != e["id"] and lead in self.traj:
+                self.traj[e["id"]] = self.traj[lead]
+                self.goals[e["id"]] = self.goals[lead]
 
     def _cached_trajectories(self) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Motor simulation, cached on disk: it takes seconds per head for a whole track (a 60-head rig:
@@ -609,6 +622,7 @@ class MotionMixin:
                     [len(self.cine_hits), float(self.cine_hits.t.sum()), self.CINE_VERSION] if self.program else None,
                     [(p.pickup_kind, round(p.pickup_start, 3)) for p in self.a.phrases if p.pickup_beats],
                     IK_VERSION,
+                    [(g["g"], g["k"], g["m"], g["kind"], round(g["gside"], 3)) for g in self.hgroup],  # the sections
                 ],
                 sort_keys=True,
                 default=str,
@@ -1006,16 +1020,17 @@ class MotionMixin:
         if avoid:
             HP = np.array(self.head_pos, dtype=float)
             ROLL = [geometry.mount_roll(fx) for fx, _ in self.head_fx]
-            # a moving bar's cells share its motor: the first cell's move is checked for every cell of the bar
+            # a moving bar's cells share its motor: the leading cell's move is checked for every cell of the bar
             owner = [self._motor_owner(j) for j in range(n)]
+            lead = self._motor_leaders()
             cells: dict[str, list[int]] = {}
             for j in range(n):
                 cells.setdefault(owner[j], []).append(j)
             ROWS = np.array(
-                [k for j in range(n) for k in (cells[owner[j]] if cells[owner[j]][0] == j else [j])]
+                [k for j in range(n) for k in (cells[owner[j]] if lead[owner[j]] == j else [j])]
             )  # positions to test, per row
             OWNER = np.array(
-                [j for j in range(n) for _ in (cells[owner[j]] if cells[owner[j]][0] == j else [j])]
+                [j for j in range(n) for _ in (cells[owner[j]] if lead[owner[j]] == j else [j])]
             )  # whose motor each row is
 
             slot = np.full(n, -1)

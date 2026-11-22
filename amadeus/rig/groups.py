@@ -10,8 +10,9 @@ Groups come from the rig ("group" on a fixture), else from the trusses and posit
   as a circle);
 - a lift of a scaffold: 3+ heads on one ledger, left to right (fewer: the rules below, so heads stacked up the sides of
   a scaffold are its columns);
-- a column: 3+ heads at the same spot across the stage, stacked in height (a truss tower); a head hung on a lying
-  truss is never part of one, however the floor heads under it stand;
+- a column: 3+ fixtures at the same spot across the stage, stacked in height (a truss tower), two of them at least up
+  off the floor; a head hung on a lying truss is never part of one, however the floor heads under it stand, and a
+  fixture's heads are never split up;
 - a row: heads with the same mount at about the same depth and height, chained neighbour to neighbour, and the heads
   on one lying truss always together (two short trusses end to end at one height and depth are one row).
 Each group gets a class the director talks about: overhead, ring, back, front, towers (or "all").
@@ -82,7 +83,12 @@ def head_groups(rig: dict) -> list[dict]:
             h for h in stackable if h[0]["id"] not in used and abs(h[1][0] - p[0]) < 0.35 and abs(h[1][1] - p[1]) < 0.6
         ]
         zs = [h[1][2] for h in col]
-        if len(col) >= 3 and max(zs) - min(zs) > 1.2:
+        units = {h[2]["id"] for h in col}  # fixtures, not cells: a unit of three heads and one above is no tower
+        up = {h[2]["id"] for h in col if h[2].get("mount") != "floor"}  # stacked up something, not at its foot: a
+        # totem with one head and the floor units round it is no tower (nor is it one on one side of the stage only
+        # because the floor heads there stand a little nearer)
+        if len(units) >= 3 and len(up) >= 2 and max(zs) - min(zs) > 1.2:
+            col = [h for h in stackable if h[2]["id"] in units and h[0]["id"] not in used]  # a fixture's cells together
             name = f"column@{p[0]:.1f}"
             named[name] = col
             used |= {h[0]["id"] for h in col}

@@ -65,3 +65,38 @@ def test_a_real_tower_is_still_a_column():
     fixtures = [T.place(head(k), tower, p, W, "front") for k, p in enumerate((0.8, 2.0, 3.2))]
     g = head_groups(load_rig_dict({"stage": {"width_m": W}, "trusses": [tower], "fixtures": fixtures}))
     assert [x["kind"] for x in g] == ["column"]
+
+
+def test_a_totem_with_floor_heads_at_its_foot_is_no_tower_on_either_side():
+    # the studio: one head up each totem, floor heads round its foot, standing a little nearer it on the right; that
+    # right side was called a tower (and played a part the left didn't have)
+    totems = [{"id": f"totem{i}", "type": "quatro", "vertical": True, "length_m": 1.5, "x_m": x, "y_m": -0.85,
+               "z_m": 0.75} for i, x in ((1, 1.5), (2, 4.5))]  # fmt: skip
+    fixtures = [T.place(head(0), totems[0], 1.5, W, "top"), T.place(head(1), totems[1], 1.5, W, "top")]
+    fixtures += [
+        head(2, x=0.22, y_m=-1.5, z_m=0.25, mount="floor"),
+        head(3, x=0.29, y_m=-1.76, z_m=0.25, mount="floor"),
+    ]
+    fixtures += [head(4, x=0.70, y_m=-1.3, z_m=0.25, mount="floor"), head(5, x=0.76, y_m=-1.3, z_m=0.25, mount="floor")]
+    g = head_groups(load_rig_dict({"stage": {"width_m": W}, "trusses": totems, "fixtures": fixtures}))
+    assert all(x["kind"] == "row" for x in g), g
+    assert sorted(len(x["ids"]) for x in g) == [2, 4]  # the totem heads a pair, the floor a row
+
+
+def test_the_cells_of_one_motor_follow_their_middle_cell():
+    from amadeus.engine.motion import MotionMixin
+
+    units = {
+        "l": (0.11, 0.17, 0.22),  # three heads on one yoke, stage left …
+        "r": (0.78, 0.83, 0.89),  # … and its mirror twin on the right
+        "b": (0.10, 0.15, 0.20, 0.25),  # a bar of four on the left: the middle cell nearer the centre
+    }
+
+    class Unit:
+        heads = [{"id": f"{u}.{c}", "x": x} for u, xs in units.items() for c, x in enumerate(xs)]
+
+        def _motor_owner(self, j):
+            return self.heads[j]["id"].split(".")[0]
+
+    lead = {o: Unit.heads[j]["id"] for o, j in MotionMixin._motor_leaders(Unit()).items()}
+    assert lead == {"l": "l.1", "r": "r.1", "b": "b.2"}  # was the first cell: the outer end left, the inner right
