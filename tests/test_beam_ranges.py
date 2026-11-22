@@ -133,7 +133,8 @@ def test_a_qlc_fixture_added_before_reads_its_prism_and_frost_from_the_catalogue
 # a translated chart (CHEGIT 150W mini beam): "Open prism" is the prism in
 TRANSLATED_PRISM = [(0, 7, "Close prism"), (8, 127, "Open prism"), (128, 255, "Prism rotates from slow to fast")]
 PATTERN_WHEEL = [(0, 7, "White light"), (8, 15, "Pattern 1"), (16, 23, "Pattern 2"),
-                 (64, 73, "Pattern 7 jitter from slow to fast"), (128, 191, "Clockwise automatic color switch")]  # fmt: skip
+                 (64, 73, "Pattern 7 jitter from slow to fast"),
+                 (128, 191, "Clockwise automatic color switch")]  # fmt: skip
 
 
 def test_a_wheel_at_rest_in_the_beam_rests_out_of_it():

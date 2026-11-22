@@ -7,8 +7,8 @@
   let go gently while the next one comes, so the run flows instead of blinking. The level is the phrase's (the
   look's intensity), not the loudness from moment to moment, and well under the heads' (a layer behind the show:
   they leave the heads their headroom), except at the peaks (a phrase at full intensity: the drops), where a
-  step lights its cells full. An RGBW bar has no dimmer: at 55% of a saturated colour it hardly showed. Where the beat doesn't drive the
-  music (a breakdown, an intro, the kick gone), the run steps once a bar, softer.
+  step lights its cells full. An RGBW bar has no dimmer: at 55% of a saturated colour it hardly showed. Where the
+  beat doesn't drive the music (a breakdown, an intro, the kick gone), the run steps once a bar, softer.
 - **cells**: how a bar's cells play each step is the director's pick per phrase (`Decision.wall_cells`,
   director/rules.py; PATTERNS below): one light in calm phrases; in phrases that drive, a pattern along the bar. Each
   cell is its own short note started on the grid (never off it), so only part of the bar is lit at a time: it
