@@ -51,14 +51,15 @@ public static class RenderSelfTest
                 }
                 r.Context.Flush();
                 var px = r.ReadPixels(tex, W, H);
-                var lit = 0;
-                for (var k = 0; k < px.Length; k += 4) if (px[k] + px[k + 1] + px[k + 2] > 90) lit++;
+                var (varied, white) = Picture(px);
                 var name = $"amadeus-stage-{preset.RawValue().ToLowerInvariant().Replace(' ', '-')}.png";
                 File.WriteAllBytes(Path.Combine(dir, name), Png(px, W, H));
-                var share = lit / (double)(W * H);
-                var good = share > 0.01 && share < 0.95;
-                ok &= good;
-                report.Add($"{preset.RawValue()}: {name}, {share:P1} of the pixels lit{(good ? "" : " — EMPTY OR WHITE")}, " +
+                // a broken stage is one flat colour (nothing drew) or white all over; a lit room is neither
+                var empty = varied < 0.01;
+                var blown = white > 0.9;
+                ok &= !empty && !blown;
+                report.Add($"{preset.RawValue()}: {name}, {varied:P1} of the pixels off the background, {white:P1} white" +
+                           $"{(empty ? " — EMPTY" : blown ? " — WHITE" : "")}, " +
                            $"render scale {r.RenderScale:F2}, exposure {r.AutoExposure:F2}, wall {r.WallNow}");
             }
             report.Add($"GPU time (smoothed): {r.GpuMs:F2} ms per frame");
@@ -72,6 +73,25 @@ public static class RenderSelfTest
         File.WriteAllLines(Path.Combine(dir, "amadeus-stage-selftest.txt"), report);
         foreach (var line in report) Console.WriteLine(line);
         return ok ? 0 : 1;
+    }
+
+    /// <summary>How much of a frame differs from its most common brightness (the background: clear colour, room
+    /// or sky) by more than a quarter of the way to white, and how much of it is near white.</summary>
+    internal static (double Varied, double White) Picture(byte[] bgra)
+    {
+        var n = bgra.Length / 4;
+        if (n == 0) return (0, 0);
+        var counts = new int[766];
+        for (var k = 0; k < bgra.Length; k += 4) counts[bgra[k] + bgra[k + 1] + bgra[k + 2]]++;
+        int median = 0, seen = 0;
+        while (seen + counts[median] <= n / 2) seen += counts[median++];
+        int varied = 0, white = 0;
+        for (var v = 0; v < counts.Length; v++)
+        {
+            if (Math.Abs(v - median) > 60) varied += counts[v];
+            if (v > 720) white += counts[v];
+        }
+        return (varied / (double)n, white / (double)n);
     }
 
     static byte[] Png(byte[] bgra, int w, int h)
