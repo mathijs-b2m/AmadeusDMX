@@ -597,6 +597,95 @@ def _strobing(chans: list[dict], els: dict) -> dict:
     return {"values": values, "held": held}
 
 
+# What patch() reads from a fixture's definition and mode that never changes during a show, worked out once per
+# definition and mode (a 60-head rig spent most of its frame on it). Edits make new channel lists (the mapper) or new
+# definitions (saving clears the library), so the lists themselves are the key, kept here so their ids stay theirs.
+_PLANS: dict[tuple[int, int], tuple] = {}
+
+# what a channel plays, decided once from its definition (in patch's order of precedence, after the live strobe
+# and beam-effect values)
+(_ROLL, _FOG, _FAN, _UV, _DEFAULT, _PAN, _PAN_F, _CELL_TILT, _TILT, _TILT_F, _CELL_DIM, _DIM, _DIM_F, _CMY, _RGB,
+ _WHITE, _WHEEL, _RING, _ZOOM, _LASER, _ZERO) = range(21)  # fmt: skip
+
+
+def _op(c: dict, defn: dict, blacklight: bool) -> int:
+    a = c["attr"]
+    if a == "lens_roll":
+        return _ROLL
+    if a == "fog":
+        return _FOG
+    if a == "fog_fan":
+        return _FAN
+    if a == "uv" and blacklight:
+        return _UV
+    if "default" in c:
+        return _DEFAULT
+    if a == "pan":
+        return _PAN
+    if a == "pan_fine":
+        return _PAN_F
+    if a in ("tilt", "tilt_fine") and "head" in c:
+        return _CELL_TILT
+    if a == "tilt":
+        return _TILT
+    if a == "tilt_fine":
+        return _TILT_F
+    if a == "dimmer" and "head" in c:
+        return _CELL_DIM
+    if a == "dimmer":
+        return _DIM
+    if a == "dimmer_fine":
+        return _DIM_F
+    if a in ("cyan", "magenta", "yellow"):
+        return _CMY
+    if a in ("red", "green", "blue"):
+        return _RGB
+    if a == "white":
+        return _WHITE
+    if a == "color_wheel":
+        return _WHEEL
+    if a == "ring_color":
+        return _RING
+    if a == "zoom" and "tight" in c:
+        return _ZOOM
+    if a.startswith("laser_") and "laser" in defn:
+        return _LASER
+    return _ZERO
+
+
+def _plan(defn: dict, chans: list[dict]) -> tuple:
+    key = (id(defn), id(chans))
+    p = _PLANS.get(key)
+    if p is not None and p[0] is defn and p[1] is chans:
+        return p
+    if len(_PLANS) > 1024:
+        _PLANS.clear()
+    hs = sorted({c["head"] for c in chans if "head" in c}) or [0]  # (heads(), from the list at hand)
+    blacklight = uv_only(defn)
+    has_dimmer = any(c["attr"] == "dimmer" for c in chans)
+    head_dimmers = any(c["attr"] == "dimmer" and "head" in c for c in chans)
+    per_head_colour = len(hs) > 1
+    px = pixels(defn, chans)
+    ops = tuple((off, _op(c, defn, blacklight), c, c["attr"], c.get("head", 0), px[off]) for off, c in enumerate(chans))
+    p = _PLANS[key] = (
+        defn,
+        chans,
+        bool(inert(defn)),
+        hs,
+        per_head_colour,
+        blacklight,
+        (per_head_colour and not head_dimmers) or not has_dimmer,  # the RGB carries the level, not a dimmer
+        any("strobe_range" in c for c in chans),
+        any(c["attr"] == "cyan" for c in chans),
+        has_wheel(defn),
+        bee_eye(defn),
+        ops,
+        {},  # beam effect asked for → the one played (beam_effect)
+        {},  # fixture id → its elements' ids, per head
+    )
+    return p
+
+
 def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) -> None:
     """Write one rig fixture's channels into a 512-byte universe buffer (nothing without a start address).
 
@@ -608,31 +697,38 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
     ceiling = limiter.level() if limit is None else min(max(limit, 0.0), 1.0)
     defn = get(fx["fixture"])
     chans = channels(defn, fx["mode"])
-    if inert(defn):  # never driven: every channel at its off value
+    (_, _, is_inert, hs, per_head_colour, blacklight, rgb_level, strobes, has_cmy, wheel, bees, ops, shown_of,
+     ids_of) = _plan(defn, chans)  # fmt: skip
+    base = fx["address"] - 1
+    if is_inert:  # never driven: every channel at its off value
         for off, c in enumerate(chans):
-            if 0 <= fx["address"] - 1 + off < 512:
-                buf[fx["address"] - 1 + off] = int(c.get("default", 0))
+            if 0 <= base + off < 512:
+                buf[base + off] = int(c.get("default", 0))
         return
-    els = {e["head"]: states[e["id"]] for e in expand(fx)}
-    first = next(iter(els.values()))
-    per_head_colour = len(els) > 1
-    has_dimmer = any(c["attr"] == "dimmer" for c in chans)
-    head_dimmers = any(c["attr"] == "dimmer" and "head" in c for c in chans)  # a dimmer per cell (Sunstrip)
-    blacklight = uv_only(defn)
-    rgb_level = (per_head_colour and not head_dimmers) or not has_dimmer  # the RGB carries the level, not a dimmer
-    strobing = _strobing(chans, els)
+    fid = fx["id"]
+    ids = ids_of.get(fid)
+    if ids is None:  # (its elements' ids follow from its id and its heads)
+        ids = ids_of[fid] = [(e["head"], e["id"]) for e in expand(fx)]
+    els = {h: states[i] for h, i in ids}
+    first = els[ids[0][0]]
+    strobing = _strobing(chans, els) if strobes else None
+    held = strobing["held"] if strobing else ()
+    strobe_values = strobing["values"] if strobing else {}
 
-    def dimmed(s) -> float:
-        """The level of an element's light: open while its strobe channel flashes it, else with the flash."""
-        return s.dimmer if id(s) in strobing["held"] else s.dimmer * getattr(s, "gate", 1.0)
-
-    def ceiled(s) -> float:
-        """How much the limiter turns this element's emitters down (1: not at all), the same for all of them so
-        the colour keeps its hue. Only where they carry the level; a dimmer channel is limited on its own."""
-        if ceiling >= 1.0 or not rgb_level:
-            return 1.0
-        peak = min((max(s.r, s.g, s.b, 0.0) + max(s.white, 0.0)) * dimmed(s), 1.0)
-        return ceiling / peak if peak > ceiling else 1.0
+    # per element: its light's level (open while its strobe channel flashes it, else with the flash), a dimmer
+    # channel's level under the limiter, and how much the limiter turns its emitters down (the same for all of them,
+    # so the colour keeps its hue; only where they carry the level: a dimmer channel is limited on its own)
+    looks = {}
+    for h, s in els.items():
+        dim = s.dimmer if id(s) in held else s.dimmer * getattr(s, "gate", 1.0)
+        level = min(max(max(dim, s.white), 0), 1, ceiling)
+        ceil = 1.0
+        if ceiling < 1.0 and rgb_level:
+            peak = min((max(s.r, s.g, s.b, 0.0) + max(s.white, 0.0)) * dim, 1.0)
+            if peak > ceiling:
+                ceil = ceiling / peak
+        looks[h] = (s, dim, level, ceil)
+    look0 = looks[ids[0][0]]
 
     pan_l, tilt_l = fx.get("pan_limits", [0, 1]), fx.get("tilt_limits", [0, 1])  # optional hard limits
     want_pan = first.pan if getattr(first, "dmx_pan", None) is None else first.dmx_pan
@@ -640,17 +736,18 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
     pan = min(max(want_pan, pan_l[0]), pan_l[1])
     tilt = min(max(want_tilt, tilt_l[0]), tilt_l[1])
     p16, t16 = int(min(max(pan, 0), 1) * 65535), int(min(max(tilt, 0), 1) * 65535)
-    has_cmy = any(c["attr"] == "cyan" for c in chans)
     # CMY fixtures mix the colour; their wheel (if any) stays open
     slot = (
         (defn["color_wheel"]["slots"][0] if has_cmy else nearest_slot(defn, (first.r, first.g, first.b), first.white))
-        if has_wheel(defn)
+        if wheel
         else None
     )
-    px = pixels(defn, chans)  # a bee eye's lenses: lit in the pattern it plays, its front turning
-    shares, turns = bee_look(n, first) if (n := bee_eye(defn)) else ([], 0.0)
+    shares, turns = bee_look(bees, first) if bees else ([], 0.0)  # a bee eye's lenses: lit in its pattern, turning
     overrides = {}
-    shown = beam_effect(defn, chans, getattr(first, "fx", "open"))
+    want_fx = getattr(first, "fx", "open")
+    shown = shown_of.get(want_fx)
+    if shown is None:
+        shown = shown_of[want_fx] = beam_effect(defn, chans, want_fx)
     for attr, val in defn.get("beam_fx", {}).get(shown, {}).items():
         if isinstance(val, list):  # one value per gobo
             overrides[attr] = val[getattr(first, "gobo", 0) % len(val)]
@@ -660,69 +757,71 @@ def patch(buf: bytearray, fx: dict, states: dict, limit: float | None = None) ->
         else:
             overrides[attr] = val
 
-    for off, c in enumerate(chans):
-        addr = fx["address"] - 1 + off
+    for off, op, c, a, head, lens in ops:
+        addr = base + off
         if not 0 <= addr < 512:
             continue
-        a = c["attr"]
-        s = els.get(c.get("head", 0), first)
-        # Per-head colour without per-head dimmers: master dimmer full, intensity goes into RGB.
-        scale = dimmed(s) if rgb_level else 1.0
-        level = min(max(max(dimmed(s), s.white), 0), 1, ceiling)  # a dimmer channel's level, under the limiter
-        if 0 <= px[off] < len(shares):  # a bee eye's lens: its share of the pattern
-            scale *= shares[px[off]]
-        if off in strobing["values"]:  # the fixture's own strobe, at the rate the show asks
-            v = strobing["values"][off]
+        s, dim, level, ceil = looks.get(head, look0)
+        if off in strobe_values:  # the fixture's own strobe, at the rate the show asks
+            v = strobe_values[off]
         elif a in overrides:
             v = overrides[a]
-        elif a == "lens_roll":  # a bee eye's barrel roll
-            v = roll_value(c, turns)
-        elif a == "fog":  # smoke output: the element's level (engine/fog.py), above the value where smoke starts
-            on = c.get("on_from", 1)
-            v = 0 if s.dimmer <= 0 else on + round(min(s.dimmer, 1.0) * (255 - on))
-        elif a == "fog_fan":  # a hazer's fan: spreads what it makes; resting when it makes nothing
-            v = round((0.4 + 0.6 * min(s.dimmer, 1.0)) * 255) if s.dimmer > 0 else c.get("default", 0)
-        elif a == "uv" and blacklight:  # its only colour: the level, as a dimmer-only lamp shows it
-            lvl = max(dimmed(s), s.white) if rgb_level else 1.0
-            v = round(min(max(lvl, 0), 1, ceiling) * 255)
-        elif "default" in c:
+        elif op == _DEFAULT:
             v = c["default"]
-        elif a == "pan":
+        elif op == _RGB:
+            scale = dim if rgb_level else 1.0
+            if 0 <= lens < len(shares):  # a bee eye's lens: its share of the pattern
+                scale *= shares[lens]
+            v = round(
+                min(max(((s.r if a == "red" else s.g if a == "green" else s.b) + s.white) * scale, 0), 1) * ceil * 255
+            )
+        elif op == _WHITE:
+            scale = dim if rgb_level else 1.0
+            if 0 <= lens < len(shares):
+                scale *= shares[lens]
+            v = round(min(max(s.white * scale, 0), 1) * ceil * 255)
+        elif op == _CELL_DIM:  # this cell's own dimmer
+            v = round(level * 255)
+        elif op == _DIM:
+            v = 255 if per_head_colour else round(level * 255)
+        elif op == _DIM_F:  # low byte of a 16-bit dimmer
+            v = 255 if per_head_colour else round(level * 65535) & 255
+        elif op == _PAN:
             v = p16 >> 8
-        elif a == "pan_fine":
+        elif op == _PAN_F:
             v = p16 & 255
-        elif a in ("tilt", "tilt_fine") and "head" in c:  # this cell's own motor
+        elif op == _TILT:
+            v = t16 >> 8
+        elif op == _TILT_F:
+            v = t16 & 255
+        elif op == _CELL_TILT:  # this cell's own motor
             tc = s.tilt if getattr(s, "dmx_tilt", None) is None else s.dmx_tilt
             tc16 = int(min(max(tc, tilt_l[0], 0), tilt_l[1], 1) * 65535)
             v = tc16 >> 8 if a == "tilt" else tc16 & 255
-        elif a == "tilt":
-            v = t16 >> 8
-        elif a == "tilt_fine":
-            v = t16 & 255
-        elif a == "dimmer" and "head" in c:  # this cell's own dimmer
-            v = round(level * 255)
-        elif a == "dimmer":
-            v = 255 if per_head_colour else round(level * 255)
-        elif a == "dimmer_fine":  # low byte of a 16-bit dimmer
-            v = 255 if per_head_colour else round(level * 65535) & 255
-        elif a in ("cyan", "magenta", "yellow"):  # subtractive: filter out what the colour lacks
+        elif op == _WHEEL:
+            if getattr(first, "lcolor", "") in defn.get("laser", {}).get("color_modes", {}):
+                v = defn["laser"]["color_modes"][first.lcolor]  # laser multicolour modes
+            else:
+                v = (slot["from"] + slot["to"]) // 2
+        elif op == _CMY:  # subtractive: filter out what the colour lacks
             mx = max(s.r, s.g, s.b) + s.white
-            base = {"cyan": s.r, "magenta": s.g, "yellow": s.b}[a] + s.white
-            v = 0 if mx < 1e-6 else round(min(max(1 - base / mx, 0), 1) * 255)
-        elif a in ("red", "green", "blue"):
-            base = {"red": s.r, "green": s.g, "blue": s.b}[a]
-            v = round(min(max((base + s.white) * scale, 0), 1) * ceiled(s) * 255)
-        elif a == "white":
-            v = round(min(max(s.white * scale, 0), 1) * ceiled(s) * 255)
-        elif a == "color_wheel" and getattr(first, "lcolor", "") in defn.get("laser", {}).get("color_modes", {}):
-            v = defn["laser"]["color_modes"][first.lcolor]  # laser multicolour modes
-        elif a == "color_wheel":
-            v = (slot["from"] + slot["to"]) // 2
-        elif a == "ring_color":
-            v = ring_value(defn, fx.get("id", ""), first)
-        elif a == "zoom" and "tight" in c:  # the show's zoom between the lens's tightest and widest
+            base_c = (s.r if a == "cyan" else s.g if a == "magenta" else s.b) + s.white
+            v = 0 if mx < 1e-6 else round(min(max(1 - base_c / mx, 0), 1) * 255)
+        elif op == _ZOOM:  # the show's zoom between the lens's tightest and widest
             v = round(c["tight"] + (c["wide"] - c["tight"]) * zoom_of(s))
-        elif a.startswith("laser_") and "laser" in defn:
+        elif op == _ROLL:  # a bee eye's barrel roll
+            v = roll_value(c, turns)
+        elif op == _FOG:  # smoke output: the element's level (engine/fog.py), above the value where smoke starts
+            on = c.get("on_from", 1)
+            v = 0 if s.dimmer <= 0 else on + round(min(s.dimmer, 1.0) * (255 - on))
+        elif op == _FAN:  # a hazer's fan: spreads what it makes; resting when it makes nothing
+            v = round((0.4 + 0.6 * min(s.dimmer, 1.0)) * 255) if s.dimmer > 0 else c.get("default", 0)
+        elif op == _UV:  # its only colour: the level, as a dimmer-only lamp shows it
+            lvl = max(dim, s.white) if rgb_level else 1.0
+            v = round(min(max(lvl, 0), 1, ceiling) * 255)
+        elif op == _RING:
+            v = ring_value(defn, fid, first)
+        elif op == _LASER:
             v = _laser_value(a, defn["laser"], s)
         else:
             v = 0
