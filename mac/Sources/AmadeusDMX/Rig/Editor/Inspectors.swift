@@ -697,8 +697,14 @@ struct FixtureInspector: View {
     private func icon(_ kind: String?) -> String { FixtureIcon.symbol(kind) }
 }
 
+extension EnvironmentValues {
+    /// A slider pressed (true) or let go (false): the rig editor makes the changes in between one undo step.
+    @Entry var sliderEditing: (Bool) -> Void = { _ in }
+}
+
 /// A labelled slider with its value; snaps to `step`.
 struct ValueSlider: View {
+    @Environment(\.sliderEditing) private var editing
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -709,7 +715,7 @@ struct ValueSlider: View {
         LabeledContent(title) {
             HStack {
                 Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) },
-                                      set: { value = ($0 / step).rounded() * step }), in: range)
+                                      set: { value = ($0 / step).rounded() * step }), in: range, onEditingChanged: editing)
                 Text(unit == "°" ? "\(Int(value.rounded()))°" : String(format: "%.2f%@", value, unit))
                     .monospacedDigit().foregroundStyle(.secondary).frame(width: 58, alignment: .trailing)
             }
