@@ -35,6 +35,7 @@ public sealed partial class StageRenderer : IDisposable
     /// A buffer refilled every frame (Metal's setVertexBytes), grown when a frame needs more.
     sealed class DynamicBuffer(BindFlags bind, int stride, bool structured) : IDisposable
     {
+        public uint Stride => (uint)stride;
         public ID3D11Buffer? Buffer;
         public ID3D11ShaderResourceView? View;
         int _capacity;
@@ -103,13 +104,15 @@ public sealed partial class StageRenderer : IDisposable
     ID3D11DepthStencilView? depth;
     ID3D11Buffer? uniformsBuffer, wallParamsBuffer, blurBuffer;
     readonly DynamicBuffer _parts = new(BindFlags.VertexBuffer, SolidVertex.Size, false);
-    readonly DynamicBuffer _beams = new(BindFlags.ShaderResource, BeamInstance.Size, true);
-    readonly DynamicBuffer _sprites = new(BindFlags.ShaderResource, SpriteInstance.Size, true);
-    readonly DynamicBuffer _decals = new(BindFlags.ShaderResource, DecalInstance.Size, true);
-    readonly DynamicBuffer _lines = new(BindFlags.ShaderResource, LineInstance.Size, true);
-    readonly DynamicBuffer _goboBeams = new(BindFlags.ShaderResource, GoboBeamInstance.Size, true);
-    readonly DynamicBuffer _goboDecals = new(BindFlags.ShaderResource, GoboDecalInstance.Size, true);
-    readonly DynamicBuffer _zoneEdges = new(BindFlags.ShaderResource, LineInstance.Size, true);
+    // the instances: per-instance vertex data (input slot 1), which Direct3D 10's vertex shaders can read
+    readonly DynamicBuffer _beams = new(BindFlags.VertexBuffer, BeamInstance.Size, false);
+    readonly DynamicBuffer _sprites = new(BindFlags.VertexBuffer, SpriteInstance.Size, false);
+    readonly DynamicBuffer _decals = new(BindFlags.VertexBuffer, DecalInstance.Size, false);
+    readonly DynamicBuffer _lines = new(BindFlags.VertexBuffer, LineInstance.Size, false);
+    readonly DynamicBuffer _goboBeams = new(BindFlags.VertexBuffer, GoboBeamInstance.Size, false);
+    readonly DynamicBuffer _goboDecals = new(BindFlags.VertexBuffer, GoboDecalInstance.Size, false);
+    readonly DynamicBuffer _zoneEdges = new(BindFlags.VertexBuffer, LineInstance.Size, false);
+    const uint InstanceSlot = 1;
     // auto exposure: the mean of the quarter-size light buffer, read back a couple of frames later (no stall)
     readonly ID3D11Texture2D?[] _stats = new ID3D11Texture2D?[3];
     int _statsFrame;
@@ -134,9 +137,18 @@ public sealed partial class StageRenderer : IDisposable
         }
     }
 
+    /// The highest feature level asked for: `-d3dFeatureLevel 10.0` (or 10.1, 11.0) tries the stage as older graphics
+    /// draw it, on any card (for testing).
+    static FeatureLevel[] Levels(string? cap)
+    {
+        FeatureLevel[] all = [FeatureLevel.Level_11_1, FeatureLevel.Level_11_0, FeatureLevel.Level_10_1, FeatureLevel.Level_10_0];
+        var max = cap switch { "10.0" or "10_0" => FeatureLevel.Level_10_0, "10.1" or "10_1" => FeatureLevel.Level_10_1, "11.0" or "11_0" => FeatureLevel.Level_11_0, _ => FeatureLevel.Level_11_1 };
+        return all.Where(l => l <= max).ToArray();
+    }
+
     void CreateDevice()
     {
-        FeatureLevel[] levels = [FeatureLevel.Level_11_1, FeatureLevel.Level_11_0, FeatureLevel.Level_10_1, FeatureLevel.Level_10_0];
+        var levels = Levels(Defaults.Standard.String("d3dFeatureLevel"));
         var flags = DeviceCreationFlags.BgraSupport;
         var dev = Defaults.Standard.Bool("d3dDebug") ? flags | DeviceCreationFlags.Debug : flags;
         var hr = D3D11.D3D11CreateDevice(null, DriverType.Hardware, dev, levels, out var device, out var level, out var context);
@@ -317,8 +329,7 @@ public sealed partial class StageRenderer : IDisposable
         if (f.GoboDecals.Count > 0 && goboView is not null)
         {
             Use(goboDecalPipe!, lightDepth);
-            ctx.VSSetShaderResource(0, _goboDecals.View!);
-            ctx.PSSetShaderResource(0, _goboDecals.View!);
+            ctx.IASetVertexBuffer(InstanceSlot, _goboDecals.Buffer!, GoboDecalInstance.Size);
             ctx.PSSetShaderResource(1, goboView);
             ctx.DrawInstanced(6, (uint)f.GoboDecals.Count, 0, 0);
             UnbindShaderResources();
@@ -327,8 +338,7 @@ public sealed partial class StageRenderer : IDisposable
         {
             Use(goboBeamPipe!, lightDepth);
             ctx.IASetVertexBuffer(0, cappedConeBuffer!, 12);
-            ctx.VSSetShaderResource(0, _goboBeams.View!);
-            ctx.PSSetShaderResource(0, _goboBeams.View!);
+            ctx.IASetVertexBuffer(InstanceSlot, _goboBeams.Buffer!, GoboBeamInstance.Size);
             ctx.PSSetShaderResource(1, goboView);
             ctx.DrawInstanced((uint)cappedConeCount, (uint)f.GoboBeams.Count, 0, 0);
             UnbindShaderResources();
@@ -337,7 +347,7 @@ public sealed partial class StageRenderer : IDisposable
         {
             Use(beamPipe!, lightDepth);
             ctx.IASetVertexBuffer(0, coneBuffer!, 12);
-            ctx.VSSetShaderResource(0, _beams.View!);
+            ctx.IASetVertexBuffer(InstanceSlot, _beams.Buffer!, BeamInstance.Size);
             ctx.DrawInstanced((uint)coneCount, (uint)f.Beams.Count, 0, 0);
         }
         if (f.Lines.Count > 0) Instanced(linePipe!, _lines, 6, f.Lines.Count);
@@ -401,7 +411,7 @@ public sealed partial class StageRenderer : IDisposable
     void Instanced(Pipeline p, DynamicBuffer instances, int vertices, int count)
     {
         Use(p, lightDepth);
-        Context.VSSetShaderResource(0, instances.View!);
+        Context.IASetVertexBuffer(InstanceSlot, instances.Buffer!, instances.Stride);
         Context.DrawInstanced((uint)vertices, (uint)count, 0, 0);
     }
 

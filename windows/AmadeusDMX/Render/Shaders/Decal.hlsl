@@ -1,11 +1,8 @@
 // The spots where beams land on the floor, the walls and the ceiling (decals).
 #include "Common.hlsli"
 
-StructuredBuffer<DecalInstance> decalInstances : register(t0);
-
-QuadOut decal_vertex(uint vid : SV_VertexID, uint iid : SV_InstanceID)
+QuadOut decal_vertex(uint vid : SV_VertexID, DecalInstance s)
 {
-    DecalInstance s = decalInstances[iid];
     float3 n = normalize(s.normal.xyz);
     float3 side = abs(n.z) < 0.95 ? float3(0, 0, 1) : float3(1, 0, 0);
     float3 a = normalize(cross(n, side)), b = cross(n, a);

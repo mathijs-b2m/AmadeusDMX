@@ -1,4 +1,4 @@
-// `AmadeusDMX.exe -renderSelfTest`: draws the sample club rig (SceneSamples) offscreen with the real renderer, from
+// `AmadeusDMX.exe -renderSelfTest [-d3dFeatureLevel 10.0]`: draws the sample club rig (SceneSamples) offscreen with the real renderer, from
 // three cameras, into PNGs in %TEMP% (amadeus-stage-*.png) with a report (amadeus-stage-selftest.txt), then quits
 // without starting the app. Exit code 0 when every picture was drawn and isn't empty. For checking the Direct3D half
 // on a Windows machine (the Mac checks the rest: RenderTests).
@@ -18,6 +18,8 @@ public static class RenderSelfTest
 
     public static int Run()
     {
+        // -d3dFeatureLevel 10.0: as older graphics draw it (the flag itself out: `-key value` would take the next word)
+        Defaults.Standard = new Defaults(null, Environment.GetCommandLineArgs().Where(a => !Requested([a])).ToArray());
         var dir = Path.GetTempPath();
         var report = new List<string> { $"Amadeus DMX render self-test, {DateTime.Now.ToString("u", CultureInfo.InvariantCulture)}" };
         var ok = true;

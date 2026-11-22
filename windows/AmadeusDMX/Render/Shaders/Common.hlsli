@@ -1,4 +1,4 @@
-// HLSL (Shader Model 5.0, D3DCompiler) port of mac/Sources/AmadeusDMX/Render/Shaders.swift: what every stage
+// HLSL (Shader Model 4.0, D3DCompiler: Direct3D 10 graphics too) port of mac/Sources/AmadeusDMX/Render/Shaders.swift: what every stage
 // shader shares. ShaderLibrary.cs pastes this file in place of `#include "Common.hlsli"`.
 //
 // World: x across the stage, y towards the audience, z up (metres), like the engine.
@@ -9,10 +9,11 @@
 //   Uniforms        buffer(1)  → cbuffer b0 (vertex and pixel)
 //   WallParams      buffer(3)  → cbuffer b1 (pixel)
 //   BlurParams      (MPS blur) → cbuffer b2 (pixel)
-//   instances       buffer(2)  → StructuredBuffer t0 (vertex)
+//   instances       buffer(2)  → per-instance vertex data in input slot 1 (INSTANCE0.., one float4 each; Direct3D 10's
+//                                vertex shaders can't read a StructuredBuffer)
 //   textures        texture(n) → Texture2D tn (pixel), sampler s0: linear, clamp to edge
-//   gobo beams and decals read their instances in the pixel shader too (StructuredBuffer t0 in both stages), the
-//   gobo pictures are a Texture2DArray at t1 (Metal's texture(0))
+//   gobo beams and decals need their instance in the pixel shader too: the vertex shader passes it on unchanged
+//   (nointerpolation); the gobo pictures are a Texture2DArray at t1 (Metal's texture(0))
 // Matrices are column_major (the C# side stores Swift's column-major float4x4), multiplied mul(M, v) like Metal's M * v.
 // Keep the structs in step with Render/GPUTypes.cs (RenderTests compares the sizes).
 
@@ -38,15 +39,17 @@ cbuffer BlurParams : register(b2)
     float4 blurStep;    // xy one texel along the pass's direction (uv), z sigma (texels)
 };
 
-struct BeamInstance { float4 apexLen; float4 dirRadius; float4 colorIntensity; float4 extra; };  // extra.x = lens radius, y = reference radius (BeamLight)
-struct SpriteInstance { float4 centerSize; float4 colorIntensity; float4 extra; };              // extra.x = hardness
-struct DecalInstance { float4 centerRadius; float4 normal; float4 colorIntensity; };
-struct LineInstance { float4 p0Width; float4 p1; float4 colorIntensity; };
+struct BeamInstance { float4 apexLen : INSTANCE0; float4 dirRadius : INSTANCE1; float4 colorIntensity : INSTANCE2; float4 extra : INSTANCE3; };  // extra.x = lens radius, y = reference radius (BeamLight)
+struct SpriteInstance { float4 centerSize : INSTANCE0; float4 colorIntensity : INSTANCE1; float4 extra : INSTANCE2; };              // extra.x = hardness
+struct DecalInstance { float4 centerRadius : INSTANCE0; float4 normal : INSTANCE1; float4 colorIntensity : INSTANCE2; };
+struct LineInstance { float4 p0Width : INSTANCE0; float4 p1 : INSTANCE1; float4 colorIntensity : INSTANCE2; };
 // gobos (GoboBeam.hlsl, GoboDecal.hlsl). wheel: x the picture (texture slice; -1: the open hole), y the next one on the
 // wheel, z how far the wheel has turned towards it (0..1), w the lens radius; axis: xyz the picture's x direction
 // across the beam, w its rotation
-struct GoboBeamInstance { float4 apexLen; float4 dirRadius; float4 colorIntensity; float4 wheel; float4 axis; };
-struct GoboDecalInstance { float4 centerRadius; float4 normal; float4 colorIntensity; float4 apexLen; float4 dirK; float4 wheel; float4 axis; };
+struct GoboBeamInstance { float4 apexLen : INSTANCE0; float4 dirRadius : INSTANCE1; float4 colorIntensity : INSTANCE2; float4 wheel : INSTANCE3;
+                          float4 axis : INSTANCE4; };
+struct GoboDecalInstance { float4 centerRadius : INSTANCE0; float4 normal : INSTANCE1; float4 colorIntensity : INSTANCE2; float4 apexLen : INSTANCE3;
+                           float4 dirK : INSTANCE4; float4 wheel : INSTANCE5; float4 axis : INSTANCE6; };
 
 SamplerState smp : register(s0);
 
@@ -107,9 +110,25 @@ float3 gobo_at(Texture2DArray<float4> pics, float2 q, float4 wheel, float rot, f
 
 float3 beam_axis(float3 axis, float3 d) { return normalize(axis - d * dot(axis, d) + float3(1e-6, 0, 0)); }
 
-struct GoboOut
+// the instance, unchanged for every pixel (the pixel shader marches through the beam with it)
+struct GoboBeamOut
 {
     float4 pos : SV_Position;
     float3 world : TEXCOORD0;
-    nointerpolation uint iid : TEXCOORD1;
+    nointerpolation float4 apexLen : TEXCOORD1;
+    nointerpolation float4 dirRadius : TEXCOORD2;
+    nointerpolation float4 colorIntensity : TEXCOORD3;
+    nointerpolation float4 wheel : TEXCOORD4;
+    nointerpolation float4 axis : TEXCOORD5;
+};
+
+struct GoboDecalOut
+{
+    float4 pos : SV_Position;
+    float3 world : TEXCOORD0;
+    nointerpolation float4 colorIntensity : TEXCOORD1;
+    nointerpolation float4 apexLen : TEXCOORD2;
+    nointerpolation float4 dirK : TEXCOORD3;
+    nointerpolation float4 wheel : TEXCOORD4;
+    nointerpolation float4 axis : TEXCOORD5;
 };

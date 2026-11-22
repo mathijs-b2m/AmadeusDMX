@@ -4,25 +4,23 @@
 
 struct ConeIn { float3 local : POSITION; };   // x = cos, y = sin, z = 0 (lens) .. 1 (end)
 
-StructuredBuffer<GoboBeamInstance> goboBeams : register(t0);
 Texture2DArray<float4> goboPictures : register(t1);
 
-GoboOut gobo_beam_vertex(ConeIn i, uint iid : SV_InstanceID)
+GoboBeamOut gobo_beam_vertex(ConeIn i, GoboBeamInstance b)
 {
-    GoboBeamInstance b = goboBeams[iid];
     float3 d = normalize(b.dirRadius.xyz + float3(0, 0, 1e-7));
     float3 bu = beam_axis(b.axis.xyz, d), bv = cross(d, bu);
     float r = lerp(b.wheel.w, b.dirRadius.w, i.local.z);
-    GoboOut o;
+    GoboBeamOut o;
     o.world = b.apexLen.xyz + d * (i.local.z * b.apexLen.w) + (bu * i.local.x + bv * i.local.y) * r;
     o.pos = project(o.world);
-    o.iid = iid;
+    o.apexLen = b.apexLen; o.dirRadius = b.dirRadius; o.colorIntensity = b.colorIntensity; o.wheel = b.wheel; o.axis = b.axis;
     return o;
 }
 
-float4 gobo_beam_fragment(GoboOut i) : SV_Target
+float4 gobo_beam_fragment(GoboBeamOut b) : SV_Target
 {
-    GoboBeamInstance b = goboBeams[i.iid];
+    GoboBeamOut i = b;
     // how much of the world one pixel covers per metre of distance (for the picture's detail, below)
     float pixel = length(fwidth(i.world)) / max(distance(i.world, camPos.xyz), 0.1);
     float3 A = b.apexLen.xyz, d = normalize(b.dirRadius.xyz + float3(0, 0, 1e-7));
