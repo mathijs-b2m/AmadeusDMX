@@ -173,9 +173,14 @@ public class RenderTests
         var m = Regex.Match(source, @"(?:struct|cbuffer)\s+" + type + @"\b[^{]*\{(?<body>[^}]*)\}");
         Assert.True(m.Success, type);
         var size = 0;
-        foreach (Match f in Regex.Matches(m.Groups["body"].Value, @"\b(float4x4|float4)\s+(\w+)\s*(?:\[(\d+)\])?\s*;"))
+        var slot = 0;
+        // (an instance's members carry INSTANCE0, 1, … in order: the input layout puts element k at 16 k bytes)
+        foreach (Match f in Regex.Matches(m.Groups["body"].Value, @"\b(float4x4|float4)\s+(\w+)\s*(?:\[(\d+)\])?\s*(?::\s*INSTANCE(?<k>\d+)\s*)?;"))
+        {
+            if (f.Groups["k"].Success) Assert.Equal(slot++, int.Parse(f.Groups["k"].Value));
             size += (f.Groups[1].Value == "float4x4" ? 64 : 16) * (f.Groups[3].Success ? int.Parse(f.Groups[3].Value) : 1);
-        Assert.False(Regex.IsMatch(m.Groups["body"].Value, @"\b(float|float2|float3|int|uint)\s+\w+\s*;"), $"{type}: only float4s");
+        }
+        Assert.False(Regex.IsMatch(m.Groups["body"].Value, @"\b(float|float2|float3|int|uint)\s+\w+\s*(?::\s*\w+\s*)?;"), $"{type}: only float4s");
         return size;
     }
 

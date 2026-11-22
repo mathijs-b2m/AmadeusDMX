@@ -18,8 +18,9 @@ public sealed partial class StageRenderer
 
         Pipeline Pipe(string file, string v, string f, InputElementDescription[]? layout, ID3D11BlendState? blend)
         {
-            var vs = ShaderLibrary.Bytecode(file, v, "vs_5_0");
-            var ps = ShaderLibrary.Bytecode(file, f, "ps_5_0");
+            // Shader Model 4.0: Direct3D 10 graphics (feature level 10.0) draw the stage too
+            var vs = ShaderLibrary.Bytecode(file, v, "vs_4_0");
+            var ps = ShaderLibrary.Bytecode(file, f, "ps_4_0");
             return new Pipeline(Device.CreateVertexShader(vs), Device.CreatePixelShader(ps),
                 layout is null ? null : Device.CreateInputLayout(layout, vs), blend);
         }
@@ -30,6 +31,14 @@ public sealed partial class StageRenderer
             new("COLOR", 0, Format.R32G32B32A32_Float, SolidVertex.ColorOffset, 0),
         ];
         InputElementDescription[] coneVD = [new("POSITION", 0, Format.R32G32B32_Float, 0, 0)];
+        // the instances: per-instance vertex data in slot 1, one float4 each (INSTANCE0..), after the slot-0 vertices
+        static InputElementDescription[] Instances(int float4s, InputElementDescription[]? vertices = null) =>
+        [
+            .. vertices ?? [],
+            .. Enumerable.Range(0, float4s).Select(k =>
+                new InputElementDescription("INSTANCE", (uint)k, Format.R32G32B32A32_Float, (uint)(16 * k), InstanceSlot,
+                                            InputClassification.PerInstanceData, 1)),
+        ];
         InputElementDescription[] wallVD =
         [
             new("POSITION", 0, Format.R32G32B32_Float, 0, 0),
@@ -45,12 +54,12 @@ public sealed partial class StageRenderer
 
         solidPipe = Pipe("Solid.hlsl", "solid_vertex", "solid_fragment", solidVD, null);
         wallPipe = Pipe("Wall.hlsl", "wall_vertex", "wall_fragment", wallVD, null);
-        beamPipe = Pipe("Beam.hlsl", "beam_vertex", "beam_fragment", coneVD, additive);
-        spritePipe = Pipe("Sprite.hlsl", "sprite_vertex", "sprite_fragment", null, additive);
-        decalPipe = Pipe("Decal.hlsl", "decal_vertex", "decal_fragment", null, additive);
-        linePipe = Pipe("Line.hlsl", "line_vertex", "line_fragment", null, additive);
-        goboBeamPipe = Pipe("GoboBeam.hlsl", "gobo_beam_vertex", "gobo_beam_fragment", coneVD, additive);
-        goboDecalPipe = Pipe("GoboDecal.hlsl", "gobo_decal_vertex", "gobo_decal_fragment", null, additive);
+        beamPipe = Pipe("Beam.hlsl", "beam_vertex", "beam_fragment", Instances(BeamInstance.Size / 16, coneVD), additive);
+        spritePipe = Pipe("Sprite.hlsl", "sprite_vertex", "sprite_fragment", Instances(SpriteInstance.Size / 16), additive);
+        decalPipe = Pipe("Decal.hlsl", "decal_vertex", "decal_fragment", Instances(DecalInstance.Size / 16), additive);
+        linePipe = Pipe("Line.hlsl", "line_vertex", "line_fragment", Instances(LineInstance.Size / 16), additive);
+        goboBeamPipe = Pipe("GoboBeam.hlsl", "gobo_beam_vertex", "gobo_beam_fragment", Instances(GoboBeamInstance.Size / 16, coneVD), additive);
+        goboDecalPipe = Pipe("GoboDecal.hlsl", "gobo_decal_vertex", "gobo_decal_fragment", Instances(GoboDecalInstance.Size / 16), additive);
         compositePipe = Pipe("Post.hlsl", "fullscreen_vertex", "composite_fragment", null, null);
         downsamplePipe = Pipe("Post.hlsl", "fullscreen_vertex", "downsample_fragment", null, null);
         blurPipe = Pipe("Post.hlsl", "fullscreen_vertex", "blur_fragment", null, null);

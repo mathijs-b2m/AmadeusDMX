@@ -3,11 +3,8 @@
 
 struct LineOut { float4 pos : SV_Position; float across : TEXCOORD0; float along : TEXCOORD1; float4 color : COLOR0; };
 
-StructuredBuffer<LineInstance> lineInstances : register(t0);
-
-LineOut line_vertex(uint vid : SV_VertexID, uint iid : SV_InstanceID)
+LineOut line_vertex(uint vid : SV_VertexID, LineInstance s)
 {
-    LineInstance s = lineInstances[iid];
     float2 q = QUAD[vid];
     float t = q.x * 0.5 + 0.5;
     float3 p = lerp(s.p0Width.xyz, s.p1.xyz, t);

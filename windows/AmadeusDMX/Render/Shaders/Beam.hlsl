@@ -7,11 +7,8 @@ struct ConeIn { float3 local : POSITION; };   // x = cos, y = sin, z = 0 (lens) 
 struct BeamOut { float4 pos : SV_Position; float3 world : TEXCOORD0; float3 normal : TEXCOORD1; float along : TEXCOORD2; float4 color : COLOR0;
                  float radius : TEXCOORD3; float dist : TEXCOORD4; float refR : TEXCOORD5; };
 
-StructuredBuffer<BeamInstance> beamInstances : register(t0);
-
-BeamOut beam_vertex(ConeIn i, uint iid : SV_InstanceID)
+BeamOut beam_vertex(ConeIn i, BeamInstance b)
 {
-    BeamInstance b = beamInstances[iid];
     float3 d = normalize(b.dirRadius.xyz + float3(0, 0, 1e-7));
     float3 side = abs(d.z) < 0.95 ? float3(0, 0, 1) : float3(1, 0, 0);
     float3 bu = normalize(cross(d, side)), bv = cross(d, bu);

@@ -4,8 +4,9 @@
 // - Constant buffers (Uniforms, WallParams, BlurParams) follow HLSL's cbuffer rules: members never straddle a 16-byte
 //   boundary, every array element starts on one, and the buffer's size is a multiple of 16. Everything here is float4
 //   or float4x4, so the C# structs are packed tight and match (sizes checked in RenderTests).
-// - Instance data (BeamInstance, SpriteInstance, DecalInstance, LineInstance, GoboBeamInstance, GoboDecalInstance) is read in the vertex shader as a
-//   StructuredBuffer (Metal: `const device T*`), whose stride is the C# struct's size; float4 only, so no padding.
+// - Instance data (BeamInstance, SpriteInstance, DecalInstance, LineInstance, GoboBeamInstance, GoboDecalInstance) goes
+//   in as per-instance vertex data (Metal: `const device T*`; a StructuredBuffer would leave Direct3D 10 graphics out),
+//   one float4 per INSTANCEn element, the stride the C# struct's size; float4 only, so no padding.
 // - Vertex buffers (SolidVertex, WallVertex, the cone's float3) go through an input layout with explicit offsets.
 //   Swift's SIMD3<Float> takes 16 bytes (a SolidVertex is 48 there); here a Vector3 is 12 and a SolidVertex 40.
 using System.Numerics;

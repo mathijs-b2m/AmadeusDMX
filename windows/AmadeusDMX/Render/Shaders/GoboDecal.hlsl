@@ -1,26 +1,24 @@
 // Where a gobo beam lands on the floor, the walls and the ceiling: the gobo's picture, projected.
 #include "Common.hlsli"
 
-StructuredBuffer<GoboDecalInstance> goboDecals : register(t0);
 Texture2DArray<float4> goboPictures : register(t1);
 
-GoboOut gobo_decal_vertex(uint vid : SV_VertexID, uint iid : SV_InstanceID)
+GoboDecalOut gobo_decal_vertex(uint vid : SV_VertexID, GoboDecalInstance g)
 {
-    GoboDecalInstance g = goboDecals[iid];
     float3 n = normalize(g.normal.xyz);
     float3 side = abs(n.z) < 0.95 ? float3(0, 0, 1) : float3(1, 0, 0);
     float3 a = normalize(cross(n, side)), b = cross(n, a);
     float2 q = QUAD[vid];
-    GoboOut o;
+    GoboDecalOut o;
     o.world = g.centerRadius.xyz + n * 0.014 + (a * q.x + b * q.y) * g.centerRadius.w * g.normal.w;
     o.pos = project(o.world);
-    o.iid = iid;
+    o.colorIntensity = g.colorIntensity; o.apexLen = g.apexLen; o.dirK = g.dirK; o.wheel = g.wheel; o.axis = g.axis;
     return o;
 }
 
-float4 gobo_decal_fragment(GoboOut i) : SV_Target
+float4 gobo_decal_fragment(GoboDecalOut g) : SV_Target
 {
-    GoboDecalInstance g = goboDecals[i.iid];
+    GoboDecalOut i = g;
     float3 A = g.apexLen.xyz, d = normalize(g.dirK.xyz + float3(0, 0, 1e-7));
     float3 bu = beam_axis(g.axis.xyz, d), bv = cross(d, bu);
     float a = max(dot(i.world - A, d), 1e-3);

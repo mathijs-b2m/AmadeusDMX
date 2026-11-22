@@ -1,11 +1,8 @@
 // Camera-facing sprites: lenses, flares.
 #include "Common.hlsli"
 
-StructuredBuffer<SpriteInstance> spriteInstances : register(t0);
-
-QuadOut sprite_vertex(uint vid : SV_VertexID, uint iid : SV_InstanceID)
+QuadOut sprite_vertex(uint vid : SV_VertexID, SpriteInstance s)
 {
-    SpriteInstance s = spriteInstances[iid];
     float2 q = QUAD[vid];
     float3 w = s.centerSize.xyz + (camRight.xyz * q.x + camUp.xyz * q.y) * s.centerSize.w;
     QuadOut o;
