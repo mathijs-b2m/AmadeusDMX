@@ -115,6 +115,16 @@ RUN_STEPS = 4  # a lap has at most this many steps: the pairs, middle out, in as
 MELODY_TAU = 0.7  # how long a melody note keeps its par lit
 
 
+# a colour wave through the heads (head_color "wave"): the crest crosses the row in this share of a bar, left to
+# right, then back the next bar; each head takes the wave's colour as it arrives, holds it and lets it go (in beats)
+WAVE_SPREAD, WAVE_HOLD, WAVE_RELEASE = 0.75, 0.3, 0.9
+WAVE_WHITE_BASE = 0.8  # a base this pale (its weakest emitter) has no white to show: the wave plays the accent
+# a colour wheel can't blend: the wave wipes it to the slot next to the look's colour (the one nearest the wave's
+# colour: the shortest turn), and back on the next pass. The wheels hide each turn in the dark (engine/wheels.py):
+# in a pulse's gap every pass plays; under a steady beam a turn waits for a gap or the planner's dip, at most every
+# other bar, and the passes in between are skipped. The wave never darkens a beam itself: that flickers.
+
+
 PAR_BASE_LEVEL = {"off": 0.0, "dim": 0.22, "full": 0.75, "fade": 0.5, "sides": 0.6}
 STROBE_WASH = 0.8  # an LED strobe with colour holds the pars' glow, a little under them (it is far brighter)
 
@@ -780,6 +790,78 @@ class LooksMixin:
         with left and right alike; `sides` plays left against right, by where it stands."""
         return (k, n) if pattern == "sides" else self.turn.get(eid, (k, n))
 
+    def _colour_wave(self, t: float, rank: int, n: int) -> float:
+        """How much of the wave's colour a head shows (0..1): the crest starts on the downbeat at the stage-left end
+        and crosses the row in WAVE_SPREAD of the bar (back from stage right the bar after); each head plays it as
+        a note: on as it arrives, held, let go gently. Colour only: the beams' level stays the look's."""
+        bars = self.downbeat_times
+        k = bisect.bisect_right(bars, t) - 1
+        place = rank / (n - 1) if n > 1 else 0.0
+        v = 0.0
+        for b in (k - 1, k):  # (the bar before's crest may still be letting go)
+            if b < 0:
+                continue
+            start = float(bars[b])
+            length = float(bars[b + 1]) - start if b + 1 < len(bars) else 4 * self._beat_s()
+            beat = length / 4
+            r = place if b % 2 == 0 else 1.0 - place
+            dt = t - start - r * WAVE_SPREAD * length
+            if dt >= 0:
+                v = max(v, _release(dt, 1.0, WAVE_HOLD * beat, WAVE_RELEASE * beat))
+        return v
+
+    def _wheel_wave(self, d, t: float, eid: str, rank: int, n: int, base, crest) -> tuple:
+        """A wheel head's colour in a colour wave: the look's, or the slot next to it nearest the wave's colour. A
+        wipe once a bar from stage left, there in one bar and back the next; the phrase starts and ends in the
+        look's colour."""
+        from amadeus.engine.wheels import travel_s
+
+        w = self.wheel_heads[eid]
+        slots, home = w.slots, w.index(base)
+        k = len(slots)
+
+        def other(way: int) -> int:  # the next slot round the wheel that is another colour (wheels repeat colours)
+            i = home
+            for _ in range(k - 1):
+                i = (i + way) % k
+                if tuple(slots[i]["rgb"]) != tuple(slots[home]["rgb"]):
+                    return i
+            return home
+
+        def gap(i: int) -> float:
+            return sum((a - b) ** 2 for a, b in zip(slots[i]["rgb"], crest, strict=False))
+
+        near = min((other(-1), other(1)), key=lambda i: (gap(i), travel_s(k, w.slot_s, home, i)))
+        colours = (tuple(slots[home]["rgb"]), tuple(slots[near]["rgb"]))
+        if near == home:
+            return colours[0]
+        bars = self.downbeat_times
+        k0 = bisect.bisect_left(bars, d.start - 0.02)
+        b = bisect.bisect_right(bars, t) - 1
+        place = rank / (n - 1) if n > 1 else 0.0
+
+        def switch(bar: int) -> float:  # when the wipe reaches this head in a bar: always from stage left (there
+            # and back, the end heads would turn twice at once and never show the colour), on the beat nearest
+            # (the wheels hide a turn in the gaps the beat makes; between beats they would have to make one)
+            start = float(bars[bar])
+            length = float(bars[bar + 1]) - start if bar + 1 < len(bars) else 4 * self._beat_s()
+            at = start + place * WAVE_SPREAD * length
+            i = bisect.bisect_left(self.beats, at)
+            near = [float(self.beats[j]) for j in (i - 1, i) if 0 <= j < len(self.beats)]
+            return min(near, key=lambda x: abs(x - at), default=at)
+
+        def plays(bar: int) -> bool:  # a pass there only when the pass back fits in the phrase too: the phrase
+            # ends in the look's colour (a wheel left in the wave's would have to turn as the next look hits)
+            if (bar - k0) % 2:
+                return True
+            return bar + 1 < len(bars) and switch(bar + 1) < d.end - 0.1
+
+        now = 0  # passes made: the colour is the look's after an even number
+        for bar in range(max(k0, b - 1), b + 1):
+            if 0 <= bar < len(bars) and plays(bar - (bar - k0) % 2) and t >= switch(bar):
+                now = bar - k0 + 1
+        return colours[now % 2]
+
     def _x_rank(self, elements: list[dict]) -> dict[str, int]:
         """Elements ranked left to right (cached per list)."""
         cache = self.__dict__.setdefault("_x_ranks", {})
@@ -913,7 +995,16 @@ class LooksMixin:
             slot = self.turn.get(f["id"], (j, nh))[0]  # a section plays as one, left and right alike
             cycle = cols[(slot + step) % len(cols)]
             side = base if self.head_pos[j][0] <= self.stage["width_m"] / 2 else accent  # stage left | stage right
-            col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cycle, "sides": side}[hc]
+            wave = None  # a colour wave's crest at this head (0..1)
+            if hc in ("wave", "wave_accent"):  # the base colour, the wave's colour passing through
+                wave = self._colour_wave(t, rank[f["id"]], nh)
+                crest = accent if hc == "wave_accent" or min(base) >= WAVE_WHITE_BASE else (1.0, 1.0, 1.0)
+                if f["id"] in getattr(self, "wheel_heads", {}):
+                    col = self._wheel_wave(d, t, f["id"], rank[f["id"]], nh, base, crest)
+                else:
+                    col = _lerp(base, crest, wave)
+            else:
+                col = {"base": base, "accent": accent, "white": (1.0, 1.0, 1.0), "cycle": cycle, "sides": side}[hc]
             hl = d.head_light
             if hl == "off" and not self.pars:  # nothing else to carry the look: the heads keep a pulse
                 hl = "pulse"

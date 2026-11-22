@@ -282,6 +282,8 @@ HEAD_COLOR = [
     ("white", "Open white beams: crisp, cut through the colour."),
     ("cycle", "A new palette colour every bar."),
     ("sides", "Stage left in the base colour, stage right in the accent: the rig split down the middle."),
+    ("wave", "All heads in the base colour, a white wave running through them once a bar, there and back."),
+    ("wave_accent", "All heads in the base colour, an accent-colour wave running through them once a bar."),
 ]
 
 BEAM_FX = [  # what the moving heads' beam itself looks like (gobo wheel, prism, frost)
