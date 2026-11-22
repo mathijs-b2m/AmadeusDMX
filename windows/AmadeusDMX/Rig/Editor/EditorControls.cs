@@ -52,6 +52,10 @@ public static class EditorUI
             var snapped = Math.Round(v / step, MidpointRounding.AwayFromZero) * step;
             if (Math.Abs(snapped - get()) > 1e-9) set(snapped);
         }, step).MinWidth(120);
+        // a drag of the thumb (or along the track) is one undo step, not one per tick
+        slider.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler((_, _) => editor.BeginGesture()), true);
+        slider.AddHandler(UIElement.PointerReleasedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler((_, _) => editor.EndGesture()), true);
+        slider.AddHandler(UIElement.PointerCaptureLostEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler((_, _) => editor.EndGesture()), true);
         // no spacer: the slider takes all the room the label leaves, and a long label wraps rather than squeeze it under its MinWidth
         var row = UI.HStack(8, UI.Text(title).Wrap(), slider.Grow(), value);
         return row.Bind(editor, Follow, _ =>

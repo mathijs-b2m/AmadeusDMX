@@ -21,7 +21,11 @@ public sealed class RigEditorView(AppModel model, RigEditorModel editor)
 
     public FrameworkElement Build()
     {
+        _undo.LevelsOfUndo = 200;  // (each step a copy of the whole set on its rig)
         editor.UndoManager = _undo;
+        // a drag's and the hover's changes told once the pointer moves waiting are handled, not once per move
+        var queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        editor.Coalesce = tell => { if (!queue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => tell())) tell(); };
         _viewport = new EditorViewport(editor);
 
         var stage = new Grid { MinWidth = 520 };

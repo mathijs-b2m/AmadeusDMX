@@ -553,6 +553,83 @@ public class RigEditorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void ADragTellsItsChangesOncePerRunOfTheQueue()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var queued = new List<Action>();
+        e.Coalesce = queued.Add;
+        var told = 0;
+        e.PropertyChanged += (_, a) => { if (a.PropertyName == nameof(RigEditorModel.Version)) told++; };
+        var front = Tr(e, "front") with { };
+        Assert.True(e.Pick(Above(front.XM, front.YM), Down, false));
+        told = 0;
+        var v = e.Version;
+        for (var i = 1; i <= 20; i++) e.Drag(Above(front.XM, front.YM - 0.05 * i), Down, true);  // 20 moves before a frame
+        Assert.True(e.Version > v);       // the document and the scene's key follow every move
+        Assert.Equal(0, told);            // the views hear of it once the moves are handled
+        Assert.Single(queued);
+        queued[0]();
+        Assert.Equal(1, told);
+        e.Drag(Above(front.XM, front.YM - 1.5), Down, true);
+        e.EndDrag();                      // where it ended, at once
+        Assert.Equal(2, told);
+        Assert.Equal(front.YM - 1.5, Tr(e, "front").YM, 6);
+        Assert.True(e.IsDirty);
+    }
+
+    [Fact]
+    public void ASliderDragIsOneUndoStep()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var u = e.UndoManager!;
+        var width = e.Doc.Stage.WidthM;
+        e.BeginGesture();
+        foreach (var x in new[] { 0.5, 1.0, 1.5, 2.0 }) e.UpdateStage(s => s.WidthM = width + x);
+        e.EndGesture();
+        Assert.Equal(width + 2, e.Doc.Stage.WidthM, 6);
+        e.UpdateStage(s => s.CeilingM = 9);  // a change after it: a step of its own
+        u.Undo();
+        Assert.Equal(width + 2, e.Doc.Stage.WidthM, 6);
+        u.Undo();
+        Assert.Equal(width, e.Doc.Stage.WidthM, 6);  // the whole drag at once
+        Assert.False(e.IsDirty);
+        Assert.False(u.CanUndo);
+        foreach (var x in new[] { 1.0, 2.0 }) e.UpdateStage(s => s.WidthM = width + x);  // without a drag: a step each
+        u.Undo();
+        Assert.Equal(width + 1, e.Doc.Stage.WidthM, 6);
+    }
+
+    [Fact]
+    public void TheUndoHistoryIsCapped()
+    {
+        var u = new UndoManager { LevelsOfUndo = 3 };
+        var undone = new List<int>();
+        for (var i = 0; i < 5; i++) { var k = i; u.RegisterUndo(() => undone.Add(k)); }
+        while (u.CanUndo) u.Undo();
+        Assert.Equal([4, 3, 2], undone);  // the oldest two forgotten
+    }
+
+    [Fact]
+    public void TheStageInputIsBuiltOncePerChange()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var a = e.StageInput();
+        Assert.Same(a, e.StageInput());  // every frame asks: the same, nothing changed
+        e.Selection = EditorSelection.Truss("front");  // the selection changes on its own
+        var b = e.StageInput();
+        Assert.NotSame(a, b);
+        Assert.Contains("truss:front", b.Selected);
+        e.UpdateStage(s => s.CeilingM = 9);
+        var c = e.StageInput();
+        Assert.NotSame(b, c);
+        Assert.Equal(9, c.Stage.CeilingM, 6);
+        Assert.NotEqual(b.Key, c.Key);
+    }
+
+    [Fact]
     public void UndoRedoAndRevert()
     {
         using var w = new EditorWorkspace();

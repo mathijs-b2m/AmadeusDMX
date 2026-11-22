@@ -25,6 +25,14 @@ public sealed class UndoManager : Observable
     /// Foundation's flag; kept for the ported code (every registration outside a group is its own step here).
     public bool GroupsByEvent { get; set; } = true;
 
+    /// Foundation's levelsOfUndo: at most this many steps are kept, the oldest forgotten first (0: no limit). Every
+    /// step of the editor holds a copy of the whole set on its rig.
+    public int LevelsOfUndo { get; set; }
+
+    /// Goes up whenever the history changes (a step registered, undone or redone): a change can tell whether its
+    /// step is still the last one.
+    public int Steps { get; private set; }
+
     public bool CanUndo => _undo.Count > 0 || _open is { Actions.Count: > 0 };
     public bool CanRedo => _redo.Count > 0;
     public string UndoActionName => _open is { Actions.Count: > 0 } o ? o.Name : _undo.Count > 0 ? _undo[^1].Name : "";
@@ -50,7 +58,7 @@ public sealed class UndoManager : Observable
         var g = _open;
         _open = null;
         _level = 0;
-        if (g is { Actions.Count: > 0 }) _undo.Add(g);
+        if (g is { Actions.Count: > 0 }) Add(_undo, g);
         Tell();
     }
 
@@ -59,7 +67,7 @@ public sealed class UndoManager : Observable
         if (_collect is { } c) { c.Actions.Add(undo); return; }
         _redo.Clear();  // a new change: what was undone can't be redone any more
         if (_open is { } g) g.Actions.Add(undo);
-        else _undo.Add(new Group { Actions = { undo } });
+        else Add(_undo, new Group { Actions = { undo } });
         Tell();
     }
 
@@ -103,7 +111,7 @@ public sealed class UndoManager : Observable
             var back = _collect;
             _collect = null;
             // registered while the step ran last-first: run last-first again, they go first-first
-            if (back.Actions.Count > 0) (_undoing ? _redo : _undo).Add(back);
+            if (back.Actions.Count > 0) Add(_undoing ? _redo : _undo, back);
             Tell();
         }
     }
@@ -117,6 +125,16 @@ public sealed class UndoManager : Observable
         Tell();
     }
 
-    void Tell() => Changed(nameof(CanUndo), nameof(CanRedo), nameof(UndoActionName), nameof(RedoActionName),
-                           nameof(UndoMenuTitle), nameof(RedoMenuTitle));
+    void Add(List<Group> steps, Group g)
+    {
+        steps.Add(g);
+        if (LevelsOfUndo > 0 && steps.Count > LevelsOfUndo) steps.RemoveRange(0, steps.Count - LevelsOfUndo);
+    }
+
+    void Tell()
+    {
+        Steps++;
+        Changed(nameof(CanUndo), nameof(CanRedo), nameof(UndoActionName), nameof(RedoActionName),
+                nameof(UndoMenuTitle), nameof(RedoMenuTitle));
+    }
 }

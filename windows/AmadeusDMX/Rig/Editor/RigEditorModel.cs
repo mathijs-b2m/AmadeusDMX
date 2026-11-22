@@ -109,8 +109,42 @@ public sealed class RigEditorModel : Observable, IStageEditing
     readonly Workspace _workspace;
     (EditorSelection Sel, Vec3 Grab, Vec3 Start, RigDocument Before)? _drag;
     int _version;
-    /// Goes up with every change the stage should show (the scene's key).
-    public int Version { get => _version; private set { _version = value; Changed(nameof(Version), nameof(Doc), nameof(IsDirty)); } }
+    /// Goes up with every change the stage should show (the scene's key). One event says it: the views that show the
+    /// document, and whether it is saved, follow Version (Swift's views follow the whole model).
+    public int Version { get => _version; private set { _version = value; TellVersion(); } }
+
+    /// Set by the view: runs an action once the input waiting has been handled (WinUI: a low-priority dispatcher item).
+    /// A mouse sends far more moves than the screen shows frames (a gaming mouse 1,000 a second): what a drag or the
+    /// hover changes is told once per run of it, not per move. Null (the tests): told at once.
+    public Action<Action>? Coalesce { get; set; }
+    int _pointerMoving;
+    bool _versionPending;
+
+    void TellVersion()
+    {
+        if (_pointerMoving > 0 && Coalesce is { } later)
+        {
+            if (_versionPending) return;
+            _versionPending = true;
+            later(() =>
+            {
+                if (!_versionPending) return;  // told meanwhile
+                _versionPending = false;
+                Changed(nameof(Version));
+            });
+            return;
+        }
+        _versionPending = false;
+        Changed(nameof(Version));
+    }
+
+    /// A pointer move's work: its changes told once the moves waiting are handled (Coalesce).
+    void PointerMove(Action move)
+    {
+        _pointerMoving++;
+        try { move(); }
+        finally { _pointerMoving--; }
+    }
 
     public const double HangDrop = 0.42;   // a fixture under a truss: its beam centre below the truss centre
     public const double SideOut = 0.4;     // a fixture on the front/back face: its centre out from the truss centre
@@ -200,7 +234,19 @@ public sealed class RigEditorModel : Observable, IStageEditing
         return new RigEditorModel(workspace, d);
     }
 
-    public bool IsDirty => !Same(Doc, _saved);
+    (int Version, RigDocument Doc, RigDocument Saved, bool Dirty)? _dirty;
+    /// Unsaved changes. Every view's key asks for it on every change: compared once per version of the document (the
+    /// document changes in place only with a new Version; undo, revert and saving put other documents in).
+    public bool IsDirty
+    {
+        get
+        {
+            if (_dirty is { } m && m.Version == _version && ReferenceEquals(m.Doc, _doc) && ReferenceEquals(m.Saved, _saved)) return m.Dirty;
+            var dirty = !Same(_doc, _saved);
+            _dirty = (_version, _doc, _saved, dirty);
+            return dirty;
+        }
+    }
     public string RigName => Doc.Rig;
     public string SetName => Doc.Set;
 
@@ -240,9 +286,35 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     // MARK: - what the stage shows
 
+    (int Version, RigDocument Doc, IReadOnlyList<FixtureInfo> Elements)? _elements;
+    /// Every fixture's elements as placed now, built once per version of the document (the stage asks every frame).
+    IReadOnlyList<FixtureInfo> Elements()
+    {
+        if (_elements is { } c && c.Version == _version && ReferenceEquals(c.Doc, _doc)) return c.Elements;
+        var els = RigElements.Elements(Doc, Definition);
+        _elements = (_version, _doc, els);
+        return els;
+    }
+
+    (int Version, RigDocument Doc, EditorSelection? Selection, HashSet<string> Group, string? Drop, string? Hovered, bool Zones,
+     IReadOnlyList<Underlay> Underlays, StageInput Input)? _stageInput;
+
+    /// What the stage shows, asked for every frame: built again only when something it shows changed (all of that
+    /// gives a new Version, which is also the scene's key; the selection is checked too, it can change on its own).
     public StageInput StageInput()
     {
-        var els = RigElements.Elements(Doc, Definition);
+        if (_stageInput is { } c && c.Version == _version && ReferenceEquals(c.Doc, _doc) && c.Selection == Selection
+            && ReferenceEquals(c.Group, _group) && c.Drop == DropTarget && c.Hovered == _hovered && c.Zones == ShowZones
+            && ReferenceEquals(c.Underlays, _underlays))
+            return c.Input;
+        var input = BuildStageInput();
+        _stageInput = (_version, _doc, Selection, _group, DropTarget, _hovered, ShowZones, _underlays, input);
+        return input;
+    }
+
+    StageInput BuildStageInput()
+    {
+        var els = Elements();
         var selected = Selection is { } s ? new List<string> { s.Key } : [];
         selected.AddRange(_group.Select(id => $"fixture:{id}"));
         if (DropTarget is { } t) selected.Add($"truss:{t}");
@@ -261,13 +333,29 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     void Change(string name, Action<RigDocument> body)
     {
+        if (_gesture is { } g && g.Name == name && g.Steps == UndoManager?.Steps)
+        {
+            // the same slider still being dragged: one undo step for the whole drag (its first one), no copy per tick
+            body(Doc);
+            Version++;
+            ReaimTests();
+            return;
+        }
         var before = Doc.Clone();
         body(Doc);
         if (Same(Doc, before)) return;
         Version++;
         RegisterUndo(name, before);
+        if (_gesture is not null) _gesture = (name, UndoManager?.Steps);
         ReaimTests();
     }
+
+    (string? Name, int? Steps)? _gesture;
+
+    /// A slider (or another control the pointer drags) is pressed: its changes until EndGesture are one undo step.
+    public void BeginGesture() => _gesture = (null, null);
+
+    public void EndGesture() => _gesture = null;
 
     void RegisterUndo(string name, RigDocument before)
     {
@@ -287,7 +375,17 @@ public sealed class RigEditorModel : Observable, IStageEditing
     // MARK: - the venue
 
     /// How far behind the stage's front edge the room's back wall stands: where the rig puts it, else where it follows the rig.
-    public double RoomBack => Doc.Stage.RoomBackM ?? -new Room(Doc.Stage, RigElements.Elements(Doc, Definition), Doc.Trusses).Back;
+    public double RoomBack => Doc.Stage.RoomBackM ?? FollowedRoomBack();
+
+    (int Version, RigDocument Doc, double Back)? _roomBack;
+
+    double FollowedRoomBack()
+    {
+        if (_roomBack is { } c && c.Version == _version && ReferenceEquals(c.Doc, _doc)) return c.Back;
+        var back = -new Room(Doc.Stage, Elements(), Doc.Trusses).Back;
+        _roomBack = (_version, _doc, back);
+        return back;
+    }
 
     public void UpdateStage(Action<Stage> body) => UpdateStage(L("Change Stage"), body);
 
@@ -783,7 +881,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
     public AmadeusKit.Frame? TestFrame()  // AmadeusKit's: the app's global usings bring WinUI's Frame too
     {
         if (_lit.Count == 0) return null;
-        var els = RigElements.Elements(Doc, Definition);
+        var els = Elements();
         var on = els.Select(e => _lit.Contains(e.Fixture ?? e.Id)).ToArray();
         return new AmadeusKit.Frame(on.Select(o => o ? new float[] { 1, 1, 1, 1, 0, 0.5f, 0.5f } : [0, 0, 0, 0, 0, 0.5f, 0.5f]).ToArray(),
                          els.Zip(on, (e, o) => o && _testDirs.TryGetValue(e.Fixture ?? e.Id, out var d) ? d : (Vector3?)null).ToArray());
@@ -1723,11 +1821,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
     public const double FixtureCore = 0.2;     // a click this close to a fixture (m) is the fixture, not its truss
 
     /// The pointer moved over the stage: light up what a click would pick.
-    public void Hover(Vector3 origin, Vector3 dir)
+    public void Hover(Vector3 origin, Vector3 dir) => PointerMove(() =>
     {
         var key = Tool == EditorTool.Select ? Hit(S(origin), S(dir))?.Sel.Key : null;
         if (key != _hovered) { _hovered = key; Refresh(); }
-    }
+    });
 
     bool Grab((EditorSelection Sel, double Score, Vec3 At) b, bool extend)
     {
@@ -1772,7 +1870,9 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     static Vec3 TrussCentre(Truss t) => new(t.XM, t.YM, t.ZM);
 
-    public void Drag(Vector3 origin, Vector3 dir, bool free)
+    public void Drag(Vector3 origin, Vector3 dir, bool free) => PointerMove(() => DragNow(origin, dir, free));
+
+    void DragNow(Vector3 origin, Vector3 dir, bool free)
     {
         if (DragBuild(S(origin), S(dir), free)) return;
         if (_drag is not { } g) return;
@@ -1891,6 +1991,7 @@ public sealed class RigEditorModel : Observable, IStageEditing
 
     public void EndDrag()
     {
+        if (_versionPending) TellVersion();  // where the drag ended, at once
         if (_stretch is { } st)
         {
             _stretch = null;
@@ -1938,11 +2039,11 @@ public sealed class RigEditorModel : Observable, IStageEditing
         return ids.Count == 0 ? null : ids;
     }
 
-    public void DropHover(Vector3 origin, Vector3 dir)
+    public void DropHover(Vector3 origin, Vector3 dir) => PointerMove(() =>
     {
         var t = TrussNear(S(origin), S(dir), 0.8)?.Truss.Id;
         if (t != DropTarget) { DropTarget = t; Refresh(); }
-    }
+    });
 
     public void DropEnded()
     {
