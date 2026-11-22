@@ -852,6 +852,10 @@ class MotionMixin:
             az = np.full_like(ts, aim["az"] + side * (30 if f == "fan" else 15), dtype=float)
             if ring:
                 az = np.full_like(ts, self._crown_az(ring), dtype=float)
+            elif aim_name != "down" and geometry.over_ground(head_pos, self.stage) >= LOW_HEAD_M:
+                # the bottom of the wave lands over the crowd (the throw line), not at the stage: a low head lifts
+                # its wave rather than having it squeezed flat
+                centre = max(centre, float(geometry.throw_lowest_deg(head_pos, self.stage, az[0])) + amp)
             el = centre + amp * wave + role["vside"] * 6
             out = self._direction_v(az, el)
         elif ring and f in RING_FORMATIONS:  # a crown, a cone, a twister
@@ -896,10 +900,19 @@ class MotionMixin:
         the whole phrase (switching between them would jump)."""
         head_pos = self.head_pos[j]
         steep = geometry.room_safe_v(out, head_pos, self.stage)
-        if not self.stage.get("back_guard", True) or len(self.heads) < 2 or np.array_equal(steep, out):
-            return steep
-        side = geometry.room_safe_v(out, head_pos, self.stage, sideways=True)
-        return side if self._into_rig(side, j) < self._into_rig(steep, j) else steep
+        if self.stage.get("back_guard", True) and len(self.heads) >= 2 and not np.array_equal(steep, out):
+            side = geometry.room_safe_v(out, head_pos, self.stage, sideways=True)
+            steep = side if self._into_rig(side, j) < self._into_rig(steep, j) else steep
+        return self._throw_v(steep, j)
+
+    def _throw_v(self, out: np.ndarray, j: int) -> np.ndarray:
+        """Head j's beams towards the audience over the crowd, off the side walls by the stage (geometry.throw_v).
+        A truss that plays down onto the crowd under it keeps its steep beams; a low head aims up: only the walls."""
+        if getattr(self, "truss_aim", None) and self.truss_aim[j] == "down":
+            return out
+        head_pos = self.head_pos[j]
+        low = geometry.over_ground(head_pos, self.stage) < LOW_HEAD_M
+        return geometry.throw_v(out, head_pos, self.stage, floor=not low)
 
     def _into_rig(self, dirs: np.ndarray, j: int) -> int:
         """How many of head j's beams (rows of `dirs`) pass close by another head."""

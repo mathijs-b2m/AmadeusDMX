@@ -263,6 +263,72 @@ def room_safe_v(d: np.ndarray, head_pos, st: dict, sideways: bool = False) -> np
     return np.where(changed[:, None], fixed, d)
 
 
+THROW_SHARE = 0.4  # a beam towards the audience first meets the floor this share of the room's depth out
+THROW_MAX_M = 5.0  # … (at most this far past the stage's front edge): over and into the crowd, not at the DJ's feet
+THROW_WALL = (0.5, 8.0)  # … and a side wall no nearer than this share of the depth (at most this far): a narrow hall
+# keeps its beams over the crowd, not on the walls beside it
+THROW_KNEE_DEG = (12.0, 8.0)  # azimuth, elevation: the last degrees before a limit a swing past it is squeezed into
+
+
+def throw_m(st: dict, wall: bool = False) -> float:
+    """How far past the stage's front edge a beam towards the audience may first meet the floor (`wall`: a side
+    wall)."""
+    depth = float(st.get("room_depth_m", 6.0) or 6.0)
+    share, most = THROW_WALL if wall else (THROW_SHARE, THROW_MAX_M)
+    return min(most, share * depth)
+
+
+def _soft_above(x: np.ndarray, lo, knee: float, least: float) -> np.ndarray:
+    """x, but everything from `least` (the furthest a swing goes) to lo + knee scaled into [lo, lo + knee]: a swing
+    past the limit keeps moving, smaller (never parked on the limit)."""
+    top = lo + knee
+    squeezed = top - (top - x) * knee / np.maximum(top - least, knee)
+    return np.where(x < top, np.maximum(squeezed, lo), x)
+
+
+def throw_lowest_deg(head_pos, st: dict, az):
+    """The lowest elevation a beam towards the audience at azimuth `az` may have: it meets the floor at throw_m."""
+    reach = max(throw_m(st) - float(head_pos[1]), 0.5)
+    run = reach / np.maximum(np.cos(np.radians(az)), 0.2)  # the horizontal run to the throw line at this azimuth
+    return -np.degrees(np.arctan2(float(head_pos[2]), run))
+
+
+def throw_v(d: np.ndarray, head_pos, st: dict, floor: bool = True) -> np.ndarray:
+    """Beams towards the audience thrown over the crowd (rows of unit directions): sideways only so far that the beam
+    meets a side wall well out over the crowd, and down only so far that it meets the floor no nearer than throw_m
+    past the stage's edge. A narrow hall keeps its beams off the walls by the stage; a head over the DJ never lights the
+    floor at their feet. Swings past a limit are squeezed, not clipped (a head never freezes on the limit). Beams
+    the back guard turned (steeply down by the head, or back) are left alone. The walls count only where the rig
+    gives the hall's width (`room_width_m`). `floor` False: only the walls (a low head aiming up)."""
+    d = np.asarray(d, dtype=float)
+    px, py, pz = (float(v) for v in head_pos)
+    el = np.degrees(np.arcsin(np.clip(d[:, 2], -1, 1)))
+    az = np.degrees(np.arctan2(d[:, 0], d[:, 1]))
+    # forwards and sideways, up to the back guard's own sideways limit (one rule for both: a sweep past straight
+    # sideways never jumps); not the beams the back guard turned steeply down beside the head or up behind it
+    back = math.degrees(math.acos(-BACK_Y)) + 1.0
+    fwd = (np.abs(az) <= back) & (el > BACK_DOWN_DEG)
+    if not fwd.any():
+        return d
+    new_az = az
+    if st.get("room_width_m") and not st.get("outdoor"):  # (walls only where the rig gives the hall: not a guess)
+        W, side = float(st["width_m"]), room_side(st)
+        wall = max(throw_m(st, wall=True) - py, 0.5)
+        lim_r = math.degrees(math.atan2(max(W + side - px, 0.05), wall))
+        lim_l = math.degrees(math.atan2(max(px + side, 0.05), wall))
+        k = min(THROW_KNEE_DEG[0], 0.5 * min(lim_r, lim_l))
+        new_az = -_soft_above(-_soft_above(az, -lim_l, k, -back), -lim_r, k, -back)
+    new_el = el
+    if floor and pz > 0.3:
+        new_el = _soft_above(el, throw_lowest_deg(head_pos, st, new_az), THROW_KNEE_DEG[1], BACK_DOWN_DEG)
+    changed = fwd & ((np.abs(new_az - az) > 1e-6) | (np.abs(new_el - el) > 1e-6))
+    if not changed.any():
+        return d
+    a, e = np.radians(new_az), np.radians(new_el)
+    fixed = np.stack([np.cos(e) * np.sin(a), np.cos(e) * np.cos(a), np.sin(e)], axis=-1)
+    return np.where(changed[:, None], fixed, d)
+
+
 def _truss_rear(t: dict) -> float:
     """The y of a truss's back edge (a ring or a carré: its whole round, to be safe)."""
     y = float(t.get("y_m", 0.0))
