@@ -35,7 +35,7 @@ from amadeus.show.vdj import UDP_PORT, Listener
 from amadeus.web.server import serve as serve_http
 
 DEFAULT_LINK_PORT = 7123
-HANDOVER_S = 0.6  # a deck's stand-in groove crossfades into the track's own show over this long
+HANDOVER_S = 1.5  # a deck's stand-in groove, or the show a new plan replaces, crossfades into its new show this long
 DJ_LOOKUP_TRIES = 5  # × 3 s: how long to look for a DJ laptop by name before giving up
 
 
@@ -232,7 +232,8 @@ async def run(
     shows = TrackShows(rig, director, cache, real_output=drives_real_lights(sender, rig))
     follower = DirectorFollower(show, shows) if follow_set else None
     standins = StandIns(rig, shows.real_output, lambda: shows.named or shows.set_genre.current or "")
-    handover: dict[int, tuple] = {}  # per deck: (when its own show took over, the stand-in it fades out of)
+    handover: dict[int, tuple] = {}  # per deck: (when its new show took over, the show it fades out of, a stand-in?)
+    own: dict[int, tuple] = {}  # per deck: (file, its own show last played)
     on_standin: set[int] = set()  # decks playing their stand-in groove
     universes = sorted({f["universe"] for f in rig["fixtures"]})
     ids = [e["id"] for e in rig["elements"]]
@@ -286,9 +287,15 @@ async def run(
                     # not prepared yet (loaded late, a streamed copy on its way): a groove on its tempo meanwhile
                     standin = standins.get(deck) if show is None and (deck.file or deck.bpm > 1) else None
                     if show is not None and deck.deck in on_standin:  # its own show is ready: fade over to it
-                        handover[deck.deck] = (now, standins.get(deck))
+                        handover[deck.deck] = (now, standins.get(deck), True)
+                    elif show is not None and own.get(deck.deck, (None, show))[0] == deck.file:
+                        before = own[deck.deck][1]
+                        if before is not show and deck.play:  # a new plan for the playing track: fade, never a cut
+                            handover[deck.deck] = (now, before, False)  # (separated instruments, the AI, the arc)
                     if show is None:
                         handover.pop(deck.deck, None)
+                    else:
+                        own[deck.deck] = (deck.file, show)
                     on_standin.discard(deck.deck)
                     decks.append(
                         {
@@ -327,14 +334,17 @@ async def run(
                         pos += aligned.get(deck.file, 0.0)
                     t = min(max(pos + lead, 0.0), a.duration - 0.05)  # the lights a little ahead (clock.py)
                     i, states = engine.render(t)
-                    since, old = handover.get(deck.deck, (0.0, None))
-                    if old is not None and now - since < HANDOVER_S:  # still fading out of the stand-in groove
-                        k = (now - since) / HANDOVER_S
-                        _, was = old[2].render(standins.position(old, pos + lead))
-                        states = {eid: was[eid].blend(s, k) for eid, s in states.items()}
+                    since, old, groove = handover.get(deck.deck, (0.0, None, False))
+                    if old is not None and now - since < HANDOVER_S:  # still fading out of the show before
+                        x = (now - since) / HANDOVER_S
+                        k = x * x * (3 - 2 * x)  # eased: no step as the fade starts or ends
+                        was_t = standins.position(old, pos + lead) if groove else min(t, old[0].duration - 0.05)
+                        _, was = old[2].render(was_t)
+                        states = {eid: was[eid].blend(s, k) if eid in was else s for eid, s in states.items()}
                     elif old is not None:
                         del handover[deck.deck]
-                        print(f"  ♪ deck {deck.deck}: its own show took over from the {old[0].bpm:.1f} BPM groove")
+                        came = f"the {old[0].bpm:.1f} BPM groove" if groove else f"its {old[3]} show before"
+                        print(f"  ♪ deck {deck.deck}: its new show took over from {came}")
                     if phrase_of.get(deck.deck) != (deck.file, i):  # the log: where the show is vs the DJ software
                         phrase_of[deck.deck] = (deck.file, i)
                         d = show[1][i]
