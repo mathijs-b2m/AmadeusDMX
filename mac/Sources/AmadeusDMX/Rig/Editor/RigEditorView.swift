@@ -45,6 +45,7 @@ struct RigEditorView: View {
             .frame(minWidth: 520)
 
             EditorInspector(editor: editor, showAdd: $showAdd)
+                .environment(\.sliderEditing) { editor.gesture($0) }
                 .frame(minWidth: 300, idealWidth: 340, maxWidth: 440)
         }
         .onChange(of: undoManager) { editor.undoManager = undoManager }

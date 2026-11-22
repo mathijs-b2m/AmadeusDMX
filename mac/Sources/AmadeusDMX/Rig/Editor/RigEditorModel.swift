@@ -63,7 +63,11 @@ final class RigEditorModel: StageEditing {
     // The window's undo manager doesn't keep its targets alive: a step left behind for an editor that's gone
     // (another rig or set picked, the page left) would crash on undo, so they go with the editor.
     @ObservationIgnored var undoManager: UndoManager? {
-        didSet { if oldValue !== undoManager { oldValue?.removeAllActions(withTarget: self) } }
+        didSet {
+            if oldValue !== undoManager { oldValue?.removeAllActions(withTarget: self) }
+            // every step holds a copy of the whole set on its rig: the oldest go after 200 (unless the window has a limit)
+            if let u = undoManager, u.levelsOfUndo == 0 { u.levelsOfUndo = 200 }
+        }
     }
     @ObservationIgnored private var defs: [String: FixtureDefinition] = [:]
     @ObservationIgnored private let workspace: Workspace
@@ -158,8 +162,24 @@ final class RigEditorModel: StageEditing {
         body(&doc)
         guard doc != before else { return }
         version += 1
+        if gesturing, gestureStep == name, undoManager?.undoActionName == name {
+            reaimTests()  // the same slider still dragged: its first step undoes the whole drag
+            return
+        }
         registerUndo(name, before)
+        if gesturing { gestureStep = name }
         reaimTests()
+    }
+
+    /// While a slider is pressed: its changes are one undo step (each tick is an event of its own, so groupsByEvent
+    /// would make a step per tick).
+    @ObservationIgnored private var gesturing = false
+    @ObservationIgnored private var gestureStep: String?
+
+    /// A slider pressed (true) or let go (false).
+    func gesture(_ on: Bool) {
+        gesturing = on
+        gestureStep = nil
     }
 
     private func registerUndo(_ name: String, _ before: RigDocument) {
