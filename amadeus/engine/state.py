@@ -42,6 +42,10 @@ class State:
         out.fx, out.gobo, out.fx_speed, out.fx_reverse = src.fx, src.gobo, src.fx_speed, src.fx_reverse
         out.size, out.spin, out.lcolor, out.phase = src.size, src.spin, src.lcolor, src.phase
         out.dmx_pan, out.dmx_tilt, out.strobe_hz, out.gate = src.dmx_pan, src.dmx_tilt, src.strobe_hz, src.gate
+        if self.dmx_pan is not None and o.dmx_pan is not None:  # two shows' motors: the head travels, never jumps
+            out.dmx_pan = self.dmx_pan * (1 - k) + o.dmx_pan * k
+        if self.dmx_tilt is not None and o.dmx_tilt is not None:
+            out.dmx_tilt = self.dmx_tilt * (1 - k) + o.dmx_tilt * k
         out.zoom = self.zoom * (1 - k) + o.zoom * k
         return out
 

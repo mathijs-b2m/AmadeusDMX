@@ -30,12 +30,13 @@ _separator = None
 
 
 def available() -> bool:
-    try:
-        import demucs.api  # noqa: F401
-        import torch  # noqa: F401
+    """Demucs and PyTorch are installed. Looked up, not imported: the separation runs in a process of its own, and
+    importing torch in the show's process takes the interpreter for seconds on a slow PC (the lights stall)."""
+    from importlib.util import find_spec
 
-        return True
-    except ImportError:
+    try:
+        return find_spec("demucs") is not None and find_spec("torch") is not None
+    except (ImportError, ValueError):
         return False
 
 
