@@ -27,6 +27,7 @@ STEM_SR = 22050
 NAMES = ("drums", "bass", "vocals", "other")
 STEMS_DIR = paths.CACHE / "stems"
 _separator = None
+_beside_show = False  # a show runs beside this separation (python -m amadeus.audio.stems TRACK --beside-show)
 
 
 def available() -> bool:
@@ -38,6 +39,13 @@ def available() -> bool:
         return find_spec("demucs") is not None and find_spec("torch") is not None
     except (ImportError, ValueError):
         return False
+
+
+def threads(beside_show: bool = False) -> int:
+    """Threads for separating on the processor: one per fast physical core (hyperthreads and the Mac's efficiency
+    cores only slow it down), one fewer while a show runs beside it. Measured on a 2:26 track (M3 Max): 4 threads
+    30 s, 8 → 28 s, 12 → 31 s, every logical core 37 s."""
+    return max(1, system.physical_cores() - (1 if beside_show else 0))
 
 
 def device(torch) -> str:
@@ -83,6 +91,8 @@ def stems(path: str | Path, verbose: bool = True) -> dict[str, np.ndarray] | Non
     if sr != _separator.samplerate:
         wav = resample_poly(wav, _separator.samplerate, sr, axis=0).astype(np.float32)
     wav = torch.from_numpy(wav.T.copy())
+    if _separator._device == "cpu":
+        torch.set_num_threads(threads(_beside_show))
     try:
         _, parts = _separator.separate_tensor(wav, _separator.samplerate)
     except Exception as e:  # the graphics card ran out of memory, or its driver can't run this build: the processor
@@ -90,6 +100,7 @@ def stems(path: str | Path, verbose: bool = True) -> dict[str, np.ndarray] | Non
             raise
         print(f"  separating on {_separator._device} failed ({str(e).splitlines()[0]}); on the processor", flush=True)
         _separator.update_parameter(device="cpu")
+        torch.set_num_threads(threads(_beside_show))
         _, parts = _separator.separate_tensor(wav, _separator.samplerate)
     out.mkdir(parents=True, exist_ok=True)
     result = {}
@@ -271,15 +282,16 @@ def running(path: str | Path) -> int | None:
         return None
 
 
-def start_background(path: str | Path):
+def start_background(path: str | Path, beside_show: bool = False):
     """Separate a track in its own process (own memory, no competition with the light loop); returns the
-    Popen. The result appears as notes.npz; poll the process or `load_notes`."""
+    Popen. The result appears as notes.npz; poll the process or `load_notes`. `beside_show`: a show is running,
+    leave it a core."""
     import subprocess
     import sys
 
     path = Path(path)
     proc = subprocess.Popen(
-        [sys.executable, "-m", "amadeus.audio.stems", str(path)],
+        [sys.executable, "-m", "amadeus.audio.stems", str(path), *(["--beside-show"] if beside_show else [])],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -296,6 +308,7 @@ if __name__ == "__main__":  # python -m amadeus.audio.stems TRACK: separate it (
     import time
 
     system.lower_priority()  # be kind to a running show
+    _beside_show = "--beside-show" in sys.argv
     t0 = time.time()
     try:
         res = separate_and_save(sys.argv[1], verbose=False)

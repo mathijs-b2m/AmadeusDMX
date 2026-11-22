@@ -216,6 +216,56 @@ def peak_memory_mb() -> float:
     return peak / 1e6 if MACOS else peak / 1e3  # bytes on macOS, KB on Linux
 
 
+def physical_cores() -> int:
+    """The processor's fast physical cores: no hyperthreads, and on a hybrid chip (Apple silicon, Intel's 12th
+    generation and later) only its performance cores. What heavy number crunching (Demucs) runs best on."""
+    n = 0
+    try:
+        if MACOS:
+            for key in ("hw.perflevel0.physicalcpu", "hw.physicalcpu"):
+                out = subprocess.run(["sysctl", "-n", key], capture_output=True, text=True, timeout=5).stdout
+                if out.strip().isdigit():
+                    n = int(out)
+                    break
+        elif WINDOWS:
+            n = _win_performance_cores()
+        else:
+            cores = set()
+            for block in Path("/proc/cpuinfo").read_text().split("\n\n"):
+                f = {k.strip(): v.strip() for k, v in (x.split(":", 1) for x in block.splitlines() if ":" in x)}
+                if "core id" in f:
+                    cores.add((f.get("physical id", "0"), f["core id"]))
+            n = len(cores)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        n = 0
+    return n or max(1, (os.cpu_count() or 2) // 2)
+
+
+def _win_performance_cores() -> int:
+    """Windows: the cores (RelationProcessorCore records) of the highest efficiency class: the performance cores
+    of a hybrid chip, every core of any other."""
+    import ctypes
+
+    k = _kernel32()
+    size = ctypes.c_uint32(0)
+    k.GetLogicalProcessorInformationEx(0, None, ctypes.byref(size))
+    if not size.value:
+        return 0
+    buf = ctypes.create_string_buffer(size.value)
+    if not k.GetLogicalProcessorInformationEx(0, buf, ctypes.byref(size)):
+        return 0
+    raw, classes, off = buf.raw, [], 0
+    while off + 10 <= size.value:
+        relationship = int.from_bytes(raw[off : off + 4], "little")
+        length = int.from_bytes(raw[off + 4 : off + 8], "little")
+        if relationship == 0:  # PROCESSOR_RELATIONSHIP: Flags, then EfficiencyClass
+            classes.append(raw[off + 9])
+        if length <= 0:
+            break
+        off += length
+    return classes.count(max(classes)) if classes else 0
+
+
 def lower_priority():
     """This process a little below the show's (a background separation)."""
     if WINDOWS:
@@ -388,6 +438,7 @@ def _kernel32():
         ("CreateToolhelp32Snapshot", H, [D, D]),
         ("Process32FirstW", B, [H, P]),
         ("Process32NextW", B, [H, P]),
+        ("GetLogicalProcessorInformationEx", B, [ctypes.c_int, P, P]),
     ):
         f = getattr(k, name)
         f.restype, f.argtypes = res, args

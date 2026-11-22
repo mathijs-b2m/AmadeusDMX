@@ -231,7 +231,7 @@ class TrackShows:
                 time.sleep(1.0)
         else:
             print(f"  ⧗ {name}: separating instruments in the background (the show already runs) …", flush=True)
-            proc = stemlib.start_background(src)
+            proc = stemlib.start_background(src, beside_show=True)
             while proc.poll() is None:
                 time.sleep(1.0)
         if stemlib.load_notes(src) is None:
