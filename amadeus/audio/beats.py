@@ -169,7 +169,7 @@ def comb_score(env: np.ndarray, fps: float, bpm: float) -> float:
 
 
 KICK_DOUBLE = 0.93  # the low end rises this much as clearly on the lines between: the kick runs twice as fast
-KICK_DOUBLE_MAX = 200.0  # (measured: hardcore 0.96–0.98; Maluma, Chemise and other real 90–100 BPM tracks ≤ 0.89)
+KICK_DOUBLE_MAX = 200.0  # (measured: hardcore 0.96–0.98; Maluma and other real 90–100 BPM tracks ≤ 0.89)
 
 
 def kick_double(env: np.ndarray, fps: float, bpm: float, score: float, share: float = KICK_DOUBLE) -> bool:
