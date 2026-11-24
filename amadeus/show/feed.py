@@ -215,6 +215,16 @@ class Feed:
                 for e in self.ids
             ],
         }
+        # the lights strobe: how much of the rig does, and its flash on the beat grid now (0 dark .. 1 lit). The LED
+        # wall flashes with it: whatever holds a strobe back (the flash limit, a strobe-free set, the arc) holds this
+        gates = [
+            states[e].gate
+            for e in self.ids
+            if e not in self.dark and states[e].strobe_hz > 0 and states[e].dimmer > 0.05
+        ]
+        if gates:
+            lights = max(1, len(self.ids) - len(self.dark))
+            out["strobe"] = [round(len(gates) / lights, 2), round(sum(gates) / len(gates), 2)]
         if any(b[1] for b in beams.values()):  # a gobo in a beam: [picture, next, wheel turn, rotation, shake, prism]
             out["gobo"] = [beams[e][1] if e in beams else None for e in self.ids]
         if any(b[2] is not None for b in beams.values()):  # zoom 0 (tightest) .. 1 (widest), lights that have one

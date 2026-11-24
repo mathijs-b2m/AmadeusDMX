@@ -2,6 +2,10 @@
 // (decision.screen): off | ambient | figure | words | equalizer | psychedelic. Figures are playful neon
 // outlines on the beat: a runner, a dancer, a jumping crowd, pong. The modes also bring abstract scenes: geometric
 // shapes among the figures, a scope for the equaliser, a starfield for ambient, a tunnel in drops (pick()). Into a
+// The music's style picks the family: the harder styles (hardstyle, hardcore, metal) get dark, sharp scenes (a wolf's
+// head in facets, claws, jaws of spikes) and none of the playful figures; techno and the other club styles get hard
+// lines and a ridge landscape beside them. The wall flashes when the lights strobe (frame.strobe) and when blinders
+// and strobe lights fire: it is part of the light show. Into a
 // drop the wall counts 3-2-1 and
 // shouts DROP!. Psychedelic is drawn by a Metal shader (WallSource); everything else here, with
 // Core Graphics, into a 640×360 picture (the wall's shape when the rig gives its pixels; finer for a real LED wall:
@@ -13,7 +17,7 @@ import Foundation
 import simd
 
 enum WallScene: String, CaseIterable, Identifiable {
-    case auto, off, ambient, starfield, runner, dancer, crowd, pong, shapes, words, equalizer, scope, tunnel, psychedelic
+    case auto, off, ambient, starfield, runner, dancer, crowd, pong, shapes, lines, grid, wolf, claws, spikes, words, equalizer, scope, tunnel, psychedelic
     var id: String { rawValue }
     var title: String { self == .auto ? "Director's Choice" : rawValue.capitalized }
     var symbol: String {
@@ -25,6 +29,11 @@ enum WallScene: String, CaseIterable, Identifiable {
         case .shapes: "triangle"
         case .scope: "waveform"
         case .tunnel: "circle.circle"
+        case .lines: "barcode"
+        case .grid: "mountain.2"
+        case .wolf: "pawprint"
+        case .claws: "line.diagonal"
+        case .spikes: "bolt"
         case .runner: "figure.run"
         case .dancer: "figure.dance"
         case .crowd: "person.3"
@@ -43,6 +52,21 @@ struct WallState {
     var palette: [SIMD3<Float>]
     var bands: SIMD4<Float>
     var scene: WallScene
+    /// The lights strobe or the blinders fire: how much of the wall is the flash now, 0..1.
+    var flash: Float = 0
+    /// The overlay layer (WallSource's layer_mask): x the mask, y the beat's lift 0..1, z the beat's phase, w its parity.
+    var layer = SIMD4<Float>(repeating: 0)
+}
+
+/// What kind of scenes a style of music gets.
+enum WallFamily {
+    case hard, club, other
+
+    init(_ h: Hello) {
+        let g = (h.style.isEmpty ? h.genre : h.style).lowercased()
+        self = ["hardstyle", "hardcore", "metal"].contains(g) ? .hard
+            : ["techno", "trance", "psytrance", "edm", "house", "dnb", "dubstep"].contains(g) ? .club : .other
+    }
 }
 
 final class WallRenderer {
@@ -71,6 +95,10 @@ final class WallRenderer {
     private var travel: Double = 0, lastBp: Double?
     /// The music's bass, mids and highs, smoothed (the scope's lines, the bokeh's breath).
     private var sound = SIMD3<Float>(repeating: 0)
+    /// The flash with the lights' strobes (its short tail).
+    private var flash: Float = 0
+    /// The blinders' and strobe lights' level as it has been lately: the wall flashes on what comes on top of it.
+    private var blindHeld: Float = 0
     private var amb: Double = 0
     private var fromPose: [[Float]] = WallRenderer.moves["down"]!
     private var lastBeat = -1
@@ -79,6 +107,9 @@ final class WallRenderer {
     /// The time between pictures, smoothed: the trail's fade follows it (one picture 25 ms after the last, the next 50,
     /// would brighten and dim every glow that builds up on the trail).
     private var fadeDt: Double = 1.0 / 40
+
+    /// One overlay mask tried out (development: the stage snapshot's -wallMask 0…7).
+    nonisolated(unsafe) static var forceMask: Float?
 
     /// The canvas for a wall of this shape, in units.
     static func canvas(_ aspect: Double) -> (w: CGFloat, h: CGFloat) {
@@ -107,7 +138,7 @@ final class WallRenderer {
     func takeOver(from old: WallRenderer) {
         cur = old.cur; fade = old.fade; level = old.level; amb = old.amb
         if old.eq.count == eq.count { eq = old.eq; caps = old.caps }
-        travel = old.travel; lastBp = old.lastBp; sound = old.sound
+        travel = old.travel; lastBp = old.lastBp; sound = old.sound; flash = old.flash; blindHeld = old.blindHeld
         fromPose = old.fromPose; lastBeat = old.lastBeat; force = old.force; fadeDt = old.fadeDt
         if old.aspect == aspect, let img = old.context.makeImage() {
             context.saveGState()
@@ -130,7 +161,7 @@ final class WallRenderer {
         "verse": ["off", "ambient", "words"], "chorus": ["figure", "equalizer", "words"], "bridge": ["ambient", "off"],
     ]
 
-    private func wanted(_ f: Frame, _ d: Decision?) -> (String, WallScene) {
+    private func wanted(_ f: Frame, _ d: Decision?, _ h: Hello) -> (String, WallScene) {
         if force != .auto {
             return (WallScene.figures.contains(force) ? "figure" : force.rawValue, force)
         }
@@ -139,17 +170,23 @@ final class WallRenderer {
             let opts = Self.rules[d?.section ?? ""] ?? ["off"]
             mode = opts[Self.hash(f.phrase, 2) % opts.count]
         }
-        return (mode, Self.pick(mode, phrase: f.phrase, drop: d?.section == "drop"))
+        return (mode, Self.pick(mode, phrase: f.phrase, drop: d?.section == "drop", family: WallFamily(h)))
     }
 
     /// The scene a mode shows this phrase: the director's modes are few, each brings a small family of scenes.
-    static func pick(_ mode: String, phrase: Int, drop: Bool) -> WallScene {
+    static func pick(_ mode: String, phrase: Int, drop: Bool, family: WallFamily = .other) -> WallScene {
         let pool: [WallScene]
-        switch mode {
-        case "figure": pool = WallScene.figures + (drop ? [.shapes, .tunnel] : [.shapes])
-        case "equalizer": pool = [.equalizer, .scope]
-        case "ambient": pool = [.ambient, .ambient, .starfield]
-        case "psychedelic": pool = [.psychedelic, .psychedelic, .tunnel]
+        switch (mode, family) {
+        case ("figure", .hard): pool = [.wolf, .claws, .spikes, .shapes] + (drop ? [.wolf, .tunnel] : [])
+        case ("figure", .club): pool = [.lines, .grid, .shapes, .dancer, .crowd] + (drop ? [.tunnel, .lines] : [])
+        case ("figure", _): pool = WallScene.figures + (drop ? [.shapes, .tunnel] : [.shapes])
+        case ("equalizer", .hard): pool = [.spikes, .scope]
+        case ("equalizer", .club): pool = [.equalizer, .scope, .grid]
+        case ("equalizer", _): pool = [.equalizer, .scope]
+        case ("ambient", _): pool = [.ambient, .ambient, .starfield]
+        case ("psychedelic", .hard): pool = [.psychedelic, .tunnel, .claws]
+        case ("psychedelic", .club): pool = [.psychedelic, .psychedelic, .tunnel, .lines]
+        case ("psychedelic", _): pool = [.psychedelic, .psychedelic, .tunnel]
         default: return WallScene(rawValue: mode) ?? .off
         }
         return pool[hash(phrase, 9) % pool.count]
@@ -157,7 +194,7 @@ final class WallRenderer {
 
     func update(frame f: Frame, hello h: Hello, dt: Float) -> WallState {
         let d = h.plan.indices.contains(f.phrase) ? h.plan[f.phrase] : nil
-        var want = wanted(f, d)
+        var want = wanted(f, d, h)
         // the show arc's LED wall knob (live mode): dimmer, below half only calm colour, at zero off
         let wall = force == .auto ? Float(f.arc.flatMap { $0.on ? $0.values["screen"] : nil } ?? 1) : 1
         if wall < 0.03 { want = ("off", .off) } else if wall < 0.5, want.0 != "off" { want = ("ambient", .ambient) }
@@ -192,8 +229,31 @@ final class WallRenderer {
             target = cur.mode == "off" ? 0 : cur.scene == .ambient ? 0.4 : cur.scene == .starfield && calm ? 0.55 : 0.95
         }
         level += (target * min(1, wall * 2) * fade - level) * min(1, dt * 10)
-        return WallState(level: level, psychedelic: cur.scene == .psychedelic, palette: Palettes.colors(d?.palette),
-                          bands: bandsV, scene: cur.scene)
+        // the wall flashes with the lights: the share of the rig that strobes, on its beat grid, and the blinders and
+        // strobe lights when they fire (the engine holds all of it to the set's flash limit); a short tail after it
+        var flashNow: Float = 0
+        if force != .off, wall >= 0.5 {
+            if let s = f.strobe, s.x >= 0.15 { flashNow = s.y * min(1, 0.35 + 1.3 * s.x) }
+            var sum: Float = 0, n: Float = 0
+            for (i, fixture) in h.fixtures.enumerated() where (fixture.kind == .blinder || fixture.kind == .strobe) && i < f.fx.count {
+                sum += f.fx[i].first ?? 0; n += 1
+            }
+            // (their hit, not their light: one held on is let go of in half a second, or the wall would stay white)
+            let blind = n > 0 ? sum / n : 0
+            blindHeld += (blind - blindHeld) * min(1, dt * (blind > blindHeld ? 2.5 : 8))
+            if blind - blindHeld > 0.15 { flashNow = max(flashNow, min(1, (blind - blindHeld) * 1.6)) }
+        }
+        flash = max(flashNow, flash - dt * 12)
+        // the overlay layer, as a VJ lays one over the picture: a mask per phrase in the style's taste; the picture
+        // lifts through it on every beat of the parts with energy, and the strobe's flash shows through it
+        let beatNow = Int(floor(bp)), phase = Float(bp - floor(bp)), section = d?.section ?? ""
+        let masks: [Float] = switch WallFamily(h) { case .hard: [5, 3, 1, 7, 6]; case .club: [2, 1, 3, 4, 7]; case .other: [4, 6, 1, 0] }
+        let lively = force != .off && wall >= 0.5 && cur.mode != "off" && cur.scene != .ambient
+            && ["drop", "chorus", "buildup"].contains(section)
+        let lift = lively ? exp(-phase * 5) * (section == "drop" ? 1 : 0.6) * fade : 0
+        let layer = SIMD4<Float>(Self.forceMask ?? masks[Self.hash(f.phrase, 91) % masks.count], lift, phase, Float(((beatNow % 2) + 2) % 2))
+        return WallState(level: max(level, flash * 0.95), psychedelic: cur.scene == .psychedelic, palette: Palettes.colors(d?.palette),
+                          bands: bandsV, scene: cur.scene, flash: flash, layer: layer)
     }
 
     // MARK: drawing
@@ -244,12 +304,35 @@ final class WallRenderer {
 
     private static func frac(_ v: Double) -> Double { v - floor(v) }
 
+    /// Hard edges: mitred corners, no round caps, no glow (the sharp scenes).
+    private func sharp(_ c: SIMD3<Float>, _ width: CGFloat) {
+        flat(c, width)
+        g.setLineCap(.butt); g.setLineJoin(.miter); g.setMiterLimit(12)
+    }
+
+    /// A glow round a wall-sized line, cheaply: a few wide translucent strokes under it (a real glow costs its whole
+    /// bounding box, which for these is the wall).
+    private func softGlow(_ p: CGPath, _ c: SIMD3<Float>, _ width: CGFloat) {
+        g.setShadow(offset: .zero, blur: 0, color: nil)
+        for (wide, alpha) in [(7.0, 0.05), (4.6, 0.08), (3.0, 0.13), (1.9, 0.22)] as [(CGFloat, CGFloat)] {
+            g.setStrokeColor(cg(c, alpha)); g.setLineWidth(width * wide)
+            g.addPath(p); g.strokePath()
+        }
+    }
+
+    private func path(_ pts: [CGPoint]) -> CGPath {
+        let p = CGMutablePath()
+        p.addLines(between: pts); p.closeSubpath()
+        return p
+    }
+
     private func draw(_ f: Frame, _ d: Decision?, _ h: Hello, _ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ dt: Float) {
         g.saveGState()
         g.setShadow(offset: .zero, blur: 0, color: nil)
         // a short trail behind moving lines: how much of the last picture fades is set per 1/60 s, so the trail
         // is as short at any drawing rate (a fixed share per picture ghosted when the wall was drawn less often)
-        let fadeShare = cur.scene == .words ? 0.8 : cur.scene == .tunnel || cur.scene == .scope ? 0.6 : 0.45
+        let crisp: Set<WallScene> = [.lines, .grid, .wolf, .spikes]   // sharp scenes leave next to no trail
+        let fadeShare = cur.scene == .words ? 0.8 : crisp.contains(cur.scene) ? 0.75 : [.tunnel, .scope, .claws].contains(cur.scene) ? 0.6 : 0.45
         // the tunnel, the stars and the shapes travel with the beat, faster in a drop (a jump in the song is no travel)
         let drop = d?.section == "drop", build = d?.section == "buildup"
         let rate = cur.scene == .starfield ? (drop ? 2.5 : build ? 1.2 : 0.5) : drop ? 2.0 : 1.0
@@ -274,6 +357,11 @@ final class WallRenderer {
             case .starfield: starfield(cols, warp: drop)
             case .scope: scope(cols, bp)
             case .shapes: shapes(cols, bp, drop)
+            case .lines: lines(cols, bp, bass, drop)
+            case .grid: grid(cols)
+            case .wolf: wolf(cols, bp, bass, drop)
+            case .claws: claws(cols, bp, drop)
+            case .spikes: spikes(f, cols, bp, bass, dt)
             default: break
             }
         }
@@ -583,7 +671,8 @@ final class WallRenderer {
         text(w, at: at, size: size, fill: u < 0.15)
     }
 
-    private func equalizer(_ f: Frame, _ cols: [SIMD3<Float>], _ dt: Float) {
+    /// The spectrum's bars (and their falling caps), from the frame's bands.
+    private func meter(_ f: Frame, _ dt: Float) {
         let b = f.bands, n = eq.count, now = Float(Date().timeIntervalSinceReferenceDate)
         for i in 0..<n {
             let pos = Float(i) / Float(n - 1) * Float(max(b.count - 1, 1)), j = Int(pos), k = pos - Float(j)
@@ -592,6 +681,11 @@ final class WallRenderer {
             eq[i] = max(v, eq[i] - dt * 2.2)   // a held level holds (falling only where the music fell)
             caps[i] = max(eq[i], caps[i] - dt * 0.6)
         }
+    }
+
+    private func equalizer(_ f: Frame, _ cols: [SIMD3<Float>], _ dt: Float) {
+        meter(f, dt)
+        let n = eq.count
         // the bars stand on a line with their reflection under it
         let bw = cw / CGFloat(n), mirror = min(64, ch * 0.16), base = ch - 16 - mirror, top = base - 44
         let white = SIMD3<Float>(repeating: 1)
@@ -773,6 +867,245 @@ final class WallRenderer {
             let dot = 5 + CGFloat(exp(-u * 5)) * 9
             g.fillEllipse(in: CGRect(x: x - dot, y: y - dot, width: dot * 2, height: dot * 2))
         }
+    }
+
+    // MARK: techno and club
+
+    /// Hard vertical bars, a barcode that steps along with the beat; a scanner crosses once a bar.
+    private func lines(_ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ drop: Bool) {
+        let n = max(12, Int((28 * cw / CGFloat(Self.W)).rounded())), bw = cw / CGFloat(n)
+        let beat = Int(floor(bp)), u = bp - floor(bp), bar = beat / 4
+        let white = SIMD3<Float>(repeating: 1), kick = Float(exp(-u * 5))
+        let shift = Int(floor(travel * 2))   // the code moves two bars' width a beat
+        g.setShadow(offset: .zero, blur: 0, color: nil)
+        for i in 0..<n {
+            let k = i + shift
+            guard Self.hash(k, 51 + bar % 4) % 5 < (drop ? 3 : 2) else { continue }
+            let thin = Self.hash(k, 52) % 3 == 0, accent = Self.hash(k, 53) % 6 == 0
+            // a band that breathes across the wall; in a drop the bars stand wall-high
+            let wave = 0.5 + 0.5 * sin(Double(i) * 0.45 - bp * .pi / 2)
+            let h = drop ? ch : ch * CGFloat(0.22 + 0.5 * wave + 0.25 * Double(bass))
+            let c = accent ? cols[0] : mix(cols[1 % cols.count], white, 0.75)
+            g.setFillColor(cg(dim(c, 0.4 + 0.6 * kick)))
+            let w = thin ? max(2, bw * 0.22) : bw * 0.82
+            g.fill(CGRect(x: CGFloat(i) * bw + (bw - w) / 2, y: (ch - h) / 2, width: w, height: h))
+        }
+        // two cuts through the bars, and the scanner
+        g.setFillColor(CGColor(gray: 0, alpha: 1))
+        for y in [ch * 0.36, ch * 0.64] { g.fill(CGRect(x: 0, y: y - 2.5, width: cw, height: 5)) }
+        let sx = CGFloat(Self.frac(bp / 4)) * cw
+        neon(cols[0], 3)
+        g.setLineCap(.butt)
+        g.strokeLineSegments(between: [CGPoint(x: sx, y: 0), CGPoint(x: sx, y: ch)])
+    }
+
+    /// A landscape of ridges coming on, line behind line, rising with the music.
+    private func grid(_ cols: [SIMD3<Float>]) {
+        let rows = 16, horizon = ch * 0.14, f = Self.frac(travel * 0.5), first = Int(floor(travel * 0.5))
+        let loud = CGFloat(0.22 + 0.7 * sound.x + 0.5 * sound.y), white = SIMD3<Float>(repeating: 1)
+        g.setShadow(offset: .zero, blur: 0, color: nil)
+        for k in stride(from: rows - 1, through: 0, by: -1) {   // the far ridges first: the near ones hide them
+            let z = (Double(k) + 1 - f) * 1.35, s = CGFloat(1 / (0.4 + z * 0.3))   // near 1.2 .. far 0.15
+            let near = min(1, s / 1.4)
+            let y0 = horizon + (ch * 1.08 - horizon) * near
+            let half = cw * (0.42 + 0.5 * near), amp = ch * 0.4 * pow(near, 0.55) * loud
+            let row = first + k
+            let p1 = Double(Self.hash(row, 81) % 628) / 100, p2 = Double(Self.hash(row, 82) % 628) / 100, p3 = Double(Self.hash(row, 83) % 628) / 100
+            var pts: [CGPoint] = []
+            let steps = 56
+            for i in 0...steps {
+                let t = Double(i) / Double(steps), env = pow(sin(t * .pi), 2.4)   // the ridge stands in the middle
+                let v = abs(0.5 * sin(t * 11 + p1) + 0.32 * sin(t * 27 + p2) + 0.18 * sin(t * 53 + p3))
+                pts.append(CGPoint(x: cw / 2 + CGFloat(t * 2 - 1) * half, y: y0 - amp * CGFloat(env * v)))
+            }
+            let body = CGMutablePath()
+            body.addLines(between: pts)
+            body.addLine(to: CGPoint(x: pts.last!.x, y: ch + 4)); body.addLine(to: CGPoint(x: pts[0].x, y: ch + 4)); body.closeSubpath()
+            g.setFillColor(CGColor(gray: 0, alpha: 1))
+            g.setShouldAntialias(false)   // (the line drawn over its edge is the smooth one)
+            g.addPath(body); g.fillPath()
+            g.setShouldAntialias(true)
+            let c = mix(cols[row % cols.count < 0 ? 0 : row % cols.count], white, 0.25)
+            let line = CGMutablePath()
+            line.addLines(between: pts)
+            let shade = dim(c, Float(0.2 + 0.8 * near)), width = 1 + 1.6 * near
+            g.setLineCap(.round); g.setLineJoin(.round)
+            if k < 3 { softGlow(line, shade, width) }
+            flat(shade, width)
+            g.setLineJoin(.miter)
+            g.addPath(line); g.strokePath()
+        }
+    }
+
+    // MARK: the harder styles
+
+    private static let wolfPoints: [String: (Double, Double)] = [
+        "E": (0.62, -1.18), "Eo": (0.84, -0.42), "En": (0.52, -0.62), "Ei": (0.26, -0.66), "T": (0, -0.56), "B": (0, -0.2),
+        "Bo": (0.5, -0.3), "Tm": (0.88, -0.08), "C1": (1.02, 0.34), "C2": (0.7, 0.36), "J": (0.5, 0.74), "Yi": (0.15, -0.06),
+        "Yo": (0.56, -0.22), "Yb": (0.38, 0.02), "Nb": (0.13, 0.32), "M": (0.3, 0.56), "N": (0.13, 0.64), "Nt": (0, 0.8),
+        "Mc": (0.25, 0.82), "Ch": (0, 1.04), "Nc": (0, 0.3),
+    ]
+    /// The right half of the head in facets (mirrored for the left); the last one is the lower jaw, which opens.
+    private static let wolfFacets: [[String]] = [
+        ["E", "Eo", "En"], ["E", "En", "Ei"], ["T", "Ei", "Bo", "B"], ["Ei", "En", "Eo", "Tm", "Bo"], ["B", "Bo", "Yo", "Yi"],
+        ["Yo", "Bo", "Tm"], ["Yo", "Tm", "C1", "C2"], ["Yo", "C2", "Yb"], ["B", "Yi", "Nb", "Nc"], ["Yi", "Yb", "M", "Nb"],
+        ["Yb", "C2", "J", "M"], ["Nb", "M", "N"], ["Nc", "Nb", "N", "Nt"], ["N", "M", "Mc", "Nt"], ["M", "J", "Mc"],
+        ["Nt", "Mc", "Ch"],
+    ]
+
+    /// A wolf's head in hard facets: its eyes burn with the bass, facets catch light on the kick, in a drop it bares
+    /// its teeth. A wide wall shows a pack.
+    private func wolf(_ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ drop: Bool) {
+        let beat = Int(floor(bp)), u = bp - floor(bp), kick = Float(exp(-u * 4)), white = SIMD3<Float>(repeating: 1)
+        let open = drop ? Double(min(1, 0.25 + bass)) * (0.55 + 0.45 * Double(kick)) : Double(max(0, bass - 0.75)) * 1.2
+        func head(_ x0: CGFloat, _ y0: CGFloat, _ size: CGFloat, _ lightK: Float, _ salt: Int) {
+            let s = size * CGFloat(1 + 0.035 * Double(bass))
+            func pt(_ name: String, _ side: CGFloat) -> CGPoint {
+                var (x, y) = Self.wolfPoints[name]!
+                if name == "Ch" { y += 0.24 * open } else if name == "Mc" { y += 0.06 * open }
+                return CGPoint(x: x0 + side * CGFloat(x) * s, y: y0 + CGFloat(y) * s)
+            }
+            // a mane of spikes behind the head, thrown out on the kick
+            sharp(dim(cols[1 % cols.count], 0.5 * lightK), 1.5)
+            let mane = CGMutablePath(), spikes = 18
+            for i in 0..<spikes {
+                let a = Double(i) / Double(spikes) * 2 * .pi + travel * 0.05
+                guard sin(a) < 0.55 else { continue }   // none under the chin
+                let long = 1.34 + 0.2 * Double(Self.hash(i + salt, 73) % 100) / 100 + 0.3 * Double(kick)
+                let tip = CGPoint(x: x0 + CGFloat(cos(a) * long) * s, y: y0 - 0.1 * s + CGFloat(sin(a) * long) * s)
+                for da in [-0.07, 0.07] {
+                    mane.move(to: CGPoint(x: x0 + CGFloat(cos(a + da) * 1.02) * s, y: y0 - 0.1 * s + CGFloat(sin(a + da) * 1.02) * s))
+                    mane.addLine(to: tip)
+                }
+            }
+            g.addPath(mane); g.strokePath()
+            // the facets: each its own shade, the left side in the light, some lit by the kick
+            let edges = CGMutablePath()
+            for side in [CGFloat(1), -1] {
+                for (fi, facet) in Self.wolfFacets.enumerated() {
+                    let p = path(facet.map { pt($0, side) })
+                    var shade = 0.05 + 0.15 * Float(Self.hash(fi + salt, side > 0 ? 71 : 74) % 100) / 100
+                    if side < 0 { shade *= 1.7 }
+                    if Self.hash(fi + beat * 17 + (side > 0 ? 0 : 50), 72) % 4 == 0 { shade += 0.4 * kick }
+                    g.setShadow(offset: .zero, blur: 0, color: nil)
+                    g.setFillColor(cg(dim(mix(cols[1 % cols.count], white, 0.2), shade * lightK)))
+                    g.addPath(p); g.fillPath()
+                    edges.addPath(p)
+                }
+            }
+            sharp(dim(cols[0], 0.85 * lightK), 1.4)
+            g.addPath(edges); g.strokePath()
+            // the open mouth is dark, with fangs
+            if open > 0.12 {
+                g.setFillColor(CGColor(gray: 0, alpha: 1))
+                g.addPath(path([pt("Mc", 1), pt("Nt", 1), pt("Mc", -1), CGPoint(x: x0, y: y0 + CGFloat(0.8 + 0.2 * open) * s)])); g.fillPath()
+                sharp(dim(white, lightK), 1.2)
+                for side in [CGFloat(1), -1] {
+                    for (fx, len) in [(0.1, 0.17), (0.2, 0.09)] {
+                        let fang = path([CGPoint(x: x0 + side * CGFloat(fx - 0.035) * s, y: y0 + 0.81 * s),
+                                         CGPoint(x: x0 + side * CGFloat(fx + 0.035) * s, y: y0 + 0.82 * s),
+                                         CGPoint(x: x0 + side * CGFloat(fx) * s, y: y0 + CGFloat(0.82 + len * min(1, open * 1.6)) * s)])
+                        g.setFillColor(cg(dim(white, 0.85 * lightK)))
+                        g.addPath(fang); g.fillPath()
+                    }
+                }
+            }
+            // the nose, and the eyes: they burn
+            g.setShadow(offset: .zero, blur: 0, color: nil)
+            g.setFillColor(cg(dim(cols[0], 0.5 * lightK)))
+            g.addPath(path([pt("N", 1), pt("Nt", 1), pt("N", -1)])); g.fillPath()
+            let burn = mix(cols[0], white, 0.35 + 0.65 * max(bass, kick))
+            neon(dim(burn, lightK), 2.5 + 2.5 * CGFloat(kick))
+            g.setLineJoin(.miter)
+            for side in [CGFloat(1), -1] {
+                let eye = path([pt("Yi", side), pt("Yo", side), pt("Yb", side)])
+                g.addPath(eye); g.fillPath()
+                g.addPath(eye); g.strokePath()
+            }
+        }
+        let size = min(cw, ch) * 0.36, cy = ch / 2 + size * 0.06
+        if cw / ch > 2.4 {   // a pack: two more behind, smaller and darker
+            head(cw / 2 - cw * 0.3, cy + size * 0.12, size * 0.68, 0.55, 5)
+            head(cw / 2 + cw * 0.3, cy + size * 0.12, size * 0.68, 0.55, 9)
+        }
+        head(cw / 2, cy, size, 1, 0)
+    }
+
+    /// Claws rip across the wall, one slash every other beat (every beat in a drop); the scars stay a while.
+    private func claws(_ cols: [SIMD3<Float>], _ bp: Double, _ drop: Bool) {
+        let step = drop ? 1.0 : 2.0, hit = Int(floor(bp / step)), u = bp - Double(hit) * step
+        let white = SIMD3<Float>(repeating: 1), long = min(max(cw, ch) * 0.8, min(cw, ch) * 1.9)
+        for age in stride(from: 2, through: 0, by: -1) {   // the oldest scar first
+            let h = hit - age, since = u + Double(age) * step
+            let reveal = age == 0 ? CGFloat(min(1, u / 0.14)) : 1, heat = Float(exp(-since * (drop ? 1.5 : 0.9)))
+            let dir: CGFloat = Self.hash(h, 61) % 2 == 0 ? 1 : -1
+            let cx = cw * CGFloat(0.3 + 0.4 * Double(Self.hash(h, 62) % 100) / 100), cy = ch * CGFloat(0.4 + 0.2 * Double(Self.hash(h, 63) % 100) / 100)
+            let a = 0.85 + 0.35 * Double(Self.hash(h, 64) % 100) / 100   // from the vertical
+            let d = CGPoint(x: dir * CGFloat(sin(a)), y: CGFloat(cos(a))), nrm = CGPoint(x: d.y, y: -d.x)
+            let count = 3 + Self.hash(h, 65) % 2
+            for c in 0..<count {
+                let off = (CGFloat(c) - CGFloat(count - 1) / 2) * min(cw, ch) * 0.13
+                let len = long * (c == 0 || c == count - 1 ? 0.78 : 1), wide = min(cw, ch) * 0.028
+                let start = CGPoint(x: cx + nrm.x * off - d.x * len / 2, y: cy + nrm.y * off - d.y * len / 2)
+                let end = CGPoint(x: start.x + d.x * len * reveal, y: start.y + d.y * len * reveal)
+                let mid = CGPoint(x: start.x + (end.x - start.x) * 0.4, y: start.y + (end.y - start.y) * 0.4)
+                let blade = path([start, CGPoint(x: mid.x + nrm.x * wide, y: mid.y + nrm.y * wide), end,
+                                  CGPoint(x: mid.x - nrm.x * wide, y: mid.y - nrm.y * wide)])
+                if age == 0 {
+                    let hot = mix(cols[0], white, heat)
+                    g.setLineCap(.round); g.setLineJoin(.round)
+                    softGlow(blade, hot, 2)
+                    sharp(hot, 1.5)
+                    g.setFillColor(cg(hot))
+                } else {
+                    sharp(dim(cols[0], 0.18 + 0.6 * heat), 1.2)
+                    g.setFillColor(cg(dim(cols[0], 0.08 + 0.3 * heat)))
+                }
+                g.setLineJoin(.miter)
+                g.addPath(blade); g.fillPath()
+                g.addPath(blade); g.strokePath()
+            }
+            if age == 0 {   // shards fly off the fresh slash
+                sharp(dim(mix(cols[1 % cols.count], white, 0.5), heat), 1)
+                for i in 0..<16 {
+                    let along = CGFloat(Self.hash(h * 16 + i, 66) % 100) / 100 - 0.5, sideways: CGFloat = i % 2 == 0 ? 1 : -1
+                    let fly = CGFloat(u) * min(cw, ch) * CGFloat(0.25 + 0.5 * Double(Self.hash(h * 16 + i, 67) % 100) / 100)
+                    let o = CGPoint(x: cx + d.x * long * along + nrm.x * sideways * (min(cw, ch) * 0.1 + fly),
+                                    y: cy + d.y * long * along + nrm.y * sideways * (min(cw, ch) * 0.1 + fly))
+                    let r = 3 + CGFloat(Self.hash(i, 68) % 5), turn = CGFloat(u * 5 + Double(i))
+                    g.setFillColor(cg(dim(mix(cols[1 % cols.count], white, 0.5), heat)))
+                    g.addPath(polygon(o.x, o.y, r, sides: 3, rot: turn)); g.fillPath()
+                }
+            }
+        }
+    }
+
+    /// Jaws: rows of spikes from the top and the bottom, as long as the music is loud there; they bite on the kick.
+    private func spikes(_ f: Frame, _ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ dt: Float) {
+        meter(f, dt)
+        let n = eq.count, tw = cw / CGFloat(n), u = bp - floor(bp), kick = CGFloat(exp(-u * 5))
+        let white = SIMD3<Float>(repeating: 1), bite = ch * 0.07 * kick * CGFloat(0.4 + bass)
+        for side in 0..<2 {
+            let edge: CGFloat = side == 0 ? 0 : ch, dir: CGFloat = side == 0 ? 1 : -1
+            var pts = [CGPoint(x: -tw, y: edge)]
+            for i in -1...n {
+                let j = min(n - 1, max(0, side == 0 ? i : n - 1 - i))
+                let len = ch * (0.09 + 0.33 * CGFloat(eq[j])) + bite
+                let x0 = CGFloat(i) * tw + (side == 1 ? tw / 2 : 0)   // the rows interlock
+                pts += [CGPoint(x: x0, y: edge), CGPoint(x: x0 + tw / 2, y: edge + dir * len)]
+            }
+            pts.append(CGPoint(x: cw + tw * 2, y: edge))
+            let jaw = path(pts), c = cols[side % cols.count]
+            g.setShadow(offset: .zero, blur: 0, color: nil)
+            g.setFillColor(cg(dim(c, 0.14 + 0.2 * Float(kick))))
+            g.addPath(jaw); g.fillPath()
+            neon(mix(c, white, 0.5 * Float(kick)), 2)
+            g.setLineJoin(.miter); g.setMiterLimit(12)
+            g.addPath(jaw); g.strokePath()
+        }
+        // between the jaws a cut of light on the kick
+        sharp(dim(mix(cols[0], white, 0.7), Float(kick)), 1 + 5 * kick)
+        g.strokeLineSegments(between: [CGPoint(x: 0, y: ch / 2), CGPoint(x: cw, y: ch / 2)])
     }
 
     /// 3-2-1 into the drop the engine picked (hello.countdown: once or twice a night), then DROP!

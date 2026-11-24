@@ -451,6 +451,9 @@ public struct Frame: Decodable, Sendable {
     /// Per element: [dimmer, r, g, b, white, pan, tilt]
     public var fx: [[Float]]
     public var bands: [Float]
+    /// While lights strobe: the share of the rig that does (x, 0..1) and its flash on the beat grid now (y, 0 dark ..
+    /// 1 lit). The LED wall flashes with it.
+    public var strobe: SIMD2<Float>?
     public var beam: [String?]
     public var dirs: [SIMD3<Float>?]
     public var lz: [[LaserBeam]?]
@@ -477,11 +480,11 @@ public struct Frame: Decodable, Sendable {
     /// The show arc (live mode).
     public var arc: ArcStatus?
 
-    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, beam, dirs, lz, gobo, zoom, ring, bee, decks, laserGuard = "guard", link, aiKey = "ai_key", lite, fog, arc }
+    enum CodingKeys: String, CodingKey { case t, phrase, bp, fx, bands, strobe, beam, dirs, lz, gobo, zoom, ring, bee, decks, laserGuard = "guard", link, aiKey = "ai_key", lite, fog, arc }
 
     /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
     public init(fx: [[Float]], dirs: [SIMD3<Float>?]) {
-        t = 0; phrase = 0; bp = nil; self.fx = fx; bands = []; beam = dirs.map { $0 == nil ? nil : "open" }
+        t = 0; phrase = 0; bp = nil; self.fx = fx; bands = []; strobe = nil; beam = dirs.map { $0 == nil ? nil : "open" }
         self.dirs = dirs; lz = fx.map { _ in nil }; gobo = []; zoom = []; ring = []; bee = []; decks = nil; laserGuard = nil; link = nil; aiKey = nil; lite = false; fog = [:]; arc = nil
     }
 
@@ -492,6 +495,7 @@ public struct Frame: Decodable, Sendable {
         bp = try c.decodeIfPresent(Double.self, forKey: .bp)
         fx = try c.decodeIfPresent([[Float]].self, forKey: .fx) ?? []
         bands = try c.decodeIfPresent([Float].self, forKey: .bands) ?? []
+        strobe = ((try? c.decodeIfPresent([Float].self, forKey: .strobe)) ?? nil).flatMap { $0.count >= 2 ? SIMD2($0[0], $0[1]) : nil }
         beam = try c.decodeIfPresent([String?].self, forKey: .beam) ?? []
         dirs = (try c.decodeIfPresent([[Float]?].self, forKey: .dirs) ?? []).map { d in
             d.flatMap { $0.count >= 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }

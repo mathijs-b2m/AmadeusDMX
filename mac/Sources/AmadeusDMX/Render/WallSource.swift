@@ -162,7 +162,8 @@ final class WallSource {
         rp.colorAttachments[0].storeAction = .store
         guard let enc = cmd.makeRenderCommandEncoder(descriptor: rp) else { return }
         let p = s.palette + Array(repeating: s.palette.last ?? .one, count: max(0, 4 - s.palette.count))
-        var wp = WallParams(info: [s.level, s.psychedelic ? 1 : 0, Float(now - startTime), Float(aspect)], bands: s.bands,
+        var wp = WallParams(info: [s.level, s.psychedelic ? 1 : 0, Float(now - startTime), Float(aspect)],
+                            bands: SIMD4(s.bands.x, s.bands.y, s.bands.z, s.flash), layer: s.layer,
                             pal: (SIMD4(p[0], 1), SIMD4(p[1], 1), SIMD4(p[2], 1), SIMD4(p[3], 1)))
         enc.setRenderPipelineState(composePipe)
         enc.setFragmentTexture(cpu, index: 0)
@@ -230,7 +231,8 @@ enum WallShaders {
 #include <metal_stdlib>
 using namespace metal;
 
-struct WallParams { float4 info; float4 bands; float4 pal[4]; };   // info: x level, y psychedelic, z time, w aspect
+// info: x level, y psychedelic, z time, w aspect; bands.w: the flash; layer: x mask, y beat pulse, z beat phase, w beat parity
+struct WallParams { float4 info; float4 bands; float4 layer; float4 pal[4]; };
 struct FSOut { float4 pos [[position]]; float2 uv; };
 
 vertex FSOut wall_fs_vertex(uint vid [[vertex_id]]) {
@@ -257,11 +259,37 @@ float3 psychedelic(float2 uv, float t, float aspect, float4 bands, constant floa
     return c;
 }
 
+// The overlay layer's mask, as a VJ lays one over the picture: where the beat's lift and the strobe's flash show.
+// 0 the whole wall, 1 bars across, 2 bars down, 3 blocks, 4 a diamond opening with the beat, 5 slashes, 6 a frame,
+// 7 the whole wall with the flash as the picture's negative. Bars, blocks and slashes swap places every beat.
+float layer_mask(float2 uv, float kind, float aspect, float u, float parity) {
+    float2 p = float2(uv.x * aspect, uv.y);   // in wall heights: the pattern is as coarse on any shape
+    if (kind < 0.5 || kind > 6.5) return 1.0;
+    if (kind < 1.5) return fmod(floor(p.y * 8.0) + parity, 2.0) < 0.5 ? 1.0 : 0.0;
+    if (kind < 2.5) return fmod(floor(p.x * 8.0) + parity, 2.0) < 0.5 ? 1.0 : 0.0;
+    if (kind < 3.5) return fmod(floor(p.x * 4.0) + floor(p.y * 4.0) + parity, 2.0) < 0.5 ? 1.0 : 0.0;
+    if (kind < 4.5) {
+        float d = abs(p.x - aspect * 0.5) + abs(p.y - 0.5), r = u * (aspect * 0.5 + 0.5);
+        return abs(d - r) < 0.1 ? 1.0 : (d < r ? 0.3 : 0.0);
+    }
+    if (kind < 5.5) return fmod(floor((p.x + (parity > 0.5 ? p.y : -p.y)) * 5.0 + 40.0), 2.0) < 0.5 ? 1.0 : 0.0;
+    float e = min(min(p.x, aspect - p.x), min(p.y, 1.0 - p.y));
+    return e < 0.06 ? 1.0 : 0.0;
+}
+
 // the picture as the wall shows it, at full level: the CPU's drawing or the psychedelic shader (HDR: the stage's bloom
 // sees the rings; the output clamps). The level is applied by who shows it.
 fragment float4 wall_compose(FSOut in [[stage_in]], texture2d<float> tex [[texture(0)]], constant WallParams &w [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
     float3 c = w.info.y > 0.5 ? psychedelic(in.uv, w.info.z, w.info.w > 0.0 ? w.info.w : 16.0 / 9.0, w.bands, w.pal) : tex.sample(smp, in.uv).rgb;
+    // the overlay layer: on the beat the picture lifts through the mask (and a breath of colour with it); when the
+    // lights strobe the mask flashes with them, near white with a touch of the palette, or as the picture's negative
+    float aspect = w.info.w > 0.0 ? w.info.w : 16.0 / 9.0;
+    float m = layer_mask(in.uv, w.layer.x, aspect, w.layer.z, w.layer.w);
+    c = c * (1.0 + 0.6 * w.layer.y * m) + w.pal[1].rgb * (0.1 * w.layer.y * m);
+    float3 white = mix(w.pal[0].rgb, float3(1.0), 0.8);
+    float3 lit = w.layer.x > 6.5 ? white * (1.0 - saturate(c)) : white;
+    c = mix(c, lit, saturate(w.bands.w) * m);
     return float4(c, 1);
 }
 

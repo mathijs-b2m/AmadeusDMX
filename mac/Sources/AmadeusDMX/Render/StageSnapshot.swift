@@ -4,7 +4,7 @@
 // -camera "Front of House" (a preset), -cameraYaw 180 (turned round the stage that many degrees from it), -inRoom YES,
 // -snapshotSize 1600x900. On a rig with an LED wall it also draws what the LED Wall Output sends: NAME-wall.png (the
 // show's picture) and NAME-card.png (the test card) on a display of -wallOutputSize 1920x1080, the wall at
-// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128, one scene with -wallScene runner. The app quits when done, before it starts
+// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128, one scene with -wallScene runner, one overlay mask with -wallMask 5. The app quits when done, before it starts
 // anything.
 import AmadeusKit
 import AppKit
@@ -102,6 +102,7 @@ enum StageSnapshot {
             }
             exit(0)
         }
+        if let mask = UserDefaults.standard.string(forKey: "wallMask").flatMap(Float.init) { WallRenderer.forceMask = mask }   // -wallMask 5
         if let scene = UserDefaults.standard.string(forKey: "wallScene").flatMap(WallScene.init(rawValue:)) {
             WallSource.shared.force = scene   // -wallScene runner: one scene on the wall
         }
