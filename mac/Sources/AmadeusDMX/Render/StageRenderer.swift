@@ -88,7 +88,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var fogT: Float = 0
     var exposure: Float = 1.0 { didSet { wake() } }
 
-    private var wallOn: Float = 0   // the wall plays (a show on a rig with one), for the shader
+    private var wallOn: Float = 0   // the wall's level (0: dark, or no show on a rig with one), for the shader
 
     /// Every frame's GPU time (seconds), for the power meter.
     static var onGPUTime: ((Double) -> Void)?
@@ -393,7 +393,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         wallOn = 0
         if let inp, let h = inp.hello, let frame, scenery?.wall != nil,
            let out = WallSource.shared.prepare(frame: frame, hello: h, now: now, cmd: cmd) {
-            wallOn = 1
+            wallOn = out.level
             let p = out.palette + Array(repeating: out.palette.last ?? .one, count: max(0, 4 - out.palette.count))
             // the wall lights the stage around it a little
             ambient += (out.psychedelic ? (p[0] + p[1]) * 0.5 : SIMD3(repeating: 0.4)) * out.level * 0.08

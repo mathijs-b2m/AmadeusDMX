@@ -90,9 +90,9 @@ enum StageSnapshot {
             if let outTarget {   // what goes to the LED wall
                 for (suffix, card) in [("wall", nil), ("card", TestCard.draw(pixels: (wall.w, wall.h), wall: wall, panelPx: panelPx))] as [(String, CGImage?)] {
                     guard let cmd = r.queue.makeCommandBuffer() else { continue }
-                    WallSource.shared.prepare(frame: frame, hello: hello, now: now, cmd: cmd)
                     let tex = try card.map { try MTKTextureLoader(device: r.device).newTexture(cgImage: $0, options: [.SRGB: false]) }
-                    drawer.encode(cmd, into: outTarget, wall: wall, picture: pic, level: 1, card: tex, time: 0.7)
+                    let lit = WallSource.shared.prepare(frame: frame, hello: hello, now: now, cmd: cmd)?.level ?? 0
+                    drawer.encode(cmd, into: outTarget, wall: wall, picture: pic, level: tex != nil ? 1 : lit, card: tex, time: 0.7)
                     cmd.commit()
                     cmd.waitUntilCompleted()
                     let url = out.deletingPathExtension().appendingPathExtension("png").path.replacingOccurrences(of: ".png", with: "-\(suffix).png")

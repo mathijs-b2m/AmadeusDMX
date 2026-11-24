@@ -335,9 +335,9 @@ vertex WallOut wall_vertex(WallIn in [[stage_in]], constant Uniforms &u [[buffer
     WallOut o; o.pos = u.viewProj * float4(in.pos, 1); o.uv = in.uv; return o;
 }
 
-// the wall's picture comes ready (WallSource: the drawing or the psychedelic shader, at the wall's level)
+// the wall's picture comes ready (WallSource: the drawing or the psychedelic shader), lit at the wall's level
 fragment float4 wall_fragment(WallOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
-                              constant float4 &w [[buffer(3)]]) {   // w.x: 1 while the wall plays, else 0; w.y: its aspect
+                              constant float4 &w [[buffer(3)]]) {   // w.x: the wall's level (light), w.y: its aspect
     constexpr sampler smp(filter::linear, mip_filter::linear, address::clamp_to_edge);
     float3 c = tex.sample(smp, in.uv).rgb * w.x;
     // LED pixel grid, faintly visible up close

@@ -1,6 +1,7 @@
 // The LED wall's picture, once for the whole app. The 3D stages show it on their wall, and the LED Wall Output puts
 // it on a real one (a display: the HDMI into the LED processor). WallRenderer draws the picture on the CPU, once per
-// show frame. Here it goes onto the GPU, the psychedelic shader is drawn in its place and the wall's level is applied,
+// show frame. Here it goes onto the GPU and the psychedelic shader is drawn in its place (the wall's level is light:
+// each reader applies it, the stage to its light, the output to what it sends),
 // so every one of them shows the same picture, also while no 3D stage is open (Perform mode).
 import AmadeusKit
 import CoreGraphics
@@ -172,23 +173,26 @@ float3 psychedelic(float2 uv, float t, float aspect, float4 bands, constant floa
     return c;
 }
 
-// the picture as the wall shows it: the CPU's drawing or the psychedelic shader, at the wall's level (HDR: the
-// stage's bloom sees the rings; the output clamps)
+// the picture as the wall shows it, at full level: the CPU's drawing or the psychedelic shader (HDR: the stage's bloom
+// sees the rings; the output clamps). The level is applied by who shows it.
 fragment float4 wall_compose(FSOut in [[stage_in]], texture2d<float> tex [[texture(0)]], constant WallParams &w [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
     float3 c = w.info.y > 0.5 ? psychedelic(in.uv, w.info.z, w.info.w > 0.0 ? w.info.w : 16.0 / 9.0, w.bands, w.pal) : tex.sample(smp, in.uv).rgb;
-    return float4(c * w.info.x, 1);
+    return float4(c, 1);
 }
 
-// the output: the picture in the wall's rectangle (the viewport), under the brightness ceiling
-struct OutParams { float4 info; };   // x brightness, y time, z test card's moving bar on (1)
+// the output: the picture in the wall's rectangle (the viewport). info.x is a share of the wall's light (its level,
+// the brightness ceiling, the fade): the picture is sRGB-encoded, so it goes out as that share of light, not of the
+// encoded value (18% of the value would be 2% of the light: black on a wall that should glow faintly).
+struct OutParams { float4 info; };   // x light 0..1, y time, z test card's moving bar on (1)
 
 fragment float4 wall_output(FSOut in [[stage_in]], texture2d<float> tex [[texture(0)]], constant OutParams &o [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
-    float3 c = clamp(tex.sample(smp, in.uv).rgb, 0.0, 1.0) * o.info.x;
+    float k = pow(saturate(o.info.x), 1.0 / 2.2);
+    float3 c = clamp(tex.sample(smp, in.uv).rgb, 0.0, 1.0) * k;
     if (o.info.z > 0.5) {   // the test card: a bar crossing every two seconds shows tearing and dropped frames
         float x = fract(o.info.y * 0.5);
-        if (abs(in.uv.x - x) < 0.006) c = float3(o.info.x);
+        if (abs(in.uv.x - x) < 0.006) c = float3(k);
     }
     return float4(c, 1);
 }

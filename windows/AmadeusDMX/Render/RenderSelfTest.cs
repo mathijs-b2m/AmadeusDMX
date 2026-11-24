@@ -102,13 +102,14 @@ public static class RenderSelfTest
         var ok = true;
         foreach (var testCard in new[] { false, true })
         {
-            for (var i = 0; i < 10; i++) WallSource.Shared.Update(frame, inp.Hello, now + i / 40.0);
+            WallState? lit = null;
+            for (var i = 0; i < 10; i++) lit = WallSource.Shared.Update(frame, inp.Hello, now + i / 40.0) ?? lit;
             (ID3D11Texture2D Texture, ID3D11ShaderResourceView View)? card = null;
             using (gpu.Lock())
             {
                 var picture = WallSource.Shared.Compose(gpu, now + 0.25);
                 if (testCard) card = WallOutputDrawer.CardTexture(gpu, (wall.W, wall.H), wall, panelPx);
-                drawer.Encode(gpu, rtv, wall, pic, 1, card?.View, picture, 0.7f);
+                drawer.Encode(gpu, rtv, wall, pic, testCard ? 1 : lit?.Level ?? 0, card?.View, picture, 0.7f);
                 gpu.Context.Flush();
             }
             card?.View.Dispose();

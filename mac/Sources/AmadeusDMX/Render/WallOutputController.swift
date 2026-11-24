@@ -298,7 +298,8 @@ final class WallOutputDrawer {
         } catch { print("wall output shaders: \(error)"); pipe = nil }
     }
 
-    /// `level`: the brightness ceiling times the fade to black; `card`: the test card, else the show's picture.
+    /// `level`: the share of the wall's light that goes out (its level × the brightness ceiling × the fade; the card's:
+    /// the ceiling); `card`: the test card, else the show's picture.
     func encode(_ cmd: MTLCommandBuffer, into target: MTLTexture, wall: PixelRect, picture: PixelRect, level: Float,
                 card: MTLTexture?, time: Float) {
         let rp = MTLRenderPassDescriptor()
@@ -400,7 +401,8 @@ final class WallOutputView: NSView {
 
         let (wall, pic) = controller.layout(drawable: drawablePixels)
         let card = s.testPattern ? controller.testCard(wall, modeWall: controller.modeWall) : nil
-        drawer.encode(cmd, into: drawable.texture, wall: wall, picture: pic, level: Float(s.brightness) * (card != nil ? 1 : fade),
+        drawer.encode(cmd, into: drawable.texture, wall: wall, picture: pic,
+                      level: Float(s.brightness) * (card != nil ? 1 : fade * (state?.level ?? 0)),
                       card: card, time: Float(now - start0))
         cmd.present(drawable)
         cmd.commit()

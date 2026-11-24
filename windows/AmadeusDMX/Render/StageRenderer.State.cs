@@ -455,7 +455,7 @@ public sealed partial class StageRenderer
         // shows the same), here only put on the stage's wall
         if (inp is { Hello: { } h } && frame is not null && Scenery?.Wall is not null && WallSource.Shared.Update(frame, h, now) is { } wo)
         {
-            out_.WallOn = 1;
+            out_.WallOn = wo.Level;   // its light, on the stage's wall
             WallNow = wo.Scene;
             var p = wo.Palette.Concat(Enumerable.Repeat(wo.Palette.Length > 0 ? wo.Palette[^1] : Vector3.One, Math.Max(0, 4 - wo.Palette.Length))).ToArray();
             // the wall lights the stage around it a little

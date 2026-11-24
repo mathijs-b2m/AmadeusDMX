@@ -273,7 +273,7 @@ public sealed partial class StageRenderer : IDisposable
 
         // the frame's buffers
         ctx.UpdateSubresource(in f.U, uniformsBuffer!);
-        var wallOn = new Vector4(wallPicture is null ? 0 : 1, f.WallAspect, 0, 0);
+        var wallOn = new Vector4(wallPicture is null ? 0 : f.WallOn, f.WallAspect, 0, 0);
         ctx.UpdateSubresource(in wallOn, wallOnBuffer!);
         _parts.Upload(Device, ctx, (ReadOnlySpan<SolidVertex>)f.Parts.V.Span());
         _beams.Upload(Device, ctx, (ReadOnlySpan<BeamInstance>)f.Beams.Span());

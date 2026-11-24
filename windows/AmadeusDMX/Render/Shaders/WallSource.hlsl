@@ -12,7 +12,7 @@ cbuffer WallParams : register(b0)
 
 cbuffer OutParams : register(b1)
 {
-    float4 out_info;    // x brightness, y time, z test card's moving bar on (1)
+    float4 out_info;    // x light 0..1, y time, z test card's moving bar on (1)
 };
 
 Texture2D<float4> tex : register(t0);
@@ -53,17 +53,20 @@ float4 wall_compose(FSOut i) : SV_Target
     // both branches evaluated (a vector ?: in SM4 isn't short-circuit); the picture has one level, no gradients needed
     float3 picture = tex.SampleLevel(smp, i.uv, 0).rgb;
     float3 c = info.y > 0.5 ? psychedelic(i.uv, info.z, info.w > 0.0 ? info.w : 16.0 / 9.0) : picture;
-    return float4(c * info.x, 1);
+    return float4(c, 1);   // at full level: who shows it applies the wall's level (as light)
 }
 
 // the output: the picture in the wall's rectangle (the viewport), under the brightness ceiling
 float4 wall_output(FSOut i) : SV_Target
 {
-    float3 c = clamp(tex.SampleLevel(smp, i.uv, 0).rgb, 0.0, 1.0) * out_info.x;
+    // out_info.x is a share of the wall's light (its level × the brightness ceiling × the fade): the picture is
+    // sRGB-encoded, so it goes out as that share of light, not of the encoded value (18% of the value is 2% of the light)
+    float k = pow(saturate(out_info.x), 1.0 / 2.2);
+    float3 c = clamp(tex.SampleLevel(smp, i.uv, 0).rgb, 0.0, 1.0) * k;
     if (out_info.z > 0.5)   // the test card: a bar crossing every two seconds shows tearing and dropped frames
     {
         float x = frac(out_info.y * 0.5);
-        if (abs(i.uv.x - x) < 0.006) c = float3(out_info.x, out_info.x, out_info.x);
+        if (abs(i.uv.x - x) < 0.006) c = float3(k, k, k);
     }
     return float4(c, 1);
 }

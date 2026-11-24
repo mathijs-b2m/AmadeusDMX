@@ -310,7 +310,8 @@ public sealed class WallOutputDrawer : IDisposable
         });
     }
 
-    /// `level`: the brightness ceiling times the fade to black; `card`: the test card, else the show's `picture`.
+    /// `level`: the share of the wall's light that goes out (its level × the brightness ceiling × the fade; the card's:
+    /// the ceiling); `card`: the test card, else the show's `picture`.
     public void Encode(SharedGpu gpu, ID3D11RenderTargetView target, PixelRect wall, PixelRect picture, float level,
                        ID3D11ShaderResourceView? card, ID3D11ShaderResourceView? show, float time)
     {
@@ -615,7 +616,7 @@ internal sealed class WallOutputView : IDisposable
         {
             var picture = WallSource.Shared.Compose(gpu, now);
             var card = plan.TestPattern ? TestCardView(gpu, wall, plan.ModeWall(d), plan.PanelPx) : null;
-            _drawer.Encode(gpu, _target!, wall, pic, plan.Brightness * (card is not null ? 1 : _fade), card, picture, (float)(now - _start0));
+            _drawer.Encode(gpu, _target!, wall, pic, plan.Brightness * (card is not null ? 1 : _fade * (state?.Level ?? 0)), card, picture, (float)(now - _start0));
         }
     }
 

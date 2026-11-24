@@ -302,7 +302,7 @@ public class RenderTests
         Assert.NotEmpty(f.Parts.V);
         Assert.Equal(0, f.Parts.V.Count % 3);
         Assert.True(f.U.Ambient.X + f.U.Ambient.Y + f.U.Ambient.Z > 0);
-        Assert.Equal(1, f.WallOn);   // the first show frame draws the wall's picture (WallSource)
+        Assert.True(f.WallOn > 0 && f.WallOn <= 1);   // the first show frame lights the wall's picture (WallSource), at its level
         Assert.All(f.Beams, b => Assert.True(float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0 && b.DirRadius.W > 0));
         Assert.Equal(12, r.ZoneEdges.Count);  // a box zone: 12 edges
         Assert.Equal(36, r.ZoneVertices.Count);
