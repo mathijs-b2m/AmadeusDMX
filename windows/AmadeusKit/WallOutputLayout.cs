@@ -122,13 +122,13 @@ public static class WallOutputLayout
     }
 
     /// How much finer than its canvas (WallRenderer's units: 640×360 for 16:9) the picture is drawn to fill a wall
-    /// `picture` big: 1, 1.5 or 2, and never more than about 1.6 million pixels for the CPU to draw.
+    /// `picture` big, in half steps: 3 for 1080p, 6 for 4K (at most 4096 pixels on the long side). The app draws
+    /// coarser by itself when a picture takes too long (WallSource's adapting).
     public static double PictureScale(PixelRect? picture, (double W, double H) canvas)
     {
         if (picture is not { W: > 0, H: > 0 } p || canvas.W <= 0 || canvas.H <= 0) return 1;
-        var s = Math.Min(2, Math.Max(1, Math.Ceiling(Math.Max(p.W / canvas.W, p.H / canvas.H) * 2) / 2));
-        while (s > 1 && canvas.W * canvas.H * s * s > 1.6e6) s -= 0.5;
-        return s;
+        var s = Math.Max(1, Math.Ceiling(Math.Max(p.W / canvas.W, p.H / canvas.H) * 2) / 2);
+        return Math.Min(s, Math.Max(1, Math.Floor(4096 / Math.Max(canvas.W, canvas.H) * 2) / 2));
     }
 
     /// A rectangle in the monitor's own pixels, in the pixels of what is drawn (on the Mac a HiDPI mode draws more

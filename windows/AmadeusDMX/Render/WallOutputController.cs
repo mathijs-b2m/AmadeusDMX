@@ -54,6 +54,21 @@ internal sealed record OutputPlan((int W, int H)? Mode, PixelRect? Rect, float B
     public double PictureScale((int W, int H) d, double aspect, (float W, float H) canvas) =>
         WallOutputLayout.PictureScale(WallOutputLayout.Fit(ModeWall(d), aspect), (canvas.W, canvas.H));
 
+    /// The wall's picture on the monitor, in its pixels (it sizes the composed picture: as sharp as the output).
+    public (int W, int H) Picture((int W, int H) d, double aspect)
+    {
+        var p = WallOutputLayout.Fit(ModeWall(d), aspect);
+        return (p.W, p.H);
+    }
+
+    /// Scale and size of the picture for this output (WallSource), from the output's thread or the UI's.
+    public void Apply(WallSource src, (int W, int H) d)
+    {
+        var aspect = src.Aspect;
+        src.Scale = PictureScale(d, aspect, src.Canvas);
+        src.OutputPicture = Picture(d, aspect);
+    }
+
     /// The wall's rectangle in the monitor's own pixels (what the processor is told), for the test card's labels.
     public PixelRect ModeWall((int W, int H) d)
     {
@@ -176,7 +191,7 @@ public sealed class WallOutputController : Observable
     void ApplyNow()
     {
         WallSource.Shared.Lead = Settings.LeadMs / 1000;
-        if (!Settings.On) { Close(); Problem = null; WallSource.Shared.Scale = 1; return; }
+        if (!Settings.On) { Close(); Problem = null; WallSource.Shared.Scale = 1; WallSource.Shared.OutputPicture = null; return; }
         switch (Settings.Target)
         {
             case WallOutputSettings.TargetKind.Window:
@@ -260,8 +275,7 @@ public sealed class WallOutputController : Observable
     /// Draw the picture as fine as the wall needs (its rectangle, the rig's shape). `pixels`: what it plays on.
     internal void UpdateScale((int W, int H) pixels)
     {
-        var src = WallSource.Shared;
-        src.Scale = Plan.PictureScale(pixels, src.Aspect, src.Canvas);
+        Plan.Apply(WallSource.Shared, pixels);
     }
 
     /// The window target's first size: 960 × 540 at the main window's scaling, where it was last time.
@@ -612,7 +626,7 @@ internal sealed class WallOutputView : IDisposable
 
         var d = (_bufferW, _bufferH);
         var src = WallSource.Shared;
-        src.Scale = plan.PictureScale(d, src.Aspect, src.Canvas);   // a show on a rig of another shape
+        plan.Apply(src, d);   // a show on a rig of another shape: as fine and as big as the output wants
         var (wall, pic) = plan.Layout(d, src.Aspect);
         using (gpu.Lock())
         {

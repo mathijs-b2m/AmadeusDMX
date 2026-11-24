@@ -106,12 +106,14 @@ public sealed class WallOutputLayoutTests
     }
 
     [Fact]
-    public void ALongWallIsDrawnFineEnoughButNotTooBig()
+    public void ThePictureIsDrawnAsFineAsTheOutputUpTo4K()
     {
         Assert.Equal(1, WallOutputLayout.PictureScale(null, (640, 360)));
-        Assert.Equal(2, WallOutputLayout.PictureScale(new PixelRect(0, 0, 1920, 1080), (640, 360)));
+        Assert.Equal(3, WallOutputLayout.PictureScale(new PixelRect(0, 0, 1920, 1080), (640, 360)));
+        Assert.Equal(6, WallOutputLayout.PictureScale(new PixelRect(0, 0, 3840, 2160), (640, 360)));
         Assert.Equal(1.5, WallOutputLayout.PictureScale(new PixelRect(0, 0, 768, 384), (720, 360)));
-        // a 4:1 ribbon of 2560 × 640: 1440 × 360 units at 2 would be 2 million pixels for the CPU
-        Assert.Equal(1.5, WallOutputLayout.PictureScale(new PixelRect(0, 0, 2560, 640), (1440, 360)));
+        Assert.Equal(2, WallOutputLayout.PictureScale(new PixelRect(0, 0, 2560, 640), (1440, 360)));
+        // never more than 4096 pixels on the long side: an 8K output gets a 4K-ish picture
+        Assert.Equal(6, WallOutputLayout.PictureScale(new PixelRect(0, 0, 7680, 4320), (640, 360)));
     }
 }

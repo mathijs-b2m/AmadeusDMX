@@ -302,7 +302,15 @@ public class RenderTests
         Assert.NotEmpty(f.Parts.V);
         Assert.Equal(0, f.Parts.V.Count % 3);
         Assert.True(f.U.Ambient.X + f.U.Ambient.Y + f.U.Ambient.Z > 0);
-        Assert.True(f.WallOn > 0 && f.WallOn <= 1);   // the first show frame lights the wall's picture (WallSource), at its level
+        // the wall's picture is drawn on the painter's thread (the next frames have it), and fades in with the show
+        var g = new StageFrame();
+        var t = StageRenderer.Now();
+        for (var i = 1; i <= 5; i++)
+        {
+            WallSource.Shared.Flush();
+            r.PrepareFrame(g, t + 0.1 * i, new(1280, 720));
+        }
+        Assert.True(g.WallOn > 0 && g.WallOn <= 1);   // the next frame lights the wall's picture (WallSource), at its level
         Assert.All(f.Beams, b => Assert.True(float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0 && b.DirRadius.W > 0));
         Assert.Equal(12, r.ZoneEdges.Count);  // a box zone: 12 edges
         Assert.Equal(36, r.ZoneVertices.Count);
@@ -529,20 +537,32 @@ public class RenderTests
         Assert.Null(source.Update(frame, new Hello { Screen = false }, 10));
         Assert.Null(source.Update(new Frame { T = 1, Lite = true }, inp.Hello, 10));
         Assert.Null(source.State);
-        Assert.NotNull(source.Update(frame, inp.Hello, 10));
+        // the picture is drawn on the painter's thread: nobody waits for it, it is there a moment later
+        Assert.Null(source.Update(frame, inp.Hello, 10));
+        source.Flush();
+        Assert.NotNull(source.Update(frame, inp.Hello, 10.001));
+        source.Flush();
+        source.Update(frame, inp.Hello, 10.002);
         var v = source.StateVersion;
         // the same show frame again, from another stage or the output, in the same moment: shared
         source.Update(frame, inp.Hello, 10.01);
+        source.Flush();
+        source.Update(frame, inp.Hello, 10.011);
         Assert.Equal(v, source.StateVersion);
         // a still show keeps the wall alive
-        source.Update(frame, inp.Hello, 10.01 + WallSource.UpdateInterval);
+        source.Update(frame, inp.Hello, 10.002 + WallSource.UpdateInterval);
+        source.Flush();
+        source.Update(frame, inp.Hello, 10.003 + WallSource.UpdateInterval);
         Assert.Equal(v + 1, source.StateVersion);
-        // finer for a real wall: drawn again from scratch
+        // finer for a real wall
         source.Scale = 1.5;
-        Assert.Null(source.State);
-        Assert.NotNull(source.Update(frame, inp.Hello, 11));
+        source.Update(SceneSamples.Frame(inp, 21), inp.Hello, 11);
+        Assert.Equal(1.5, source.DrawScale);
+        source.Flush();
+        Assert.True(source.DrawMs > 0);
         source.Force = WallScene.Psychedelic;
         source.Update(SceneSamples.Frame(inp, 31), inp.Hello, 11.2);
+        source.Flush();
         Assert.True(source.Update(SceneSamples.Frame(inp, 31.1), inp.Hello, 11.3)!.Value.Psychedelic);
     }
 
@@ -582,7 +602,10 @@ public class RenderTests
         Assert.Equal((1440f, 360f), WallRenderer.Canvas(4));
         Assert.Equal((360f, 720f), WallRenderer.Canvas(0.5));
         Assert.Equal((1280, 720), WallSource.PictureSize(16.0 / 9.0));
-        Assert.Equal((2560, 427), WallSource.PictureSize(6));   // the long side at most 2560
+        Assert.Equal((3840, 2160), WallSource.PictureSize(16.0 / 9.0, (3840, 2160)));   // as big as the output's wall
+        Assert.Equal((1280, 720), WallSource.PictureSize(16.0 / 9.0, (768, 432)));      // never smaller than twice the canvas
+        Assert.Equal((4096, 683), WallSource.PictureSize(6));   // the long side at most 4096
+        Assert.Equal((4096, 2304), WallSource.PictureSize(16.0 / 9.0, (7680, 4320)));
         var inp = SceneSamples.Club();
         foreach (var aspect in new[] { 4.0, 0.5 })
             foreach (var scene in new[] { WallScene.Runner, WallScene.Dancer, WallScene.Crowd, WallScene.Pong, WallScene.Words, WallScene.Equalizer, WallScene.Ambient })

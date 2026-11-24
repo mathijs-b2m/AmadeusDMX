@@ -132,10 +132,16 @@ public sealed partial class WallSource
         lock (_lock)
         {
             if (_gpuGeneration != gpu.Generation) Build(gpu);
-            if (PictureSize(_aspect) != (_picW, _picH)) MakePicture(gpu);   // a rig of another shape
+            if (PictureSize(_aspect, _outputPicture) != (_picW, _picH)) MakePicture(gpu);   // a rig of another shape, another output
             if (_state is not { } s || _pictureView is null || _composePS is null) return _pictureView;
-            if (!s.Psychedelic && _uploaded != _pictureVersion) Upload(gpu);
-            if (_composed != _stateVersion || (s.Psychedelic && now - _composedAt > 1.0 / 90))
+            var uploaded = false;
+            if (!s.Psychedelic)   // the painter's newest pixels (copied while its lock is held: never the ones it draws into)
+            {
+                var seq = _painter.CopyPixels(_uploaded, (bytes, w, h) => Upload(gpu, bytes, w, h));
+                uploaded = seq != _uploaded;
+                _uploaded = seq;
+            }
+            if (_composed != _stateVersion || uploaded || (s.Psychedelic && now - _composedAt > 1.0 / 90))
             {
                 if (s.Psychedelic || _cpuView is not null) Draw(gpu, s, now);
                 _composed = _stateVersion;
@@ -175,7 +181,7 @@ public sealed partial class WallSource
     {
         _pictureView?.Dispose(); _pictureTarget?.Dispose(); _picture?.Dispose();
         var d = gpu.Device;
-        (_picW, _picH) = PictureSize(_aspect);
+        (_picW, _picH) = PictureSize(_aspect, _outputPicture);
         var mips = (uint)(Math.Floor(Math.Log2(Math.Max(_picW, _picH))) + 1);
         _picture = d.CreateTexture2D(new Texture2DDescription(Format.R16G16B16A16_Float, (uint)_picW, (uint)_picH, 1, mips,
             BindFlags.ShaderResource | BindFlags.RenderTarget, ResourceUsage.Default, CpuAccessFlags.None, 1, 0, ResourceOptionFlags.GenerateMips));
@@ -187,10 +193,8 @@ public sealed partial class WallSource
         _uploaded = _composed = -1;
     }
 
-    unsafe void Upload(SharedGpu gpu)
+    unsafe void Upload(SharedGpu gpu, byte[] bytes, int w, int h)
     {
-        var r = _renderer;
-        int w = r.PixelWidth, h = r.PixelHeight;
         if (_cpu is null || _cpuW != w || _cpuH != h)
         {
             _cpuView?.Dispose(); _cpu?.Dispose();
@@ -198,10 +202,8 @@ public sealed partial class WallSource
             _cpuView = gpu.Device.CreateShaderResourceView(_cpu);
             (_cpuW, _cpuH) = (w, h);
         }
-        var px = r.Pixels;
-        fixed (byte* p = px)
-            gpu.Context.UpdateSubresource(_cpu, 0, null, (IntPtr)p, (uint)r.RowBytes, 0);
-        _uploaded = _pictureVersion;
+        fixed (byte* p = bytes)
+            gpu.Context.UpdateSubresource(_cpu, 0, null, (IntPtr)p, (uint)(w * 4), 0);
     }
 
     void Draw(SharedGpu gpu, WallState s, double now)
