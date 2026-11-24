@@ -141,7 +141,7 @@ public static class RenderSelfTest
     {
         var h = inp.Hello!;
         foreach (var s in new[] { 2.0, 3.0, 6.0 })
-            foreach (var scene in new[] { WallScene.Runner, WallScene.Dancer, WallScene.Crowd, WallScene.Pong, WallScene.Words, WallScene.Equalizer, WallScene.Ambient })
+            foreach (var scene in WallScenes.AllCases.Where(s => s is not (WallScene.Auto or WallScene.Off or WallScene.Psychedelic)))
             {
                 using var w = new WallRenderer((float)s, h.ScreenAspect) { Force = scene };
                 for (var k = 0; k < 10; k++) w.Update(SceneSamples.Frame(inp, 30 + k / 40.0), h, 1 / 40f);

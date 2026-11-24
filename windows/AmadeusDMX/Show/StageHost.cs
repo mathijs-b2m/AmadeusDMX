@@ -26,8 +26,10 @@ public sealed class StageSettings : Observable
     public static IReadOnlyList<(string RawValue, string Title, string Symbol)> WallScenes =>
     [
         ("auto", L("Director's Choice"), "wand.and.stars"), ("off", L("Off"), "rectangle.slash"), ("ambient", L("Ambient"), "cloud.fog"),
+        ("starfield", L("Starfield"), "sparkles"),
         ("runner", L("Runner"), "figure.run"), ("dancer", L("Dancer"), "figure.dance"), ("crowd", L("Crowd"), "person.3"),
-        ("pong", L("Pong"), "gamecontroller"), ("words", L("Words"), "textformat.size"), ("equalizer", L("Equalizer"), "chart.bar"),
+        ("pong", L("Pong"), "gamecontroller"), ("shapes", L("Shapes"), "triangle"), ("words", L("Words"), "textformat.size"),
+        ("equalizer", L("Equalizer"), "chart.bar"), ("scope", L("Scope"), "waveform"), ("tunnel", L("Tunnel"), "circle.circle"),
         ("psychedelic", L("Psychedelic"), "circle.hexagongrid"),
     ];
 

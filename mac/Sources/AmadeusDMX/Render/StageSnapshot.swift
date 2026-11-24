@@ -68,7 +68,7 @@ enum StageSnapshot {
            case .frame(let bf)? = FeedMessage.decode(try Data(contentsOf: dir.appending(path: f0))) {
             // -wallBench YES: how long the CPU takes to draw one wall picture per scene, at 720p, 1080p and 4K
             for s in [2.0, 3.0, 6.0] {
-                for scene in [WallScene.runner, .dancer, .crowd, .pong, .words, .equalizer, .ambient] {
+                for scene in WallScene.allCases.filter { ![.auto, .off, .psychedelic].contains($0) } {
                     let w = WallRenderer(scale: CGFloat(s), aspect: hello.screenAspect)
                     w.force = scene
                     var f = bf
@@ -86,7 +86,7 @@ enum StageSnapshot {
                 let p = d.assumingMemoryBound(to: UInt8.self), n = w.pixelWidth * w.pixelHeight
                 return Double((0..<n).reduce(0) { $0 + Int(p[$1 * 4]) + Int(p[$1 * 4 + 1]) + Int(p[$1 * 4 + 2]) }) / Double(n * 3)
             }
-            for scene in [WallScene.runner, .dancer, .crowd, .pong, .words, .equalizer, .ambient] {
+            for scene in WallScene.allCases.filter { ![.auto, .off, .psychedelic].contains($0) } {
                 let w = WallRenderer(scale: 1, aspect: hello.screenAspect)
                 w.force = scene
                 var f = bf, t = 0.0, short = [Double](), long = [Double]()
