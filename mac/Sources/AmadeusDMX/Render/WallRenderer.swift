@@ -63,6 +63,11 @@ final class WallRenderer {
     private var amb: Double = 0
     private var fromPose: [[Float]] = WallRenderer.moves["down"]!
     private var lastBeat = -1
+    /// This picture's fade (the share of the last picture darkened) and the fade at the show's 40 pictures a second.
+    private var fadeNow: CGFloat = 0.59, fadeRef: CGFloat = 0.59
+    /// The time between pictures, smoothed: the trail's fade follows it (one picture 25 ms after the last, the next 50,
+    /// would brighten and dim every glow that builds up on the trail).
+    private var fadeDt: Double = 1.0 / 40
 
     /// The canvas for a wall of this shape, in units.
     static func canvas(_ aspect: Double) -> (w: CGFloat, h: CGFloat) {
@@ -88,7 +93,7 @@ final class WallRenderer {
     /// last picture (the trails fade on it), so drawing finer or coarser doesn't show.
     func takeOver(from old: WallRenderer) {
         cur = old.cur; fade = old.fade; level = old.level; eq = old.eq; caps = old.caps; amb = old.amb
-        fromPose = old.fromPose; lastBeat = old.lastBeat; force = old.force
+        fromPose = old.fromPose; lastBeat = old.lastBeat; force = old.force; fadeDt = old.fadeDt
         if old.aspect == aspect, let img = old.context.makeImage() {
             context.saveGState()
             context.scaleBy(x: 1, y: -1)   // the picture's own orientation, in units
@@ -190,7 +195,10 @@ final class WallRenderer {
         // a short trail behind moving lines: how much of the last picture fades is set per 1/60 s, so the trail
         // is as short at any drawing rate (a fixed share per picture ghosted when the wall was drawn less often)
         let fadeShare = cur.scene == .words ? 0.8 : 0.45
-        g.setFillColor(CGColor(gray: 0, alpha: CGFloat(1 - pow(1 - fadeShare, Double(max(dt, 1 / 240)) * 60))))
+        fadeDt += (min(0.1, max(Double(dt), 1 / 240)) - fadeDt) * 0.15
+        fadeNow = CGFloat(1 - pow(1 - fadeShare, fadeDt * 60))
+        fadeRef = CGFloat(1 - pow(1 - fadeShare, 1.5))
+        g.setFillColor(CGColor(gray: 0, alpha: fadeNow))
         g.fill(CGRect(x: 0, y: 0, width: cw, height: ch))
         let phraseFrac = d.map { min(1, max(0, ($0.end > $0.start ? (f.t - $0.start) / ($0.end - $0.start) : 0))) } ?? 0
         if !(cur.mode != "off" && countdown(f, d, h, cols)) {
@@ -206,6 +214,18 @@ final class WallRenderer {
             }
         }
         g.restoreGState()
+    }
+
+    /// What a translucent stroke drawn on every picture settles at (it builds up on the fading last picture), at the
+    /// show's 40 pictures a second.
+    private func settled(_ a: CGFloat) -> CGFloat { a / (fadeRef + a - fadeRef * a) }
+
+    /// The alpha that brings a stroke drawn on every picture to what `a` looks like at 40 pictures a second, at this
+    /// picture's rate: the time between pictures varies (they are drawn on a queue of their own), and a fixed alpha
+    /// would make the wall brighter and darker with it, a flicker.
+    private func held(_ a: CGFloat) -> CGFloat {
+        let t = settled(a)
+        return min(1, t * fadeNow / max(0.001, 1 - t * (1 - fadeNow)))
     }
 
     /// A stick figure: hip at (x, y), size s. Angles: 0 = hanging down, positive = towards +x.
@@ -234,7 +254,7 @@ final class WallRenderer {
         let s: CGFloat = 150, gy: CGFloat = ground - 60, rx = (cw * 0.36).rounded(), drop = d?.section == "drop"
         let speed = drop ? 90.0 : 60.0, scroll = bp * speed
         neon(cols[1 % cols.count], 2)
-        g.setAlpha(0.45)
+        g.setAlpha(held(0.45))
         let sky = CGMutablePath(), off = scroll * 0.3
         for i in -1..<(Int(cw / 70) + 2) {
             let x = CGFloat(Double(i) * 70 - off.truncatingRemainder(dividingBy: 70))
@@ -299,7 +319,7 @@ final class WallRenderer {
         for i in 0..<(8 + 2 * max(0, Int((cw - 640) / 140))) {  // the dance floor lights up with the beat
             let on = Self.hash(i + beat * 8, 1) % 3 == 0
             neon(cols[i % cols.count], 2)
-            g.setAlpha(on ? 0.55 : 0.12)
+            g.setAlpha(held(on ? 0.55 : 0.12))
             let n = 8 + 2 * max(0, Int((cw - 640) / 140))
             let x0 = mx + CGFloat(i - n / 2) * 70, x1 = x0 + 70
             let p = CGMutablePath()
@@ -377,7 +397,7 @@ final class WallRenderer {
             let pos = Float(i) / Float(n - 1) * Float(max(b.count - 1, 1)), j = Int(pos), k = pos - Float(j)
             let lo = j < b.count ? b[j] : 0, hi = j + 1 < b.count ? b[j + 1] : lo
             let v = min(1, max(0, (lo + (hi - lo) * k) * (0.85 + 0.3 * sin(Float(i) * 2.3 + now * 5.5))))
-            eq[i] = v > eq[i] ? v : eq[i] - dt * 2.2
+            eq[i] = max(v, eq[i] - dt * 2.2)   // a held level holds (falling only where the music fell)
             caps[i] = max(eq[i], caps[i] - dt * 0.6)
         }
         let bw = cw / CGFloat(n), top = ch - 60, base = ch - 20
@@ -393,11 +413,16 @@ final class WallRenderer {
     private func ambient(_ cols: [SIMD3<Float>], _ dt: Float) {
         amb += Double(dt) * 0.15
         g.setShadow(offset: .zero, blur: 0, color: nil)
+        // slow clouds need no trail: drawn afresh on black each picture, as bright as they settled at 40 a second
+        g.setFillColor(CGColor(gray: 0, alpha: 1))
+        g.fill(CGRect(x: 0, y: 0, width: cw, height: ch))
+        let stops: [CGFloat] = [0, 0.25, 0.5, 0.75, 1]
         for (i, c) in cols.enumerated() {
             let x = Double(cw) / 2 + (Double(cw) / 2 - 90) * sin(amb * (0.7 + Double(i) * 0.23) + Double(i) * 2)
             let y = Double(ch) / 2 + (Double(ch) / 2 - 70) * cos(amb * (0.5 + Double(i) * 0.17) + Double(i))
             let grad = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                                  colors: [cg(c, 0.5), cg(c, 0)] as CFArray, locations: [0, 1])!
+                                  colors: stops.map { cg(c, settled(0.5 * (1 - $0))) } as CFArray,
+                                  locations: stops)!
             g.drawRadialGradient(grad, startCenter: CGPoint(x: x, y: y), startRadius: 0,
                                  endCenter: CGPoint(x: x, y: y), endRadius: max(260, max(cw, ch) * 0.4), options: [])
         }

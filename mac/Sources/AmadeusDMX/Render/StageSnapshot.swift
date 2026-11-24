@@ -79,6 +79,27 @@ enum StageSnapshot {
                                  (CACurrentMediaTime() - t0) / 40 * 1000))
                 }
             }
+            // and how much a scene's brightness jumps when the time between pictures does (25 ms, then 50: the
+            // painter skips a show frame while busy): steady scenes stay within a few percent
+            func light(_ w: WallRenderer) -> Double {
+                guard let d = w.context.data else { return 0 }
+                let p = d.assumingMemoryBound(to: UInt8.self), n = w.pixelWidth * w.pixelHeight
+                return Double((0..<n).reduce(0) { $0 + Int(p[$1 * 4]) + Int(p[$1 * 4 + 1]) + Int(p[$1 * 4 + 2]) }) / Double(n * 3)
+            }
+            for scene in [WallScene.runner, .dancer, .crowd, .pong, .words, .equalizer, .ambient] {
+                let w = WallRenderer(scale: 1, aspect: hello.screenAspect)
+                w.force = scene
+                var f = bf, t = 0.0, short = [Double](), long = [Double]()
+                for k in 0..<120 {
+                    let dt = k % 2 == 0 ? 1.0 / 40 : 1.0 / 20
+                    t += dt; f.t = bf.t + t; f.bp = (bf.bp ?? 0) + t * hello.bpm / 60
+                    _ = w.update(frame: f, hello: hello, dt: Float(dt))
+                    if k >= 40 { if dt < 0.03 { short.append(light(w)) } else { long.append(light(w)) } }
+                }
+                let a = short.reduce(0, +) / Double(max(1, short.count)), b = long.reduce(0, +) / Double(max(1, long.count))
+                print(String(format: "wall steady: %@ %.1f after 25 ms, %.1f after 50 ms (%+.0f%%)", scene.rawValue, a, b,
+                             (a / max(b, 0.001) - 1) * 100))
+            }
             exit(0)
         }
         if let scene = UserDefaults.standard.string(forKey: "wallScene").flatMap(WallScene.init(rawValue:)) {

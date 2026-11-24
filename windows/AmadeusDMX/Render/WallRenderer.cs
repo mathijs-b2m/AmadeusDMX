@@ -72,6 +72,11 @@ public sealed partial class WallRenderer : IDisposable
     double _amb;
     float[][] _fromPose = Moves["down"];
     int _lastBeat = -1;
+    /// This picture's fade (the share of the last picture darkened) and the fade at the show's 40 pictures a second.
+    float _fadeNow = 0.59f, _fadeRef = 0.59f;
+    /// The time between pictures, smoothed: the trail's fade follows it (one picture 25 ms after the last, the next 50,
+    /// would brighten and dim every glow that builds up on the trail).
+    double _fadeDt = 1.0 / 40;
     static readonly Stopwatch Clock = Stopwatch.StartNew();
 
     /// The canvas for a wall of this shape, in units.
@@ -100,7 +105,7 @@ public sealed partial class WallRenderer : IDisposable
     {
         _cur = old._cur; _fade = old._fade; _level = old._level; _amb = old._amb;
         old._eq.CopyTo(_eq, 0); old._caps.CopyTo(_caps, 0);
-        _fromPose = old._fromPose; _lastBeat = old._lastBeat; Force = old.Force;
+        _fromPose = old._fromPose; _lastBeat = old._lastBeat; Force = old.Force; _fadeDt = old._fadeDt;
         if (old.Aspect != Aspect) return;
         _canvas.Save();
         _canvas.ResetMatrix();   // in pixels: the old picture stretched over the new one
@@ -281,7 +286,10 @@ public sealed partial class WallRenderer : IDisposable
         // a short trail behind moving lines: how much of the last picture fades is set per 1/60 s, so the trail
         // is as short at any drawing rate (a fixed share per picture ghosted when the wall was drawn less often)
         var fadeShare = _cur.Scene == WallScene.Words ? 0.8 : 0.45;
-        _g.Fill = new SKColor(0, 0, 0, (byte)Math.Clamp(Math.Round(255 * (1 - Math.Pow(1 - fadeShare, Math.Max(dt, 1.0 / 240) * 60))), 0, 255));
+        _fadeDt += (Math.Min(0.1, Math.Max(dt, 1.0 / 240)) - _fadeDt) * 0.15;
+        _fadeNow = (float)(1 - Math.Pow(1 - fadeShare, _fadeDt * 60));
+        _fadeRef = (float)(1 - Math.Pow(1 - fadeShare, 1.5));
+        _g.Fill = new SKColor(0, 0, 0, (byte)Math.Clamp(Math.Round(255 * _fadeNow), 0, 255));
         FillRect(Rect(0, 0, Cw, Ch));
         var phraseFrac = d is null ? 0 : Math.Min(1, Math.Max(0, d.End > d.Start ? (f.T - d.Start) / (d.End - d.Start) : 0));
         if (!(_cur.Mode != "off" && Countdown(f, d, h, cols)))
@@ -298,6 +306,19 @@ public sealed partial class WallRenderer : IDisposable
             }
         }
         RestoreGState();
+    }
+
+    /// What a translucent stroke drawn on every picture settles at (it builds up on the fading last picture), at the
+    /// show's 40 pictures a second.
+    float Settled(float a) => a / (_fadeRef + a - _fadeRef * a);
+
+    /// The alpha that brings a stroke drawn on every picture to what `a` looks like at 40 pictures a second, at this
+    /// picture's rate: the time between pictures varies (they are drawn on a thread of their own), and a fixed alpha
+    /// would make the wall brighter and darker with it, a flicker.
+    float Held(float a)
+    {
+        var t = Settled(a);
+        return MathF.Min(1, t * _fadeNow / MathF.Max(0.001f, 1 - t * (1 - _fadeNow)));
     }
 
     /// A stick figure: hip at (x, y), size s. Angles: 0 = hanging down, positive = towards +x.
@@ -330,7 +351,7 @@ public sealed partial class WallRenderer : IDisposable
         var speed = drop ? 90.0 : 60.0;
         var scroll = bp * speed;
         Neon(cols[1 % cols.Length], 2);
-        SetAlpha(0.45f);
+        SetAlpha(Held(0.45f));
         using (var sky = new SKPath())
         {
             var off = scroll * 0.3;
@@ -405,7 +426,7 @@ public sealed partial class WallRenderer : IDisposable
         {
             var on = Hash(i + beat * 8, 1) % 3 == 0;
             Neon(cols[i % cols.Length], 2);
-            SetAlpha(on ? 0.55f : 0.12f);
+            SetAlpha(Held(on ? 0.55f : 0.12f));
             double x0 = mx + (i - n / 2) * 70, x1 = x0 + 70;
             using var p = new SKPath();
             p.MoveTo(Pt(x0 + (x0 - mx) * 0.4, floorY)); p.LineTo(Pt(x1 + (x1 - mx) * 0.4, floorY));
@@ -501,7 +522,7 @@ public sealed partial class WallRenderer : IDisposable
             var lo = j < b.Length ? b[j] : 0;
             var hi = j + 1 < b.Length ? b[j + 1] : lo;
             var v = MathF.Min(1, MathF.Max(0, (lo + (hi - lo) * k) * (0.85f + 0.3f * MathF.Sin(i * 2.3f + now * 5.5f))));
-            _eq[i] = v > _eq[i] ? v : _eq[i] - dt * 2.2f;
+            _eq[i] = MathF.Max(v, _eq[i] - dt * 2.2f);   // a held level holds (falling only where the music fell)
             _caps[i] = MathF.Max(_eq[i], _caps[i] - dt * 0.6f);
         }
         double bw = Cw / n, top = Ch - 60, base_ = Ch - 20;
@@ -518,13 +539,17 @@ public sealed partial class WallRenderer : IDisposable
     {
         _amb += dt * 0.15;
         SetShadow(0, null);
+        // slow clouds need no trail: drawn afresh on black each picture, as bright as they settled at 40 a second
+        _g.Fill = SKColors.Black;
+        FillRect(Rect(0, 0, Cw, Ch));
+        float[] stops = [0, 0.25f, 0.5f, 0.75f, 1];
         for (var i = 0; i < cols.Length; i++)
         {
             var c = cols[i];
             var x = Cw / 2.0 + (Cw / 2.0 - 90) * Math.Sin(_amb * (0.7 + i * 0.23) + i * 2);
             var y = Ch / 2.0 + (Ch / 2.0 - 70) * Math.Cos(_amb * (0.5 + i * 0.17) + i);
             var radius = MathF.Max(260, MathF.Max(Cw, Ch) * 0.4f);
-            using var shader = SKShader.CreateRadialGradient(Pt(x, y), radius, [Cg(c, 0.5f), Cg(c, 0)], [0, 1], SKShaderTileMode.Clamp);
+            using var shader = SKShader.CreateRadialGradient(Pt(x, y), radius, stops.Select(s => Cg(c, Settled(0.5f * (1 - s)))).ToArray(), stops, SKShaderTileMode.Clamp);
             var p = Paint(false);
             p.Shader = shader;
             p.Color = SKColors.White.WithAlpha((byte)Math.Round(255 * _g.Alpha));
