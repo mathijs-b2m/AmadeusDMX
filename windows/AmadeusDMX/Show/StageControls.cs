@@ -18,21 +18,23 @@ public sealed class StageControls(StageSettings stage, AppModel model)
         row.Children.Add(Glassy(UI.IconButton("cube.transparent", StageRoom.Help, () => StageRoom.Shared.On = !StageRoom.Shared.On),
             () => StageRoom.Shared.On, nameof(StageRoom.On), StageRoom.Shared));
 
-        var wall = new Button { Padding = new Thickness(8, 6, 8, 6) }.Tooltip(L("LED wall: the director's choice, or try one scene"));
+        var wall = new Button { Padding = new Thickness(8, 6, 8, 6) }.Tooltip(L("LED wall: the director's choice, or try one scene; and the LED Wall Output"));
         var wallMenu = new MenuFlyout();
         wallMenu.Opening += (_, _) =>
         {
             wallMenu.Items.Clear();
+            var hasWall = model.StageInput()?.Screen ?? false;   // without one, only the output
             foreach (var (raw, title, symbol) in StageSettings.WallScenes)
-                wallMenu.Items.Add(UI.Choice(title, "wall", stage.WallScene == raw, () => stage.WallScene = raw, symbol));
+            {
+                var item = UI.Choice(title, "wall", stage.WallScene == raw, () => stage.WallScene = raw, symbol);
+                item.IsEnabled = hasWall;
+                wallMenu.Items.Add(item);
+            }
             wallMenu.Items.Add(UI.Separator());
             wallMenu.Items.Add(UI.Item(L("LED Wall Output…"), () => LEDWallOutputWindow.Open(model), "rectangle.on.rectangle"));
         };
         wall.Flyout = wallMenu;
         wall.Bind(stage, nameof(StageSettings.WallScene), b => b.Content = UI.Icon(stage.WallScene == "auto" ? "tv" : stage.WallSymbol, 14));
-        // only with an LED wall in the rig
-        wall.Bind(model, [nameof(AppModel.SelectedRig), nameof(AppModel.SelectedSet), nameof(AppModel.ConfigVersion)], b => b.IsEnabled = model.StageInput()?.Screen ?? false);
-        wall.Bind(model.Feed, nameof(LiveFeed.Hello), b => b.IsEnabled = model.StageInput()?.Screen ?? false);
         row.Children.Add(wall);
 
         row.Children.Add(Glassy(UI.IconButton("square.dashed", L("Show the zones: where beams may (not) go"), () => model.ShowZones = !model.ShowZones),

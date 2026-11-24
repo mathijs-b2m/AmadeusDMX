@@ -6,26 +6,39 @@ struct StageControls: View {
     @ObservedObject var stage: StageController
     @Environment(AppModel.self) private var model
     @State private var showLook = false
+    @State private var showWall = false
     @Environment(\.openWindow) private var openWindow
+
+    private var hasWall: Bool { model.stageInput()?.screen ?? false }
 
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
                 CameraButtons(stage: stage, outdoor: model.stageInput()?.stage.outdoor ?? false)
-                Menu {
-                    Picker("LED Wall", selection: $stage.wallScene) {
-                        ForEach(WallScene.allCases) { s in Label(s.title, systemImage: s.symbol).tag(s) }
-                    }
-                    .pickerStyle(.inline)
-                    Divider()
-                    Button("LED Wall Output…", systemImage: "rectangle.on.rectangle") { openWindow(id: "walloutput") }
+                // a glass button with a popover, like the others (a Menu lost its glass once it had opened a window)
+                Button {
+                    showWall.toggle()
                 } label: {
                     Image(systemName: stage.wallScene == .auto ? "tv" : stage.wallScene.symbol).frame(width: 18, height: 18)
                 }
-                .menuIndicator(.hidden)
-                .buttonStyle(.glass)
-                .help("LED wall: the director's choice, or try one scene")
-                .disabled(!(model.stageInput()?.screen ?? false))
+                .buttonStyle(stage.wallScene == .auto ? AnyPrimitiveButtonStyle(.glass) : AnyPrimitiveButtonStyle(.glassProminent))
+                .popover(isPresented: $showWall, arrowEdge: .top) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("LED Wall", selection: $stage.wallScene) {
+                            ForEach(WallScene.allCases) { s in Label(s.title, systemImage: s.symbol).tag(s) }
+                        }
+                        .pickerStyle(.radioGroup)
+                        .disabled(!hasWall)
+                        Divider()
+                        Button("LED Wall Output…", systemImage: "rectangle.on.rectangle") {
+                            showWall = false
+                            DispatchQueue.main.async { openWindow(id: "walloutput") }   // once the popover has gone
+                        }
+                    }
+                    .padding()
+                }
+                .help(hasWall ? "LED wall: the director's choice, or try one scene; and the LED Wall Output"
+                              : "LED Wall Output (this rig has no LED wall to try scenes on)")
                 Button {
                     model.showZones.toggle()
                 } label: {
