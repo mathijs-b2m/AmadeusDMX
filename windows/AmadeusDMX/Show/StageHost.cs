@@ -28,7 +28,9 @@ public sealed class StageSettings : Observable
         ("auto", L("Director's Choice"), "wand.and.stars"), ("off", L("Off"), "rectangle.slash"), ("ambient", L("Ambient"), "cloud.fog"),
         ("starfield", L("Starfield"), "sparkles"),
         ("runner", L("Runner"), "figure.run"), ("dancer", L("Dancer"), "figure.dance"), ("crowd", L("Crowd"), "person.3"),
-        ("pong", L("Pong"), "gamecontroller"), ("shapes", L("Shapes"), "triangle"), ("words", L("Words"), "textformat.size"),
+        ("pong", L("Pong"), "gamecontroller"), ("shapes", L("Shapes"), "triangle"), ("lines", L("Lines"), "barcode"),
+        ("grid", L("Grid"), "mountain.2"), ("wolf", L("Wolf"), "pawprint"), ("claws", L("Claws"), "line.diagonal"),
+        ("spikes", L("Spikes"), "bolt"), ("words", L("Words"), "textformat.size"),
         ("equalizer", L("Equalizer"), "chart.bar"), ("scope", L("Scope"), "waveform"), ("tunnel", L("Tunnel"), "circle.circle"),
         ("psychedelic", L("Psychedelic"), "circle.hexagongrid"),
     ];
