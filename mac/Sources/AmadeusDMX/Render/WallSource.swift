@@ -3,6 +3,10 @@
 // show frame. Here it goes onto the GPU and the psychedelic shader is drawn in its place (the wall's level is light:
 // each reader applies it, the stage to its light, the output to what it sends),
 // so every one of them shows the same picture, also while no 3D stage is open (Perform mode).
+//
+// A big output (a 4K projector) gets a big picture: the composed picture is the size of the wall on the display, and
+// the CPU draws the figures that fine, on a queue of its own (a 4K picture takes too long to draw beside the UI). When
+// a picture takes longer than the show's frames allow, it draws coarser, and finer again when there is room.
 import AmadeusKit
 import CoreGraphics
 import Foundation
@@ -20,22 +24,31 @@ final class WallSource {
         return (d, q)
     }()
 
-    /// The composed picture: twice the canvas (1280×720 for 16:9), the wall's shape, at most 2560 on its long side
-    /// (the stage samples it with mipmaps, the output fits it to the wall).
+    /// The composed picture, the wall's shape: twice the canvas (1280×720 for 16:9), or the output's wall when that
+    /// is bigger, at most 4096 on its long side (the stage samples it with mipmaps, the output fits it to the wall).
     private(set) var picture: MTLTexture?
+    /// The output's wall in pixels (the picture fitted into its rectangle), nil while there is no output.
+    var outputPicture: (w: Int, h: Int)? {
+        didSet { if outputPicture.map({ "\($0)" }) != oldValue.map({ "\($0)" }) { makePicture() } }
+    }
     /// What the wall showed last.
     private(set) var state: WallState?
 
     /// The director's choice, or one scene tried out (the stage's LED wall menu).
-    var force: WallScene = .auto { didSet { renderer.force = force } }
-    /// How much finer than its units the CPU draws (WallOutputLayout.pictureScale: the output's wall).
-    var scale: Double = 1 { didSet { if scale != oldValue { rebuild() } } }
+    var force: WallScene = .auto
+    /// How much finer than its units the CPU should draw (WallOutputLayout.pictureScale: the output's wall).
+    var scale: Double = 1
+    /// How fine it does draw: `scale`, unless that takes too long (adapt()).
+    private(set) var drawScale: Double = 1
+    private var scaleCap: Double = .infinity
+    private var adaptedAt: CFTimeInterval = 0
     /// The wall's shape, width over height: the show's rig (its pixels), 16:9 without them.
-    private(set) var aspect: Double = ScreenShape.defaultAspect { didSet { if aspect != oldValue { rebuild(); makePicture() } } }
+    private(set) var aspect: Double = ScreenShape.defaultAspect { didSet { if aspect != oldValue { state = nil; makePicture() } } }
     /// Seconds the picture runs ahead of the show's clock (the output's lead).
     var lead: Double = 0
 
-    private var renderer = WallRenderer()
+    private let painter = Painter()
+    private var paintedSeq = 0
     private var cpu: MTLTexture?
     private var composePipe: MTLRenderPipelineState?
     private var lastShowT: Double?
@@ -60,18 +73,14 @@ final class WallSource {
         makePicture()
     }
 
-    private func rebuild() {
-        renderer = WallRenderer(scale: CGFloat(scale), aspect: aspect)
-        renderer.force = force
-        cpu = nil
-        state = nil
-    }
-
     private func makePicture() {
         guard let gpu = Self.gpu else { return }
-        let c = WallRenderer.canvas(aspect), k = min(2, 2560 / max(c.w, c.h))
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Int((c.w * k).rounded()),
-                                                          height: Int((c.h * k).rounded()), mipmapped: true)
+        let c = WallRenderer.canvas(aspect)
+        var w = c.w * 2, h = c.h * 2
+        if let o = outputPicture, CGFloat(o.w) > w { w = CGFloat(o.w); h = w * c.h / c.w }
+        let k = min(1, 4096 / max(w, h))
+        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: max(1, Int((w * k).rounded())),
+                                                          height: max(1, Int((h * k).rounded())), mipmapped: true)
         td.usage = [.shaderRead, .renderTarget]
         td.storageMode = .private
         picture = gpu.device.makeTexture(descriptor: td)
@@ -93,20 +102,28 @@ final class WallSource {
             f.t += lead
             if let bp = f.bp { f.bp = bp + lead * h.bpm / 60 }
         }
-        if state == nil || f.t != lastShowT || now - updatedAt >= Self.updateInterval {
-            let s = renderer.update(frame: f, hello: h, dt: pending)
+        adapt(now)
+        // the next picture, drawn on the painter's queue; one at a time (a show frame that comes while it draws waits
+        // for the next, its time passed on)
+        if state == nil || f.t != lastShowT || now - updatedAt >= Self.updateInterval,
+           painter.submit(.init(frame: f, hello: h, dt: pending, force: force, scale: drawScale, aspect: aspect)) {
             pending = 0
             updatedAt = now
             lastShowT = f.t
-            state = s
-            if !s.psychedelic, let data = renderer.context.data {
-                let w = renderer.pixelWidth, ht = renderer.pixelHeight
-                if cpu?.width != w || cpu?.height != ht {
-                    let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: ht, mipmapped: false)
+        }
+        // the newest picture drawn, onto the GPU
+        if let p = painter.take(after: paintedSeq) {
+            paintedSeq = p.seq
+            state = p.state
+            if let bytes = p.bytes {
+                if cpu?.width != p.w || cpu?.height != p.h {
+                    let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: p.w, height: p.h, mipmapped: false)
                     td.usage = .shaderRead
                     cpu = gpu.device.makeTexture(descriptor: td)
                 }
-                cpu?.replace(region: MTLRegionMake2D(0, 0, w, ht), mipmapLevel: 0, withBytes: data, bytesPerRow: w * 4)
+                bytes.withUnsafeBytes { b in
+                    cpu?.replace(region: MTLRegionMake2D(0, 0, p.w, p.h), mipmapLevel: 0, withBytes: b.baseAddress!, bytesPerRow: p.w * 4)
+                }
             }
             dirty = true
         }
@@ -118,6 +135,24 @@ final class WallSource {
         }
         return state
     }
+
+    /// Draw coarser when a picture takes longer than the show's frames allow (40 a second: 25 ms, kept to 20), finer
+    /// again when there is room: looked at once a second, a step at a time.
+    private func adapt(_ now: CFTimeInterval) {
+        let ms = painter.drawMs
+        if now - adaptedAt >= 1 {
+            adaptedAt = now
+            if ms > 20, drawScale > 1 {
+                scaleCap = max(1, ((drawScale * 0.75) * 2).rounded(.down) / 2)
+            } else if ms > 0, ms < 9, scaleCap < scale {
+                scaleCap += 0.5
+            }
+        }
+        drawScale = max(1, min(scale, scaleCap))
+    }
+
+    /// Wait for the picture being drawn (development: the stage snapshot).
+    func flush() { painter.queue.sync {} }
 
     private func compose(_ s: WallState, now: CFTimeInterval, cmd: MTLCommandBuffer) {
         guard let picture, let composePipe, s.psychedelic || cpu != nil else { return }
@@ -138,6 +173,53 @@ final class WallSource {
             blit.generateMipmaps(for: picture)
             blit.endEncoding()
         }
+    }
+}
+
+/// Draws the wall's pictures on a queue of its own (WallRenderer keeps the last picture: its trails fade on it).
+private final class Painter: @unchecked Sendable {
+    struct Job {
+        var frame: Frame, hello: Hello, dt: Float, force: WallScene, scale: Double, aspect: Double
+    }
+    struct Picture {
+        var seq: Int, state: WallState, bytes: Data?, w: Int, h: Int
+    }
+
+    let queue = DispatchQueue(label: "amadeus.wall.paint", qos: .userInteractive)
+    private let lock = NSLock()
+    private var renderer: WallRenderer?   // only on the queue
+    private var busy = false, seq = 0, latest: Picture?, ms: Double = 0   // under the lock
+
+    /// Milliseconds a picture takes to draw (smoothed); 0 before the first.
+    var drawMs: Double { lock.withLock { ms } }
+
+    /// Starts drawing the next picture; false while the last one is still being drawn.
+    func submit(_ job: Job) -> Bool {
+        guard lock.withLock({ busy ? false : { busy = true; return true }() }) else { return false }
+        queue.async { [self] in
+            if renderer.map({ $0.scale != CGFloat(job.scale) || $0.aspect != job.aspect }) ?? true {
+                renderer = WallRenderer(scale: CGFloat(job.scale), aspect: job.aspect)
+            }
+            let r = renderer!
+            r.force = job.force
+            let t0 = CACurrentMediaTime()
+            let s = r.update(frame: job.frame, hello: job.hello, dt: job.dt)
+            let w = r.pixelWidth, h = r.pixelHeight
+            let bytes = s.psychedelic ? nil : r.context.data.map { Data(bytes: $0, count: w * h * 4) }
+            let took = (CACurrentMediaTime() - t0) * 1000
+            lock.withLock {
+                seq += 1
+                latest = Picture(seq: seq, state: s, bytes: bytes, w: w, h: h)
+                ms = ms == 0 ? took : ms * 0.8 + took * 0.2
+                busy = false
+            }
+        }
+        return true
+    }
+
+    /// The newest picture, if it is newer than `after`.
+    func take(after: Int) -> Picture? {
+        lock.withLock { latest.flatMap { $0.seq > after ? $0 : nil } }
     }
 }
 

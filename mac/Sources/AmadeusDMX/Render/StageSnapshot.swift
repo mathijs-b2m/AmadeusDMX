@@ -58,11 +58,29 @@ enum StageSnapshot {
         let pic = WallOutputLayout.fit(wall, aspect: hello.screenAspect), canvas = WallRenderer.canvas(hello.screenAspect)
         let panelPx = UserDefaults.standard.integer(forKey: "panelPx") > 0 ? UserDefaults.standard.integer(forKey: "panelPx") : 128
         WallSource.shared.scale = WallOutputLayout.pictureScale(picture: pic, canvas: (Double(canvas.w), Double(canvas.h)))
+        WallSource.shared.outputPicture = (pic.w, pic.h)
         let drawer = WallOutputDrawer()
         let od = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: outSize.w, height: outSize.h, mipmapped: false)
         od.usage = [.renderTarget, .shaderRead]
         od.storageMode = .shared
         let outTarget = hello.screen ? r.device.makeTexture(descriptor: od) : nil
+        if UserDefaults.standard.bool(forKey: "wallBench"), let f0 = files.first,
+           case .frame(let bf)? = FeedMessage.decode(try Data(contentsOf: dir.appending(path: f0))) {
+            // -wallBench YES: how long the CPU takes to draw one wall picture per scene, at 720p, 1080p and 4K
+            for s in [2.0, 3.0, 6.0] {
+                for scene in [WallScene.runner, .dancer, .crowd, .pong, .words, .equalizer, .ambient] {
+                    let w = WallRenderer(scale: CGFloat(s), aspect: hello.screenAspect)
+                    w.force = scene
+                    var f = bf
+                    for k in 0..<10 { f.t = bf.t + Double(k) / 40; f.bp = (bf.bp ?? 0) + Double(k) / 40 * hello.bpm / 60; _ = w.update(frame: f, hello: hello, dt: 1 / 40) }
+                    let t0 = CACurrentMediaTime()
+                    for k in 10..<50 { f.t = bf.t + Double(k) / 40; f.bp = (bf.bp ?? 0) + Double(k) / 40 * hello.bpm / 60; _ = w.update(frame: f, hello: hello, dt: 1 / 40) }
+                    print(String(format: "wall bench: %@ at %d×%d: %.1f ms", scene.rawValue, w.pixelWidth, w.pixelHeight,
+                                 (CACurrentMediaTime() - t0) / 40 * 1000))
+                }
+            }
+            exit(0)
+        }
         if let scene = UserDefaults.standard.string(forKey: "wallScene").flatMap(WallScene.init(rawValue:)) {
             WallSource.shared.force = scene   // -wallScene runner: one scene on the wall
         }
@@ -91,6 +109,7 @@ enum StageSnapshot {
                 for (suffix, card) in [("wall", nil), ("card", TestCard.draw(pixels: (wall.w, wall.h), wall: wall, panelPx: panelPx))] as [(String, CGImage?)] {
                     guard let cmd = r.queue.makeCommandBuffer() else { continue }
                     let tex = try card.map { try MTKTextureLoader(device: r.device).newTexture(cgImage: $0, options: [.SRGB: false]) }
+                    WallSource.shared.flush()   // the picture drawn on the painter's queue
                     let lit = WallSource.shared.prepare(frame: frame, hello: hello, now: now, cmd: cmd)?.level ?? 0
                     drawer.encode(cmd, into: outTarget, wall: wall, picture: pic, level: tex != nil ? 1 : lit, card: tex, time: 0.7)
                     cmd.commit()

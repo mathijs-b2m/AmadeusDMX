@@ -82,10 +82,12 @@ import Testing
     #expect(old.screenPx == nil && old.screenAspect == 16.0 / 9.0)
 }
 
-@Test func aLongWallIsDrawnFineEnoughButNotTooBig() {
+@Test func thePictureIsDrawnAsFineAsTheOutputUpTo4K() {
     #expect(WallOutputLayout.pictureScale(picture: nil, canvas: (640, 360)) == 1)
-    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 1920, h: 1080), canvas: (640, 360)) == 2)
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 1920, h: 1080), canvas: (640, 360)) == 3)
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 3840, h: 2160), canvas: (640, 360)) == 6)
     #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 768, h: 384), canvas: (720, 360)) == 1.5)
-    // a 4:1 ribbon of 2560 × 640: 1440 × 360 units at 2 would be 2 million pixels for the CPU
-    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 2560, h: 640), canvas: (1440, 360)) == 1.5)
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 2560, h: 640), canvas: (1440, 360)) == 2)
+    // never more than 4096 pixels on the long side: an 8K output gets a 4K-ish picture
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 7680, h: 4320), canvas: (640, 360)) == 6)
 }

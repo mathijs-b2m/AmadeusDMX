@@ -102,12 +102,12 @@ public enum WallOutputLayout {
     }
 
     /// How much finer than its canvas (WallRenderer's units: 640×360 for 16:9) the picture is drawn to fill a wall
-    /// `picture` big: 1, 1.5 or 2, and never more than about 1.6 million pixels for the CPU to draw.
+    /// `picture` big, in half steps: 2 for 1080p, 6 for 4K (at most 4096 pixels on the long side). The app draws
+    /// coarser by itself when a picture takes too long (WallSource.adapt).
     public static func pictureScale(picture: PixelRect?, canvas: (w: Double, h: Double)) -> Double {
         guard let p = picture, p.w > 0, p.h > 0, canvas.w > 0, canvas.h > 0 else { return 1 }
-        var s = min(2, max(1, (max(Double(p.w) / canvas.w, Double(p.h) / canvas.h) * 2).rounded(.up) / 2))
-        while s > 1 && canvas.w * canvas.h * s * s > 1.6e6 { s -= 0.5 }
-        return s
+        let s = max(1, (max(Double(p.w) / canvas.w, Double(p.h) / canvas.h) * 2).rounded(.up) / 2)
+        return min(s, max(1, (4096 / max(canvas.w, canvas.h) * 2).rounded(.down) / 2))
     }
 
     /// A rectangle in the display's own pixels, in the pixels of what is drawn (a HiDPI mode draws more pixels than

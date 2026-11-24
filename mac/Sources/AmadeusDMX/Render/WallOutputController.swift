@@ -124,7 +124,7 @@ final class WallOutputController {
         applying = true
         defer { applying = false }
         WallSource.shared.lead = settings.leadMs / 1000
-        guard settings.on else { close(); problem = nil; WallSource.shared.scale = 1; return }
+        guard settings.on else { close(); problem = nil; WallSource.shared.scale = 1; WallSource.shared.outputPicture = nil; return }
         switch settings.target {
         case .window:
             problem = nil
@@ -151,9 +151,10 @@ final class WallOutputController {
     fileprivate func updateScale() {
         let src = WallSource.shared
         let px = outputPixels.map { WallOutputLayout.wallRect(settings.target == .display ? settings.rect : nil, display: $0.w, $0.h) }
-        let c = WallRenderer.canvas(src.aspect)
-        src.scale = WallOutputLayout.pictureScale(picture: px.map { WallOutputLayout.fit($0, aspect: src.aspect) },
-                                                  canvas: (Double(c.w), Double(c.h)))
+        let c = WallRenderer.canvas(src.aspect), pic = px.map { WallOutputLayout.fit($0, aspect: src.aspect) }
+        src.scale = WallOutputLayout.pictureScale(picture: pic, canvas: (Double(c.w), Double(c.h)))
+        let size = pic.map { (w: $0.w, h: $0.h) }
+        if src.outputPicture.map({ $0 != size! }) ?? (size != nil) { src.outputPicture = size }
     }
 
     private func open(on screen: NSScreen?) {
