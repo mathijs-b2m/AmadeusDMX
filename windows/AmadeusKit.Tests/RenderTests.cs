@@ -560,10 +560,14 @@ public class RenderTests
         Assert.Equal(1.5, source.DrawScale);
         source.Flush();
         Assert.True(source.DrawMs > 0);
+        // a scene tried out: the one playing fades out first (a finer drawing carries it on, it doesn't start over)
         source.Force = WallScene.Psychedelic;
-        source.Update(SceneSamples.Frame(inp, 31), inp.Hello, 11.2);
-        source.Flush();
-        Assert.True(source.Update(SceneSamples.Frame(inp, 31.1), inp.Hello, 11.3)!.Value.Psychedelic);
+        for (var k = 0; k < 10; k++)
+        {
+            source.Update(SceneSamples.Frame(inp, 31 + k * 0.1), inp.Hello, 11.2 + k * 0.1);
+            source.Flush();
+        }
+        Assert.True(source.Update(SceneSamples.Frame(inp, 32.1), inp.Hello, 12.3)!.Value.Psychedelic);
     }
 
     [Fact]

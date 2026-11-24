@@ -84,6 +84,21 @@ final class WallRenderer {
         context.fill(CGRect(x: 0, y: 0, width: cw, height: ch))
     }
 
+    /// Carries on where `old` was (another resolution, the same shape): its scene, fades, equaliser and dancer, and its
+    /// last picture (the trails fade on it), so drawing finer or coarser doesn't show.
+    func takeOver(from old: WallRenderer) {
+        cur = old.cur; fade = old.fade; level = old.level; eq = old.eq; caps = old.caps; amb = old.amb
+        fromPose = old.fromPose; lastBeat = old.lastBeat; force = old.force
+        if old.aspect == aspect, let img = old.context.makeImage() {
+            context.saveGState()
+            context.scaleBy(x: 1, y: -1)   // the picture's own orientation, in units
+            context.translateBy(x: 0, y: -ch)
+            context.interpolationQuality = .medium
+            context.draw(img, in: CGRect(x: 0, y: 0, width: cw, height: ch))
+            context.restoreGState()
+        }
+    }
+
     static func hash(_ n: Int, _ salt: Int = 0) -> Int {
         Int((UInt64(truncatingIfNeeded: n + 1) &* 2654435761 &+ UInt64(salt) &* 40503) % 4294967296)
     }

@@ -94,6 +94,21 @@ public sealed partial class WallRenderer : IDisposable
         _canvas.Scale(scale);   // in units
     }
 
+    /// Carries on where `old` was (another resolution, the same shape): its scene, fades, equaliser and dancer, and its
+    /// last picture (the trails fade on it), so drawing finer or coarser doesn't show.
+    public void TakeOver(WallRenderer old)
+    {
+        _cur = old._cur; _fade = old._fade; _level = old._level; _amb = old._amb;
+        old._eq.CopyTo(_eq, 0); old._caps.CopyTo(_caps, 0);
+        _fromPose = old._fromPose; _lastBeat = old._lastBeat; Force = old.Force;
+        if (old.Aspect != Aspect) return;
+        _canvas.Save();
+        _canvas.ResetMatrix();   // in pixels: the old picture stretched over the new one
+        using var image = SKImage.FromBitmap(old._bitmap);
+        _canvas.DrawImage(image, new SKRect(0, 0, _bitmap.Width, _bitmap.Height), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+        _canvas.Restore();
+    }
+
     public void Dispose()
     {
         _canvas.Dispose();

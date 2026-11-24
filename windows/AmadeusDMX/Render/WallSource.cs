@@ -238,8 +238,9 @@ public sealed partial class WallSource
         {
             if (_renderer is not { } r || r.Scale != (float)job.Scale || r.Aspect != job.Aspect)
             {
-                _renderer?.Dispose();
-                _renderer = r = new WallRenderer((float)job.Scale, job.Aspect);
+                var next = new WallRenderer((float)job.Scale, job.Aspect);
+                if (_renderer is { } old) { next.TakeOver(old); old.Dispose(); }   // finer or coarser: no fade, no lost trails
+                _renderer = r = next;
             }
             r.Force = job.Force;
             var t0 = Stopwatch.GetTimestamp();

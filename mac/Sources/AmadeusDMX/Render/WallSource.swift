@@ -198,7 +198,9 @@ private final class Painter: @unchecked Sendable {
         guard lock.withLock({ busy ? false : { busy = true; return true }() }) else { return false }
         queue.async { [self] in
             if renderer.map({ $0.scale != CGFloat(job.scale) || $0.aspect != job.aspect }) ?? true {
-                renderer = WallRenderer(scale: CGFloat(job.scale), aspect: job.aspect)
+                let next = WallRenderer(scale: CGFloat(job.scale), aspect: job.aspect)
+                if let old = renderer { next.takeOver(from: old) }   // finer or coarser: no fade, no lost trails
+                renderer = next
             }
             let r = renderer!
             r.force = job.force
