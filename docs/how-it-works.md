@@ -155,24 +155,36 @@ For one song that should be a light show of its own (a demo, the night's anthem)
 a live show in the night card (every track is then rebuilt in the background, the show keeps playing
 meanwhile); for a track on its own with **Start › Play a Track as Lightshow…** (⇧⌘O), or the Lightshow switch
 on the now-playing card while it plays (the track starts again where it was); from the command line with
-`--director lightshow`. It is the cinematic program, hit by hit, turned all the way up:
+`--director lightshow`. It is the cinematic program, hit by hit, turned all the way up, and it plays the band:
 
+- **the drums lead**: every kick and every snare of the drummer (from the separated drums, where the guitars
+  don't mask them) is a hit of whole families at full level. The kick has its side of the line-up and its
+  colour, the snare the other side, white once the music is loud, held for as long as it rings. At a climax both
+  drums hit all of it, with the strobes (when the set's flash limit leaves room for both on one light). A drum
+  hit is placed first; the other parts play around it;
+- **the guitar runs**: the notes of the separated melodic part (a riff, a solo) run over their families block by
+  block, a family a motif, and a chord that rings is played by all of them at once. While the drummer doesn't
+  play, the drums' families play the guitar too;
+- **everything else** the analysis found (shouts, cymbals, the bass) is played by the family of its voice; the
+  strong ones by every family of the line-up at once, white, with the strobes. The impacts hit the strobes, the
+  lasers and the line-up, and the whole rig when it plays or a phrase starts on them. A climax that arrives
+  starts on an impact of its own: its first drum hit. Snare rolls into the drops flash on their hits;
 - **every light gets its turn**: the rig is played in families, one per fixture model however many trusses it
   hangs on (all the PARs, all the Auras…), each in a few blocks left to right for its chases; a rig of one or two
-  models splits them into interleaved halves or thirds, so it has groups to vary too. Every family plays an
-  instrument of the music (booms, cymbals, stabs, ticks); with more families than instruments, an instrument
-  gets several, and they play it together when the music is loud;
-- **a build-up**: one family starts with every hit, and every loud phrase brings a third of the rig in. A quiet
-  part takes families away. The colours warm up as it builds (cool, warm, fire), and the heads change picture at
-  the phrases, then every two bars, at a climax every bar;
+  models splits them into interleaved halves or thirds, so it has groups to vary too;
+- **a build-up that is played**: the song starts with half of the families, and every loud phrase brings a third
+  of the rig in. What builds is how hard they play: the glow between the hits, white and the strobes, how often
+  the heads move (every two bars, every bar once it has built, on the drummer's kick) and how wide and fast they
+  sway. The colours warm up as it builds (cool, warm, fire);
+- **by the size of the rig**: a handful of lights (up to 8) all play all the time, and their families swap
+  instruments from passage to passage instead. The bigger the rig, the more of it can sit out: a line-up is all
+  of a small rig's lights, two fifths of a big one's (60 lights and up) at least;
 - **layers and turns**: every four bars the line-up changes. A phrase starts with half of the families it may
   use and adds a layer each time; when it can't add any, another part of the families takes over and some stay.
   The whole rig plays only at the climaxes: a drop hits with all of it, thins out and builds back to it;
-- **flashing**: hits are short and hard, at full level. Strong hits are played by every family of the line-up at
-  once, white, with the strobes; while the whole rig plays, the strobes also hit every kick and snare. Snare
-  rolls into the drops flash on their hits. The impacts hit the strobes, the lasers and the line-up, and the whole
-  rig when it plays or a phrase starts on them. A busy family's hit is played by another. The line-up glows
-  between the hits (dark in silences), in a quiet phrase only one family of it; the rest of the rig stays dark;
+- **hits you see**: a hit is short and hard, at full level, and it has let go before the same light is hit
+  again, so every hit is a new flash. The line-up glows between the hits (dark in silences); the rest of the rig
+  stays dark;
 - **heads in pictures that fit the room**: every picture is checked from where each head hangs, with the drift
   around it. A head the ceiling or the back-wall guard would have to bend, or that would light the ceiling
   nearby, takes a picture that works from its place (down onto the floor ahead), and a picture most heads
@@ -180,7 +192,7 @@ on the now-playing card while it plays (the track starts again where it was); fr
 
 While it is on, the show arc leaves the frame as the program plays it: every group, the specials, full
 response. Only the intensity and flashes knobs you hold still apply. Every flash stays within the set's
-`max_flash_hz` (faster only with *allow fast strobe*, none with *strobe free*). Switching it off in a live show
+`max_flash_hz` (the strobes faster with *allow fast strobe*, none with *strobe free*). Switching it off in a live show
 goes back to the rules' show at once, and to your decision model's plan when that is ready.
 
 ## Decision models

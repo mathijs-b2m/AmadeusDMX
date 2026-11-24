@@ -1,6 +1,7 @@
-"""The lightshow program: switched on by hand, it builds up layer by layer, the groups take turns and the whole
-rig is kept for the climaxes, every voice keeps its own section, it is brighter than the cinematic program, and
-the no-flicker rules still hold."""
+"""The lightshow program: switched on by hand, it plays the band (every kick and snare of the drummer, the
+guitar's notes), it builds up with light from the first note, the groups take turns and the whole rig is kept for
+the climaxes, every voice keeps its own section, it is brighter than the cinematic program, and the flash limits
+still hold."""
 
 from pathlib import Path
 
@@ -48,14 +49,15 @@ def test_the_layers_build_up_one_by_one():
     a = rock()
     n = 6
     got = D.layers(a, n)
-    assert got[0] == 1  # one section starts alone
+    assert got[0] == 3  # half of the rig starts: a build-up with light
     # a third of the rig at a time (after a breakdown the ones that played before come back at once)
     assert all(got[k] <= max(got[:k]) + 2 for k in range(1, len(got)))
-    assert max(got) > 1
+    assert max(got) > got[0]
     r = D.ranks(a)
     for k, rank in zip(got, r):
-        assert k <= max(1, 1 + round(rank / D.CLIMAX * (n - 1)))  # a quiet part thins out
+        assert k >= 3  # a quiet part thins out, never under half
         assert k < n or rank >= D.CLIMAX  # the whole rig is kept for the climaxes
+    assert D.layers(a, 1) == [1] * len(a.phrases) and min(D.layers(a, 2)) == 2
 
 
 def test_the_build_reaches_everything_at_a_long_climax():
@@ -63,7 +65,9 @@ def test_the_build_reaches_everything_at_a_long_climax():
     loud = [10, 20, 40, 60, 70, 80, 90, 95, 99, 99, 99, 99]
     a.phrases = [a.phrases[0].__class__(**{**a.phrases[0].__dict__, "loudness_pct": v}) for v in loud]
     got = D.layers(a, 5)
-    assert got[-1] == 5 and got[0] == 1
+    assert got[-1] == 5 and got[0] == 3
+    b = D.builds(a)
+    assert b[0] < 0.2 and b[-1] == 1 and np.all(np.diff(b) >= 0)  # how far the song has built: it never falls
 
 
 def test_a_phrase_starts_with_half_and_adds_layers():
@@ -71,7 +75,8 @@ def test_a_phrase_starts_with_half_and_adds_layers():
     assert D.passages(1, 3, climax=False, opens=False) == [1, 1, 1]
     assert D.passages(5, 1, climax=False, opens=False) == [3]
     assert D.passages(6, 1, climax=True, opens=False) == [6]
-    assert D.passages(6, 4, climax=True, opens=True) == [6, 4, 5, 6]  # a drop hits with everything, then thins out
+    assert D.passages(6, 4, climax=True, opens=True) == [6, 5, 5, 6]  # a drop hits with everything, then thins out
+    assert D.passages(6, 4, climax=True, opens=False) == [4, 5, 5, 6]  # a climax keeps most of it
 
 
 def varied(a, rig):
@@ -85,6 +90,10 @@ def test_the_groups_take_turns(path):
     if len(e.cine_sections) < 2:
         pytest.skip("nothing to vary")
     lineups = [frozenset(s["active"]) for s in e.ls_scores]
+    if e.ls_all_in:  # a handful of lights: nobody sits out, the families swap instruments instead
+        assert len(set(lineups)) == 1
+        assert len({(tuple(s["kick"]), tuple(s["snare"])) for s in e.ls_scores if not s["climax"]}) >= 2
+        return
     assert len(set(lineups)) >= 3
     ts = np.arange(0, a.duration, 0.25)
     full = np.mean([e._score_at(float(t), e.decision_at(float(t))[0])["full"] for t in ts])
@@ -171,8 +180,8 @@ def test_a_family_is_every_fixture_of_a_model(show):
 def test_only_sections_that_have_joined_play(show):
     a, _, e = show
     first = e.cine_score[0]["active"]
-    assert len(first) == 1
-    playing = {eid for u in e.cine_sections[first[0]]["units"] for eid in u}
+    assert 2 <= len(first) < len(e.cine_sections)  # half of the rig starts
+    playing = {eid for si in first for u in e.cine_sections[si]["units"] for eid in u}
     end = e.plan[0].end
     for eid, (_, items) in e.cine_events.items():
         early = [it for it in items if it[0] < end and not it[5]]
@@ -358,3 +367,108 @@ def test_strobe_free_keeps_the_strobes_dark(show):
     for t in np.arange(0, a.duration, 0.05):
         states = e.render(float(t))[1]
         assert all(states[s].dimmer == 0 for s in e.cine_strobes)
+
+
+def played_at(e, t: float, tol: float = 1e-6) -> list[tuple]:
+    """The events on the show's lights at this time."""
+    out = []
+    for eid, (times, items) in e.cine_events.items():
+        if eid in e.cine_strobes or eid in e.cine_lasers:
+            continue
+        k = int(np.searchsorted(times, t - tol))
+        if k < len(times) and abs(times[k] - t) <= tol:
+            out.append((eid, *items[k]))
+    return out
+
+
+@pytest.mark.parametrize("path", SETS, ids=lambda p: p.stem)
+def test_the_drummer_leads(path):
+    """Every kick and snare is a hit of whole families at full level, wherever the song is."""
+    a = rock()
+    e = varied(a, load_rig(path))
+    if not e.cine_sections:
+        pytest.skip("no lights to play them")
+    kit = e.ls_kit
+    assert len(kit.kick_t) > 20 and len(kit.snare_t) > 20
+    for name, ts in (("kick", kit.kick_t), ("snare", kit.snare_t)):
+        got = [played_at(e, float(t)) for t in ts]
+        assert np.mean([bool(g) for g in got]) >= 0.95, name
+        for t, g in zip(ts, got):
+            if not g or any(ev[-1] for ev in g):
+                continue  # (an impact took it)
+            score = e._score_at(float(t), e.decision_at(float(t))[0])
+            side = {eid for si in score[name] for u in e.cine_sections[si]["units"] for eid in u}
+            assert len({ev[0] for ev in g} & side) >= 0.5 * len(side), (name, t)  # its side of the line-up
+            assert max(ev[2] for ev in g) >= 0.85
+
+
+def test_the_guitar_runs_over_the_rig():
+    """The separated melodic part's notes are played one by one, by the families that play the guitar."""
+    a = rock()
+    t = np.arange(4.0, 30.0, 0.115)  # a riff of sixteenths
+    a.synth_notes = (t, np.full(len(t), 0.4), (np.arange(len(t)) % 7) / 6)
+    e = varied(a, load_rig("tests/sets/showcase.json"))
+    drums = np.sort(np.concatenate([e.ls_kit.kick_t, e.ls_kit.snare_t, a.hits.t[a.hits.impact]]))
+    alone = [x for x in t if np.min(np.abs(drums - x)) > 0.06]
+    got = [played_at(e, float(x)) for x in alone]
+    assert np.mean([bool(g) for g in got]) >= 0.9
+    lights = [frozenset(ev[0] for ev in g) for g in got if g]
+    assert len(set(lights)) >= 6  # a run: block by block, not one light
+
+
+def test_a_hit_has_let_go_before_the_next_one(show):
+    _, _, e = show
+    for eid, (times, items) in e.cine_events.items():
+        if eid in e.cine_strobes or eid in e.cine_lasers:
+            continue
+        for (t0, _, hold, fade, *_), t1 in zip(items, times[1:]):
+            assert t0 + hold + fade <= t1 - 0.05 or t1 - t0 < 0.2, eid
+
+
+def test_a_small_rig_plays_with_all_of_it_from_the_first_note():
+    a = rock()
+    e = varied(a, load_rig("tests/sets/small.json"))
+    assert e.ls_all_in
+    n = len(e.cine_sections)
+    assert all(len(s["active"]) == n for s in e.ls_scores)
+    big = varied(a, load_rig("tests/sets/showcase.json"))
+    mid = varied(a, load_rig("tests/sets/fuze24.json"))
+    assert e.ls_share == 1.0 > mid.ls_share > big.ls_share == 0.4  # the bigger the rig, the more can sit out
+    assert not big.ls_all_in
+    lights = sum(len(s["units"]) for s in big.cine_sections)
+    for sc in big.ls_scores:
+        assert sum(len(big.cine_sections[si]["units"]) for si in sc["active"]) >= 0.4 * lights
+    showing = {eid for s in e.cine_sections for u in s["units"] for eid in u}
+    end = e.plan[0].end
+    early = {eid for eid, (times, _) in e.cine_events.items() if np.any(times < end)}
+    assert showing <= early
+
+
+def test_a_climax_arrives_on_an_impact(show):
+    a, _, e = show
+    r = e.ls_ranks
+    opens = [d.start for i, d in enumerate(e.plan) if r[i] >= D.CLIMAX and i and r[i - 1] < D.CLIMAX]
+    assert opens
+    for t in opens:
+        near = [ev for eid, (times, items) in e.cine_events.items() for ev in items if abs(ev[0] - t) <= 0.5 and ev[5]]
+        assert near, t
+
+
+def test_the_heads_change_pictures_on_the_kick(show):
+    a, _, e = show
+    kicks = np.asarray(e.ls_kit.kick_t, float)
+    off = np.array([np.min(np.abs(kicks - m)) for m in e.cine_moves])
+    assert np.mean(off < 0.02) > 0.5
+
+
+def test_the_heads_sway_faster_and_wider_as_it_gets_louder(show):
+    _, _, e = show
+    r = e.ls_ranks
+    quiet, loud = int(np.argmin(r)), int(np.argmax(r))
+
+    def mid(i):
+        return int((e.plan[i].start + e.plan[i].end) / 2 * C.GRID_HZ)
+
+    assert e.ls_sway_amp[mid(loud)] > e.ls_sway_amp[mid(quiet)]
+    rate = np.diff(e.ls_sway_turns)
+    assert rate[mid(loud)] > rate[mid(quiet)]
