@@ -129,6 +129,10 @@ struct MapperSheet: View {
                         .font(.callout).foregroundStyle(m.plays ? Color.secondary : Color.orange)
                 }
                 Spacer()
+            }
+            // The buttons get a row of their own: beside the fixture picker they were cut down to "Try on t…".
+            HStack(spacing: 10) {
+                Spacer()
                 if hasKey && checking == nil && colours == nil {
                     Menu {
                         Button("Choose a PDF or Picture…") { chooseManual() }
@@ -145,6 +149,7 @@ struct MapperSheet: View {
                         Label("Try on the Lights", systemImage: trying ? "lightbulb.fill" : "lightbulb")
                     }
                     .toggleStyle(.button)
+                    .fixedSize()
                     .tint(trying ? .yellow : nil)
                     .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false))
                     .help(tryRefusal ?? "Send these values as they are to \(on) (the rest of the set dark, a running show paused), to see what each channel does")
@@ -154,6 +159,7 @@ struct MapperSheet: View {
                     checking == nil ? startCheck() : stopCheck()
                 }
                 .buttonStyle(.bordered)
+                .fixedSize()
                 .tint(needsCheck && checking == nil ? .orange : nil)
                 .disabled(tryRefusal != nil || mapping == nil || !(mapping?.refusal.isEmpty ?? false) || colours != nil)
                 .help(tryRefusal ?? "Go through the channels one by one on \(on): each sweeps while you say what the fixture does")
