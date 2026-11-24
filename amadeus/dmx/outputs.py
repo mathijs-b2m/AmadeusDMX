@@ -28,6 +28,7 @@ import sys
 import time
 import uuid
 
+from amadeus.dmx import trace
 from amadeus.dmx.artnet import ArtNetSender, Reachability, held
 
 TYPES = ("artnet", "sacn", "enttec_pro")
@@ -54,10 +55,15 @@ class Output:
 
     def send(self, universes: dict[int, bytes]):
         if not self._paused():
-            self._send(self._mine(universes))
+            mine = self._mine(universes)
+            trace.frame(mine)  # the DMX trace (dmx/trace.py): what really goes out, when it is switched on
+            self._send(mine)
 
     def blackout(self, universes):
-        self._send(self._mine({u: bytes(512) for u in universes}))
+        mine = self._mine({u: bytes(512) for u in universes})
+        trace.frame(mine)
+        self._send(mine)
+        trace.flush()  # the last word of a show: written before the engine is gone
 
     def close(self):
         pass
@@ -236,7 +242,9 @@ def open_output(rig: dict, ip: str | None = None, owner: bool = False) -> Output
     replaces the network output's address."""
     specs = _specs(rig)
     outs = [_one(s, rig, ip, owner) for s in specs]
-    return outs[0] if len(outs) == 1 else MultiOutput(outs)
+    out = outs[0] if len(outs) == 1 else MultiOutput(outs)
+    trace.describe(rig, out.describe())
+    return out
 
 
 def _one(s: dict, rig: dict, ip: str | None, owner: bool) -> Output:

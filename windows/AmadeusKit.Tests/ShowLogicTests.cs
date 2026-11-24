@@ -322,3 +322,48 @@ public class ShowLogicTests
         Assert.Equal("A", PairingCode.AutoChoose("A", [new LinkBrowser.DJ("B")]));
     }
 }
+
+public sealed class DMXTraceTests
+{
+    [Fact]
+    public void TheTraceFollowsTheFileAndItsSwitch()
+    {
+        var data = Path.Combine(Path.GetTempPath(), "dmx-trace-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var trace = new DMXTrace(data);
+            var changes = 0;
+            trace.Changed += () => changes++;
+            Assert.False(trace.IsOn);
+            trace.Set(true);
+            Assert.True(trace.IsOn && File.Exists(trace.Flag));
+            trace.Poll();  // no file yet
+            Assert.Empty(trace.Lines);
+
+            File.WriteAllText(trace.Log, "# 14:03:07.412  trace on\n14:03:07.412  U1.017  fx1  pan  · → 131\n14:03:07.43");
+            changes = 0;
+            trace.Poll();
+            Assert.Equal(1, changes);
+            Assert.Equal(["# 14:03:07.412  trace on", "14:03:07.412  U1.017  fx1  pan  · → 131"], trace.Lines.Select(l => l.Text));
+            Assert.True(DMXTrace.IsNote(trace.Lines[0]) && !DMXTrace.IsNote(trace.Lines[1]));
+            Assert.Equal(Tone.Secondary, EngineLog.TraceTone(trace.Lines[0]));
+            File.AppendAllText(trace.Log, "7  U1.021  fx1  dimmer  0 → 255\n");  // the half line is finished
+            trace.Poll();
+            Assert.Equal("14:03:07.437  U1.021  fx1  dimmer  0 → 255", trace.Lines[^1].Text);
+            trace.Poll(read: false);
+            trace.Poll();
+            Assert.Equal(3, trace.Lines.Count);
+            Assert.Equal([2], EngineLog.Trace(trace.Lines, "DIMMER").Select(l => l.Id));
+
+            File.WriteAllText(trace.Log, "14:04:00.000  U1.001  -  -  1 → 2\n");  // started over, shorter
+            trace.Poll();
+            Assert.Equal("14:04:00.000  U1.001  -  -  1 → 2", trace.Lines[^1].Text);
+
+            trace.Clear();
+            Assert.Empty(trace.Lines);
+            trace.Set(false);
+            Assert.False(trace.IsOn);
+        }
+        finally { Directory.Delete(data, true); }
+    }
+}
