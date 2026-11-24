@@ -167,3 +167,5 @@ Included: **beamZ Fuze75B Beam** (12ch/10ch, measured motion, named gobos and co
 6. First show with `safety.master` at about 0.5.
 
 Discovery also lists RDM fixtures and can re-address them over RDM (`--readdress`), but most budget fixtures (including the Fuze75 and ComPar) don't speak RDM, so patch them by hand. `amadeus simnode` simulates a node with RDM fixtures for testing without hardware.
+
+**Why did that light do that?** The DMX trace writes down every value that goes out, as it changes: the time (to the millisecond), the set's universe and channel, the fixture and its channel (`14:03:07.412  U1.017  mh1  pan  127 → 131`). In the apps: the Engine page → **Trace DMX**, then *DMX Trace* to watch it and filter on a fixture or a channel; it can be switched while a show runs. By hand: make the file `.cache/dmx-trace` (remove it to stop) and read `.cache/dmx-trace.log`. It covers everything that sends: a show, Identify, Check Channels. A light that holds still writes nothing; the file starts over at 32 MB (the lines before stay in `dmx-trace.log.1`).

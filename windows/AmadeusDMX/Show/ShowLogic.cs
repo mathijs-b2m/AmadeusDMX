@@ -412,6 +412,19 @@ public static class EngineLog
     public static IReadOnlyList<EngineProcess.LogLine> Filter(IReadOnlyList<EngineProcess.LogLine> log, string filter) =>
         filter.Length == 0 ? log : log.Where(l => l.Text.Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToList();
 
+    /// The DMX trace shows at most this many lines at once (the filter looks through all that are kept).
+    public const int TraceShown = 3000;
+
+    /// The trace's lines on screen: those with the filter in them, the newest `TraceShown`.
+    public static IReadOnlyList<EngineProcess.LogLine> Trace(IReadOnlyList<EngineProcess.LogLine> lines, string filter)
+    {
+        var match = Filter(lines, filter);
+        return match.Count <= TraceShown ? match : match.Skip(match.Count - TraceShown).ToList();
+    }
+
+    /// A trace line has its own time in its text, and the engine's notes ("# …") stand back.
+    public static Tone TraceTone(EngineProcess.LogLine l) => DMXTrace.IsNote(l) ? AmadeusDMX.Tone.Secondary : AmadeusDMX.Tone.Primary;
+
     public static Tone Tone(EngineProcess.LogLine l) =>
         l.IsError ? AmadeusDMX.Tone.Red : l.Text.Contains('✓') ? AmadeusDMX.Tone.Green : l.Text.Contains('⚠') ? AmadeusDMX.Tone.Orange : AmadeusDMX.Tone.Primary;
 
