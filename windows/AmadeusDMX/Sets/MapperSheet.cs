@@ -164,10 +164,9 @@ public sealed class MapperSheet
             m is null ? null
                 : m.Plays ? UI.Label("checkmark.circle", L("The show plays it"), Font.Callout).Secondary()
                 : UI.Label("exclamationmark.triangle.fill", L("The show plays nothing in this mode yet"), Font.Callout).Foreground(Tint.Orange),
-            UI.Spacer(),
-            manual,
-            tryIt,
-            check);
+            UI.Spacer());
+        // The buttons get a row of their own: beside the fixture picker they ran off the sheet's edge.
+        var buttons = UI.HStack(10, UI.Spacer(), manual, tryIt, check);
         UIElement note = m?.Manual is { } read && !_checking && !_checkedAll
             ? Form.Note("doc.text.magnifyingglass", L("Filled in from {0}, the manual's mode “{1}”. Check it, then save.", read.File, read.Mode), Tint.Orange)
             : _m.NeedsCheck && !_checkedAll && !_checking
@@ -176,7 +175,7 @@ public sealed class MapperSheet
                 ? Form.Note("checkmark.circle.fill", L("Every channel checked: save it."), Tint.Green)
                 : UI.Text(L("Give each channel what the show plays on it, or hold it at a value (programs off, a shutter open, a macro on a colour). Every {0} in your sets plays by it.", m?.Name ?? L("fixture of this model")),
                           Font.Caption).Secondary().Wrap();
-        _header.Content = UI.VStack(8, title, line, note).Margin(0, 0, 0, 10);
+        _header.Content = UI.VStack(8, title, line, buttons, note).Margin(0, 0, 0, 10);
     }
 
     /// Which fixture the values and the check go to. The mapping itself is the model's: every one plays by it.
