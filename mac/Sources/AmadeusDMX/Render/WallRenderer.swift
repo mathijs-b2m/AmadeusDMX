@@ -1,8 +1,8 @@
 // The LED wall's picture (the native version of web/js/screen.js). The director picks a mode per phrase
 // (decision.screen): off | ambient | figure | words | equalizer | psychedelic. Figures are playful neon
 // outlines on the beat: a runner, a dancer, a jumping crowd, pong. Into a drop the wall counts 3-2-1 and
-// shouts DROP!. Psychedelic is drawn by a Metal shader on the wall itself; everything else here, with
-// Core Graphics, into a 640×360 picture that the renderer puts on the wall.
+// shouts DROP!. Psychedelic is drawn by a Metal shader (WallSource); everything else here, with
+// Core Graphics, into a 640×360 picture (finer for a real LED wall: `scale`) that WallSource puts on the GPU.
 import CoreGraphics
 import CoreText
 import AmadeusKit
@@ -30,7 +30,7 @@ enum WallScene: String, CaseIterable, Identifiable {
     static let figures: [WallScene] = [.runner, .dancer, .crowd, .pong]
 }
 
-struct WallOutput {
+struct WallState {
     var level: Float
     var psychedelic: Bool
     var palette: [SIMD3<Float>]
@@ -39,8 +39,13 @@ struct WallOutput {
 }
 
 final class WallRenderer {
+    /// The picture's own units: everything is drawn as if on 640×360.
     static let W = 640, H = 360
     let context: CGContext
+    /// How much finer than 640×360 the context is (a real LED wall wants more pixels than the 3D stage's wall).
+    let scale: CGFloat
+    var pixelWidth: Int { context.width }
+    var pixelHeight: Int { context.height }
     var force: WallScene = .auto
 
     private var cur: (mode: String, scene: WallScene) = ("off", .off)
@@ -51,12 +56,14 @@ final class WallRenderer {
     private var fromPose: [[Float]] = WallRenderer.moves["down"]!
     private var lastBeat = -1
 
-    init() {
-        context = CGContext(data: nil, width: Self.W, height: Self.H, bitsPerComponent: 8, bytesPerRow: Self.W * 4,
+    init(scale: CGFloat = 1) {
+        self.scale = scale
+        let w = Int((CGFloat(Self.W) * scale).rounded()), h = Int((CGFloat(Self.H) * scale).rounded())
+        context = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
                             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
-        context.translateBy(x: 0, y: CGFloat(Self.H))
-        context.scaleBy(x: 1, y: -1)   // y down, like a canvas
+        context.translateBy(x: 0, y: CGFloat(h))
+        context.scaleBy(x: scale, y: -scale)   // y down, like a canvas, in 640×360 units
         context.setFillColor(CGColor(gray: 0, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: Self.W, height: Self.H))
     }
@@ -86,7 +93,7 @@ final class WallRenderer {
         return (mode, scene)
     }
 
-    func update(frame f: Frame, hello h: Hello, dt: Float) -> WallOutput {
+    func update(frame f: Frame, hello h: Hello, dt: Float) -> WallState {
         let d = h.plan.indices.contains(f.phrase) ? h.plan[f.phrase] : nil
         var want = wanted(f, d)
         // the show arc's LED wall knob (live mode): dimmer, below half only calm colour, at zero off
@@ -121,7 +128,7 @@ final class WallRenderer {
             target = cur.mode == "off" ? 0 : cur.mode == "ambient" ? 0.4 : 0.95
         }
         level += (target * min(1, wall * 2) * fade - level) * min(1, dt * 10)
-        return WallOutput(level: level, psychedelic: cur.mode == "psychedelic", palette: Palettes.colors(d?.palette),
+        return WallState(level: level, psychedelic: cur.mode == "psychedelic", palette: Palettes.colors(d?.palette),
                           bands: bandsV, scene: cur.scene)
     }
 
@@ -143,7 +150,7 @@ final class WallRenderer {
     private func neon(_ c: SIMD3<Float>, _ width: CGFloat) {
         g.setStrokeColor(cg(c)); g.setFillColor(cg(c)); g.setLineWidth(width)
         g.setLineCap(.round); g.setLineJoin(.round)
-        g.setShadow(offset: .zero, blur: width * 2.2, color: cg(c))
+        g.setShadow(offset: .zero, blur: width * 2.2 * scale, color: cg(c))   // a shadow's blur is in pixels, not units
     }
 
     private func draw(_ f: Frame, _ d: Decision?, _ h: Hello, _ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ dt: Float) {

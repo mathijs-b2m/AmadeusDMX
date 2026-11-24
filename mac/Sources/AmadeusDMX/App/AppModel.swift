@@ -18,6 +18,8 @@ final class AppModel {
     /// Updates (Sparkle; a release build only).
     let updates = Updates()
     let feed = LiveFeed()
+    /// The LED wall's picture on a display (the HDMI into the LED processor), or in a window.
+    let wallOutput = WallOutputController()
     let api = SetupAPI(port: 8181)
 
     var section: Section = .show
@@ -111,10 +113,12 @@ final class AppModel {
     var mode: ShowMode = .both {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: "showMode")
-            feed.lite = !mode.renders3D
+            updateFeedLite()
         }
     }
     var sendArtNet: Bool { mode.sendsDMX }
+    /// Status frames only while nothing draws the show (Perform mode, no LED wall output): the wall needs full frames.
+    private func updateFeedLite() { feed.lite = !mode.renders3D && !wallOutput.settings.on }
     /// A mode change that needs the running show restarted, waiting for the operator's OK.
     var pendingMode: ShowMode?
     @ObservationIgnored private var runningWithDMX = false
@@ -233,6 +237,13 @@ final class AppModel {
             let lightshow = UserDefaults.standard.bool(forKey: "lightshow")
             DispatchQueue.main.async { self.play(URL(filePath: file), from: from, lightshow: lightshow) }
         }
+        wallOutput.source = { [weak self] in
+            guard let self else { return (nil, nil, false) }
+            let hello = self.feed.state == .connected ? self.feed.hello : nil
+            return (hello, self.feed.latestFullFrame, Date().timeIntervalSince(self.feed.latestFrameArrival) < 0.6)
+        }
+        wallOutput.onToggle = { [weak self] _ in self?.updateFeedLite() }
+        updateFeedLite()
         feed.start()
         if let ws = workspace, ws.limiterLevel() < 1 { ws.setLimiterLevel(1) }
         watchLimiter()

@@ -33,6 +33,13 @@ struct AmadeusDMXApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultPosition(.center)
 
+        Window("LED Wall Output", id: "walloutput") {
+            LEDWallOutputPanel()
+                .environment(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         Settings {
             SettingsView()
                 .environment(model)
@@ -108,6 +115,8 @@ struct AppCommands: Commands {
             Button("DMX Output") { model.section = .dmx }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
                 .disabled(model.workspace == nil)
+            Button("LED Wall Output…") { openWindow(id: "walloutput") }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
             Divider()
             Picker("Mode", selection: Binding(get: { model.mode }, set: { model.setMode($0) })) {
                 ForEach(ShowMode.allCases) { m in Label(m.title, systemImage: m.symbol).tag(m) }

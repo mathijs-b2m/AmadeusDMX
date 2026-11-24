@@ -193,6 +193,28 @@ While you set up, the **☀︎ brightness limiter** in the toolbar caps every li
 A striped banner shows whenever it's on. It starts at 100 % each time the app opens; set it back to
 100 % for the show.
 
+### A real LED wall
+
+The LED wall's animations can play on a real wall: connect the LED processor (NovaStar and the like) to the Mac
+over HDMI or DisplayPort, as a second display set to **Extend**, not Mirror. Then **Show › LED Wall Output…**
+(⇧⌘L):
+
+1. Choose that display and turn on **Play the LED Wall**. The picture fills it, over its menu bar and Dock.
+   Amadeus DMX never covers the display its own window is on.
+2. Turn off **Whole Display** and type the wall's rectangle in pixels, as the processor reads it: its start
+   position and the wall's size (**From Panels** works it out: 6 across, 3 high of 128 px is 768 × 384).
+   Everything around it stays black.
+3. Turn on the **Test Card** and check it on the wall: each corner has its own colour (top left red, top right
+   green, bottom left blue, bottom right yellow), every panel shows its column and row, and the circle must
+   look round. A bar crosses every two seconds: if it stutters or tears, frames are being dropped.
+4. Set the **Brightness**: a dark club wants far less than daylight. The processor holds the picture a frame
+   or two: set **Ahead of the Lights** (about 20–50 ms) until the wall and the lights land on the same beat.
+
+Use the display's own resolution (not a scaled one in System Settings › Displays), or the wall's pixels won't
+line up one to one. The output keeps the display awake, plays in Perform Only mode too, goes black when the
+show stops, and comes back by itself when the display is plugged in again. **In a Window** shows the same
+picture in a window, to try it without a second display or to capture it.
+
 ## 9. Run the night: the show arc
 
 Start a live show and open the **night card** at the top of the stage. The **show arc** reads your night from

@@ -225,7 +225,11 @@ final class StageController: ObservableObject {
     /// Show the room's walls and ceiling and keep the camera inside them.
     var inRoom = false { didSet { renderer?.inRoom = inRoom } }
     var workLight: Float = 0 { didSet { renderer?.workLight = workLight } }
-    @Published var wallScene: WallScene = .auto { didSet { renderer?.wallScene = wallScene } }
+    /// The LED wall: the director's choice or one scene tried out. One for the app (the stages and the LED Wall
+    /// Output show the same picture).
+    @Published var wallScene: WallScene = WallSource.shared.force {
+        didSet { WallSource.shared.force = wallScene; renderer?.wake() }
+    }
 
     var input: (() -> (StageInput?, Frame?))? {
         didSet { renderer?.input = input }
@@ -246,7 +250,6 @@ final class StageController: ObservableObject {
         r.fly = fly
         r.inRoom = inRoom
         r.workLight = workLight
-        r.wallScene = wallScene
         r.setPreset(preset, animated: false)
     }
 }

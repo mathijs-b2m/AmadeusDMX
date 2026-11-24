@@ -23,4 +23,5 @@ struct GoboDecalInstance {
 }
 struct LineInstance { var p0Width: SIMD4<Float>; var p1: SIMD4<Float>; var color: SIMD4<Float> }
 struct WallVertex { var pos: SIMD3<Float>; var uv: SIMD2<Float> }
+/// The LED wall (WallSource's shaders). info: x level, y psychedelic, z time.
 struct WallParams { var info: SIMD4<Float>; var bands: SIMD4<Float>; var pal: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) }

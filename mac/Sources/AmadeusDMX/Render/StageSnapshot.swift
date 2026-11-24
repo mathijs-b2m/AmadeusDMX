@@ -2,7 +2,10 @@
 // DIR holds hello.json and frame files (feed messages, e.g. from the engine); every frame-NAME.json becomes
 // NAME.png, drawn after a second of show time on that frame (gobos turn, the exposure settles). Optional:
 // -camera "Front of House" (a preset), -cameraYaw 180 (turned round the stage that many degrees from it), -inRoom YES,
-// -snapshotSize 1600x900. The app quits when done, before it starts anything.
+// -snapshotSize 1600x900. On a rig with an LED wall it also draws what the LED Wall Output sends: NAME-wall.png (the
+// show's picture) and NAME-card.png (the test card) on a display of -wallOutputSize 1920x1080, the wall at
+// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128. The app quits when done, before it starts
+// anything.
 import AmadeusKit
 import AppKit
 import ImageIO
@@ -46,6 +49,19 @@ enum StageSnapshot {
         r.input = { (input, frame) }
         r.inRoom = UserDefaults.standard.bool(forKey: "inRoom")
         let preset = UserDefaults.standard.string(forKey: "camera").flatMap(CameraPreset.init(rawValue:)) ?? .frontOfHouse
+        func ints(_ key: String, _ sep: Character) -> [Int]? {
+            UserDefaults.standard.string(forKey: key).map { $0.split(separator: sep).compactMap { Int($0.trimmingCharacters(in: .whitespaces)) } }
+        }
+        let outSize = ints("wallOutputSize", "x").flatMap { $0.count == 2 ? (w: $0[0], h: $0[1]) : nil } ?? (w: 1920, h: 1080)
+        let wallRect = ints("wallRect", ",").flatMap { $0.count == 4 ? PixelRect(x: $0[0], y: $0[1], w: $0[2], h: $0[3]) : nil }
+        let wall = WallOutputLayout.wallRect(wallRect, display: outSize.w, outSize.h), pic = WallOutputLayout.fit(wall)
+        let panelPx = UserDefaults.standard.integer(forKey: "panelPx") > 0 ? UserDefaults.standard.integer(forKey: "panelPx") : 128
+        WallSource.shared.scale = WallOutputLayout.pictureScale(forWallHeight: pic.h)
+        let drawer = WallOutputDrawer()
+        let od = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: outSize.w, height: outSize.h, mipmapped: false)
+        od.usage = [.renderTarget, .shaderRead]
+        od.storageMode = .shared
+        let outTarget = hello.screen ? r.device.makeTexture(descriptor: od) : nil
         var gpu: [Double] = []
         StageRenderer.onGPUTime = { gpu.append($0) }
         var now: CFTimeInterval = 1000
@@ -67,6 +83,19 @@ enum StageSnapshot {
             cmd.waitUntilCompleted()
             let out = dir.appending(path: name.replacingOccurrences(of: "frame-", with: "").replacingOccurrences(of: ".json", with: ".png"))
             try save(target, to: out)
+            if let outTarget {   // what goes to the LED wall
+                for (suffix, card) in [("wall", nil), ("card", TestCard.draw(pixels: (wall.w, wall.h), wall: wall, panelPx: panelPx))] as [(String, CGImage?)] {
+                    guard let cmd = r.queue.makeCommandBuffer() else { continue }
+                    WallSource.shared.prepare(frame: frame, hello: hello, now: now, cmd: cmd)
+                    let tex = try card.map { try MTKTextureLoader(device: r.device).newTexture(cgImage: $0, options: [.SRGB: false]) }
+                    drawer.encode(cmd, into: outTarget, wall: wall, picture: pic, level: 1, card: tex, time: 0.7)
+                    cmd.commit()
+                    cmd.waitUntilCompleted()
+                    let url = out.deletingPathExtension().appendingPathExtension("png").path.replacingOccurrences(of: ".png", with: "-\(suffix).png")
+                    try save(outTarget, to: URL(fileURLWithPath: url))
+                    print("stage snapshot: \(url)")
+                }
+            }
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))  // the GPU times come in on the main queue
             let ms = gpu.suffix(20).reduce(0, +) / Double(max(1, min(20, gpu.count))) * 1000
             print(String(format: "stage snapshot: %@ (%.1f ms GPU per frame at %d×%d)", out.path, ms, w, h))

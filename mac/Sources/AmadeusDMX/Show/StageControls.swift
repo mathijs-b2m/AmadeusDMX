@@ -6,6 +6,7 @@ struct StageControls: View {
     @ObservedObject var stage: StageController
     @Environment(AppModel.self) private var model
     @State private var showLook = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         GlassEffectContainer(spacing: 8) {
@@ -16,6 +17,8 @@ struct StageControls: View {
                         ForEach(WallScene.allCases) { s in Label(s.title, systemImage: s.symbol).tag(s) }
                     }
                     .pickerStyle(.inline)
+                    Divider()
+                    Button("LED Wall Output…", systemImage: "rectangle.on.rectangle") { openWindow(id: "walloutput") }
                 } label: {
                     Image(systemName: stage.wallScene == .auto ? "tv" : stage.wallScene.symbol).frame(width: 18, height: 18)
                 }
