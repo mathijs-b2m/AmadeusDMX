@@ -44,7 +44,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 48
+ANALYSIS_VERSION = 49
 HARD_AGREE = 0.5  # a hard track takes the one-tempo grid when this share of the tracker's beats is on it
 
 
@@ -124,6 +124,28 @@ def _no_window() -> dict:
     return {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
 
 
+# The whole-track tempo against the beat tracker's. The tracker counts its beats in whole frames (136.0 for a band
+# at 133.3 BPM), so the low end scores badly at exactly its tempo, and a track not made on a grid has no clear best
+# tempo: one at two thirds or three quarters of the real one can score a hair higher (AC/DC's "Thunderstruck",
+# 133.3 BPM: 88.9 at 0.212 against 0.214; Fleetwood Mac's "Dreams", 120: 80.4). So the best tempo close to the
+# tracker's is looked up too, and it stands when it scores about as well. On 338 cached tracks: the 13 this changes
+# score 1.05–2.16 times the other tempo there; where the other tempo is right (a reggaeton or cumbia counted double,
+# 148 BPM trance counted at two thirds) it scores 0.87 at most.
+TRACKED_NEAR = 0.04  # this close to the tracker's tempo is the tracker's tempo, measured finer
+TRACKED_AS_GOOD = 0.95  # …and it stands when the low end scores this share of the best tempo's there
+
+
+def whole_track_tempo(low_rise: np.ndarray, fps: float, tracked: float) -> tuple[float, float]:
+    """The tempo (BPM) the low end rises on most over the whole track, and its score: the best one anywhere, or
+    the best one close to the tracker's tempo when that scores about as well."""
+    bpm, score = strongest_tempo(low_rise, fps)
+    if abs(bpm / tracked - 1) > TRACKED_NEAR:  # another tempo than the tracker's: is the tracker's as good?
+        near, near_score = strongest_tempo(low_rise, fps, tracked * (1 - TRACKED_NEAR), tracked * (1 + TRACKED_NEAR))
+        if near_score >= TRACKED_AS_GOOD * score:
+            return near, near_score
+    return bpm, score
+
+
 def twice_as_fast(low_rise: np.ndarray, fps: float, bpm: float, score: float, facts: dict) -> bool:
     """Is the track twice as fast as the comb counted? By the kick only without the style model; with it, the
     sound says hardcore (and `analyze` searches hardcore's tempo). A band's bass in eighths rises on the lines
@@ -166,7 +188,7 @@ def analyze(
     facts = sound.facts(path)
     if not tempo:  # a tempo the whole track agrees on much more than the tracker's: track again from it
         tracked = 60 * fps / float(np.median(np.diff(beat_frames)))
-        bpm, score = strongest_tempo(low_rise, fps)
+        bpm, score = whole_track_tempo(low_rise, fps, tracked)
         doubled = twice_as_fast(low_rise, fps, bpm, score, facts)
         bpm *= 2 if doubled else 1
         # the kick's tempo where the sound says hardcore (a pumping bass can count it at a half, or two thirds)
