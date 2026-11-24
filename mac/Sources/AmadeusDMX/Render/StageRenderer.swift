@@ -14,6 +14,7 @@ struct StageInput {
     var fixtures: [FixtureInfo]
     var stage: Stage
     var screen: Bool
+    var screenAspect: Double = ScreenShape.defaultAspect   // the LED wall's shape, width over height
     var hello: Hello?
     var trusses: [Truss] = []
     var selected: Set<String> = []   // "truss:ID" / "fixture:ID" (rig editor)
@@ -73,11 +74,9 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     // the drawings on the floor: their pages as textures (kept per page), and what to draw this rig
     var drawingTextures: [String: MTLTexture] = [:]
     var drawingDraws: [(buffer: MTLBuffer, count: Int, texture: MTLTexture, opacity: Float)] = []
-    var wallTexture: MTLTexture!
     var hdr, depth, halfA, halfB, quarterA, quarterB: MTLTexture?
     var scenery: Scenery?
     var sceneryKey = ""
-    let wall = WallRenderer()
 
     // inputs
     var input: (() -> (StageInput?, Frame?))?
@@ -89,11 +88,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var fogT: Float = 0
     var exposure: Float = 1.0 { didSet { wake() } }
 
-    static let wallInterval: CFTimeInterval = 0.05
-    private var wallOut: WallOutput?
-    private var wallAt: CFTimeInterval = 0
-    private var wallShowT: Double?
-    private var wallDt: Float = 0
+    private var wallOn: Float = 0   // the wall's level (0: dark, or no show on a rig with one), for the shader
 
     /// Every frame's GPU time (seconds), for the power meter.
     static var onGPUTime: ((Double) -> Void)?
@@ -142,9 +137,6 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var autoOrbit = false { didSet { wake() } }
     /// Light the room so the rig is easy to see (rig pages, no show).
     var workLight: Float = 0 { didSet { wake() } }
-    var wallScene: WallScene { get { wall.force } set { wall.force = newValue; wake() } }
-    /// What the wall shows right now (for the UI).
-    private(set) var wallNow: WallScene = .off
 
     // camera
     private(set) var pose = CameraPose(target: [3, -1, 2], yaw: 0, pitch: 0.15, distance: 12)
@@ -157,9 +149,10 @@ final class StageRenderer: NSObject, MTKViewDelegate {
     var viewSize = CGSize(width: 1, height: 1)
 
     init?(view: MTKView) {
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return nil }
-        self.device = device
-        self.queue = queue
+        // the app's one GPU queue (WallSource): the wall's picture is drawn there before any stage reads it
+        guard let gpu = WallSource.gpu else { return nil }
+        self.device = gpu.device
+        self.queue = gpu.queue
         super.init()
         view.device = device
         view.colorPixelFormat = .bgra8Unorm_srgb
@@ -170,10 +163,6 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         do { try buildPipelines(view) } catch { print("stage shaders: \(error)"); return nil }
         buildCone()
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: WallRenderer.W,
-                                                          height: WallRenderer.H, mipmapped: false)
-        td.usage = .shaderRead
-        wallTexture = device.makeTexture(descriptor: td)
         view.delegate = self
     }
 
@@ -399,28 +388,13 @@ final class StageRenderer: NSObject, MTKViewDelegate {
         var u = Uniforms(viewProj: proj * viewM, camPos: SIMD4(eye, 1), camRight: SIMD4(right, 0), camUp: SIMD4(up, 0),
                          params: [Float(now - startTime), haze * (1 + roomFog), exposure, 0.9], ambient: SIMD4(ambient, workLight))
 
-        // the wall's picture
-        var wp = WallParams(info: .zero, bands: .zero, pal: (.zero, .zero, .zero, .zero))
-        if let inp, let h = inp.hello, let frame, scenery?.wall != nil {
-            // the wall's picture is drawn on the CPU, once per show frame (the engine's 40 a second: its figures move
-            // with the music as fluently as the lights); while the show stands still, wallInterval keeps it alive
-            wallDt += dt
-            if wallOut == nil || frame.t != wallShowT || now - wallAt >= Self.wallInterval {
-                let o = wall.update(frame: frame, hello: h, dt: wallDt)
-                wallOut = o
-                wallAt = now
-                wallShowT = frame.t
-                wallDt = 0
-                if !o.psychedelic, let data = wall.context.data {
-                    wallTexture.replace(region: MTLRegionMake2D(0, 0, WallRenderer.W, WallRenderer.H), mipmapLevel: 0,
-                                        withBytes: data, bytesPerRow: WallRenderer.W * 4)
-                }
-            }
-            let out = wallOut!
-            wallNow = out.scene
+        // the wall's picture: drawn once for the app (WallSource, the 40 show frames a second; the LED Wall Output
+        // shows the same), here only put on the stage's wall
+        wallOn = 0
+        if let inp, let h = inp.hello, let frame, scenery?.wall != nil,
+           let out = WallSource.shared.prepare(frame: frame, hello: h, now: now, cmd: cmd) {
+            wallOn = out.level
             let p = out.palette + Array(repeating: out.palette.last ?? .one, count: max(0, 4 - out.palette.count))
-            wp = WallParams(info: [out.level, out.psychedelic ? 1 : 0, Float(now - startTime), 0], bands: out.bands,
-                            pal: (SIMD4(p[0], 1), SIMD4(p[1], 1), SIMD4(p[2], 1), SIMD4(p[3], 1)))
             // the wall lights the stage around it a little
             ambient += (out.psychedelic ? (p[0] + p[1]) * 0.5 : SIMD3(repeating: 0.4)) * out.level * 0.08
             u.ambient = SIMD4(ambient, workLight)
@@ -462,8 +436,9 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 enc.setRenderPipelineState(wallPipe)
                 enc.setDepthStencilState(solidDepth)
                 enc.setVertexBuffer(wb, offset: 0, index: 0)
-                enc.setFragmentTexture(wallTexture, index: 0)
-                enc.setFragmentBytes(&wp, length: MemoryLayout<WallParams>.stride, index: 3)
+                var w = SIMD4<Float>(wallOn, Float(inp?.screenAspect ?? ScreenShape.defaultAspect), 0, 0)
+                enc.setFragmentTexture(WallSource.shared.picture, index: 0)
+                enc.setFragmentBytes(&w, length: MemoryLayout<SIMD4<Float>>.stride, index: 3)
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
             }
             // the drawings on the floor: over it, under everything standing on it (they don't hide the spots)

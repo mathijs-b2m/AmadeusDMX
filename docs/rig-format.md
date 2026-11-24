@@ -59,7 +59,7 @@ machines make the room ([fixture-catalog.md](fixture-catalog.md)).
     {"id": "front", "type": "quatro", "length_m": 8.5, "x_m": 5, "y_m": -1.0, "z_m": 4.5},
     {"id": "towerL", "type": "quatro", "length_m": 4, "x_m": 0.3, "y_m": -1.0, "z_m": 2, "vertical": true}
   ],
-  "screen": {"width_m": 5.5},
+  "screen": {"width_m": 5.5, "pixels": [768, 384], "panel_px": 128},
   "zones": [],
   "placements": {
     "my-set": {
@@ -135,6 +135,13 @@ Fixtures clamp to the ledgers of its front frame: `truss_pos_m` along it from it
 own; fewer, stacked up the sides, are columns. Heads on a scaffold play out to the audience unless it has an `aim`.
 The rig's LED wall hangs on the front of the widest scaffold that faces the audience (auto-mount keeps clear of it).
 `stage.deck_scaffold: true` draws a raised stage on open tube; the `festival` template has all of this.
+
+**LED wall.** `screen` puts an LED wall behind the DJ (`true`, or a dict). `pixels: [w, h]` is its resolution, as
+its LED processor maps it (6 × 3 panels of 128 px: `[768, 384]`): it sets the wall's shape, in the apps and for
+auto-mount, and the animations lay themselves out for it (a long ribbon or a tall pillar as well as 16:9). A wall
+taller than 16:9 stays under the ceiling. `panel_px` is one panel's size in pixels, for the hang sheet. Without
+pixels the wall is 16:9. Where the picture goes on the computer's video output is not the rig's business: that is
+the app's LED Wall Output (the display, and the wall's rectangle on it).
 
 **Carré.** A truss with `"shape": "carre"` is a rectangle of box truss standing on its own four legs (a tower in
 each corner, down to the floor), as round a DJ booth on the dance floor or at a trade-fair stand: `width_m` across

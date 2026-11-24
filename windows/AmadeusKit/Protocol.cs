@@ -425,6 +425,10 @@ public sealed partial class Hello
     public double MaxFlashHz { get; init; } = 4;
     public IReadOnlyList<double> Energy { get; init; } = [];
     public bool Screen { get; init; }
+    /// The LED wall's pixels, when the rig gives them (its shape).
+    public IReadOnlyList<int>? ScreenPx { get; init; }
+    /// The LED wall's shape, width over height (16:9 without its pixels).
+    public double ScreenAspect => ScreenShape.Aspect(ScreenPx is { } p ? (p[0], p[1]) : null);
     /// The phrase of the drop the LED wall counts into (3-2-1 DROP!): a rare moment, once or twice a night.
     public int? Countdown { get; init; }
     public IReadOnlyList<Truss> Trusses { get; init; } = [];
@@ -450,6 +454,7 @@ public sealed partial class Hello
         MaxFlashHz = J.Val(c, "max_flash_hz", J.Double) ?? 4,
         Energy = J.Ref(c, "energy", J.ArrayOf(J.Double)) ?? [],
         Screen = J.Val(c, "screen", J.Bool) ?? false,
+        ScreenPx = J.Try(() => J.Ref(c, "screen_px", J.ArrayOf(J.Int))) is { Length: 2 } px && px.All(v => v > 0) ? px : null,
         Countdown = J.Try(() => J.Val(c, "countdown", J.Int)),
         Trusses = J.Try(() => J.Ref(c, "trusses", J.ArrayOf(Truss.From))) ?? [],
         Genre = J.Try(() => J.Ref(c, "genre", J.String)) ?? "",
@@ -663,10 +668,12 @@ public sealed record HazePush
 
 public sealed class Frame
 {
-    public double T { get; init; }
+    double _t;
+    double? _bp;
+    public double T { get => _t; init => _t = value; }
     public int Phrase { get; init; }
     /// The beat position (beat index + phase), when the engine sends it.
-    public double? Bp { get; init; }
+    public double? Bp { get => _bp; init => _bp = value; }
     /// Per element: [dimmer, r, g, b, white, pan, tilt]
     public float[][] Fx { get; init; } = [];
     public float[] Bands { get; init; } = [];
@@ -697,6 +704,15 @@ public sealed class Frame
     public ArcStatus? Arc { get; init; }
 
     public Frame() { }
+
+    /// A copy at another moment of the show (Swift: `var f = frame; f.t = …; f.bp = …`), for the LED wall output's lead.
+    public Frame At(double t, double? bp)
+    {
+        var f = (Frame)MemberwiseClone();
+        f._t = t;
+        f._bp = bp;
+        return f;
+    }
 
     /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
     public Frame(float[][] fx, Vector3?[] dirs)

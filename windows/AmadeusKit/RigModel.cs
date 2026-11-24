@@ -700,6 +700,10 @@ public sealed class RigDocument
     public int WaitingCount => Fixtures.Count(f => f.Waiting);
 
     public bool HasScreen => Raw.GetValueOrDefault("screen") is { } s && !s.IsNull && s.Bool != false;
+    /// The LED wall's pixels (`screen.pixels`), nil when not given.
+    public (int W, int H)? ScreenPixels => ScreenShape.Pixels(Raw.GetValueOrDefault("screen"));
+    /// The LED wall's shape, width over height.
+    public double ScreenAspect => ScreenShape.Aspect(ScreenPixels);
 
     /// The set as JSON, with the editor's changes merged into what was there.
     public byte[] Json()

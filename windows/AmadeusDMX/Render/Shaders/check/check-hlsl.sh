@@ -22,7 +22,7 @@ src, out = sys.argv[1], sys.argv[2]
 common = open(os.path.join(src, "Common.hlsli")).read()
 for f in sorted(glob.glob(os.path.join(src, "*.hlsl"))):
     s = open(f).read().replace('#include "Common.hlsli"', common)
-    s = re.sub(r"\s*:\s*(SV_\w+|POSITION|NORMAL|COLOR\d*|TEXCOORD\d*)\b", "", s)
+    s = re.sub(r"\s*:\s*(SV_\w+|INSTANCE\d+|POSITION|NORMAL|COLOR\d*|TEXCOORD\d*)\b", "", s)
     s = re.sub(r"\s*:\s*register\(\w+\)", "", s)
     s = re.sub(r"cbuffer\s+\w+\s*\{([^}]*)\};", lambda m: m.group(1).replace("column_major ", ""), s)
     s = s.replace("[loop]", "").replace("nointerpolation ", "").replace("discard;", "return (float4)0;")

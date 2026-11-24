@@ -18,6 +18,8 @@ final class AppModel {
     /// Updates (Sparkle; a release build only).
     let updates = Updates()
     let feed = LiveFeed()
+    /// The LED wall's picture on a display (the HDMI into the LED processor), or in a window.
+    let wallOutput = WallOutputController()
     let api = SetupAPI(port: 8181)
 
     var section: Section = .show
@@ -111,10 +113,12 @@ final class AppModel {
     var mode: ShowMode = .both {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: "showMode")
-            feed.lite = !mode.renders3D
+            updateFeedLite()
         }
     }
     var sendArtNet: Bool { mode.sendsDMX }
+    /// Status frames only while nothing draws the show (Perform mode, no LED wall output): the wall needs full frames.
+    private func updateFeedLite() { feed.lite = !mode.renders3D && !wallOutput.settings.on }
     /// A mode change that needs the running show restarted, waiting for the operator's OK.
     var pendingMode: ShowMode?
     @ObservationIgnored private var runningWithDMX = false
@@ -233,6 +237,13 @@ final class AppModel {
             let lightshow = UserDefaults.standard.bool(forKey: "lightshow")
             DispatchQueue.main.async { self.play(URL(filePath: file), from: from, lightshow: lightshow) }
         }
+        wallOutput.source = { [weak self] in
+            guard let self else { return (nil, nil, false) }
+            let hello = self.feed.state == .connected ? self.feed.hello : nil
+            return (hello, self.feed.latestFullFrame, Date().timeIntervalSince(self.feed.latestFrameArrival) < 0.6)
+        }
+        wallOutput.onToggle = { [weak self] _ in self?.updateFeedLite() }
+        updateFeedLite()
         feed.start()
         if let ws = workspace, ws.limiterLevel() < 1 { ws.setLimiterLevel(1) }
         watchLimiter()
@@ -492,8 +503,8 @@ final class AppModel {
     /// The running show's rig, or a preview of the selected set.
     func stageInput() -> StageInput? {
         if let h = feed.hello, feed.state == .connected {
-            return StageInput(key: "show:\(h.stage.widthM):\(h.screen):\(StageInput.layout(h.fixtures, h.trusses))", fixtures: h.fixtures,
-                              stage: h.stage, screen: h.screen, hello: h, trusses: h.trusses,
+            return StageInput(key: "show:\(h.stage.widthM):\(h.screen):\(h.screenAspect):\(StageInput.layout(h.fixtures, h.trusses))", fixtures: h.fixtures,
+                              stage: h.stage, screen: h.screen, screenAspect: h.screenAspect, hello: h, trusses: h.trusses,
                               zones: showZones ? h.zones : [])
         }
         return preview(rig: selectedRig, set: selectedSet)
@@ -504,8 +515,8 @@ final class AppModel {
         let key = "\(rig)/\(set)"
         if let c = previewCache, c.key == key { return c.input }
         guard let ws = workspace, let p = ws.preview(rig: rig, set: set) else { return nil }
-        let inp = StageInput(key: "preview:\(key):\(StageInput.layout(p.fixtures, p.trusses))", fixtures: p.fixtures, stage: p.stage,
-                             screen: p.screen, hello: nil, trusses: p.trusses)
+        let inp = StageInput(key: "preview:\(key):\(p.screenAspect):\(StageInput.layout(p.fixtures, p.trusses))", fixtures: p.fixtures, stage: p.stage,
+                             screen: p.screen, screenAspect: p.screenAspect, hello: nil, trusses: p.trusses)
         previewCache = (key, inp)
         return inp
     }

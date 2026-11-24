@@ -69,8 +69,19 @@ public sealed class StageController : Observable
     float _workLight;
     public float WorkLight { get => _workLight; set { _workLight = value; if (Renderer is { } r) r.WorkLight = value; } }
 
-    WallScene _wallScene = WallScene.Auto;
-    public WallScene WallScene { get => _wallScene; set { if (Set(ref _wallScene, value) && Renderer is { } r) r.WallScene = value; } }
+    /// The LED wall: the director's choice or one scene tried out. One for the app (the stages and the LED Wall
+    /// Output show the same picture).
+    public WallScene WallScene
+    {
+        get => WallSource.Shared.Force;
+        set
+        {
+            if (WallSource.Shared.Force == value) return;
+            WallSource.Shared.Force = value;
+            Changed(nameof(WallScene));
+            Renderer?.Wake();
+        }
+    }
 
     Func<(StageInput?, Frame?)>? _input;
     public Func<(StageInput?, Frame?)>? Input { get => _input; set { _input = value; if (Renderer is { } r) r.Input = value; } }
@@ -95,7 +106,6 @@ public sealed class StageController : Observable
         r.FollowsRoom = FollowsRoom;
         r.InRoom = FollowsRoom && StageRoom.Shared.On;
         r.WorkLight = WorkLight;
-        r.WallScene = WallScene;
         r.SetPreset(Preset, animated: false);
     }
 

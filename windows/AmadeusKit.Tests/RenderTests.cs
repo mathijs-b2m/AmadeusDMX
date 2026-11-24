@@ -195,7 +195,8 @@ public class RenderTests
         Assert.Equal(LineInstance.Size, HlslSize(common, "LineInstance"));
         Assert.Equal(GoboBeamInstance.Size, HlslSize(common, "GoboBeamInstance"));
         Assert.Equal(GoboDecalInstance.Size, HlslSize(common, "GoboDecalInstance"));
-        Assert.Equal(WallParams.Size, HlslSize(common, "WallParams"));
+        Assert.Equal(WallParams.Size, HlslSize(Shader("WallSource.hlsl"), "WallParams"));
+        Assert.Equal(16, HlslSize(common, "WallOn"));
         Assert.Equal(BlurParams.Size, HlslSize(common, "BlurParams"));
     }
 
@@ -223,6 +224,7 @@ public class RenderTests
         ("GoboBeam.hlsl", ["gobo_beam_vertex", "gobo_beam_fragment"]),
         ("GoboDecal.hlsl", ["gobo_decal_vertex", "gobo_decal_fragment"]),
         ("Wall.hlsl", ["wall_vertex", "wall_fragment"]),
+        ("WallSource.hlsl", ["wall_fs_vertex", "wall_compose", "wall_output"]),
         ("Underlay.hlsl", ["underlay_vertex", "underlay_fragment"]),
         ("Post.hlsl", ["fullscreen_vertex", "composite_fragment", "downsample_fragment", "blur_fragment"]),
     ];
@@ -300,7 +302,15 @@ public class RenderTests
         Assert.NotEmpty(f.Parts.V);
         Assert.Equal(0, f.Parts.V.Count % 3);
         Assert.True(f.U.Ambient.X + f.U.Ambient.Y + f.U.Ambient.Z > 0);
-        Assert.True(f.WallPictureChanged);   // the first show frame draws the wall's picture
+        // the wall's picture is drawn on the painter's thread (the next frames have it), and fades in with the show
+        var g = new StageFrame();
+        var t = StageRenderer.Now();
+        for (var i = 1; i <= 5; i++)
+        {
+            WallSource.Shared.Flush();
+            r.PrepareFrame(g, t + 0.1 * i, new(1280, 720));
+        }
+        Assert.True(g.WallOn > 0 && g.WallOn <= 1);   // the next frame lights the wall's picture (WallSource), at its level
         Assert.All(f.Beams, b => Assert.True(float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0 && b.DirRadius.W > 0));
         Assert.Equal(12, r.ZoneEdges.Count);  // a box zone: 12 edges
         Assert.Equal(36, r.ZoneVertices.Count);
@@ -486,7 +496,7 @@ public class RenderTests
         foreach (var scene in new[] { WallScene.Runner, WallScene.Dancer, WallScene.Crowd, WallScene.Pong, WallScene.Words, WallScene.Equalizer, WallScene.Ambient })
         {
             using var w = new WallRenderer { Force = scene };
-            WallOutput o = default;
+            WallState o = default;
             for (var i = 0; i < 30; i++) o = w.Update(SceneSamples.Frame(inp, 30 + i * 0.05), inp.Hello!, 0.05f);
             Assert.Equal(scene, o.Scene);
             Assert.False(o.Psychedelic);
@@ -507,13 +517,133 @@ public class RenderTests
         using var w = new WallRenderer();
         // the phrase before the drop: 3-2-1 (the words scene draws the countdown)
         var before = new Frame { T = 14, Phrase = 0, Bp = 14 * 128 / 60.0, Fx = [], Bands = [0.5f, 0.5f] };
-        WallOutput o = default;
+        WallState o = default;
         for (var i = 0; i < 20; i++) o = w.Update(before, inp.Hello!, 0.05f);
         Assert.Equal(WallScene.Words, o.Scene);
         using var psy = new WallRenderer { Force = WallScene.Psychedelic };
         o = psy.Update(SceneSamples.Frame(inp), inp.Hello!, 0.1f);
         Assert.True(o.Psychedelic);
         Assert.Equal(4, o.Palette.Length);
+    }
+
+    [Fact]
+    public void TheWallIsDrawnOnceForTheAppAndOnlyForAShowWithAWall()
+    {
+        var inp = SceneSamples.Club();
+        var source = new WallSource();
+        var frame = SceneSamples.Frame(inp);
+        // no show, a rig without a wall, a status frame: nothing (and nothing changes)
+        Assert.Null(source.Update(null, inp.Hello, 10));
+        Assert.Null(source.Update(frame, new Hello { Screen = false }, 10));
+        Assert.Null(source.Update(new Frame { T = 1, Lite = true }, inp.Hello, 10));
+        Assert.Null(source.State);
+        // the picture is drawn on the painter's thread: nobody waits for it, it is there a moment later
+        Assert.Null(source.Update(frame, inp.Hello, 10));
+        source.Flush();
+        Assert.NotNull(source.Update(frame, inp.Hello, 10.001));
+        source.Flush();
+        source.Update(frame, inp.Hello, 10.002);
+        var v = source.StateVersion;
+        // the same show frame again, from another stage or the output, in the same moment: shared
+        source.Update(frame, inp.Hello, 10.01);
+        source.Flush();
+        source.Update(frame, inp.Hello, 10.011);
+        Assert.Equal(v, source.StateVersion);
+        // a still show keeps the wall alive
+        source.Update(frame, inp.Hello, 10.002 + WallSource.UpdateInterval);
+        source.Flush();
+        source.Update(frame, inp.Hello, 10.003 + WallSource.UpdateInterval);
+        Assert.Equal(v + 1, source.StateVersion);
+        // finer for a real wall
+        source.Scale = 1.5;
+        source.Update(SceneSamples.Frame(inp, 21), inp.Hello, 11);
+        Assert.Equal(1.5, source.DrawScale);
+        source.Flush();
+        Assert.True(source.DrawMs > 0);
+        // a scene tried out: the one playing fades out first (a finer drawing carries it on, it doesn't start over)
+        source.Force = WallScene.Psychedelic;
+        for (var k = 0; k < 10; k++)
+        {
+            source.Update(SceneSamples.Frame(inp, 31 + k * 0.1), inp.Hello, 11.2 + k * 0.1);
+            source.Flush();
+        }
+        Assert.True(source.Update(SceneSamples.Frame(inp, 32.1), inp.Hello, 12.3)!.Value.Psychedelic);
+    }
+
+    [Fact]
+    public void AFrameAheadKeepsEverythingButItsMoment()
+    {
+        var f = new Frame { T = 10, Phrase = 2, Bp = 20, Bands = [0.5f] };
+        var g = f.At(10.04, 20.08);
+        Assert.Equal((10.04, 20.08, 2), (g.T, g.Bp!.Value, g.Phrase));
+        Assert.Same(f.Bands, g.Bands);
+        Assert.Equal(10, f.T);   // the feed's frame stays as it came
+    }
+
+    [Fact]
+    public void TheTestCardHasItsCornersAndPanels()
+    {
+        var wall = new PixelRect(0, 0, 768, 384);
+        using var card = TestCard.Draw((768, 384), wall, 128);
+        Assert.Equal((768, 384), (card.Width, card.Height));
+        if (Environment.GetEnvironmentVariable("AMADEUS_WALL_PNGS") is { Length: > 0 } dir)
+        {
+            using var data = card.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(Path.Combine(dir, "wall-card.png"), data.ToArray());
+        }
+        static (int, int, int) Rgb(SkiaSharp.SKColor c) => (c.Red, c.Green, c.Blue);
+        Assert.Equal((255, 0, 0), Rgb(card.GetPixel(3, 3)));        // top left red
+        Assert.Equal((0, 255, 0), Rgb(card.GetPixel(764, 3)));      // top right green
+        Assert.Equal((0, 102, 255), Rgb(card.GetPixel(3, 380)));    // bottom left blue
+        Assert.Equal((255, 230, 0), Rgb(card.GetPixel(764, 380)));  // bottom right yellow
+        Assert.Equal((115, 115, 115), Rgb(card.GetPixel(128, 125)));  // a panel's edge
+    }
+
+    [Fact]
+    public void TheWallsCanvasTakesItsShape()
+    {
+        Assert.Equal((640f, 360f), WallRenderer.Canvas(16.0 / 9.0));   // 16:9 as always
+        Assert.Equal((1440f, 360f), WallRenderer.Canvas(4));
+        Assert.Equal((360f, 720f), WallRenderer.Canvas(0.5));
+        Assert.Equal((1280, 720), WallSource.PictureSize(16.0 / 9.0));
+        Assert.Equal((3840, 2160), WallSource.PictureSize(16.0 / 9.0, (3840, 2160)));   // as big as the output's wall
+        Assert.Equal((1280, 720), WallSource.PictureSize(16.0 / 9.0, (768, 432)));      // never smaller than twice the canvas
+        Assert.Equal((4096, 683), WallSource.PictureSize(6));   // the long side at most 4096
+        Assert.Equal((4096, 2304), WallSource.PictureSize(16.0 / 9.0, (7680, 4320)));
+        var inp = SceneSamples.Club();
+        foreach (var aspect in new[] { 4.0, 0.5 })
+            foreach (var scene in new[] { WallScene.Runner, WallScene.Dancer, WallScene.Crowd, WallScene.Pong, WallScene.Words, WallScene.Equalizer, WallScene.Ambient })
+            {
+                using var w = new WallRenderer(aspect: aspect) { Force = scene };
+                for (var i = 0; i < 30; i++) w.Update(SceneSamples.Frame(inp, 30 + i * 0.05), inp.Hello!, 0.05f);
+                Assert.Equal(WallRenderer.Canvas(aspect), (w.PixelWidth, w.PixelHeight));
+                var lit = 0;
+                var px = w.Pixels;
+                for (var k = 0; k < px.Length; k += 4) if (px[k] + px[k + 1] + px[k + 2] > 60) lit++;
+                Assert.True(lit > 200, $"{scene} at {aspect}: {lit} lit pixels");
+                if (Environment.GetEnvironmentVariable("AMADEUS_WALL_PNGS") is { Length: > 0 } dir)
+                    File.WriteAllBytes(Path.Combine(dir, string.Create(System.Globalization.CultureInfo.InvariantCulture, $"wall-{scene.RawValue()}-{aspect}.png")), w.Png());
+            }
+    }
+
+    [Fact]
+    public void TheWallFollowsTheShowsShape()
+    {
+        var inp = SceneSamples.Club(screenPx: (1536, 384));
+        var source = new WallSource();
+        Assert.Equal(16.0 / 9.0, source.Aspect);
+        source.Update(SceneSamples.Frame(inp), inp.Hello, 10);
+        Assert.Equal(4, source.Aspect);
+        Assert.Equal((1440f, 360f), source.Canvas);
+        // the 3D stage's wall: as wide as before, its height from the shape; a tall one stays under the ceiling
+        var wide = new Scenery(inp.Fixtures, inp.Stage, true, inp.Trusses, screenAspect: 4).Wall!.Value;
+        var plain = new Scenery(inp.Fixtures, inp.Stage, true, inp.Trusses).Wall!.Value;
+        Assert.Equal(plain.Width, wide.Width, 4);
+        Assert.Equal(plain.Width / 4, wide.Height, 4);
+        Assert.Equal(plain.Width * 9 / 16, plain.Height, 4);
+        var tall = new Scenery(inp.Fixtures, inp.Stage, true, inp.Trusses, screenAspect: 0.25).Wall!.Value;
+        Assert.True(tall.Center.Z + tall.Height / 2 < inp.Stage.CeilingM);
+        Assert.Equal(0.25, tall.Width / tall.Height, 4);
     }
 
     [Fact]

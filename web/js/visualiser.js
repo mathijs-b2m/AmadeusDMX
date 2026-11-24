@@ -268,10 +268,13 @@ function drawScenery(P, st) {
     const wc = wallView.getContext("2d");
     wc.globalAlpha = 1; wc.fillStyle = "#000"; wc.fillRect(0, 0, wallView.width, wallView.height);
     wc.globalAlpha = Math.max(0, Math.min(1, wall.level));
-    wc.drawImage(wall.canvas, 0, 0, wallView.width, wallView.height);
+    // fitted, its shape kept (the rig's screen_px), black bars aside
+    const k = Math.min(wallView.width / wall.canvas.width, wallView.height / wall.canvas.height);
+    const dw = wall.canvas.width * k, dh = wall.canvas.height * k;
+    wc.drawImage(wall.canvas, (wallView.width - dw) / 2, (wallView.height - dh) / 2, dw, dh);
   }
   if (wall) {
-    const sw = big ? Math.min(10, st.width_m * 0.55) : 2.6, sh = sw * 9 / 16;
+    let sw = big ? Math.min(10, st.width_m * 0.55) : 2.6;
     // a scaffold wall carries it on its front (the widest facing the audience: Truss.screenWall)
     const carrier = (show.trusses || []).filter(t => t.type === "scaffold" && !t.vertical && Math.abs(t.rot_deg || 0) < 1)
       .sort((a, b) => b.length_m - a.length_m)[0];
@@ -279,6 +282,13 @@ function drawScenery(P, st) {
       : st.room_back_m != null ? Math.max(big ? Math.min(-4.5, -st.room_back_m + 1.5) - 2.2 : -2.0, -st.room_back_m + 0.45)
       : big ? Math.min(-4.5, (show.ext?.back ?? -6) + 1.5) - 2.2 : -2.0;
     const sz = (big ? 1.4 : 1.15) + (carrier ? st.deck_m || 0 : 0);
+    // its shape from the rig's pixels (trusses.screen_rect): a wall taller than 16:9 stays under the ceiling
+    const px = show.screen_px, aspect = px?.[0] > 0 && px?.[1] > 0 ? Math.min(6, Math.max(0.25, px[0] / px[1])) : 16 / 9;
+    let sh = sw / aspect;
+    if (aspect < 16 / 9 && !st.outdoor && st.ceiling_m) {
+      const room = Math.max(1, st.ceiling_m - sz - 0.3);
+      if (sh > room) { sh = room; sw = room * aspect; }
+    }
     // the picture's left edge goes on the corner that appears on the left (seen from the audience; else mirrored)
     let lx = cx - sw / 2, rx = cx + sw / 2;
     const a = P([lx, sy, sz]), b = P([rx, sy, sz]);

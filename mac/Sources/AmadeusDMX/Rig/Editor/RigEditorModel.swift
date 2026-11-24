@@ -149,8 +149,8 @@ final class RigEditorModel: StageEditing {
         selected += group.map { "fixture:\($0)" }
         if let t = dropTarget { selected.append("truss:\(t)") }
         if let h = hovered, !selected.contains(h) { selected.append("hover:" + h) }
-        return StageInput(key: "edit:\(doc.label):\(version)", fixtures: els, stage: doc.stage, screen: doc.hasScreen, hello: nil,
-                          trusses: doc.trusses, selected: Set(selected), keepCamera: true,
+        return StageInput(key: "edit:\(doc.label):\(version)", fixtures: els, stage: doc.stage, screen: doc.hasScreen,
+                          screenAspect: doc.screenAspect, hello: nil, trusses: doc.trusses, selected: Set(selected), keepCamera: true,
                           zones: doc.zones.filter { z in showZones || selection == .zone(z.id) },
                           drawings: floorDrawings())
     }
@@ -237,6 +237,24 @@ final class RigEditorModel: StageEditing {
             d.raw["screen"] = on ? .object(["width_m": .number(min(10, d.width * 0.55).rounded())]) : nil
         }
     }
+
+    /// The LED wall's pixels (its shape, and what its processor maps), nil: not given (16:9).
+    func setScreenPixels(_ px: (w: Int, h: Int)?, panel: Int? = nil) {
+        change("Change LED Wall") { d in
+            guard case .object(var o)? = d.raw["screen"] else {
+                guard let px else { return }
+                d.raw["screen"] = .object(["width_m": .number(min(10, d.width * 0.55).rounded()),
+                                           "pixels": .array([.number(Double(px.w)), .number(Double(px.h))])])
+                return
+            }
+            o["pixels"] = px.map { .array([.number(Double($0.w)), .number(Double($0.h))]) }
+            if let panel { o["panel_px"] = .number(Double(panel)) }
+            d.raw["screen"] = .object(o)
+        }
+    }
+
+    /// One LED panel's pixels (the hang sheet), nil when not given.
+    var screenPanelPx: Int? { doc.raw["screen"]?.object?["panel_px"]?.number.map { Int($0) } }
 
     // MARK: - trusses
 

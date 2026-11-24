@@ -13,7 +13,6 @@ namespace AmadeusDMX;
 public sealed class StageFrame
 {
     public Uniforms U;
-    public WallParams Wp;
     public readonly List<BeamInstance> Beams = [];
     public readonly List<SpriteInstance> Sprites = [];
     public readonly List<DecalInstance> Decals = [];
@@ -25,8 +24,10 @@ public sealed class StageFrame
     public readonly List<(int Start, int Count)> SceneryRanges = [];
     /// The camera is behind the LED wall: it isn't drawn.
     public bool ScreenCut;
-    /// The wall's picture changed this frame (upload it to the wall texture).
-    public bool WallPictureChanged;
+    /// The LED wall plays (a show on a rig with one): 1, else 0. Its picture is WallSource's.
+    public float WallOn;
+    /// The LED wall's shape, width over height (its LED grid).
+    public float WallAspect = (float)ScreenShape.DefaultAspect;
     /// The scene's size in pixels (the window's, times the adaptive render scale).
     public int Width, Height;
     public float Dt;
@@ -35,9 +36,9 @@ public sealed class StageFrame
     internal void Clear()
     {
         Beams.Clear(); Sprites.Clear(); Decals.Clear(); Lines.Clear(); GoboBeams.Clear(); GoboDecals.Clear(); Parts.Clear();
-        WallPictureChanged = false;
+        WallOn = 0;
+        WallAspect = (float)ScreenShape.DefaultAspect;
         Show = null;
-        Wp = default;
     }
 }
 
@@ -86,12 +87,6 @@ public sealed partial class StageRenderer
     internal readonly Dictionary<string, float> BeeRoll = [];   // each bee eye's front, turned this far (radians)
     float _exposure = 1.0f;
     public float Exposure { get => _exposure; set { _exposure = value; Wake(); } }
-
-    public const double WallInterval = 0.05;
-    WallOutput? _wallOut;
-    double _wallAt;
-    double? _wallShowT;
-    float _wallDt;
 
     /// Every frame's GPU time (seconds), for the power meter.
     public static Action<double>? OnGPUTime { get; set; }
@@ -179,12 +174,8 @@ public sealed partial class StageRenderer
     float _workLight;
     /// Light the room so the rig is easy to see (rig pages, no show).
     public float WorkLight { get => _workLight; set { _workLight = value; Wake(); } }
-    readonly WallRenderer _wall = new();
-    public WallScene WallScene { get => _wall.Force; set { _wall.Force = value; Wake(); } }
     /// What the wall shows right now (for the UI).
     public WallScene WallNow { get; private set; } = WallScene.Off;
-    /// The wall's picture (BGRA, WallRenderer.W × H), for the texture upload.
-    internal WallRenderer Wall => _wall;
 
     // camera
     public CameraPose Pose { get; private set; } = new(new(3, -1, 2), 0, 0.15f, 12);
@@ -412,6 +403,7 @@ public sealed partial class StageRenderer
         out_.Dt = dt;
         var (inp, frame) = Input?.Invoke() ?? (null, null);
         out_.Show = frame;
+        out_.WallAspect = (float)(inp?.ScreenAspect ?? ScreenShape.DefaultAspect);
         if (frame is not null && frame.T != _lastShowT) { _lastShowT = frame.T; _lastActive = now; }  // the show moves
         if (Goal is not null || AutoOrbit || _heldKeys.Count > 0 || (inp is not null && inp.Key != SceneryKey)) { _lastActive = now; _lastInteraction = now; }
         PreferredFramesPerSecond = FramesPerSecond(now, _lastActive, _lastInteraction);
@@ -459,29 +451,13 @@ public sealed partial class StageRenderer
             Params = new(t, Haze * (1 + RoomFog), Exposure, 0.9f), Ambient = new(ambient, WorkLight),
         };
 
-        // the wall's picture
-        if (inp is { Hello: { } h } && frame is not null && Scenery?.Wall is not null)
+        // the wall's picture: drawn once for the app (WallSource, the 40 show frames a second; the LED Wall Output
+        // shows the same), here only put on the stage's wall
+        if (inp is { Hello: { } h } && frame is not null && Scenery?.Wall is not null && WallSource.Shared.Update(frame, h, now) is { } wo)
         {
-            // the wall's picture is drawn on the CPU, once per show frame (the engine's 40 a second: its figures move
-            // with the music as fluently as the lights); while the show stands still, WallInterval keeps it alive
-            _wallDt += dt;
-            if (_wallOut is null || frame.T != _wallShowT || now - _wallAt >= WallInterval)
-            {
-                var o = _wall.Update(frame, h, _wallDt);
-                _wallOut = o;
-                _wallAt = now;
-                _wallShowT = frame.T;
-                _wallDt = 0;
-                if (!o.Psychedelic) out_.WallPictureChanged = true;
-            }
-            var wo = _wallOut.Value;
+            out_.WallOn = wo.Level;   // its light, on the stage's wall
             WallNow = wo.Scene;
             var p = wo.Palette.Concat(Enumerable.Repeat(wo.Palette.Length > 0 ? wo.Palette[^1] : Vector3.One, Math.Max(0, 4 - wo.Palette.Length))).ToArray();
-            out_.Wp = new WallParams
-            {
-                Info = new(wo.Level, wo.Psychedelic ? 1 : 0, t, 0), Bands = wo.Bands,
-                Pal0 = new(p[0], 1), Pal1 = new(p[1], 1), Pal2 = new(p[2], 1), Pal3 = new(p[3], 1),
-            };
             // the wall lights the stage around it a little
             ambient += (wo.Psychedelic ? (p[0] + p[1]) * 0.5f : new Vector3(0.4f)) * wo.Level * 0.08f;
             u.Ambient = new(ambient, WorkLight);
@@ -528,7 +504,7 @@ public sealed partial class StageRenderer
     void RebuildScenery(StageInput inp)
     {
         var first = Scenery is null;
-        var s = new Scenery(inp.Fixtures, inp.Stage, inp.Screen, inp.Trusses, inp.Selected);
+        var s = new Scenery(inp.Fixtures, inp.Stage, inp.Screen, inp.Trusses, inp.Selected, inp.ScreenAspect);
         Scenery = s;
         SceneryKey = inp.Key;
         BuildZones(inp);

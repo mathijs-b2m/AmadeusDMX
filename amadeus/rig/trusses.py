@@ -285,6 +285,41 @@ def screen_wall(trusses: list[dict]) -> dict | None:
     return max(walls, key=lambda t: t["length_m"], default=None)
 
 
+SCREEN_ASPECT = 16 / 9  # an LED wall without its pixels: the picture's own shape
+ASPECT_RANGE = (0.25, 6.0)  # from a tall pillar to a long ribbon
+
+
+def screen_pixels(rig: dict) -> tuple[int, int] | None:
+    """The LED wall's pixels (`screen.pixels`: [width, height], what its processor maps), None when not given."""
+    s = rig.get("screen")
+    px = s.get("pixels") if isinstance(s, dict) else None
+    if isinstance(px, (list, tuple)) and len(px) == 2:
+        try:
+            w, h = int(px[0]), int(px[1])
+        except (TypeError, ValueError):
+            return None
+        if w > 0 and h > 0:
+            return w, h
+    return None
+
+
+def screen_aspect(rig: dict) -> float:
+    """The LED wall's shape, width over height: from its pixels, else 16:9."""
+    px = screen_pixels(rig)
+    return min(ASPECT_RANGE[1], max(ASPECT_RANGE[0], px[0] / px[1])) if px else SCREEN_ASPECT
+
+
+def screen_size(width: float, aspect: float, bottom: float, ceiling: float | None) -> tuple[float, float]:
+    """The wall's width and height (m) for its shape, as every app draws it: as wide as the rule gives, its height
+    from the aspect. One taller than 16:9 stays under the ceiling (narrower then); 16:9 and wider walls as always."""
+    h = width / aspect
+    if aspect < SCREEN_ASPECT and ceiling:
+        room = max(1.0, ceiling - bottom - 0.3)
+        if h > room:
+            h, width = room, room * aspect
+    return width, h
+
+
 def screen_rect(rig: dict, big: bool = True) -> tuple[float, float, float] | None:
     """The LED wall on the rig's scaffold, as the apps draw it, centred on the stage: (half its width, its bottom,
     its top) in metres, or None when it has no scaffold to hang on. `big`: a big rig's wall (Scenery)."""
@@ -293,7 +328,8 @@ def screen_rect(rig: dict, big: bool = True) -> tuple[float, float, float] | Non
     st = rig.get("stage", {})
     sw = min(10.0, float(st.get("width_m", 6.0)) * 0.55) if big else 2.6
     bottom = (1.4 if big else 1.15) + float(st.get("deck_m", 0.0) or 0.0)
-    return sw / 2, bottom, bottom + sw * 9 / 16
+    sw, sh = screen_size(sw, screen_aspect(rig), bottom, None if st.get("outdoor") else st.get("ceiling_m"))
+    return sw / 2, bottom, bottom + sh
 
 
 def ring_arc(t: dict) -> float:

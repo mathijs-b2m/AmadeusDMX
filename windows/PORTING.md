@@ -41,6 +41,8 @@ windows/
 | SwiftUI view | C# class building WinUI controls in code (`Views in code`) |
 | `@Observable` / `ObservableObject` model | class implementing `INotifyPropertyChanged` (`AmadeusKit.Observable` base with `Set(ref field, value)`) |
 | Metal (`StageRenderer`, `Shaders.swift`) | Direct3D 11 + HLSL (`AmadeusDMX/Render`) |
+| the app's one Metal queue (`WallSource.gpu`) | one Direct3D 11 device + immediate context, multithread-protected (`SharedGpu`); a draw holds its lock |
+| `NSScreen` / `CGDisplay` / a display link | `EnumDisplayMonitors` + `QueryDisplayConfig` (`WallOutputNative`); a swap chain's frame-latency waitable object on a thread |
 | Keychain | Windows Credential Manager (`CredWrite`/`CredRead`, P/Invoke) |
 | Bonjour (`NWBrowser`, `NWListener`) | `DnsServiceBrowse` / `DnsServiceRegister` (dnsapi.dll, Windows 10+) |
 | Sparkle | NetSparkleUpdater (same appcast format, same Ed25519 key) |

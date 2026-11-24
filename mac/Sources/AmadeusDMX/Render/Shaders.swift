@@ -331,39 +331,19 @@ fragment float4 line_fragment(LineOut in [[stage_in]], constant Uniforms &u [[bu
 // ---------------------------------------------------------------- the LED wall
 struct WallIn { float3 pos [[attribute(0)]]; float2 uv [[attribute(1)]]; };
 struct WallOut { float4 pos [[position]]; float2 uv; };
-struct WallParams { float4 info; float4 bands; float4 pal[4]; };   // info: x level, y psychedelic, z time
-
 vertex WallOut wall_vertex(WallIn in [[stage_in]], constant Uniforms &u [[buffer(1)]]) {
     WallOut o; o.pos = u.viewProj * float4(in.pos, 1); o.uv = in.uv; return o;
 }
 
-float3 psychedelic(float2 uv, float t, float4 bands, constant float4 *pal) {
-    float2 p = (uv - 0.5) * float2(16.0 / 9.0, 1.0) * 2.0;
-    // kaleidoscope: fold the angle into 6 slices, then a flowing plasma that the bass pushes outwards
-    float a = atan2(p.y, p.x), r = length(p);
-    float k = 3.14159 / 3.0;
-    a = abs(fmod(a + t * 0.15 + 100.0 * k, 2.0 * k) - k);
-    float2 q = float2(cos(a), sin(a)) * r;
-    float bass = bands.x, mid = bands.y, hi = bands.z;
-    float v = sin(q.x * 6.0 + t * 1.3) + sin(q.y * 7.0 - t * 0.9 + bass * 3.0)
-            + sin((q.x + q.y) * 5.0 + t * 0.7) + sin(r * (10.0 + mid * 8.0) - t * 3.0 - bass * 6.0);
-    float s = v * 0.25 + 0.5;
-    float3 c0 = pal[0].rgb, c1 = pal[1].rgb, c2 = pal[2].rgb, c3 = pal[3].rgb;
-    float3 c = s < 0.33 ? mix(c0, c1, s / 0.33) : s < 0.66 ? mix(c1, c2, (s - 0.33) / 0.33) : mix(c2, c3, (s - 0.66) / 0.34);
-    float rings = smoothstep(0.85, 1.0, sin(r * 18.0 - t * 5.0 - bass * 8.0) * 0.5 + 0.5);
-    c += rings * (0.4 + hi);
-    c *= 0.55 + 0.6 * bass + 0.25 * smoothstep(1.2, 0.0, r);
-    return c;
-}
-
+// the wall's picture comes ready (WallSource: the drawing or the psychedelic shader), lit at the wall's level
 fragment float4 wall_fragment(WallOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
-                              constant WallParams &w [[buffer(3)]]) {
-    constexpr sampler smp(filter::linear, address::clamp_to_edge);
-    float3 c = w.info.y > 0.5 ? psychedelic(in.uv, w.info.z, w.bands, w.pal) : tex.sample(smp, in.uv).rgb;
+                              constant float4 &w [[buffer(3)]]) {   // w.x: the wall's level (light), w.y: its aspect
+    constexpr sampler smp(filter::linear, mip_filter::linear, address::clamp_to_edge);
+    float3 c = tex.sample(smp, in.uv).rgb * w.x;
     // LED pixel grid, faintly visible up close
-    float2 px = fract(in.uv * float2(192.0, 108.0));
+    float2 px = fract(in.uv * float2(108.0 * w.y, 108.0));
     float grid = 0.85 + 0.15 * smoothstep(0.0, 0.15, min(min(px.x, 1.0 - px.x), min(px.y, 1.0 - px.y)));
-    return float4(c * w.info.x * 1.6 * grid + float3(0.004), 1);
+    return float4(c * 1.6 * grid + float3(0.004), 1);
 }
 
 // ---------------------------------------------------------------- a drawing on the floor (rig editor)
