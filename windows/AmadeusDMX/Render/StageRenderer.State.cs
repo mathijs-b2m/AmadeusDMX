@@ -26,6 +26,8 @@ public sealed class StageFrame
     public bool ScreenCut;
     /// The LED wall plays (a show on a rig with one): 1, else 0. Its picture is WallSource's.
     public float WallOn;
+    /// The LED wall's shape, width over height (its LED grid).
+    public float WallAspect = (float)ScreenShape.DefaultAspect;
     /// The scene's size in pixels (the window's, times the adaptive render scale).
     public int Width, Height;
     public float Dt;
@@ -35,6 +37,7 @@ public sealed class StageFrame
     {
         Beams.Clear(); Sprites.Clear(); Decals.Clear(); Lines.Clear(); GoboBeams.Clear(); GoboDecals.Clear(); Parts.Clear();
         WallOn = 0;
+        WallAspect = (float)ScreenShape.DefaultAspect;
         Show = null;
     }
 }
@@ -400,6 +403,7 @@ public sealed partial class StageRenderer
         out_.Dt = dt;
         var (inp, frame) = Input?.Invoke() ?? (null, null);
         out_.Show = frame;
+        out_.WallAspect = (float)(inp?.ScreenAspect ?? ScreenShape.DefaultAspect);
         if (frame is not null && frame.T != _lastShowT) { _lastShowT = frame.T; _lastActive = now; }  // the show moves
         if (Goal is not null || AutoOrbit || _heldKeys.Count > 0 || (inp is not null && inp.Key != SceneryKey)) { _lastActive = now; _lastInteraction = now; }
         PreferredFramesPerSecond = FramesPerSecond(now, _lastActive, _lastInteraction);
@@ -500,7 +504,7 @@ public sealed partial class StageRenderer
     void RebuildScenery(StageInput inp)
     {
         var first = Scenery is null;
-        var s = new Scenery(inp.Fixtures, inp.Stage, inp.Screen, inp.Trusses, inp.Selected);
+        var s = new Scenery(inp.Fixtures, inp.Stage, inp.Screen, inp.Trusses, inp.Selected, inp.ScreenAspect);
         Scenery = s;
         SceneryKey = inp.Key;
         BuildZones(inp);

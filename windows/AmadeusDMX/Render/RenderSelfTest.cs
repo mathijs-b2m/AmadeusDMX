@@ -2,7 +2,8 @@
 // three cameras, into PNGs in %TEMP% (amadeus-stage-*.png) with a report (amadeus-stage-selftest.txt), then quits
 // without starting the app. It also draws what the LED Wall Output sends (the Mac's stage snapshot does too):
 // amadeus-wall.png (the show's picture) and amadeus-wall-card.png (the test card) on a monitor of 1920×1080, the wall
-// at -wallRect X,Y,W,H (missing: the whole monitor), panels of -panelPx 128. Exit code 0 when every picture was drawn and isn't empty. For checking the Direct3D half
+// at -wallRect X,Y,W,H (missing: the whole monitor), panels of -panelPx 128, one scene with -wallScene runner, the
+// rig's LED wall of -screenPx 1536x384 (its shape; missing: 16:9). Exit code 0 when every picture was drawn and isn't empty. For checking the Direct3D half
 // on a Windows machine (the Mac checks the rest: RenderTests).
 using System.Diagnostics;
 using System.Globalization;
@@ -33,7 +34,12 @@ public static class RenderSelfTest
             using (var dxgi = r.Device.QueryInterface<IDXGIDevice>())
             using (var adapter = dxgi.GetAdapter())
                 report.Add($"adapter: {adapter.Description.Description}");
-            var inp = SceneSamples.Club();
+            var screenPx = Defaults.Standard.String("screenPx")?.Split('x') is [var sw, var sh]
+                && int.TryParse(sw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pw) && int.TryParse(sh, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ph)
+                && pw > 0 && ph > 0 ? (pw, ph) : ((int, int)?)null;
+            var inp = SceneSamples.Club(screenPx: screenPx);
+            if (WallScenes.FromRawValue(Defaults.Standard.String("wallScene")) is { } scene)
+                WallSource.Shared.Force = scene;   // -wallScene runner: one scene on the wall
             var frame = SceneSamples.Frame(inp);
             r.Input = () => (inp, frame);
             r.Haze = 0.6f;
@@ -84,9 +90,11 @@ public static class RenderSelfTest
         const int W = 1920, H = 1080;
         var ints = Defaults.Standard.String("wallRect")?.Split(',').Select(v => int.TryParse(v.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0).ToArray();
         var wall = WallOutputLayout.WallRect(ints is { Length: 4 } a ? new PixelRect(a[0], a[1], a[2], a[3]) : null, W, H);
-        var pic = WallOutputLayout.Fit(wall);
+        var aspect = inp.Hello?.ScreenAspect ?? ScreenShape.DefaultAspect;
+        var pic = WallOutputLayout.Fit(wall, aspect);
         var panelPx = Defaults.Standard.Integer("panelPx") > 0 ? Defaults.Standard.Integer("panelPx") : 128;
-        WallSource.Shared.Scale = WallOutputLayout.PictureScale(pic.H);
+        var canvas = WallRenderer.Canvas(aspect);
+        WallSource.Shared.Scale = WallOutputLayout.PictureScale(pic, (canvas.W, canvas.H));
         var gpu = SharedGpu.Get();
         using var drawer = new WallOutputDrawer();
         using var tex = r.Device.CreateTexture2D(new Texture2DDescription(Format.B8G8R8A8_UNorm, W, H, 1, 1, BindFlags.RenderTarget | BindFlags.ShaderResource));
@@ -111,7 +119,7 @@ public static class RenderSelfTest
             File.WriteAllBytes(Path.Combine(dir, name), Png(px, W, H));
             var empty = varied < 0.01;
             ok &= !empty || !testCard;   // the show's picture may be dark at this moment; the card never is
-            report.Add($"LED wall output: {name}, wall {wall.W}×{wall.H} at {wall.X},{wall.Y}, {varied:P1} of the pixels lit{(empty && testCard ? " — EMPTY" : "")}");
+            report.Add($"LED wall output: {name}, wall {wall.W}×{wall.H} at {wall.X},{wall.Y}, picture {pic.W}×{pic.H} ({aspect:F2}:1), {varied:P1} of the pixels lit{(empty && testCard ? " — EMPTY" : "")}");
         }
         WallSource.Shared.Scale = 1;
         return ok;

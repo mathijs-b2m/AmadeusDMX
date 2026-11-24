@@ -117,7 +117,7 @@ public sealed partial class WallSource
     ID3D11PixelShader? _composePS;
     ID3D11Buffer? _params;
     ID3D11SamplerState? _sampler;
-    int _cpuW, _cpuH;
+    int _cpuW, _cpuH, _picW, _picH;
     int _uploaded = -1, _composed = -1;
     double _composedAt = double.NegativeInfinity;
 
@@ -129,6 +129,7 @@ public sealed partial class WallSource
         lock (_lock)
         {
             if (_gpuGeneration != gpu.Generation) Build(gpu);
+            if (PictureSize(_aspect) != (_picW, _picH)) MakePicture(gpu);   // a rig of another shape
             if (_state is not { } s || _pictureView is null || _composePS is null) return _pictureView;
             if (!s.Psychedelic && _uploaded != _pictureVersion) Upload(gpu);
             if (_composed != _stateVersion || (s.Psychedelic && now - _composedAt > 1.0 / 90))
@@ -162,8 +163,17 @@ public sealed partial class WallSource
             AddressU = TextureAddressMode.Clamp, AddressV = TextureAddressMode.Clamp, AddressW = TextureAddressMode.Clamp,
             ComparisonFunc = ComparisonFunction.Never, MinLOD = 0, MaxLOD = float.MaxValue,
         });
-        var mips = (uint)(Math.Floor(Math.Log2(Math.Max(PictureW, PictureH))) + 1);
-        _picture = d.CreateTexture2D(new Texture2DDescription(Format.R16G16B16A16_Float, PictureW, PictureH, 1, mips,
+        MakePicture(gpu);
+    }
+
+    /// The composed picture, the wall's shape.
+    void MakePicture(SharedGpu gpu)
+    {
+        _pictureView?.Dispose(); _pictureTarget?.Dispose(); _picture?.Dispose();
+        var d = gpu.Device;
+        (_picW, _picH) = PictureSize(_aspect);
+        var mips = (uint)(Math.Floor(Math.Log2(Math.Max(_picW, _picH))) + 1);
+        _picture = d.CreateTexture2D(new Texture2DDescription(Format.R16G16B16A16_Float, (uint)_picW, (uint)_picH, 1, mips,
             BindFlags.ShaderResource | BindFlags.RenderTarget, ResourceUsage.Default, CpuAccessFlags.None, 1, 0, ResourceOptionFlags.GenerateMips));
         _pictureTarget = d.CreateRenderTargetView(_picture);   // mip 0
         _pictureView = d.CreateShaderResourceView(_picture);
@@ -197,12 +207,12 @@ public sealed partial class WallSource
         Vector3 P(int i) => pal[Math.Min(i, pal.Length - 1)];
         var wp = new WallParams
         {
-            Info = new(s.Level, s.Psychedelic ? 1 : 0, (float)(now - _startTime), 0), Bands = s.Bands,
+            Info = new(s.Level, s.Psychedelic ? 1 : 0, (float)(now - _startTime), (float)_aspect), Bands = s.Bands,
             Pal0 = new(P(0), 1), Pal1 = new(P(1), 1), Pal2 = new(P(2), 1), Pal3 = new(P(3), 1),
         };
         ctx.UpdateSubresource(in wp, _params!);
         ctx.OMSetRenderTargets(_pictureTarget!, null);
-        ctx.RSSetViewport(new Viewport(PictureW, PictureH));
+        ctx.RSSetViewport(new Viewport(_picW, _picH));
         ctx.RSSetState(null);
         ctx.OMSetBlendState(null);
         ctx.OMSetDepthStencilState(null);
@@ -230,7 +240,7 @@ public sealed partial class WallSource
         _composePS = null;
         _params = null;
         _sampler = null;
-        _cpuW = _cpuH = 0;
+        _cpuW = _cpuH = _picW = _picH = 0;
         _gpuGeneration = -1;
     }
 }

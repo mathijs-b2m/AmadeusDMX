@@ -97,7 +97,7 @@ public sealed class LEDWallOutputPanel(AppModel model)
         var rectRows = UI.VStack(10, Form.Row(L("Start|position"), start), Form.Row(L("Size"), size), PanelsRow())
             .Bind(o, nameof(WallOutputController.Settings), r => r.Visible(S.Rect is not null));
         var wall = Form.Section(L("The Wall on the Display"),
-            [Form.Row(L("Whole Display"), whole), rectRows],
+            [Form.Row(L("Whole Display"), whole), rectRows, RigWall()],
             L("In pixels from the display's top left, as the LED processor maps it (its input's start position and the wall's size). Black around it."))
             .Bind(o, nameof(WallOutputController.Settings), w => w.Visible(S.Target == WallOutputSettings.TargetKind.Display));
 
@@ -148,6 +148,44 @@ public sealed class LEDWallOutputPanel(AppModel model)
             return L("Playing on {0}", on + px);
         }
         return o.Settings.On ? L("Starting…") : L("Off");
+    }
+
+    /// The show's LED wall pixels: the running show's rig, else the selected one.
+    (int W, int H)? RigPixels()
+    {
+        if (model.Feed.Hello?.ScreenPx is { } px && model.Feed.State == FeedState.Connected) return (px[0], px[1]);
+        return model.Workspace?.Document(model.SelectedRig, model.SelectedSet)?.ScreenPixels;
+    }
+
+    /// The rectangle is another shape than the rig's wall: the picture gets black bars.
+    string? ShapeWarning()
+    {
+        if (S.Rect is not { } r || RigPixels() is not { } px) return null;
+        double a = (double)r.W / Math.Max(1, r.H), b = (double)px.W / px.H;
+        if (Math.Abs(a / b - 1) <= 0.02) return null;
+        return L("The rectangle is {0:0.00}:1, the rig's wall {1:0.00}:1: the picture keeps the rig's shape, with black bars.", a, b);
+    }
+
+    /// "Use the Rig's Wall" and the shape warning, following the show, the selected rig and the settings.
+    UIElement RigWall()
+    {
+        var host = UI.Live(_out, RigWallRows, nameof(WallOutputController.Settings));
+        host.Bind(model.Feed, [nameof(LiveFeed.Hello), nameof(LiveFeed.State)], c => c.Rebuild(RigWallRows))
+            .Bind(model, [nameof(AppModel.SelectedRig), nameof(AppModel.SelectedSet), nameof(AppModel.ConfigVersion)], c => c.Rebuild(RigWallRows));
+        return host;
+    }
+
+    UIElement? RigWallRows()
+    {
+        var rows = UI.VStack(8);
+        if (RigPixels() is { } px && (S.Rect is not { } r0 || r0.W != px.W || r0.H != px.H))
+            rows.Children.Add(UI.Button(L("Use the Rig's Wall: {0} × {1}", px.W, px.H), () =>
+            {
+                var r = S.Rect;
+                Edit(s => s with { Rect = new PixelRect(r?.X ?? 0, r?.Y ?? 0, px.W, px.H) });
+            }).Tooltip(L("The LED wall's pixels from the show's rig (Rigs › the rig › LED wall pixels)")));
+        if (ShapeWarning() is { } warn) rows.Children.Add(UI.Text(warn, Font.Callout).Wrap().Foreground(Tint.Orange));
+        return rows.Children.Count == 0 ? null : rows;
     }
 
     /// What the show gives the wall, when it gives it nothing.

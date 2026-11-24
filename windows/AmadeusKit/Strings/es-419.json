@@ -1473,5 +1473,19 @@
   "The display": "El monitor",
   "Amadeus DMX is on {0}. Move the app's window to another display, or choose another display: the output would cover it.": "Amadeus DMX está en {0}. Mueve la ventana de la app a otro monitor, o elige otro monitor: la salida la taparía.",
   "{0} runs at {1} × {2}, not its own {3} × {4}: the wall's pixels may not land one to one. Choose its recommended resolution in Settings › System › Display.": "{0} funciona a {1} × {2}, no a su propia resolución de {3} × {4}: los píxeles de la pantalla LED pueden no coincidir uno a uno. Elige su resolución recomendada en Configuración › Sistema › Pantalla.",
-  "The LED wall output can't start: {0}": "La salida a pantalla LED no puede iniciar: {0}"
+  "The LED wall output can't start: {0}": "La salida a pantalla LED no puede iniciar: {0}",
+  "LED wall pixels": "Píxeles de la pantalla LED",
+  "W": "An",
+  "H": "Al",
+  "{0} panels across": "{0} paneles de ancho",
+  "{0} panels high": "{0} paneles de alto",
+  "Panel": "Panel",
+  "Set {0} × {1}": "Aplicar {0} × {1}",
+  "From its panels: how many across and high, and one panel's pixels": "Desde sus paneles: cuántos de ancho y de alto, y los píxeles de un panel",
+  "Not given: the wall is 16:9. Its pixels give it its shape, and the LED Wall Output and the hang sheet use them.": "Sin indicar: la pantalla es 16:9. Sus píxeles le dan su forma, y la salida a pantalla LED y la hoja de montaje los usan.",
+  "The wall's resolution as its LED processor maps it: its shape follows": "La resolución de la pantalla como la mapea su procesador LED: su forma la sigue",
+  "Change LED Wall": "Cambiar pantalla LED",
+  "Use the Rig's Wall: {0} × {1}": "Usar la pantalla del rig: {0} × {1}",
+  "The LED wall's pixels from the show's rig (Rigs › the rig › LED wall pixels)": "Los píxeles de la pantalla LED del rig del show (Rigs › el rig › Píxeles de la pantalla LED)",
+  "The rectangle is {0:0.00}:1, the rig's wall {1:0.00}:1: the picture keeps the rig's shape, with black bars.": "El rectángulo es {0:0.00}:1, la pantalla del rig {1:0.00}:1: la imagen mantiene la forma del rig, con barras negras."
 }

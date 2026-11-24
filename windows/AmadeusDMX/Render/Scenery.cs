@@ -53,7 +53,7 @@ public sealed class Scenery
     static Vector3 V(double x, double y, double z) => new((float)x, (float)y, (float)z);
 
     public Scenery(IReadOnlyList<FixtureInfo> fixtures, Stage stage, bool screen, IReadOnlyList<Truss>? trusses = null,
-                   IReadOnlySet<string>? selected = null)
+                   IReadOnlySet<string>? selected = null, double screenAspect = ScreenShape.DefaultAspect)
     {
         trusses ??= [];
         selected ??= new HashSet<string>();
@@ -148,12 +148,13 @@ public sealed class Scenery
         // the LED wall behind the DJ
         if (screen)
         {
-            var sw = Big ? MathF.Min(10, W * 0.55f) : 2.6f;
-            var sh = sw * 9 / 16;
+            var sz = (Big ? 1.4f : 1.15f) + raised;  // over the stage, as high as it stands
+            // as wide as the rule gives, as high as its shape (the rig's pixels) makes it (trusses.screen_rect)
+            var size = ScreenShape.Size(Big ? MathF.Min(10, W * 0.55f) : 2.6f, screenAspect, sz, stage.Outdoor ? null : stage.CeilingM);
+            float sw = (float)size.W, sh = (float)size.H;
             var free = Big ? MathF.Min(-4.5f, new Room(stage, fixtures, trusses).Back + 1.5f) - 2.2f : -2.0f;
             var sy = wallFront is { } wf ? wf + 0.37f
                 : Room.BackFixed ? MathF.Max(free, back + 0.45f) : free;  // (its frame against a back wall the rig fixes)
-            var sz = (Big ? 1.4f : 1.15f) + raised;  // over the stage, as high as it stands
             Wall = new WallPlacement(V(cx, sy, sz + sh / 2), sw, sh);
             var screenAt = Vertices.Count;
             Box(cx - sw / 2 - 0.12f, cx + sw / 2 + 0.12f, sy - 0.35f, sy - 0.02f, sz - 0.12f, sz + sh + 0.12f, V(0.03f, 0.03f, 0.035f));

@@ -9,7 +9,8 @@ namespace AmadeusDMX;
 
 public static class SceneSamples
 {
-    public static StageInput Club(bool screen = true)
+    /// `screenPx`: the LED wall's pixels (its shape), nil: 16:9.
+    public static StageInput Club(bool screen = true, (int W, int H)? screenPx = null)
     {
         var fixtures = new List<FixtureInfo>();
         for (var k = 0; k < 4; k++)
@@ -36,13 +37,13 @@ public static class SceneSamples
         };
         var hello = new Hello
         {
-            Track = "01 - Sample Track (Club Mix).wav", Bpm = 128, Fixtures = fixtures, Stage = stage, Plan = plan, Screen = screen, Countdown = 1,
+            Track = "01 - Sample Track (Club Mix).wav", Bpm = 128, Fixtures = fixtures, Stage = stage, Plan = plan, Screen = screen, ScreenPx = screenPx is { } px ? [px.W, px.H] : null, Countdown = 1,
             Trusses = trusses, Gobos = [DotsGobo()],
         };
         var zones = new List<Zone> { new("z1", "Audience", "laser_out", "box", new Vec3(3, 4, 1), [6, 4, 2]) };
         return new StageInput
         {
-            Key = "sample:club", Fixtures = fixtures, Stage = stage, Screen = screen, Hello = hello, Trusses = trusses, Zones = zones,
+            Key = "sample:club", Fixtures = fixtures, Stage = stage, Screen = screen, ScreenAspect = hello.ScreenAspect, Hello = hello, Trusses = trusses, Zones = zones,
         };
     }
 

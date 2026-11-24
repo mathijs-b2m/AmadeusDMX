@@ -38,17 +38,21 @@ internal sealed record OutputScreen(string Id, string Name, (int W, int H) Pixel
 /// What the output's thread draws with: the settings and the monitor, as they are now (replaced, never changed).
 internal sealed record OutputPlan((int W, int H)? Mode, PixelRect? Rect, float Brightness, bool TestPattern, int PanelPx)
 {
-    /// The wall's rectangle in the drawable's pixels, and where the picture goes inside it.
-    public (PixelRect Wall, PixelRect Picture) Layout((int W, int H) d)
+    /// The wall's rectangle in the drawable's pixels, and where the picture (of the rig's shape, `aspect`) goes inside it.
+    public (PixelRect Wall, PixelRect Picture) Layout((int W, int H) d, double aspect)
     {
         if (Mode is not { } mode)
         {
             var all = new PixelRect(0, 0, d.W, d.H);
-            return (all, WallOutputLayout.Fit(all));
+            return (all, WallOutputLayout.Fit(all, aspect));
         }
         var wall = WallOutputLayout.Scaled(WallOutputLayout.WallRect(Rect, mode.W, mode.H), mode, d);
-        return (wall, WallOutputLayout.Fit(wall));
+        return (wall, WallOutputLayout.Fit(wall, aspect));
     }
+
+    /// How fine the picture is drawn for this wall (its rectangle, the rig's shape).
+    public double PictureScale((int W, int H) d, double aspect, (float W, float H) canvas) =>
+        WallOutputLayout.PictureScale(WallOutputLayout.Fit(ModeWall(d), aspect), (canvas.W, canvas.H));
 
     /// The wall's rectangle in the monitor's own pixels (what the processor is told), for the test card's labels.
     public PixelRect ModeWall((int W, int H) d)
@@ -241,8 +245,14 @@ public sealed class WallOutputController : Observable
         if (OutputPixels != px) OutputPixels = px;
         var s = Settings;
         Plan = new OutputPlan(display ? ChosenScreen?.Pixels : null, display ? s.Rect : null, (float)s.Brightness, s.TestPattern, s.PanelPx);
-        if (px is { } p)
-            WallSource.Shared.Scale = WallOutputLayout.PictureScale(WallOutputLayout.Fit(WallOutputLayout.WallRect(display ? s.Rect : null, p.W, p.H)).H);
+        if (px is { } p) UpdateScale(p);
+    }
+
+    /// Draw the picture as fine as the wall needs (its rectangle, the rig's shape). `pixels`: what it plays on.
+    internal void UpdateScale((int W, int H) pixels)
+    {
+        var src = WallSource.Shared;
+        src.Scale = Plan.PictureScale(pixels, src.Aspect, src.Canvas);
     }
 
     /// The window target's first size: 960 × 540 at the main window's scaling, where it was last time.
@@ -589,7 +599,9 @@ internal sealed class WallOutputView : IDisposable
         if (live == 0 && _fade < 0.01f) _fade = 0;
 
         var d = (_bufferW, _bufferH);
-        var (wall, pic) = plan.Layout(d);
+        var src = WallSource.Shared;
+        src.Scale = plan.PictureScale(d, src.Aspect, src.Canvas);   // a show on a rig of another shape
+        var (wall, pic) = plan.Layout(d, src.Aspect);
         using (gpu.Lock())
         {
             var picture = WallSource.Shared.Compose(gpu, now);

@@ -8,6 +8,7 @@ public sealed record StageInput
     public required IReadOnlyList<FixtureInfo> Fixtures { get; init; }
     public required Stage Stage { get; init; }
     public bool Screen { get; init; }
+    public double ScreenAspect { get; init; } = ScreenShape.DefaultAspect;   // the LED wall's shape, width over height
     public Hello? Hello { get; init; }
     public IReadOnlyList<Truss> Trusses { get; init; } = [];
     public IReadOnlySet<string> Selected { get; init; } = new HashSet<string>();  // "truss:ID" / "fixture:ID" (rig editor)

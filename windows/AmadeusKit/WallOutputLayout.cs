@@ -121,6 +121,16 @@ public static class WallOutputLayout
         return Math.Min(2, Math.Max(1, Math.Ceiling(wallHeight.Value / 360.0 * 2) / 2));
     }
 
+    /// How much finer than its canvas (WallRenderer's units: 640×360 for 16:9) the picture is drawn to fill a wall
+    /// `picture` big: 1, 1.5 or 2, and never more than about 1.6 million pixels for the CPU to draw.
+    public static double PictureScale(PixelRect? picture, (double W, double H) canvas)
+    {
+        if (picture is not { W: > 0, H: > 0 } p || canvas.W <= 0 || canvas.H <= 0) return 1;
+        var s = Math.Min(2, Math.Max(1, Math.Ceiling(Math.Max(p.W / canvas.W, p.H / canvas.H) * 2) / 2));
+        while (s > 1 && canvas.W * canvas.H * s * s > 1.6e6) s -= 0.5;
+        return s;
+    }
+
     /// A rectangle in the monitor's own pixels, in the pixels of what is drawn (on the Mac a HiDPI mode draws more
     /// pixels than it sends; on Windows the output's swap chain is in the monitor's pixels, so this is one to one
     /// unless the window is not the monitor's size).
@@ -135,4 +145,36 @@ public static class WallOutputLayout
     /// A wall of `cols`×`rows` panels of `panelPx`, from the top left of the monitor.
     public static PixelRect Panels(int cols, int rows, int panelPx) =>
         new(0, 0, Math.Max(1, cols) * Math.Max(1, panelPx), Math.Max(1, rows) * Math.Max(1, panelPx));
+}
+
+/// The LED wall's shape (the same rules as amadeus/rig/trusses.py): its pixels (`screen.pixels`, as its processor
+/// maps it) give its aspect, 16:9 without them; a wall taller than 16:9 stays under the ceiling.
+public static class ScreenShape
+{
+    public const double DefaultAspect = 16.0 / 9.0;
+    public static readonly (double Lower, double Upper) AspectRange = (0.25, 6);
+
+    /// The pixels in a rig's `screen` value ({"pixels": [w, h]}), nil when not given.
+    public static (int W, int H)? Pixels(JSONValue? screen)
+    {
+        if (screen?.Object?.GetValueOrDefault("pixels")?.Array is not { Count: 2 } px
+            || px[0].Number is not { } w || px[1].Number is not { } h || w < 1 || h < 1) return null;
+        return ((int)w, (int)h);
+    }
+
+    public static double Aspect((int W, int H)? pixels) =>
+        pixels is { } p ? Math.Min(AspectRange.Upper, Math.Max(AspectRange.Lower, (double)p.W / p.H)) : DefaultAspect;
+
+    /// The wall's width and height (m): `width` from the app's rule, the height from the aspect; a wall taller than
+    /// 16:9 kept under the ceiling (narrower then).
+    public static (double W, double H) Size(double width, double aspect, double bottom, double? ceiling)
+    {
+        double w = width, h = width / aspect;
+        if (aspect < DefaultAspect && ceiling is { } c && c > 0)
+        {
+            var room = Math.Max(1, c - bottom - 0.3);
+            if (h > room) { h = room; w = room * aspect; }
+        }
+        return (w, h);
+    }
 }

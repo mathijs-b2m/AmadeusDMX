@@ -576,6 +576,50 @@ public class RenderTests
     }
 
     [Fact]
+    public void TheWallsCanvasTakesItsShape()
+    {
+        Assert.Equal((640f, 360f), WallRenderer.Canvas(16.0 / 9.0));   // 16:9 as always
+        Assert.Equal((1440f, 360f), WallRenderer.Canvas(4));
+        Assert.Equal((360f, 720f), WallRenderer.Canvas(0.5));
+        Assert.Equal((1280, 720), WallSource.PictureSize(16.0 / 9.0));
+        Assert.Equal((2560, 427), WallSource.PictureSize(6));   // the long side at most 2560
+        var inp = SceneSamples.Club();
+        foreach (var aspect in new[] { 4.0, 0.5 })
+            foreach (var scene in new[] { WallScene.Runner, WallScene.Dancer, WallScene.Crowd, WallScene.Pong, WallScene.Words, WallScene.Equalizer, WallScene.Ambient })
+            {
+                using var w = new WallRenderer(aspect: aspect) { Force = scene };
+                for (var i = 0; i < 30; i++) w.Update(SceneSamples.Frame(inp, 30 + i * 0.05), inp.Hello!, 0.05f);
+                Assert.Equal(WallRenderer.Canvas(aspect), (w.PixelWidth, w.PixelHeight));
+                var lit = 0;
+                var px = w.Pixels;
+                for (var k = 0; k < px.Length; k += 4) if (px[k] + px[k + 1] + px[k + 2] > 60) lit++;
+                Assert.True(lit > 200, $"{scene} at {aspect}: {lit} lit pixels");
+                if (Environment.GetEnvironmentVariable("AMADEUS_WALL_PNGS") is { Length: > 0 } dir)
+                    File.WriteAllBytes(Path.Combine(dir, string.Create(System.Globalization.CultureInfo.InvariantCulture, $"wall-{scene.RawValue()}-{aspect}.png")), w.Png());
+            }
+    }
+
+    [Fact]
+    public void TheWallFollowsTheShowsShape()
+    {
+        var inp = SceneSamples.Club(screenPx: (1536, 384));
+        var source = new WallSource();
+        Assert.Equal(16.0 / 9.0, source.Aspect);
+        source.Update(SceneSamples.Frame(inp), inp.Hello, 10);
+        Assert.Equal(4, source.Aspect);
+        Assert.Equal((1440f, 360f), source.Canvas);
+        // the 3D stage's wall: as wide as before, its height from the shape; a tall one stays under the ceiling
+        var wide = new Scenery(inp.Fixtures, inp.Stage, true, inp.Trusses, screenAspect: 4).Wall!.Value;
+        var plain = new Scenery(inp.Fixtures, inp.Stage, true, inp.Trusses).Wall!.Value;
+        Assert.Equal(plain.Width, wide.Width, 4);
+        Assert.Equal(plain.Width / 4, wide.Height, 4);
+        Assert.Equal(plain.Width * 9 / 16, plain.Height, 4);
+        var tall = new Scenery(inp.Fixtures, inp.Stage, true, inp.Trusses, screenAspect: 0.25).Wall!.Value;
+        Assert.True(tall.Center.Z + tall.Height / 2 < inp.Stage.CeilingM);
+        Assert.Equal(0.25, tall.Width / tall.Height, 4);
+    }
+
+    [Fact]
     public void TheWallsHashIsSwifts()
     {
         Assert.Equal(2654435761L, WallRenderer.Hash(0));

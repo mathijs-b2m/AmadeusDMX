@@ -121,7 +121,7 @@ public struct UnderlayVertex(Vector3 pos, Vector2 uv, float alpha)
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
 public struct WallParams
 {
-    public Vector4 Info;    // x level, y psychedelic, z time
+    public Vector4 Info;    // x level, y psychedelic, z time, w aspect
     public Vector4 Bands;
     public Vector4 Pal0, Pal1, Pal2, Pal3;   // HLSL: float4 pal[4]
 

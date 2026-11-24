@@ -321,7 +321,8 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (_hovered is { } h && !selected.Contains(h)) selected.Add("hover:" + h);
         return new StageInput
         {
-            Key = $"edit:{Doc.Label}:{Version}", Fixtures = els, Stage = Doc.Stage with { }, Screen = Doc.HasScreen, Hello = null,
+            Key = $"edit:{Doc.Label}:{Version}", Fixtures = els, Stage = Doc.Stage with { }, Screen = Doc.HasScreen,
+            ScreenAspect = Doc.ScreenAspect, Hello = null,
             Trusses = Doc.Trusses.Select(x => x with { }).ToList(), Selected = selected.ToHashSet(), KeepCamera = true,
             Zones = Doc.Zones.Where(z => ShowZones || Selection == EditorSelection.Zone(z.Id)).Select(z => z.Clone()).ToList(),
             Drawings = Drawings.Where(IsShown).Select(u => Picture(u) is { } p ? new StageDrawing(u.File, p, u.Corners, (float)DrawingOpacity, u.Crop) : null)
@@ -417,6 +418,25 @@ public sealed class RigEditorModel : Observable, IStageEditing
         if (on) d.Raw["screen"] = JSONValue.Of(new Dictionary<string, JSONValue> { ["width_m"] = Rounded(Math.Min(10, d.Width * 0.55)) });
         else d.Raw.Remove("screen");
     });
+
+    /// The LED wall's pixels (its shape, and what its processor maps), nil: not given (16:9).
+    public void SetScreenPixels((int W, int H)? px, int? panel = null) => Change(L("Change LED Wall"), d =>
+    {
+        static JSONValue Pair((int W, int H) p) => JSONValue.Of([JSONValue.Of(p.W), JSONValue.Of(p.H)]);
+        if (d.Raw.GetValueOrDefault("screen")?.Object is not { } obj)
+        {
+            if (px is not { } p) return;
+            d.Raw["screen"] = JSONValue.Of(new Dictionary<string, JSONValue> { ["width_m"] = Rounded(Math.Min(10, d.Width * 0.55)), ["pixels"] = Pair(p) });
+            return;
+        }
+        var o = new Dictionary<string, JSONValue>(obj);
+        if (px is { } q) o["pixels"] = Pair(q); else o.Remove("pixels");
+        if (panel is { } k) o["panel_px"] = k;
+        d.Raw["screen"] = JSONValue.Of(o);
+    });
+
+    /// One LED panel's pixels (the hang sheet), nil when not given.
+    public int? ScreenPanelPx => Doc.Raw.GetValueOrDefault("screen")?.Object?.GetValueOrDefault("panel_px")?.Number is { } n ? (int)n : null;
 
     // MARK: - trusses
 

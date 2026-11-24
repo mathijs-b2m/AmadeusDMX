@@ -152,6 +152,7 @@ public sealed class EditorInspector(AppModel model, RigEditorModel editor)
             EditorUI.ValueSlider(editor, L("Heads on the camera"), () => (editor.Doc.Stage.CameraShare ?? 0.7) * 100, v => editor.UpdateStage(L("Change Camera"), s => s.CameraShare = v / 100), 10, 100, 5, "%")
                 .Bind(editor, nameof(RigEditorModel.Version), row => row.Visibility = editor.Doc.Stage.CameraXM is null ? Visibility.Collapsed : Visibility.Visible),
             EditorUI.Toggle(editor, L("LED wall behind the DJ"), () => editor.Doc.HasScreen, editor.SetScreen),
+            d.HasScreen ? ScreenPixelsRow.Build(editor) : null,
             d.Stage.Outdoor ? null
                 : EditorUI.Toggle(editor, L("Beams stay off the ceiling"), () => editor.Doc.Stage.CeilingGuard, v => editor.UpdateStage(s => s.CeilingGuard = v),
                     L("Moving heads only go up so far that their beam reaches the ceiling at least the room's depth away")),

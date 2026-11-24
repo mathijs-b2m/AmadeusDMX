@@ -5,7 +5,7 @@
 
 cbuffer WallParams : register(b0)
 {
-    float4 info;        // x level, y psychedelic, z time
+    float4 info;        // x level, y psychedelic, z time, w aspect
     float4 bands;
     float4 pal[4];
 };
@@ -26,9 +26,9 @@ FSOut wall_fs_vertex(uint vid : SV_VertexID)
     FSOut o; o.pos = float4(p * 2.0 - 1.0, 0, 1); o.uv = float2(p.x, 1.0 - p.y); return o;
 }
 
-float3 psychedelic(float2 uv, float t)
+float3 psychedelic(float2 uv, float t, float aspect)
 {
-    float2 p = (uv - 0.5) * float2(16.0 / 9.0, 1.0) * 2.0;
+    float2 p = (uv - 0.5) * float2(aspect, 1.0) * 2.0;   // round on a wall of any shape
     // kaleidoscope: fold the angle into 6 slices, then a flowing plasma that the bass pushes outwards
     float a = atan2(p.y, p.x), r = length(p);
     float k = 3.14159 / 3.0;
@@ -52,7 +52,7 @@ float4 wall_compose(FSOut i) : SV_Target
 {
     // both branches evaluated (a vector ?: in SM4 isn't short-circuit); the picture has one level, no gradients needed
     float3 picture = tex.SampleLevel(smp, i.uv, 0).rgb;
-    float3 c = info.y > 0.5 ? psychedelic(i.uv, info.z) : picture;
+    float3 c = info.y > 0.5 ? psychedelic(i.uv, info.z, info.w > 0.0 ? info.w : 16.0 / 9.0) : picture;
     return float4(c * info.x, 1);
 }
 

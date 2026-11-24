@@ -2,8 +2,8 @@
 // The director picks a mode per phrase (decision.screen): off | ambient | figure | words | equalizer | psychedelic.
 // Figures are playful neon outlines on the beat: a runner, a dancer, a jumping crowd, pong. Into a drop the wall
 // counts 3-2-1 and shouts DROP!. Psychedelic is drawn by a shader (WallSource); everything else here, with
-// SkiaSharp (the Mac draws with Core Graphics), into a 640×360 BGRA picture (finer for a real LED wall: `scale`)
-// that WallSource puts on the GPU.
+// SkiaSharp (the Mac draws with Core Graphics), into a 640×360 BGRA picture (the wall's shape when the rig gives its
+// pixels; finer for a real LED wall: `scale`) that WallSource puts on the GPU.
 //
 // Core Graphics → Skia: the CG context is flipped to y-down like a canvas; Skia is y-down already. CG's per-draw
 // shadow (the neon glow) is a drop-shadow image filter with sigma = blur / 2; setAlpha multiplies every paint.
@@ -47,10 +47,18 @@ public readonly record struct WallState(float Level, bool Psychedelic, Vector3[]
 
 public sealed partial class WallRenderer : IDisposable
 {
-    /// The picture's own units: everything is drawn as if on 640×360.
+    /// The 16:9 picture's units: 640×360. A wall of another shape gets a canvas of its shape, its short side 360
+    /// (Cw × Ch: 1440×360 for 4:1, 360×720 for 1:2): figures keep their size against the short side, scenes spread
+    /// along the long one; on a tall wall the scenes that stand on a floor stand in its middle.
     public const int W = 640, H = 360;
-    /// How much finer than 640×360 the bitmap is (a real LED wall wants more pixels than the 3D stage's wall).
+    /// The canvas in units, the wall's shape.
+    public float Cw { get; }
+    public float Ch { get; }
+    public double Aspect { get; }
+    /// How much finer than the units the bitmap is (a real LED wall wants more pixels than the 3D stage's wall).
     public float Scale { get; }
+    /// Where scenes that stand on something have their floor: the bottom, or on a tall wall a little below its middle.
+    float Ground => Ch > H ? Ch - (Ch - H) * 0.4f : Ch;
     public int PixelWidth => _bitmap.Width;
     public int PixelHeight => _bitmap.Height;
     readonly SKBitmap _bitmap;
@@ -66,15 +74,24 @@ public sealed partial class WallRenderer : IDisposable
     int _lastBeat = -1;
     static readonly Stopwatch Clock = Stopwatch.StartNew();
 
-    public WallRenderer(float scale = 1)
+    /// The canvas for a wall of this shape, in units.
+    public static (float W, float H) Canvas(double aspect)
+    {
+        var a = (float)aspect;
+        return a >= 1 ? (MathF.Round(H * a, MidpointRounding.AwayFromZero), H) : (H, MathF.Round(H / a, MidpointRounding.AwayFromZero));
+    }
+
+    public WallRenderer(float scale = 1, double aspect = ScreenShape.DefaultAspect)
     {
         Scale = scale;
-        int w = (int)MathF.Round(W * scale, MidpointRounding.AwayFromZero), h = (int)MathF.Round(H * scale, MidpointRounding.AwayFromZero);
+        Aspect = aspect;
+        (Cw, Ch) = Canvas(aspect);
+        int w = (int)MathF.Round(Cw * scale, MidpointRounding.AwayFromZero), h = (int)MathF.Round(Ch * scale, MidpointRounding.AwayFromZero);
         // premultiplied BGRA, like the Mac's premultipliedFirst + byteOrder32Little (the texture is B8G8R8A8_UNORM)
         _bitmap = new SKBitmap(new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Premul));
         _canvas = new SKCanvas(_bitmap);
         _canvas.Clear(SKColors.Black);
-        _canvas.Scale(scale);   // in 640×360 units
+        _canvas.Scale(scale);   // in units
     }
 
     public void Dispose()
@@ -250,7 +267,7 @@ public sealed partial class WallRenderer : IDisposable
         // is as short at any drawing rate (a fixed share per picture ghosted when the wall was drawn less often)
         var fadeShare = _cur.Scene == WallScene.Words ? 0.8 : 0.45;
         _g.Fill = new SKColor(0, 0, 0, (byte)Math.Clamp(Math.Round(255 * (1 - Math.Pow(1 - fadeShare, Math.Max(dt, 1.0 / 240) * 60))), 0, 255));
-        FillRect(Rect(0, 0, W, H));
+        FillRect(Rect(0, 0, Cw, Ch));
         var phraseFrac = d is null ? 0 : Math.Min(1, Math.Max(0, d.End > d.Start ? (f.T - d.Start) / (d.End - d.Start) : 0));
         if (!(_cur.Mode != "off" && Countdown(f, d, h, cols)))
         {
@@ -293,7 +310,7 @@ public sealed partial class WallRenderer : IDisposable
 
     void Runner(Decision? d, Vector3[] cols, double bp, float bass)
     {
-        double s = 150, gy = 300;
+        double s = 150, gy = Ground - 60, rx = Math.Round(Cw * 0.36, MidpointRounding.AwayFromZero);
         var drop = d?.Section == "drop";
         var speed = drop ? 90.0 : 60.0;
         var scroll = bp * speed;
@@ -302,7 +319,7 @@ public sealed partial class WallRenderer : IDisposable
         using (var sky = new SKPath())
         {
             var off = scroll * 0.3;
-            for (var i = -1; i < 12; i++)
+            for (var i = -1; i < (int)(Cw / 70) + 2; i++)
             {
                 var x = i * 70 - off % 70;
                 var hh = 40 + Hash(i + (int)(off / 70)) % 90;
@@ -313,10 +330,10 @@ public sealed partial class WallRenderer : IDisposable
         }
         SetAlpha(1);
         Neon(cols[0], 3);
-        StrokeLineSegments(Pt(0, gy), Pt(640, gy));
+        StrokeLineSegments(Pt(0, gy), Pt(Cw, gy));
         // a hurdle every bar, arriving at the runner on the downbeat
         var bar = bp / 4;
-        var hx = 230 + (Math.Ceiling(bar) - bar) * 4 * speed;
+        var hx = rx + (Math.Ceiling(bar) - bar) * 4 * speed;
         StrokeLineSegments(Pt(hx, gy), Pt(hx, gy - 38), Pt(hx - 14, gy - 38), Pt(hx + 14, gy - 38));
         var fromDown = (bp + 0.5) % 4 - 0.5;
         var jump = Math.Abs(fromDown) < 0.5 ? Math.Cos(fromDown * Math.PI) : 0;
@@ -324,8 +341,8 @@ public sealed partial class WallRenderer : IDisposable
         var y = gy - s * 0.5 - Math.Abs(MathF.Cos(w)) * 6 - jump * 70;
         Neon(cols[0], 5);
         (double hx2, double hy2, double r) = jump > 0.05
-            ? Figure(230, y, s, lean: 0.35, arms: P(-2.4f, 0.3f, 2.6f, -0.2f), legs: P(1.3f, -1.9f, -0.4f, -1.2f))
-            : Figure(230, y, s, lean: drop ? 0.35 : 0.22,
+            ? Figure(rx, y, s, lean: 0.35, arms: P(-2.4f, 0.3f, 2.6f, -0.2f), legs: P(1.3f, -1.9f, -0.4f, -1.2f))
+            : Figure(rx, y, s, lean: drop ? 0.35 : 0.22,
                      arms: P(-0.9f * MathF.Sin(w), 1.5f, 0.9f * MathF.Sin(w), 1.5f),
                      legs: P(0.75f * MathF.Sin(w), -0.2f - 1.1f * MathF.Max(0, MathF.Sin(w + 1.2f)),
                              -0.75f * MathF.Sin(w), -0.2f - 1.1f * MathF.Max(0, -MathF.Sin(w + 1.2f))));
@@ -336,7 +353,7 @@ public sealed partial class WallRenderer : IDisposable
             for (var i = 0; i < 4; i++)
             {
                 var ly = y - 40 + i * 22;
-                pts.Add(Pt(150 - i * 12, ly)); pts.Add(Pt(110 - i * 20, ly));
+                pts.Add(Pt(rx - 80 - i * 12, ly)); pts.Add(Pt(rx - 120 - i * 20, ly));
             }
             StrokeLineSegments([.. pts]);
             var t = bp % 1;
@@ -367,36 +384,38 @@ public sealed partial class WallRenderer : IDisposable
         var dip = MathF.Sin(u * MathF.PI);
         var hop = drop && beat % 4 == 0 ? Math.Sin(u * Math.PI) * 60 : 0;
         var legs = hop > 0 ? P(-0.6f, 1.4f, 0.6f, -1.4f) : P(-0.25f - 0.25f * dip, 0.5f * dip, 0.25f + 0.25f * dip, -0.5f * dip);
-        for (var i = 0; i < 8; i++)  // the dance floor lights up with the beat
+        double mx = Cw / 2, floorY = Ground - 15, hipY = Ground - 155;
+        var n = 8 + 2 * Math.Max(0, (int)((Cw - 640) / 140));
+        for (var i = 0; i < n; i++)  // the dance floor lights up with the beat
         {
             var on = Hash(i + beat * 8, 1) % 3 == 0;
             Neon(cols[i % cols.Length], 2);
             SetAlpha(on ? 0.55f : 0.12f);
-            double x0 = 320 + (i - 4) * 70, x1 = x0 + 70;
+            double x0 = mx + (i - n / 2) * 70, x1 = x0 + 70;
             using var p = new SKPath();
-            p.MoveTo(Pt(x0 + (x0 - 320) * 0.4, 345)); p.LineTo(Pt(x1 + (x1 - 320) * 0.4, 345));
-            p.LineTo(Pt(x1, 300)); p.LineTo(Pt(x0, 300)); p.Close();
+            p.MoveTo(Pt(x0 + (x0 - mx) * 0.4, floorY)); p.LineTo(Pt(x1 + (x1 - mx) * 0.4, floorY));
+            p.LineTo(Pt(x1, floorY - 45)); p.LineTo(Pt(x0, floorY - 45)); p.Close();
             StrokePath(p);
         }
         SetAlpha(1);
         Neon(cols[0], 6);
-        Figure(320, 205 - dip * 8 - hop, 190, head: 0.15 * Math.Sin(bp * Math.PI), arms: arms, legs: legs);
-        if (hop > 0) { Neon(cols[1 % cols.Length], 4); Text("!", Pt(410, 60 - hop * 0.3), size: 46, fill: true); }
+        Figure(mx, hipY - dip * 8 - hop, 190, head: 0.15 * Math.Sin(bp * Math.PI), arms: arms, legs: legs);
+        if (hop > 0) { Neon(cols[1 % cols.Length], 4); Text("!", Pt(mx + 90, hipY - 145 - hop * 0.3), size: 46, fill: true); }
     }
 
     void Crowd(Decision? d, Vector3[] cols, double bp, float bass, double phraseFrac)
     {
-        const int n = 11;
+        var n = Math.Max(4, (int)Math.Round(11 * Cw / 640, MidpointRounding.AwayFromZero));
         var drop = d?.Section == "drop";
         var hands = drop || (d?.Intensity ?? 1) >= 2;
         for (var i = 0; i < n; i++)
         {
-            double x = 40 + i * 560.0 / (n - 1), s = 105 + Hash(i, 5) % 25;
+            double x = 40 + i * (Cw - 80.0) / (n - 1), s = 105 + Hash(i, 5) % 25;
             var u = drop ? bp % 1 : (bp - i * 0.12) % 1;
             var jump = Math.Max(0, Math.Sin(u * Math.PI)) * (drop ? 40 : 14 + 22 * bass);
             var wave = hands ? (float)(0.25 * Math.Sin(bp * Math.PI + i)) : 0;
             Neon(cols[i % cols.Length], 3);
-            Figure(x, 345 - s * 0.5 - jump, s,
+            Figure(x, Ground - 15 - s * 0.5 - jump, s,
                    arms: hands ? P(-2.7f + wave, 0, 2.7f + wave, 0) : P(-0.3f, 0.4f, 0.3f, -0.4f),
                    legs: jump > 4 ? P(-0.5f, 0.6f, 0.5f, -0.6f) : P(-0.2f, 0, 0.2f, 0));
         }
@@ -404,7 +423,7 @@ public sealed partial class WallRenderer : IDisposable
         {
             Neon(cols[0], 4);
             SaveGState();
-            _canvas.Translate((float)(20 + phraseFrac * 600), (float)(128 + 4 * Math.Sin(bp * Math.PI)));
+            _canvas.Translate((float)(20 + phraseFrac * (Cw - 40)), (float)(Ground - 232 + 4 * Math.Sin(bp * Math.PI)));
             _canvas.RotateRadians(-MathF.PI / 2);
             Figure(0, 0, 80, arms: P(-2.9f, 0, 2.6f, 0.3f), legs: P((float)(-0.25 + 0.3 * Math.Sin(bp * 2)), 0.3f, 0.25f, 0));
             RestoreGState();
@@ -417,23 +436,23 @@ public sealed partial class WallRenderer : IDisposable
         static double Tri(double v) => 1 - Math.Abs(((v % 2) + 2) % 2 - 1);
         Neon(cols[0], 3);
         _g.Dash = [10, 14];
-        StrokeLineSegments(Pt(320, 10), Pt(320, 350));
+        StrokeLineSegments(Pt(Cw / 2, 10), Pt(Cw / 2, Ch - 10));
         _g.Dash = null;
-        Text(((int)(bp / 4) % 100).ToString(), Pt(250, 70), size: 54, fill: true, mono: true);
-        Text(((int)(bp / 7) % 100).ToString(), Pt(390, 70), size: 54, fill: true, mono: true);
-        double yL = 180, yR = 180;
+        Text(((int)(bp / 4) % 100).ToString(), Pt(Cw / 2 - 70, 70), size: 54, fill: true, mono: true);
+        Text(((int)(bp / 7) % 100).ToString(), Pt(Cw / 2 + 70, 70), size: 54, fill: true, mono: true);
+        double yL = Ch / 2, yR = Ch / 2;
         double[] offsets = drop ? [0, 0.33, 0.66] : [0];
         for (var i = 0; i < offsets.Length; i++)
         {
             var o = offsets[i];
-            double x = 52 + Tri(bp + o) * 536, y = 20 + Tri(bp * 0.37 + o * 1.7 + 0.3) * 320;
+            double x = 52 + Tri(bp + o) * (Cw - 104), y = 20 + Tri(bp * 0.37 + o * 1.7 + 0.3) * (Ch - 40);
             Neon(cols[i % cols.Length], 3);
             FillRect(Rect(x - 8, y - 8, 16, 16));
-            if (x < 320) yL = y; else yR = y;
+            if (x < Cw / 2) yL = y; else yR = y;
         }
         Neon(cols[0], 3);
         FillRect(Rect(28, yL - 40, 12, 80));
-        FillRect(Rect(600, yR - 40, 12, 80));
+        FillRect(Rect(Cw - 40, yR - 40, 12, 80));
     }
 
     [GeneratedRegex(@"^\d+\s*[-_.]\s*")] private static partial Regex TrackNumber();
@@ -451,7 +470,7 @@ public sealed partial class WallRenderer : IDisposable
         var w = ws[Mod(beat, ws.Length)].ToUpperInvariant();
         var size = Math.Min(170, 1000.0 / Math.Max(3, w.Length)) * (1 + 0.25 * Math.Max(0, 1 - u * 4));
         Neon(cols[Mod(beat, cols.Length)], 5);
-        Text(w, Pt(320, 180), size: size, fill: u < 0.15);
+        Text(w, Pt(Cw / 2, Ch / 2), size: size * Math.Min(1.6, Cw / 640), fill: u < 0.15);
     }
 
     void Equalizer(Frame f, Vector3[] cols, float dt)
@@ -470,13 +489,13 @@ public sealed partial class WallRenderer : IDisposable
             _eq[i] = v > _eq[i] ? v : _eq[i] - dt * 2.2f;
             _caps[i] = MathF.Max(_eq[i], _caps[i] - dt * 0.6f);
         }
-        var bw = 640.0 / n;
+        double bw = Cw / n, top = Ch - 60, base_ = Ch - 20;
         for (var i = 0; i < n; i++)
         {
             Neon(cols[Math.Min(cols.Length - 1, i * cols.Length / n)], 3);
-            double h = _eq[i] * 300, x = i * bw + 6, y = 340;
-            while (y > 340 - h) { StrokeRect(Rect(x, y - 12, bw - 12, 10)); y -= 16; }
-            FillRect(Rect(x, 330 - _caps[i] * 300 - 8, bw - 12, 4));
+            double h = _eq[i] * top, x = i * bw + 6, y = base_;
+            while (y > base_ - h) { StrokeRect(Rect(x, y - 12, bw - 12, 10)); y -= 16; }
+            FillRect(Rect(x, base_ - 10 - _caps[i] * top - 8, bw - 12, 4));
         }
     }
 
@@ -487,13 +506,14 @@ public sealed partial class WallRenderer : IDisposable
         for (var i = 0; i < cols.Length; i++)
         {
             var c = cols[i];
-            var x = 320 + 230 * Math.Sin(_amb * (0.7 + i * 0.23) + i * 2);
-            var y = 180 + 110 * Math.Cos(_amb * (0.5 + i * 0.17) + i);
-            using var shader = SKShader.CreateRadialGradient(Pt(x, y), 260, [Cg(c, 0.5f), Cg(c, 0)], [0, 1], SKShaderTileMode.Clamp);
+            var x = Cw / 2.0 + (Cw / 2.0 - 90) * Math.Sin(_amb * (0.7 + i * 0.23) + i * 2);
+            var y = Ch / 2.0 + (Ch / 2.0 - 70) * Math.Cos(_amb * (0.5 + i * 0.17) + i);
+            var radius = MathF.Max(260, MathF.Max(Cw, Ch) * 0.4f);
+            using var shader = SKShader.CreateRadialGradient(Pt(x, y), radius, [Cg(c, 0.5f), Cg(c, 0)], [0, 1], SKShaderTileMode.Clamp);
             var p = Paint(false);
             p.Shader = shader;
             p.Color = SKColors.White.WithAlpha((byte)Math.Round(255 * _g.Alpha));
-            _canvas.DrawCircle(Pt(x, y), 260, p);
+            _canvas.DrawCircle(Pt(x, y), radius, p);
             p.Shader = null;
         }
     }
@@ -513,9 +533,10 @@ public sealed partial class WallRenderer : IDisposable
         if (label is null) return false;
         SetShadow(0, null);
         _g.Fill = new SKColor(0, 0, 0, (byte)Math.Round(0.85 * 255));
-        FillRect(Rect(0, 0, 640, 360));
+        FillRect(Rect(0, 0, Cw, Ch));
         Neon(cols[0], 7);
-        Text(label, Pt(320, 185), size: label.Length > 1 ? 150 : 230 * (1.3 - 0.3 * u), fill: false);
+        var fit = Math.Min(1, Cw / 520.0);   // DROP! fits a narrow wall too
+        Text(label, Pt(Cw / 2, Ch / 2 + 5), size: (label.Length > 1 ? 150 : 230 * (1.3 - 0.3 * u)) * fit, fill: false);
         return true;
     }
 

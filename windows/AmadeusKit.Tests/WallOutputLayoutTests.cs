@@ -76,4 +76,42 @@ public sealed class WallOutputLayoutTests
         Assert.True(WallOutputSettings.Load(new Defaults(null, ["-ledWallOutput", """{"on": true}"""])).On);
         Assert.Equal(new WallOutputSettings(), WallOutputSettings.Load(new Defaults(null, [])));
     }
+
+    [Fact]
+    public void TheWallsShapeComesFromItsPixels()
+    {
+        Assert.Null(ScreenShape.Pixels(null));
+        Assert.Null(ScreenShape.Pixels(JSONValue.Of(true)));
+        var px = ScreenShape.Pixels(JSONValue.Parse("""{"pixels": [768, 384]}"""));
+        Assert.Equal((768, 384), px);
+        Assert.Equal(2, ScreenShape.Aspect(px));
+        Assert.Equal(16.0 / 9.0, ScreenShape.Aspect(null));
+        Assert.Equal(6, ScreenShape.Aspect((10000, 10)));   // kept in range
+        // a tall wall stays under the ceiling, its shape kept; 16:9 and wider as always
+        var tall = ScreenShape.Size(5, 0.5, 1.4, 6);
+        Assert.True(Math.Abs(tall.H - 4.3) < 1e-9 && Math.Abs(tall.W - 2.15) < 1e-9);
+        var wide = ScreenShape.Size(8, 16.0 / 9.0, 1.4, 3);
+        Assert.Equal((8.0, 4.5), wide);
+    }
+
+    [Fact]
+    public void TheHelloCarriesTheWallsPixels()
+    {
+        var h = Assert.IsType<HelloMessage>(FeedMessage.Decode("""{"type": "hello", "screen": true, "screen_px": [1536, 384]}""")).Hello;
+        Assert.Equal([1536, 384], h.ScreenPx!);
+        Assert.Equal(4, h.ScreenAspect);
+        var old = Assert.IsType<HelloMessage>(FeedMessage.Decode("""{"type": "hello", "screen": true}""")).Hello;
+        Assert.Null(old.ScreenPx);
+        Assert.Equal(16.0 / 9.0, old.ScreenAspect);
+    }
+
+    [Fact]
+    public void ALongWallIsDrawnFineEnoughButNotTooBig()
+    {
+        Assert.Equal(1, WallOutputLayout.PictureScale(null, (640, 360)));
+        Assert.Equal(2, WallOutputLayout.PictureScale(new PixelRect(0, 0, 1920, 1080), (640, 360)));
+        Assert.Equal(1.5, WallOutputLayout.PictureScale(new PixelRect(0, 0, 768, 384), (720, 360)));
+        // a 4:1 ribbon of 2560 × 640: 1440 × 360 units at 2 would be 2 million pixels for the CPU
+        Assert.Equal(1.5, WallOutputLayout.PictureScale(new PixelRect(0, 0, 2560, 640), (1440, 360)));
+    }
 }

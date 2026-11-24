@@ -29,7 +29,7 @@ cbuffer Uniforms : register(b0)
 
 cbuffer WallOn : register(b1)
 {
-    float4 wallOn;      // x: 1 while the wall plays (a show on a rig with one), else 0
+    float4 wallOn;      // x: 1 while the wall plays (a show on a rig with one), else 0; y: its aspect
 };
 
 cbuffer BlurParams : register(b2)

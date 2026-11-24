@@ -14,8 +14,15 @@ public sealed partial class WallSource
 {
     public static readonly WallSource Shared = new();
 
-    /// The composed picture: 1280×720 (the stage samples it with mipmaps, the output fits it to the wall).
-    public const int PictureW = 1280, PictureH = 720;
+    /// The composed picture for a wall of this shape: twice the canvas (1280×720 for 16:9), at most 2560 on its long
+    /// side (the stage samples it with mipmaps, the output fits it to the wall).
+    public static (int W, int H) PictureSize(double aspect)
+    {
+        var c = WallRenderer.Canvas(aspect);
+        var k = Math.Min(2, 2560 / Math.Max(c.W, c.H));
+        return ((int)MathF.Round(c.W * k, MidpointRounding.AwayFromZero), (int)MathF.Round(c.H * k, MidpointRounding.AwayFromZero));
+    }
+
     /// A still show keeps the wall alive (its fades, the equaliser).
     public const double UpdateInterval = 0.05;
 
@@ -24,6 +31,7 @@ public sealed partial class WallSource
     WallState? _state;
     WallScene _force = WallScene.Auto;
     double _scale = 1;
+    double _aspect = ScreenShape.DefaultAspect;
     double? _lastShowT;
     double _updatedAt;
     double? _lastTick;
@@ -43,7 +51,7 @@ public sealed partial class WallSource
         set { lock (_lock) { _force = value; _renderer.Force = value; } }
     }
 
-    /// How much finer than 640×360 the CPU draws (WallOutputLayout.PictureScale: the output's wall).
+    /// How much finer than its units the CPU draws (WallOutputLayout.PictureScale: the output's wall).
     public double Scale
     {
         get { lock (_lock) return _scale; }
@@ -53,12 +61,23 @@ public sealed partial class WallSource
             {
                 if (value == _scale) return;
                 _scale = value;
-                _renderer.Dispose();
-                _renderer = new WallRenderer((float)value) { Force = _force };
-                _state = null;
-                _pictureVersion++;
+                Rebuild();
             }
         }
+    }
+
+    /// The wall's shape, width over height: the show's rig (its pixels), 16:9 without them.
+    public double Aspect { get { lock (_lock) return _aspect; } }
+
+    /// The canvas the picture is drawn on, in units (the wall's shape).
+    public (float W, float H) Canvas { get { lock (_lock) return WallRenderer.Canvas(_aspect); } }
+
+    void Rebuild()
+    {
+        _renderer.Dispose();
+        _renderer = new WallRenderer((float)_scale, _aspect) { Force = _force };
+        _state = null;
+        _pictureVersion++;
     }
 
     /// Seconds the picture runs ahead of the show's clock (the output's lead).
@@ -75,6 +94,7 @@ public sealed partial class WallSource
             var dt = (float)Math.Min(0.1, Math.Max(0, now - (_lastTick ?? now)));
             _lastTick = Math.Max(_lastTick ?? now, now);
             if (hello is not { Screen: true } h || frame is not { Lite: false } f) return null;
+            if (h.ScreenAspect != _aspect) { _aspect = h.ScreenAspect; Rebuild(); }   // (the GPU half resizes the picture)
             _pending += dt;
             var lead = Lead;
             if (lead != 0)   // ahead of the lights: the clock and the beat move on, the plan is known in advance

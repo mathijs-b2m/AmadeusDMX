@@ -577,7 +577,7 @@ public sealed partial record Workspace
     }
 
     /// The set on the rig as the visualiser would place it (the same rules as amadeus/fixtures.py + geometry.py).
-    public (IReadOnlyList<FixtureInfo> Fixtures, Stage Stage, bool Screen, IReadOnlyList<Truss> Trusses)? Preview(string rig, string set)
+    public (IReadOnlyList<FixtureInfo> Fixtures, Stage Stage, bool Screen, double ScreenAspect, IReadOnlyList<Truss> Trusses)? Preview(string rig, string set)
     {
         if (Document(rig, set) is not { } doc) return null;
         var defs = new Dictionary<string, FixtureDefinition?>();
@@ -586,6 +586,6 @@ public sealed partial record Workspace
             if (!defs.TryGetValue(key, out var d)) defs[key] = d = Definition(key);
             return d;
         });
-        return (els, doc.Stage, doc.HasScreen, doc.Trusses);
+        return (els, doc.Stage, doc.HasScreen, doc.ScreenAspect, doc.Trusses);
     }
 }

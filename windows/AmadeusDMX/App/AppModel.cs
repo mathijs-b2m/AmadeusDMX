@@ -608,8 +608,8 @@ public sealed class AppModel : Observable
         if (Feed.Hello is { } h && Feed.State == FeedState.Connected)
             return new StageInput
             {
-                Key = $"show:{h.Stage.WidthM}:{h.Screen}:{AmadeusDMX.StageInput.Layout(h.Fixtures, h.Trusses)}", Fixtures = h.Fixtures,
-                Stage = h.Stage, Screen = h.Screen, Hello = h, Trusses = h.Trusses, Zones = ShowZones ? h.Zones : [],
+                Key = $"show:{h.Stage.WidthM}:{h.Screen}:{h.ScreenAspect.ToString(System.Globalization.CultureInfo.InvariantCulture)}:{AmadeusDMX.StageInput.Layout(h.Fixtures, h.Trusses)}", Fixtures = h.Fixtures,
+                Stage = h.Stage, Screen = h.Screen, ScreenAspect = h.ScreenAspect, Hello = h, Trusses = h.Trusses, Zones = ShowZones ? h.Zones : [],
             };
         return Preview(SelectedRig, SelectedSet);
     }
@@ -622,8 +622,8 @@ public sealed class AppModel : Observable
         if (Workspace?.Preview(rig, set) is not { } p) return null;
         var input = new StageInput
         {
-            Key = $"preview:{key}:{AmadeusDMX.StageInput.Layout(p.Fixtures, p.Trusses)}", Fixtures = p.Fixtures, Stage = p.Stage,
-            Screen = p.Screen, Trusses = p.Trusses,
+            Key = $"preview:{key}:{p.ScreenAspect.ToString(System.Globalization.CultureInfo.InvariantCulture)}:{AmadeusDMX.StageInput.Layout(p.Fixtures, p.Trusses)}",
+            Fixtures = p.Fixtures, Stage = p.Stage, Screen = p.Screen, ScreenAspect = p.ScreenAspect, Trusses = p.Trusses,
         };
         _previewCache = (key, input);
         return input;

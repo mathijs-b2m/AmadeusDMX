@@ -630,6 +630,34 @@ public class RigEditorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void TheLEDWallsPixelsGiveItsShapeAndUndo()
+    {
+        using var w = new EditorWorkspace();
+        var e = w.Editor();
+        var u = e.UndoManager!;
+        Assert.True(e.Doc.HasScreen);
+        Assert.Null(e.Doc.ScreenPixels);
+        Assert.Equal(16.0 / 9.0, e.Doc.ScreenAspect);
+        e.SetScreenPixels((768, 384), panel: 128);
+        Assert.Equal((768, 384), e.Doc.ScreenPixels);
+        Assert.Equal(2, e.Doc.ScreenAspect);
+        Assert.Equal(128, e.ScreenPanelPx);
+        Assert.Equal("Change LED Wall", u.UndoActionName);
+        Assert.Equal(2, e.StageInput().ScreenAspect);   // the stage draws its shape
+        e.SetScreenPixels(null);
+        Assert.Null(e.Doc.ScreenPixels);
+        Assert.True(e.Doc.HasScreen);   // the wall stays, 16:9 again
+        u.Undo();
+        u.Undo();
+        Assert.Null(e.Doc.ScreenPixels);
+        Assert.False(e.IsDirty);
+        e.SetScreen(false);
+        e.SetScreenPixels((1536, 384));   // pixels for a rig without a wall: it gets one
+        Assert.True(e.Doc.HasScreen);
+        Assert.Equal(4, e.Doc.ScreenAspect);
+    }
+
+    [Fact]
     public void UndoRedoAndRevert()
     {
         using var w = new EditorWorkspace();
