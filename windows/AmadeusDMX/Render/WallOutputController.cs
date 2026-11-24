@@ -293,6 +293,7 @@ public sealed class WallOutputDrawer : IDisposable
     ID3D11PixelShader? _ps;
     ID3D11Buffer? _params;
     ID3D11SamplerState? _sampler;
+    ID3D11RasterizerState? _noCull;   // the full-screen triangle is counter-clockwise: the default state culls it
 
     void Build(SharedGpu gpu)
     {
@@ -308,6 +309,7 @@ public sealed class WallOutputDrawer : IDisposable
             AddressU = TextureAddressMode.Clamp, AddressV = TextureAddressMode.Clamp, AddressW = TextureAddressMode.Clamp,
             ComparisonFunc = ComparisonFunction.Never, MinLOD = 0, MaxLOD = 0,   // the picture's full size (Metal: no mip filter)
         });
+        _noCull = d.CreateRasterizerState(new RasterizerDescription(CullMode.None, FillMode.Solid));
     }
 
     /// `level`: the share of the wall's light that goes out (its level × the brightness ceiling × the fade; the card's:
@@ -325,7 +327,7 @@ public sealed class WallOutputDrawer : IDisposable
         var p = new System.Numerics.Vector4(level, time, card is not null ? 1 : 0, 0);
         ctx.UpdateSubresource(in p, _params!);
         ctx.RSSetViewport(new Viewport(r.X, r.Y, r.W, r.H));
-        ctx.RSSetState(null);
+        ctx.RSSetState(_noCull);
         ctx.OMSetBlendState(null);
         ctx.OMSetDepthStencilState(null);
         ctx.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
@@ -341,8 +343,8 @@ public sealed class WallOutputDrawer : IDisposable
 
     public void Dispose()
     {
-        _vs?.Dispose(); _ps?.Dispose(); _params?.Dispose(); _sampler?.Dispose();
-        _vs = null; _ps = null; _params = null; _sampler = null;
+        _vs?.Dispose(); _ps?.Dispose(); _params?.Dispose(); _sampler?.Dispose(); _noCull?.Dispose();
+        _vs = null; _ps = null; _params = null; _sampler = null; _noCull = null;
         _generation = -1;
     }
 

@@ -117,6 +117,9 @@ public sealed partial class WallSource
     ID3D11PixelShader? _composePS;
     ID3D11Buffer? _params;
     ID3D11SamplerState? _sampler;
+    // the full-screen triangle is wound counter-clockwise: D3D's default state culls it as a back face (Metal culls
+    // nothing by default). Without this the picture stayed empty, on the stage's wall and on the output.
+    ID3D11RasterizerState? _noCull;
     int _cpuW, _cpuH, _picW, _picH;
     int _uploaded = -1, _composed = -1;
     double _composedAt = double.NegativeInfinity;
@@ -163,6 +166,7 @@ public sealed partial class WallSource
             AddressU = TextureAddressMode.Clamp, AddressV = TextureAddressMode.Clamp, AddressW = TextureAddressMode.Clamp,
             ComparisonFunc = ComparisonFunction.Never, MinLOD = 0, MaxLOD = float.MaxValue,
         });
+        _noCull = d.CreateRasterizerState(new RasterizerDescription(CullMode.None, FillMode.Solid));
         MakePicture(gpu);
     }
 
@@ -213,7 +217,7 @@ public sealed partial class WallSource
         ctx.UpdateSubresource(in wp, _params!);
         ctx.OMSetRenderTargets(_pictureTarget!, null);
         ctx.RSSetViewport(new Viewport(_picW, _picH));
-        ctx.RSSetState(null);
+        ctx.RSSetState(_noCull);
         ctx.OMSetBlendState(null);
         ctx.OMSetDepthStencilState(null);
         ctx.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
@@ -231,7 +235,7 @@ public sealed partial class WallSource
 
     void ReleaseGpu()
     {
-        foreach (var o in new IDisposable?[] { _cpuView, _cpu, _pictureView, _pictureTarget, _picture, _vs, _composePS, _params, _sampler })
+        foreach (var o in new IDisposable?[] { _cpuView, _cpu, _pictureView, _pictureTarget, _picture, _vs, _composePS, _params, _sampler, _noCull })
             o?.Dispose();
         _cpuView = _pictureView = null;
         _cpu = _picture = null;
@@ -240,6 +244,7 @@ public sealed partial class WallSource
         _composePS = null;
         _params = null;
         _sampler = null;
+        _noCull = null;
         _cpuW = _cpuH = _picW = _picH = 0;
         _gpuGeneration = -1;
     }
