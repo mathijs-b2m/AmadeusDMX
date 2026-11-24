@@ -164,7 +164,16 @@ public sealed class WallOutputController : Observable
     // MARK: on and off
 
     /// Opens, moves or closes the output for the settings and the monitors connected now.
+    bool _applying;
+
     public void Apply()
+    {
+        if (_applying) return;   // (opening a window can call back in here: on the Mac that looped until a crash)
+        _applying = true;
+        try { ApplyNow(); } finally { _applying = false; }
+    }
+
+    void ApplyNow()
     {
         WallSource.Shared.Lead = Settings.LeadMs / 1000;
         if (!Settings.On) { Close(); Problem = null; WallSource.Shared.Scale = 1; return; }

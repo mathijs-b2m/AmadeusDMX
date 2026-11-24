@@ -58,18 +58,20 @@ final class WallOutputController {
     @ObservationIgnored private var placed: (screen: String?, frame: NSRect)?
     @ObservationIgnored private var sleepAssertion: IOPMAssertionID = 0
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var applying = false
 
     init() {
         let nc = NotificationCenter.default
         observers.append(nc.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshScreens(); self?.apply() }
         })
-        // the app's window moved to another display: what it may cover changed
+        // the app's window moved to another display: what it may cover changed. Only the app's own windows count:
+        // the output's window reports this too while it is being made (before it is ours), and opening the output
+        // again from there made a new window, which reported it again, until the stack ran out (a crash at launch).
+        // Later too, never from inside the notification: the window being made is still half there.
         observers.append(nc.addObserver(forName: NSWindow.didChangeScreenNotification, object: nil, queue: .main) { [weak self] n in
-            MainActor.assumeIsolated {
-                guard let self, (n.object as? NSWindow) !== self.window else { return }
-                self.refreshScreens(); self.apply()
-            }
+            guard !(n.object is WallOutputWindow) else { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.refreshScreens(); self?.apply() } }
         })
         // after launch: the app (NSApp) and its main window are up, which display it is on is known
         DispatchQueue.main.async { self.refreshScreens(); self.apply() }
@@ -118,6 +120,9 @@ final class WallOutputController {
 
     /// Opens, moves or closes the output for the settings and the displays connected now.
     func apply() {
+        guard !applying else { return }   // (opening a window can call back in here)
+        applying = true
+        defer { applying = false }
         WallSource.shared.lead = settings.leadMs / 1000
         guard settings.on else { close(); problem = nil; WallSource.shared.scale = 1; return }
         switch settings.target {
