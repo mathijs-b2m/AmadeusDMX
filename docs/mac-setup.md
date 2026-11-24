@@ -203,7 +203,9 @@ over HDMI or DisplayPort, as a second display set to **Extend**, not Mirror. The
    Amadeus DMX never covers the display its own window is on.
 2. Turn off **Whole Display** and type the wall's rectangle in pixels, as the processor reads it: its start
    position and the wall's size (**From Panels** works it out: 6 across, 3 high of 128 px is 768 × 384).
-   Everything around it stays black.
+   Everything around it stays black. Give the rig its wall's pixels too (**Rigs** › the rig › **LED wall
+   pixels**): the wall then has its real shape on the stage, the animations lay themselves out for it (a long
+   ribbon or a tall pillar as well as 16:9), and **Use the Rig's Wall** fills in the size here.
 3. Turn on the **Test Card** and check it on the wall: each corner has its own colour (top left red, top right
    green, bottom left blue, bottom right yellow), every panel shows its column and row, and the circle must
    look round. A bar crosses every two seconds: if it stutters or tears, frames are being dropped.

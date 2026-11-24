@@ -2,7 +2,8 @@
 // (decision.screen): off | ambient | figure | words | equalizer | psychedelic. Figures are playful neon
 // outlines on the beat: a runner, a dancer, a jumping crowd, pong. Into a drop the wall counts 3-2-1 and
 // shouts DROP!. Psychedelic is drawn by a Metal shader (WallSource); everything else here, with
-// Core Graphics, into a 640×360 picture (finer for a real LED wall: `scale`) that WallSource puts on the GPU.
+// Core Graphics, into a 640×360 picture (the wall's shape when the rig gives its pixels; finer for a real LED wall:
+// `scale`) that WallSource puts on the GPU.
 import CoreGraphics
 import CoreText
 import AmadeusKit
@@ -39,14 +40,21 @@ struct WallState {
 }
 
 final class WallRenderer {
-    /// The picture's own units: everything is drawn as if on 640×360.
+    /// The 16:9 picture's units: 640×360. A wall of another shape gets a canvas of its shape, its short side 360
+    /// (cw × ch: 1440×360 for 4:1, 360×720 for 1:2): figures keep their size against the short side, scenes spread
+    /// along the long one; on a tall wall the scenes that stand on a floor stand in its middle.
     static let W = 640, H = 360
     let context: CGContext
-    /// How much finer than 640×360 the context is (a real LED wall wants more pixels than the 3D stage's wall).
+    /// The canvas in units, the wall's shape.
+    let cw: CGFloat, ch: CGFloat
+    let aspect: Double
+    /// How much finer than the units the context is (a real LED wall wants more pixels than the 3D stage's wall).
     let scale: CGFloat
     var pixelWidth: Int { context.width }
     var pixelHeight: Int { context.height }
     var force: WallScene = .auto
+    /// Where scenes that stand on something have their floor: the bottom, or on a tall wall a little below its middle.
+    private var ground: CGFloat { ch > CGFloat(Self.H) ? ch - (ch - CGFloat(Self.H)) * 0.4 : ch }
 
     private var cur: (mode: String, scene: WallScene) = ("off", .off)
     private var fade: Float = 0
@@ -56,16 +64,24 @@ final class WallRenderer {
     private var fromPose: [[Float]] = WallRenderer.moves["down"]!
     private var lastBeat = -1
 
-    init(scale: CGFloat = 1) {
+    /// The canvas for a wall of this shape, in units.
+    static func canvas(_ aspect: Double) -> (w: CGFloat, h: CGFloat) {
+        let a = CGFloat(aspect)
+        return a >= 1 ? ((CGFloat(H) * a).rounded(), CGFloat(H)) : (CGFloat(H), (CGFloat(H) / a).rounded())
+    }
+
+    init(scale: CGFloat = 1, aspect: Double = ScreenShape.defaultAspect) {
         self.scale = scale
-        let w = Int((CGFloat(Self.W) * scale).rounded()), h = Int((CGFloat(Self.H) * scale).rounded())
+        self.aspect = aspect
+        (cw, ch) = Self.canvas(aspect)
+        let w = Int((cw * scale).rounded()), h = Int((ch * scale).rounded())
         context = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
                             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
         context.translateBy(x: 0, y: CGFloat(h))
-        context.scaleBy(x: scale, y: -scale)   // y down, like a canvas, in 640×360 units
+        context.scaleBy(x: scale, y: -scale)   // y down, like a canvas, in units
         context.setFillColor(CGColor(gray: 0, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: Self.W, height: Self.H))
+        context.fill(CGRect(x: 0, y: 0, width: cw, height: ch))
     }
 
     static func hash(_ n: Int, _ salt: Int = 0) -> Int {
@@ -160,7 +176,7 @@ final class WallRenderer {
         // is as short at any drawing rate (a fixed share per picture ghosted when the wall was drawn less often)
         let fadeShare = cur.scene == .words ? 0.8 : 0.45
         g.setFillColor(CGColor(gray: 0, alpha: CGFloat(1 - pow(1 - fadeShare, Double(max(dt, 1 / 240)) * 60))))
-        g.fill(CGRect(x: 0, y: 0, width: Self.W, height: Self.H))
+        g.fill(CGRect(x: 0, y: 0, width: cw, height: ch))
         let phraseFrac = d.map { min(1, max(0, ($0.end > $0.start ? (f.t - $0.start) / ($0.end - $0.start) : 0))) } ?? 0
         if !(cur.mode != "off" && countdown(f, d, h, cols)) {
             switch cur.scene {
@@ -200,12 +216,12 @@ final class WallRenderer {
     }
 
     private func runner(_ d: Decision?, _ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float) {
-        let s: CGFloat = 150, gy: CGFloat = 300, drop = d?.section == "drop"
+        let s: CGFloat = 150, gy: CGFloat = ground - 60, rx = (cw * 0.36).rounded(), drop = d?.section == "drop"
         let speed = drop ? 90.0 : 60.0, scroll = bp * speed
         neon(cols[1 % cols.count], 2)
         g.setAlpha(0.45)
         let sky = CGMutablePath(), off = scroll * 0.3
-        for i in -1..<12 {
+        for i in -1..<(Int(cw / 70) + 2) {
             let x = CGFloat(Double(i) * 70 - off.truncatingRemainder(dividingBy: 70))
             let h = CGFloat(40 + Self.hash(i + Int(off / 70)) % 90)
             sky.move(to: CGPoint(x: x, y: gy)); sky.addLine(to: CGPoint(x: x, y: gy - h))
@@ -214,9 +230,9 @@ final class WallRenderer {
         g.addPath(sky); g.strokePath()
         g.setAlpha(1)
         neon(cols[0], 3)
-        g.strokeLineSegments(between: [CGPoint(x: 0, y: gy), CGPoint(x: 640, y: gy)])
+        g.strokeLineSegments(between: [CGPoint(x: 0, y: gy), CGPoint(x: cw, y: gy)])
         // a hurdle every bar, arriving at the runner on the downbeat
-        let bar = bp / 4, hx = CGFloat(230 + (ceil(bar) - bar) * 4 * speed)
+        let bar = bp / 4, hx = rx + CGFloat((ceil(bar) - bar) * 4 * speed)
         g.strokeLineSegments(between: [CGPoint(x: hx, y: gy), CGPoint(x: hx, y: gy - 38),
                                        CGPoint(x: hx - 14, y: gy - 38), CGPoint(x: hx + 14, y: gy - 38)])
         let fromDown = (bp + 0.5).truncatingRemainder(dividingBy: 4) - 0.5
@@ -226,9 +242,9 @@ final class WallRenderer {
         neon(cols[0], 5)
         let (hx2, hy2, r): (CGFloat, CGFloat, CGFloat)
         if jump > 0.05 {
-            (hx2, hy2, r) = figure(230, y, s, lean: 0.35, arms: [[-2.4, 0.3], [2.6, -0.2]], legs: [[1.3, -1.9], [-0.4, -1.2]])
+            (hx2, hy2, r) = figure(rx, y, s, lean: 0.35, arms: [[-2.4, 0.3], [2.6, -0.2]], legs: [[1.3, -1.9], [-0.4, -1.2]])
         } else {
-            (hx2, hy2, r) = figure(230, y, s, lean: drop ? 0.35 : 0.22,
+            (hx2, hy2, r) = figure(rx, y, s, lean: drop ? 0.35 : 0.22,
                                    arms: [[-0.9 * sin(w), 1.5], [0.9 * sin(w), 1.5]],
                                    legs: [[0.75 * sin(w), -0.2 - 1.1 * max(0, sin(w + 1.2))],
                                           [-0.75 * sin(w), -0.2 - 1.1 * max(0, -sin(w + 1.2))]])
@@ -238,7 +254,7 @@ final class WallRenderer {
             var pts: [CGPoint] = []
             for i in 0..<4 {
                 let ly = y - 40 + CGFloat(i) * 22
-                pts += [CGPoint(x: 150 - CGFloat(i) * 12, y: ly), CGPoint(x: 110 - CGFloat(i) * 20, y: ly)]
+                pts += [CGPoint(x: rx - 80 - CGFloat(i) * 12, y: ly), CGPoint(x: rx - 120 - CGFloat(i) * 20, y: ly)]
             }
             g.strokeLineSegments(between: pts)
             let t = CGFloat(bp.truncatingRemainder(dividingBy: 1))
@@ -264,38 +280,40 @@ final class WallRenderer {
         let dip = sin(u * .pi)
         let hop: CGFloat = drop && beat % 4 == 0 ? CGFloat(sin(u * .pi)) * 60 : 0
         let legs: [[Float]] = hop > 0 ? [[-0.6, 1.4], [0.6, -1.4]] : [[-0.25 - 0.25 * dip, 0.5 * dip], [0.25 + 0.25 * dip, -0.5 * dip]]
-        for i in 0..<8 {  // the dance floor lights up with the beat
+        let mx = cw / 2, floorY = ground - 15, hipY = ground - 155
+        for i in 0..<(8 + 2 * max(0, Int((cw - 640) / 140))) {  // the dance floor lights up with the beat
             let on = Self.hash(i + beat * 8, 1) % 3 == 0
             neon(cols[i % cols.count], 2)
             g.setAlpha(on ? 0.55 : 0.12)
-            let x0 = CGFloat(320 + (i - 4) * 70), x1 = x0 + 70
+            let n = 8 + 2 * max(0, Int((cw - 640) / 140))
+            let x0 = mx + CGFloat(i - n / 2) * 70, x1 = x0 + 70
             let p = CGMutablePath()
-            p.move(to: CGPoint(x: x0 + (x0 - 320) * 0.4, y: 345)); p.addLine(to: CGPoint(x: x1 + (x1 - 320) * 0.4, y: 345))
-            p.addLine(to: CGPoint(x: x1, y: 300)); p.addLine(to: CGPoint(x: x0, y: 300)); p.closeSubpath()
+            p.move(to: CGPoint(x: x0 + (x0 - mx) * 0.4, y: floorY)); p.addLine(to: CGPoint(x: x1 + (x1 - mx) * 0.4, y: floorY))
+            p.addLine(to: CGPoint(x: x1, y: floorY - 45)); p.addLine(to: CGPoint(x: x0, y: floorY - 45)); p.closeSubpath()
             g.addPath(p); g.strokePath()
         }
         g.setAlpha(1)
         neon(cols[0], 6)
-        figure(320, 205 - CGFloat(dip) * 8 - hop, 190, head: CGFloat(0.15 * sin(bp * .pi)), arms: arms, legs: legs)
-        if hop > 0 { neon(cols[1 % cols.count], 4); text("!", at: CGPoint(x: 410, y: 60 - hop * 0.3), size: 46, fill: true) }
+        figure(mx, hipY - CGFloat(dip) * 8 - hop, 190, head: CGFloat(0.15 * sin(bp * .pi)), arms: arms, legs: legs)
+        if hop > 0 { neon(cols[1 % cols.count], 4); text("!", at: CGPoint(x: mx + 90, y: hipY - 145 - hop * 0.3), size: 46, fill: true) }
     }
 
     private func crowd(_ d: Decision?, _ cols: [SIMD3<Float>], _ bp: Double, _ bass: Float, _ phraseFrac: Double) {
-        let n = 11, drop = d?.section == "drop", hands = drop || (d?.intensity ?? 1) >= 2
+        let n = max(4, Int((11 * cw / 640).rounded())), drop = d?.section == "drop", hands = drop || (d?.intensity ?? 1) >= 2
         for i in 0..<n {
-            let x = CGFloat(40 + Double(i) * 560 / Double(n - 1)), s = CGFloat(105 + Self.hash(i, 5) % 25)
+            let x = 40 + CGFloat(i) * (cw - 80) / CGFloat(n - 1), s = CGFloat(105 + Self.hash(i, 5) % 25)
             let u = drop ? bp.truncatingRemainder(dividingBy: 1) : (bp - Double(i) * 0.12).truncatingRemainder(dividingBy: 1)
             let jump = CGFloat(max(0, sin(u * .pi))) * (drop ? 40 : 14 + 22 * CGFloat(bass))
             let wave = hands ? Float(0.25 * sin(bp * .pi + Double(i))) : 0
             neon(cols[i % cols.count], 3)
-            figure(x, 345 - s * 0.5 - jump, s,
+            figure(x, ground - 15 - s * 0.5 - jump, s,
                    arms: hands ? [[-2.7 + wave, 0], [2.7 + wave, 0]] : [[-0.3, 0.4], [0.3, -0.4]],
                    legs: jump > 4 ? [[-0.5, 0.6], [0.5, -0.6]] : [[-0.2, 0], [0.2, 0]])
         }
         if hands {  // a crowd surfer, carried across during the phrase
             neon(cols[0], 4)
             g.saveGState()
-            g.translateBy(x: CGFloat(20 + phraseFrac * 600), y: CGFloat(128 + 4 * sin(bp * .pi)))
+            g.translateBy(x: 20 + CGFloat(phraseFrac) * (cw - 40), y: ground - 232 + CGFloat(4 * sin(bp * .pi)))
             g.rotate(by: -.pi / 2)
             figure(0, 0, 80, arms: [[-2.9, 0], [2.6, 0.3]], legs: [[Float(-0.25 + 0.3 * sin(bp * 2)), 0.3], [0.25, 0]])
             g.restoreGState()
@@ -307,21 +325,21 @@ final class WallRenderer {
         func tri(_ v: Double) -> Double { 1 - abs(((v.truncatingRemainder(dividingBy: 2)) + 2).truncatingRemainder(dividingBy: 2) - 1) }
         neon(cols[0], 3)
         g.setLineDash(phase: 0, lengths: [10, 14])
-        g.strokeLineSegments(between: [CGPoint(x: 320, y: 10), CGPoint(x: 320, y: 350)])
+        g.strokeLineSegments(between: [CGPoint(x: cw / 2, y: 10), CGPoint(x: cw / 2, y: ch - 10)])
         g.setLineDash(phase: 0, lengths: [])
-        text(String(Int(bp / 4) % 100), at: CGPoint(x: 250, y: 70), size: 54, fill: true, mono: true)
-        text(String(Int(bp / 7) % 100), at: CGPoint(x: 390, y: 70), size: 54, fill: true, mono: true)
-        var yL: CGFloat = 180, yR: CGFloat = 180
+        text(String(Int(bp / 4) % 100), at: CGPoint(x: cw / 2 - 70, y: 70), size: 54, fill: true, mono: true)
+        text(String(Int(bp / 7) % 100), at: CGPoint(x: cw / 2 + 70, y: 70), size: 54, fill: true, mono: true)
+        var yL: CGFloat = ch / 2, yR: CGFloat = ch / 2
         let offsets: [Double] = drop ? [0, 0.33, 0.66] : [0]
         for (i, o) in offsets.enumerated() {
-            let x = CGFloat(52 + tri(bp + o) * 536), y = CGFloat(20 + tri(bp * 0.37 + o * 1.7 + 0.3) * 320)
+            let x = 52 + CGFloat(tri(bp + o)) * (cw - 104), y = 20 + CGFloat(tri(bp * 0.37 + o * 1.7 + 0.3)) * (ch - 40)
             neon(cols[i % cols.count], 3)
             g.fill(CGRect(x: x - 8, y: y - 8, width: 16, height: 16))
-            if x < 320 { yL = y } else { yR = y }
+            if x < cw / 2 { yL = y } else { yR = y }
         }
         neon(cols[0], 3)
         g.fill(CGRect(x: 28, y: yL - 40, width: 12, height: 80))
-        g.fill(CGRect(x: 600, y: yR - 40, width: 12, height: 80))
+        g.fill(CGRect(x: cw - 40, y: yR - 40, width: 12, height: 80))
     }
 
     private func words(_ h: Hello, _ cols: [SIMD3<Float>], _ bp: Double) {
@@ -335,7 +353,7 @@ final class WallRenderer {
         let beat = Int(floor(bp)), u = bp - floor(bp), w = ws[beat % ws.count].uppercased()
         let size = min(170, 1000 / CGFloat(max(3, w.count))) * CGFloat(1 + 0.25 * max(0, 1 - u * 4))
         neon(cols[beat % cols.count], 5)
-        text(w, at: CGPoint(x: 320, y: 180), size: size, fill: u < 0.15)
+        text(w, at: CGPoint(x: cw / 2, y: ch / 2), size: size * min(1.6, cw / 640), fill: u < 0.15)
     }
 
     private func equalizer(_ f: Frame, _ cols: [SIMD3<Float>], _ dt: Float) {
@@ -347,13 +365,13 @@ final class WallRenderer {
             eq[i] = v > eq[i] ? v : eq[i] - dt * 2.2
             caps[i] = max(eq[i], caps[i] - dt * 0.6)
         }
-        let bw = CGFloat(640) / CGFloat(n)
+        let bw = cw / CGFloat(n), top = ch - 60, base = ch - 20
         for i in 0..<n {
             neon(cols[min(cols.count - 1, i * cols.count / n)], 3)
-            let h = CGFloat(eq[i]) * 300, x = CGFloat(i) * bw + 6
-            var y: CGFloat = 340
-            while y > 340 - h { g.stroke(CGRect(x: x, y: y - 12, width: bw - 12, height: 10)); y -= 16 }
-            g.fill(CGRect(x: x, y: 330 - CGFloat(caps[i]) * 300 - 8, width: bw - 12, height: 4))
+            let h = CGFloat(eq[i]) * top, x = CGFloat(i) * bw + 6
+            var y: CGFloat = base
+            while y > base - h { g.stroke(CGRect(x: x, y: y - 12, width: bw - 12, height: 10)); y -= 16 }
+            g.fill(CGRect(x: x, y: base - 10 - CGFloat(caps[i]) * top - 8, width: bw - 12, height: 4))
         }
     }
 
@@ -361,12 +379,12 @@ final class WallRenderer {
         amb += Double(dt) * 0.15
         g.setShadow(offset: .zero, blur: 0, color: nil)
         for (i, c) in cols.enumerated() {
-            let x = 320 + 230 * sin(amb * (0.7 + Double(i) * 0.23) + Double(i) * 2)
-            let y = 180 + 110 * cos(amb * (0.5 + Double(i) * 0.17) + Double(i))
+            let x = Double(cw) / 2 + (Double(cw) / 2 - 90) * sin(amb * (0.7 + Double(i) * 0.23) + Double(i) * 2)
+            let y = Double(ch) / 2 + (Double(ch) / 2 - 70) * cos(amb * (0.5 + Double(i) * 0.17) + Double(i))
             let grad = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
                                   colors: [cg(c, 0.5), cg(c, 0)] as CFArray, locations: [0, 1])!
             g.drawRadialGradient(grad, startCenter: CGPoint(x: x, y: y), startRadius: 0,
-                                 endCenter: CGPoint(x: x, y: y), endRadius: 260, options: [])
+                                 endCenter: CGPoint(x: x, y: y), endRadius: max(260, max(cw, ch) * 0.4), options: [])
         }
     }
 
@@ -382,9 +400,10 @@ final class WallRenderer {
         guard let label else { return false }
         g.setShadow(offset: .zero, blur: 0, color: nil)
         g.setFillColor(CGColor(gray: 0, alpha: 0.85))
-        g.fill(CGRect(x: 0, y: 0, width: 640, height: 360))
+        g.fill(CGRect(x: 0, y: 0, width: cw, height: ch))
         neon(cols[0], 7)
-        text(label, at: CGPoint(x: 320, y: 185), size: label.count > 1 ? 150 : 230 * CGFloat(1.3 - 0.3 * u), fill: false)
+        let fit = min(1, cw / 520)   // DROP! fits a narrow wall too
+        text(label, at: CGPoint(x: cw / 2, y: ch / 2 + 5), size: (label.count > 1 ? 150 : 230 * CGFloat(1.3 - 0.3 * u)) * fit, fill: false)
         return true
     }
 

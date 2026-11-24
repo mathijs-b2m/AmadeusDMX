@@ -4,7 +4,7 @@
 // -camera "Front of House" (a preset), -cameraYaw 180 (turned round the stage that many degrees from it), -inRoom YES,
 // -snapshotSize 1600x900. On a rig with an LED wall it also draws what the LED Wall Output sends: NAME-wall.png (the
 // show's picture) and NAME-card.png (the test card) on a display of -wallOutputSize 1920x1080, the wall at
-// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128. The app quits when done, before it starts
+// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128, one scene with -wallScene runner. The app quits when done, before it starts
 // anything.
 import AmadeusKit
 import AppKit
@@ -42,7 +42,7 @@ enum StageSnapshot {
         d.usage = [.renderTarget, .shaderRead]
         d.storageMode = .shared
         guard let target = r.device.makeTexture(descriptor: d) else { throw Failure(description: "no texture") }
-        let input = StageInput(key: "snapshot", fixtures: hello.fixtures, stage: hello.stage, screen: hello.screen, hello: hello,
+        let input = StageInput(key: "snapshot", fixtures: hello.fixtures, stage: hello.stage, screen: hello.screen, screenAspect: hello.screenAspect, hello: hello,
                                trusses: hello.trusses)
         let files = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix("frame") && $0.hasSuffix(".json") }.sorted()
         var frame: Frame?
@@ -54,14 +54,18 @@ enum StageSnapshot {
         }
         let outSize = ints("wallOutputSize", "x").flatMap { $0.count == 2 ? (w: $0[0], h: $0[1]) : nil } ?? (w: 1920, h: 1080)
         let wallRect = ints("wallRect", ",").flatMap { $0.count == 4 ? PixelRect(x: $0[0], y: $0[1], w: $0[2], h: $0[3]) : nil }
-        let wall = WallOutputLayout.wallRect(wallRect, display: outSize.w, outSize.h), pic = WallOutputLayout.fit(wall)
+        let wall = WallOutputLayout.wallRect(wallRect, display: outSize.w, outSize.h)
+        let pic = WallOutputLayout.fit(wall, aspect: hello.screenAspect), canvas = WallRenderer.canvas(hello.screenAspect)
         let panelPx = UserDefaults.standard.integer(forKey: "panelPx") > 0 ? UserDefaults.standard.integer(forKey: "panelPx") : 128
-        WallSource.shared.scale = WallOutputLayout.pictureScale(forWallHeight: pic.h)
+        WallSource.shared.scale = WallOutputLayout.pictureScale(picture: pic, canvas: (Double(canvas.w), Double(canvas.h)))
         let drawer = WallOutputDrawer()
         let od = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: outSize.w, height: outSize.h, mipmapped: false)
         od.usage = [.renderTarget, .shaderRead]
         od.storageMode = .shared
         let outTarget = hello.screen ? r.device.makeTexture(descriptor: od) : nil
+        if let scene = UserDefaults.standard.string(forKey: "wallScene").flatMap(WallScene.init(rawValue:)) {
+            WallSource.shared.force = scene   // -wallScene runner: one scene on the wall
+        }
         var gpu: [Double] = []
         StageRenderer.onGPUTime = { gpu.append($0) }
         var now: CFTimeInterval = 1000

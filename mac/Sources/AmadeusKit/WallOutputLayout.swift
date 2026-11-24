@@ -101,6 +101,15 @@ public enum WallOutputLayout {
         return min(2, max(1, (Double(h) / 360 * 2).rounded(.up) / 2))
     }
 
+    /// How much finer than its canvas (WallRenderer's units: 640×360 for 16:9) the picture is drawn to fill a wall
+    /// `picture` big: 1, 1.5 or 2, and never more than about 1.6 million pixels for the CPU to draw.
+    public static func pictureScale(picture: PixelRect?, canvas: (w: Double, h: Double)) -> Double {
+        guard let p = picture, p.w > 0, p.h > 0, canvas.w > 0, canvas.h > 0 else { return 1 }
+        var s = min(2, max(1, (max(Double(p.w) / canvas.w, Double(p.h) / canvas.h) * 2).rounded(.up) / 2))
+        while s > 1 && canvas.w * canvas.h * s * s > 1.6e6 { s -= 0.5 }
+        return s
+    }
+
     /// A rectangle in the display's own pixels, in the pixels of what is drawn (a HiDPI mode draws more pixels than
     /// it sends; the window's drawable is in those).
     public static func scaled(_ r: PixelRect, from mode: (w: Int, h: Int), to drawable: (w: Int, h: Int)) -> PixelRect {
@@ -113,5 +122,35 @@ public enum WallOutputLayout {
     /// A wall of `cols`×`rows` panels of `panelPx`, from the top left of the display.
     public static func panels(cols: Int, rows: Int, panelPx: Int) -> PixelRect {
         PixelRect(x: 0, y: 0, w: max(1, cols) * max(1, panelPx), h: max(1, rows) * max(1, panelPx))
+    }
+}
+
+/// The LED wall's shape (the same rules as amadeus/rig/trusses.py): its pixels (`screen.pixels`, as its processor
+/// maps it) give its aspect, 16:9 without them; a wall taller than 16:9 stays under the ceiling.
+public enum ScreenShape {
+    public static let defaultAspect = 16.0 / 9.0
+    public static let aspectRange: ClosedRange<Double> = 0.25...6
+
+    /// The pixels in a rig's `screen` value ({"pixels": [w, h]}), nil when not given.
+    public static func pixels(_ screen: JSONValue?) -> (w: Int, h: Int)? {
+        guard let px = screen?.object?["pixels"]?.array, px.count == 2,
+              let w = px[0].number, let h = px[1].number, w >= 1, h >= 1 else { return nil }
+        return (Int(w), Int(h))
+    }
+
+    public static func aspect(_ pixels: (w: Int, h: Int)?) -> Double {
+        guard let p = pixels else { return defaultAspect }
+        return min(aspectRange.upperBound, max(aspectRange.lowerBound, Double(p.w) / Double(p.h)))
+    }
+
+    /// The wall's width and height (m): `width` from the app's rule, the height from the aspect; a wall taller than
+    /// 16:9 kept under the ceiling (narrower then).
+    public static func size(width: Double, aspect: Double, bottom: Double, ceiling: Double?) -> (w: Double, h: Double) {
+        var w = width, h = width / aspect
+        if aspect < defaultAspect, let ceiling, ceiling > 0 {
+            let room = max(1, ceiling - bottom - 0.3)
+            if h > room { h = room; w = room * aspect }
+        }
+        return (w, h)
     }
 }

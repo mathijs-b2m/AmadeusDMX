@@ -39,7 +39,8 @@ struct Scenery {
     /// vertices and a point and direction of its inside. Seen from behind (Plan, gliding out) it isn't drawn.
     var shell: [(range: Range<Int>, at: SIMD3<Float>, inward: SIMD3<Float>)] = []
 
-    init(fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss] = [], selected: Set<String> = []) {
+    init(fixtures: [FixtureInfo], stage: Stage, screen: Bool, screenAspect: Double = ScreenShape.defaultAspect,
+         trusses: [Truss] = [], selected: Set<String> = []) {
         room = Room(stage: stage, fixtures: fixtures, trusses: trusses)
         models = FixtureModels(fixtures: fixtures, selected: selected)
         let W = room.width, cx = W / 2
@@ -123,11 +124,14 @@ struct Scenery {
 
         // the LED wall behind the DJ
         if screen {
-            let sw = big ? min(10, W * 0.55) : 2.6, sh = sw * 9 / 16
+            let sz: Float = (big ? 1.4 : 1.15) + raised  // over the stage, as high as it stands
+            // as wide as the rule gives, as high as its shape (the rig's pixels) makes it (trusses.screen_rect)
+            let size = ScreenShape.size(width: Double(big ? min(10, W * 0.55) : 2.6), aspect: screenAspect,
+                                        bottom: Double(sz), ceiling: stage.outdoor ? nil : stage.ceilingM)
+            let sw = Float(size.w), sh = Float(size.h)
             let free = big ? min(-4.5, Room(stage: stage, fixtures: fixtures, trusses: trusses).back + 1.5) - 2.2 : -2.0
             let sy = scaffoldWall.map { Float($0.yM + $0.scaffoldDepth / 2) + 0.37 }
                 ?? (room.backFixed ? max(free, back + 0.45) : free)  // (its frame against a back wall the rig fixes)
-            let sz: Float = (big ? 1.4 : 1.15) + raised  // over the stage, as high as it stands
             wall = WallPlacement(center: [cx, sy, sz + sh / 2], width: sw, height: sh)
             let screenAt = vertices.count
             box(cx - sw / 2 - 0.12, cx + sw / 2 + 0.12, sy - 0.35, sy - 0.02, sz - 0.12, sz + sh + 0.12, [0.03, 0.03, 0.035])

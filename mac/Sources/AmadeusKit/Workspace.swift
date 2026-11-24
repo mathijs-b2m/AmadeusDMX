@@ -479,13 +479,13 @@ extension Workspace {
     }
 
     /// The set on the rig as the visualiser would place it (the same rules as amadeus/fixtures.py + geometry.py).
-    public func preview(rig: String, set: String) -> (fixtures: [FixtureInfo], stage: Stage, screen: Bool, trusses: [Truss])? {
+    public func preview(rig: String, set: String) -> (fixtures: [FixtureInfo], stage: Stage, screen: Bool, screenAspect: Double, trusses: [Truss])? {
         guard let doc = document(rig: rig, set: set) else { return nil }
         var defs: [String: FixtureDefinition] = [:]
         let els = RigElements.elements(doc) { key in
             if defs[key] == nil { defs[key] = definition(key) }
             return defs[key]
         }
-        return (els, doc.stage, doc.hasScreen, doc.trusses)
+        return (els, doc.stage, doc.hasScreen, doc.screenAspect, doc.trusses)
     }
 }

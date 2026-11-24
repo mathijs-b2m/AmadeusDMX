@@ -60,6 +60,14 @@ struct LEDWallOutputPanel: View {
                         }
                         PanelsRow(out: out)
                     }
+                    if let px = rigPixels, out.settings.rect.map({ $0.w != px.w || $0.h != px.h }) ?? true {
+                        Button("Use the Rig's Wall: \(px.w) × \(px.h)") {
+                            let r = out.settings.rect
+                            out.settings.rect = PixelRect(x: r?.x ?? 0, y: r?.y ?? 0, w: px.w, h: px.h)
+                        }
+                        .help("The LED wall's pixels from the show's rig (Rigs › the rig › LED wall pixels)")
+                    }
+                    if let warn = shapeWarning(out) { Text(warn).font(.callout).foregroundStyle(.orange) }
                 } header: {
                     Text("The Wall on the Display")
                 } footer: {
@@ -118,6 +126,20 @@ struct LEDWallOutputPanel: View {
             return "The wall stays black until a show plays."
         }
         return h.screen ? nil : "This show's rig has no LED wall: turn it on in the rig (Rigs) and the director plays it. Until then the wall stays black."
+    }
+
+    /// The show's LED wall pixels: the running show's rig, else the selected one.
+    private var rigPixels: (w: Int, h: Int)? {
+        if let px = model.feed.hello?.screenPx, model.feed.state == .connected { return (px[0], px[1]) }
+        return model.workspace?.document(rig: model.selectedRig, set: model.selectedSet)?.screenPixels
+    }
+
+    /// The rectangle is another shape than the rig's wall: the picture gets black bars.
+    private func shapeWarning(_ out: WallOutputController) -> String? {
+        guard let r = out.settings.rect, let px = rigPixels else { return nil }
+        let a = Double(r.w) / Double(max(1, r.h)), b = Double(px.w) / Double(px.h)
+        guard abs(a / b - 1) > 0.02 else { return nil }
+        return String(format: "The rectangle is %.2f:1, the rig's wall %.2f:1: the picture keeps the rig's shape, with black bars.", a, b)
     }
 
     private func displayBinding(_ out: WallOutputController) -> Binding<String?> {

@@ -13,7 +13,10 @@
 "use strict";
 
 const Screen = (() => {
-  const W = 640, H = 360, SAMPLES = 1024, SR = 44100;
+  // the canvas: 640×360 for a 16:9 wall; another shape (the rig's screen_px) keeps its short side at 360 and
+  // spreads the scenes along the long one (WallRenderer.canvas in the Mac app)
+  let W = 640, H = 360, ground = 360;
+  const SAMPLES = 1024, SR = 44100;
   const TONES = [{f: 48, k: 1.0}, {f: 110, k: 0.9}, {f: 700, k: 0.6}, {f: 3200, k: 0.45}, {f: 9000, k: 0.3}];
   const FIGURES = ["runner", "dancer", "crowd", "pong"];
   const RULES = {  // for plans made before the director chose wall modes (same idea as RULE_SCREEN)
@@ -77,6 +80,17 @@ const Screen = (() => {
   const g = cv.getContext("2d");
   let eq = new Array(16).fill(0), caps = new Array(16).fill(0), amb = 0;
 
+  // the wall's shape from its pixels: a new canvas when it changes (another rig)
+  function shape(px) {
+    const a = px && px[0] > 0 && px[1] > 0 ? clamp(px[0] / px[1], 0.25, 6) : 16 / 9;
+    const w = a >= 1 ? Math.round(360 * a) : 360, h = a >= 1 ? 360 : Math.round(360 / a);
+    if (w === W && h === H) return;
+    W = w; H = h;
+    ground = H > 360 ? H - (H - 360) * 0.4 : H;  // a tall wall: the scenes that stand on a floor stand in its middle
+    cv.width = W; cv.height = H;
+    if (bcCanvas) { bcCanvas.width = W; bcCanvas.height = H; viz?.setRendererSize?.(W, H); }
+  }
+
   function hash(n, salt = 0) { return Math.abs(((n + 1) * 2654435761 + salt * 40503) % 4294967296); }
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, k) => a + (b - a) * k;
@@ -118,12 +132,12 @@ const Screen = (() => {
 
   // the runner: runs over a scrolling city, jumps the hurdles that come by on the bar
   function runner(f, d, cols, bp, bass) {
-    const s = 150, gy = 300, drop = d?.section === "drop";
+    const s = 150, gy = ground - 60, rx = Math.round(W * 0.36), drop = d?.section === "drop";
     const scroll = bp * (drop ? 90 : 60);
     neon(cols[1 % cols.length], 2);
     g.globalAlpha = 0.45;
     g.beginPath();  // skyline, slower (parallax)
-    for (let i = -1; i < 12; i++) {
+    for (let i = -1; i < Math.floor(W / 70) + 2; i++) {
       const x = i * 70 - (scroll * 0.3) % 70, h = 40 + (hash(i + Math.floor(scroll * 0.3 / 70)) % 90);
       g.moveTo(x, gy); g.lineTo(x, gy - h); g.lineTo(x + 52, gy - h); g.lineTo(x + 52, gy);
     }
@@ -131,8 +145,8 @@ const Screen = (() => {
     g.globalAlpha = 1;
     neon(cols[0], 3);
     g.beginPath(); g.moveTo(0, gy); g.lineTo(W, gy); g.stroke();
-    // a hurdle every bar, arriving at the runner (x = 230) on the downbeat
-    const bar = bp / 4, hx = 230 + (Math.ceil(bar) - bar) * 4 * (drop ? 90 : 60);
+    // a hurdle every bar, arriving at the runner (x = rx) on the downbeat
+    const bar = bp / 4, hx = rx + (Math.ceil(bar) - bar) * 4 * (drop ? 90 : 60);
     g.beginPath(); g.moveTo(hx, gy); g.lineTo(hx, gy - 38); g.moveTo(hx - 14, gy - 38); g.lineTo(hx + 14, gy - 38);
     g.stroke();
     // the jump: half a beat either side of the downbeat
@@ -148,10 +162,10 @@ const Screen = (() => {
     };
     const y = gy - s * 0.5 - Math.abs(Math.cos(w)) * 6 - jump * 70;
     neon(cols[0], 5);
-    const [hx2, hy2, r] = figure(230, y, s, pose);
+    const [hx2, hy2, r] = figure(rx, y, s, pose);
     if (drop || bass > 0.7) {  // speed lines and a drop of sweat: going all out
       g.lineWidth = 2; g.beginPath();
-      for (let i = 0; i < 4; i++) { const ly = y - 40 + i * 22; g.moveTo(150 - i * 12, ly); g.lineTo(110 - i * 20, ly); }
+      for (let i = 0; i < 4; i++) { const ly = y - 40 + i * 22; g.moveTo(rx - 80 - i * 12, ly); g.lineTo(rx - 120 - i * 20, ly); }
       g.stroke();
       const t = (bp % 1);
       g.beginPath(); g.arc(hx2 - r - 6 - t * 20, hy2 - r + t * 25, 3, 0, 7); g.fill();
@@ -179,37 +193,38 @@ const Screen = (() => {
     const hop = drop && beat % 4 === 0 ? Math.sin(u * Math.PI) * 60 : 0;
     const legs = hop ? [[-0.6, 1.4], [0.6, -1.4]] : [[-0.25 - 0.25 * dip, 0.5 * dip], [0.25 + 0.25 * dip, -0.5 * dip]];
     // dance floor: tiles lighting up with the beat
-    for (let i = 0; i < 8; i++) {
+    const mx = W / 2, floorY = ground - 15, hipY = ground - 155, tiles = 8 + 2 * Math.max(0, Math.floor((W - 640) / 140));
+    for (let i = 0; i < tiles; i++) {
       const on = (hash(i + beat * 8, 1) % 3) === 0;
       neon(cols[i % cols.length], 2);
       g.globalAlpha = on ? 0.55 : 0.12;
-      const x0 = 320 + (i - 4) * 70, x1 = x0 + 70;
-      g.beginPath(); g.moveTo(x0 + (x0 - 320) * 0.4, 345); g.lineTo(x1 + (x1 - 320) * 0.4, 345);
-      g.lineTo(x1, 300); g.lineTo(x0, 300); g.closePath(); g.stroke();
+      const x0 = mx + (i - Math.floor(tiles / 2)) * 70, x1 = x0 + 70;
+      g.beginPath(); g.moveTo(x0 + (x0 - mx) * 0.4, floorY); g.lineTo(x1 + (x1 - mx) * 0.4, floorY);
+      g.lineTo(x1, floorY - 45); g.lineTo(x0, floorY - 45); g.closePath(); g.stroke();
     }
     g.globalAlpha = 1;
     neon(cols[0], 6);
-    figure(320, 205 - dip * 8 - hop, 190, {lean: 0, head: 0.15 * Math.sin(bp * Math.PI), arms, legs});
-    if (hop) { neon(cols[1 % cols.length], 4); g.font = "bold 46px system-ui"; g.fillText("!", 395, 70 - hop * 0.3); }
+    figure(mx, hipY - dip * 8 - hop, 190, {lean: 0, head: 0.15 * Math.sin(bp * Math.PI), arms, legs});
+    if (hop) { neon(cols[1 % cols.length], 4); g.font = "bold 46px system-ui"; g.fillText("!", mx + 90, hipY - 145 - hop * 0.3); }
   }
 
   // the crowd: a row of little people jumping (a wave in the groove, all together on a drop), one crowd surfer
   function crowd(f, d, cols, bp, bass, phraseFrac) {
-    const n = 11, drop = d?.section === "drop", hands = drop || (d?.intensity ?? 1) >= 2;
+    const n = Math.max(4, Math.round(11 * W / 640)), drop = d?.section === "drop", hands = drop || (d?.intensity ?? 1) >= 2;
     for (let i = 0; i < n; i++) {
-      const x = 40 + i * (560 / (n - 1)), s = 105 + (hash(i, 5) % 25);
+      const x = 40 + i * ((W - 80) / (n - 1)), s = 105 + (hash(i, 5) % 25);
       const u = drop ? bp % 1 : (bp - i * 0.12) % 1;
       const jump = Math.max(0, Math.sin(u * Math.PI)) * (drop ? 40 : 14 + 22 * bass);
       const wave = hands ? 0.25 * Math.sin(bp * Math.PI + i) : 0;
       neon(cols[i % cols.length], 3);
-      const y = 345 - s * 0.5 - jump;
+      const y = ground - 15 - s * 0.5 - jump;
       figure(x, y, s, {
         lean: 0, arms: hands ? [[-2.7 + wave, 0], [2.7 + wave, 0]] : [[-0.3, 0.4], [0.3, -0.4]],
         legs: jump > 4 ? [[-0.5, 0.6], [0.5, -0.6]] : [[-0.2, 0], [0.2, 0]],
       });
     }
     if (hands) {  // crowd surfer: lying on the raised hands, carried across during the phrase
-      const x = 20 + phraseFrac * 600, y = 128 + 4 * Math.sin(bp * Math.PI);
+      const x = 20 + phraseFrac * (W - 40), y = ground - 232 + 4 * Math.sin(bp * Math.PI);
       neon(cols[0], 4);
       g.save(); g.translate(x, y); g.rotate(-Math.PI / 2);
       figure(0, 0, 80, {lean: 0, arms: [[-2.9, 0], [2.6, 0.3]],
@@ -222,21 +237,21 @@ const Screen = (() => {
   function pong(f, d, cols, bp) {
     const drop = d?.section === "drop", tri = v => 1 - Math.abs(((v % 2) + 2) % 2 - 1);
     neon(cols[0], 3);
-    g.setLineDash([10, 14]); g.beginPath(); g.moveTo(320, 10); g.lineTo(320, 350); g.stroke(); g.setLineDash([]);
+    g.setLineDash([10, 14]); g.beginPath(); g.moveTo(W / 2, 10); g.lineTo(W / 2, H - 10); g.stroke(); g.setLineDash([]);
     g.font = "bold 54px ui-monospace, monospace"; g.textAlign = "center";
-    g.fillText(String(Math.floor(bp / 4) % 100), 250, 70);
-    g.fillText(String(Math.floor(bp / 7) % 100), 390, 70);
+    g.fillText(String(Math.floor(bp / 4) % 100), W / 2 - 70, 70);
+    g.fillText(String(Math.floor(bp / 7) % 100), W / 2 + 70, 70);
     const balls = drop ? [0, 0.33, 0.66] : [0];
-    let yL = 180, yR = 180;
+    let yL = H / 2, yR = H / 2;
     balls.forEach((o, i) => {
-      const x = 52 + tri(bp + o) * 536, y = 20 + tri(bp * 0.37 + o * 1.7 + 0.3) * 320;
+      const x = 52 + tri(bp + o) * (W - 104), y = 20 + tri(bp * 0.37 + o * 1.7 + 0.3) * (H - 40);
       neon(cols[i % cols.length], 3);
       g.fillRect(x - 8, y - 8, 16, 16);
-      if (x < 320) yL = y; else yR = y;
+      if (x < W / 2) yL = y; else yR = y;
     });
     neon(cols[0], 3);
     g.fillRect(28, yL - 40, 12, 80);
-    g.fillRect(600, yR - 40, 12, 80);
+    g.fillRect(W - 40, yR - 40, 12, 80);
   }
 
   function cleanTitle(track) {
@@ -249,11 +264,11 @@ const Screen = (() => {
     const ws = cleanTitle(S?.track).split(/\s+|\s*-\s*/).filter(Boolean);
     if (!ws.length) return;
     const beat = Math.floor(bp), u = bp - beat, w = ws[beat % ws.length].toUpperCase();
-    const size = Math.min(170, 1000 / Math.max(3, w.length)) * (1 + 0.25 * Math.max(0, 1 - u * 4));
+    const size = Math.min(170, 1000 / Math.max(3, w.length)) * (1 + 0.25 * Math.max(0, 1 - u * 4)) * Math.min(1.6, W / 640);
     neon(cols[beat % cols.length], 5);
     g.font = `900 ${size}px system-ui`; g.textAlign = "center"; g.textBaseline = "middle";
-    g.strokeText(w, 320, 180);
-    if (u < 0.15) { g.globalAlpha = 0.6; g.fillText(w, 320, 180); g.globalAlpha = 1; }
+    g.strokeText(w, W / 2, H / 2);
+    if (u < 0.15) { g.globalAlpha = 0.6; g.fillText(w, W / 2, H / 2); g.globalAlpha = 1; }
   }
 
   function equalizer(f, d, cols, dt) {
@@ -267,9 +282,9 @@ const Screen = (() => {
     const bw = W / eq.length;
     eq.forEach((v, i) => {
       neon(cols[Math.floor(i / eq.length * cols.length)], 3);
-      const h = v * 300, x = i * bw + 6;
-      for (let y = 340; y > 340 - h; y -= 16) g.strokeRect(x, y - 12, bw - 12, 10);
-      g.fillRect(x, 330 - caps[i] * 300 - 8, bw - 12, 4);
+      const top = H - 60, base = H - 20, h = v * top, x = i * bw + 6;
+      for (let y = base; y > base - h; y -= 16) g.strokeRect(x, y - 12, bw - 12, 10);
+      g.fillRect(x, base - 10 - caps[i] * top - 8, bw - 12, 4);
     });
   }
 
@@ -277,8 +292,8 @@ const Screen = (() => {
     amb += dt * 0.15;
     g.shadowBlur = 0;
     cols.forEach((c, i) => {
-      const x = 320 + 230 * Math.sin(amb * (0.7 + i * 0.23) + i * 2), y = 180 + 110 * Math.cos(amb * (0.5 + i * 0.17) + i);
-      const r = g.createRadialGradient(x, y, 0, x, y, 260);
+      const x = W / 2 + (W / 2 - 90) * Math.sin(amb * (0.7 + i * 0.23) + i * 2), y = H / 2 + (H / 2 - 70) * Math.cos(amb * (0.5 + i * 0.17) + i);
+      const r = g.createRadialGradient(x, y, 0, x, y, Math.max(260, Math.max(W, H) * 0.4));
       r.addColorStop(0, `rgba(${c.map(v => Math.round(v * 255)).join(",")},0.5)`); r.addColorStop(1, "rgba(0,0,0,0)");
       g.fillStyle = r; g.fillRect(0, 0, W, H);
     });
@@ -296,9 +311,10 @@ const Screen = (() => {
     if (!text) return false;
     g.fillStyle = "rgba(0,0,0,0.85)"; g.shadowBlur = 0; g.fillRect(0, 0, W, H);
     neon(cols[0], 7);
-    g.font = `900 ${text.length > 1 ? 150 : 230 * (1.3 - 0.3 * u)}px system-ui`;
+    const fit = Math.min(1, W / 520);  // DROP! fits a narrow wall too
+    g.font = `900 ${(text.length > 1 ? 150 : 230 * (1.3 - 0.3 * u)) * fit}px system-ui`;
     g.textAlign = "center"; g.textBaseline = "middle";
-    g.strokeText(text, 320, 185);
+    g.strokeText(text, W / 2, H / 2 + 5);
     return true;
   }
 
@@ -320,6 +336,7 @@ const Screen = (() => {
   function update(f, show_, dt) {
     if (!f || !show_?.screen) return null;
     S = show_;
+    shape(show_.screen_px);
     const d = show_.plan?.[f.phrase];
     const want = wanted(f, d);
     // the show arc's LED wall knob (live mode): dimmer, below half only calm colour, at zero off

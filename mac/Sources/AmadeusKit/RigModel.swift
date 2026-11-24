@@ -582,6 +582,11 @@ public struct RigDocument: Equatable {
         }
     }
 
+    /// The LED wall's pixels (`screen.pixels`), nil when not given.
+    public var screenPixels: (w: Int, h: Int)? { ScreenShape.pixels(raw["screen"]) }
+    /// The LED wall's shape, width over height.
+    public var screenAspect: Double { ScreenShape.aspect(screenPixels) }
+
     /// The set as JSON, with the editor's changes merged into what was there.
     public func json() throws -> Data {
         var out = raw

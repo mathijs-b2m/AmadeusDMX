@@ -135,6 +135,7 @@ struct EditorInspector: View {
                 }), range: 10...100, step: 5, unit: "%")
             }
             Toggle("LED wall behind the DJ", isOn: Binding(get: { editor.doc.hasScreen }, set: { editor.setScreen($0) }))
+            if editor.doc.hasScreen { ScreenPixelsRow(editor: editor) }
             if !editor.doc.stage.outdoor {
                 Toggle("Beams stay off the ceiling", isOn: Binding(get: { editor.doc.stage.ceilingGuard },
                                                                    set: { v in editor.updateStage { $0.ceilingGuard = v } }))
@@ -720,5 +721,47 @@ struct ValueSlider: View {
                     .monospacedDigit().foregroundStyle(.secondary).frame(width: 58, alignment: .trailing)
             }
         }
+    }
+}
+
+/// The LED wall's resolution, as its processor maps it: it sets the wall's shape (and the animations' layout).
+/// Typed in pixels, or worked out from its panels.
+private struct ScreenPixelsRow: View {
+    let editor: RigEditorModel
+    @State private var cols = 6
+    @State private var rows = 3
+    @State private var panel = 128
+
+    var body: some View {
+        let px = editor.doc.screenPixels
+        LabeledContent("LED wall pixels") {
+            HStack(spacing: 4) {
+                TextField("Width", value: Binding(get: { px?.w }, set: { w in
+                    editor.setScreenPixels(w.map { (max(1, $0), px?.h ?? max(1, $0 * 9 / 16)) })
+                }), format: .number.grouping(.never), prompt: Text("W"))
+                .frame(width: 56)
+                Text("×").foregroundStyle(.secondary)
+                TextField("Height", value: Binding(get: { px?.h }, set: { h in
+                    editor.setScreenPixels(h.map { (px?.w ?? max(1, $0 * 16 / 9), max(1, $0)) })
+                }), format: .number.grouping(.never), prompt: Text("H"))
+                .frame(width: 56)
+                Menu {
+                    Stepper("\(cols) panels across", value: $cols, in: 1...64)
+                    Stepper("\(rows) panels high", value: $rows, in: 1...64)
+                    Picker("Panel", selection: $panel) {
+                        ForEach([64, 96, 104, 112, 128, 144, 160, 168, 176, 192, 208, 256], id: \.self) { Text("\($0) px").tag($0) }
+                    }
+                    Button("Set \(cols * panel) × \(rows * panel)") {
+                        editor.setScreenPixels((cols * panel, rows * panel), panel: panel)
+                    }
+                } label: { Image(systemName: "square.grid.3x2") }
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("From its panels: how many across and high, and one panel's pixels")
+            }
+        }
+        .help(px == nil ? "Not given: the wall is 16:9. Its pixels give it its shape, and the LED Wall Output and the hang sheet use them."
+                        : "The wall's resolution as its LED processor maps it: its shape follows")
+        .onAppear { if let p = editor.screenPanelPx { panel = p } }
     }
 }

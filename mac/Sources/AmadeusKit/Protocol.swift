@@ -250,6 +250,8 @@ public struct Hello: Decodable, Sendable {
     public var maxFlashHz: Double
     public var energy: [Double]
     public var screen: Bool
+    /// The LED wall's pixels, when the rig gives them (its shape).
+    public var screenPx: [Int]?
     /// The phrase of the drop the LED wall counts into (3-2-1 DROP!): a rare moment, once or twice a night.
     public var countdown: Int?
     public var trusses: [Truss]
@@ -264,7 +266,7 @@ public struct Hello: Decodable, Sendable {
     public var gobos: [GoboPicture]
 
     enum CodingKeys: String, CodingKey {
-        case track, duration, bpm, director, fixtures, stage, plan, maxFlashHz = "max_flash_hz", energy, screen, countdown, trusses, zones
+        case track, duration, bpm, director, fixtures, stage, plan, maxFlashHz = "max_flash_hz", energy, screen, screenPx = "screen_px", countdown, trusses, zones
         case genre, genreSource = "genre_source", program, style, gobos
     }
 
@@ -280,6 +282,7 @@ public struct Hello: Decodable, Sendable {
         maxFlashHz = try c.decodeIfPresent(Double.self, forKey: .maxFlashHz) ?? 4
         energy = try c.decodeIfPresent([Double].self, forKey: .energy) ?? []
         screen = try c.decodeIfPresent(Bool.self, forKey: .screen) ?? false
+        screenPx = (try? c.decodeIfPresent([Int].self, forKey: .screenPx)).flatMap { $0.count == 2 && $0.allSatisfy { $0 > 0 } ? $0 : nil }
         countdown = try? c.decodeIfPresent(Int.self, forKey: .countdown)
         trusses = (try? c.decodeIfPresent([Truss].self, forKey: .trusses)) ?? []
         genre = (try? c.decodeIfPresent(String.self, forKey: .genre)) ?? ""
@@ -289,6 +292,9 @@ public struct Hello: Decodable, Sendable {
         zones = (try? c.decodeIfPresent([Zone].self, forKey: .zones)) ?? []
         gobos = (try? c.decodeIfPresent([GoboPicture].self, forKey: .gobos)) ?? []
     }
+
+    /// The LED wall's shape, width over height (16:9 without its pixels).
+    public var screenAspect: Double { ScreenShape.aspect(screenPx.map { (w: $0[0], h: $0[1]) }) }
 
     /// The track title without the "Deck A: " prefix and the file extension.
     public var title: String {

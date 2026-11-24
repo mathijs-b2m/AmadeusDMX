@@ -337,11 +337,11 @@ vertex WallOut wall_vertex(WallIn in [[stage_in]], constant Uniforms &u [[buffer
 
 // the wall's picture comes ready (WallSource: the drawing or the psychedelic shader, at the wall's level)
 fragment float4 wall_fragment(WallOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
-                              constant float4 &w [[buffer(3)]]) {   // w.x: 1 while the wall plays, else 0
+                              constant float4 &w [[buffer(3)]]) {   // w.x: 1 while the wall plays, else 0; w.y: its aspect
     constexpr sampler smp(filter::linear, mip_filter::linear, address::clamp_to_edge);
     float3 c = tex.sample(smp, in.uv).rgb * w.x;
     // LED pixel grid, faintly visible up close
-    float2 px = fract(in.uv * float2(192.0, 108.0));
+    float2 px = fract(in.uv * float2(108.0 * w.y, 108.0));
     float grid = 0.85 + 0.15 * smoothstep(0.0, 0.15, min(min(px.x, 1.0 - px.x), min(px.y, 1.0 - px.y)));
     return float4(c * 1.6 * grid + float3(0.004), 1);
 }

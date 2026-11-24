@@ -23,6 +23,7 @@ from amadeus.dmx import limiter
 from amadeus.engine.engine import program_of
 from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
+from amadeus.rig.trusses import screen_pixels
 
 LITE_HZ = 5  # status frames per second for lite clients
 
@@ -94,6 +95,7 @@ def hello(
             "max_flash_hz": rig["safety"]["max_flash_hz"],
             "energy": energy_curve(a),
             "screen": bool(rig.get("screen")),
+            "screen_px": list(px) if (px := screen_pixels(rig)) else None,  # the wall's pixels: its shape
             "countdown": countdown,
             # what kind of music, where that came from, and the program it gets (if any: cinematic, lightshow)
             "genre": getattr(a, "genre", ""),

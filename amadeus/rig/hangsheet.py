@@ -483,6 +483,26 @@ svg.tower-svg .dim { text-anchor: start; }
 """
 
 
+def screen_text(merged: dict) -> str | None:
+    """The LED wall for the crew: where it stands, its pixels and panels, how the processor maps it. None: no wall."""
+    s = merged.get("screen")
+    if not s:
+        return None
+    wall = T.screen_wall(merged.get("trusses", []))
+    where = f"on the front of {wall['id']}" if wall else "behind the DJ"
+    px = T.screen_pixels(merged)
+    if not px:
+        return f"LED wall {where}. Its pixels aren't in the rig: add them (the wall's shape and the test card follow)."
+    out = f"LED wall {where}: {px[0]} × {px[1]} pixels"
+    panel = s.get("panel_px") if isinstance(s, dict) else None
+    if isinstance(panel, int | float) and panel > 0:
+        out += f", {math.ceil(px[0] / panel)} × {math.ceil(px[1] / panel)} panels of {int(panel)} px"
+    return (
+        out + ". Map it in the LED processor pixel for pixel from where the LED Wall Output puts it (the top left "
+        "of the input unless set otherwise), then check it with the output's test card."
+    )
+
+
 def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
     """The printable hang sheet: one HTML file (print it, or save it as PDF from the browser)."""
     lay = layout(merged)
@@ -511,6 +531,8 @@ def html(merged: dict, set_name: str = "", rig_name: str = "") -> str:
             f"({_e(', '.join(r['id'] for r in lay['waiting']))}): place them in the rig editor first.</p>"
         )
     p.append(f"<p class='legend'>{legend}</p>{_plan_svg(merged, lay)}</section>")
+    if wall := screen_text(merged):
+        p.append(f"<section><h2>LED wall</h2><p class='sub'>{_e(wall)}</p></section>")
     for st in lay["structures"]:
         if not st["fixtures"]:
             continue

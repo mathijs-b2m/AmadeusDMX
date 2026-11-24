@@ -139,8 +139,16 @@ final class WallOutputController {
             problem = info.hiDPI ? "\(info.name) runs a scaled (HiDPI) resolution: the wall's pixels won't land one to one. Choose a native resolution in System Settings › Displays." : nil
             open(on: screen)
         }
+        updateScale()
+    }
+
+    /// Draw the picture as fine as the wall needs (its rectangle, the rig's shape).
+    fileprivate func updateScale() {
+        let src = WallSource.shared
         let px = outputPixels.map { WallOutputLayout.wallRect(settings.target == .display ? settings.rect : nil, display: $0.w, $0.h) }
-        WallSource.shared.scale = WallOutputLayout.pictureScale(forWallHeight: px.map { WallOutputLayout.fit($0).h })
+        let c = WallRenderer.canvas(src.aspect)
+        src.scale = WallOutputLayout.pictureScale(picture: px.map { WallOutputLayout.fit($0, aspect: src.aspect) },
+                                                  canvas: (Double(c.w), Double(c.h)))
     }
 
     private func open(on screen: NSScreen?) {
@@ -232,10 +240,10 @@ final class WallOutputController {
     fileprivate func layout(drawable d: (w: Int, h: Int)) -> (wall: PixelRect, picture: PixelRect) {
         guard settings.target == .display, let mode = chosenScreen?.pixels else {
             let all = PixelRect(x: 0, y: 0, w: d.w, h: d.h)
-            return (all, WallOutputLayout.fit(all))
+            return (all, WallOutputLayout.fit(all, aspect: WallSource.shared.aspect))
         }
         let wall = WallOutputLayout.scaled(WallOutputLayout.wallRect(settings.rect, display: mode.w, mode.h), from: mode, to: d)
-        return (wall, WallOutputLayout.fit(wall))
+        return (wall, WallOutputLayout.fit(wall, aspect: WallSource.shared.aspect))
     }
 
     /// The test card's picture for this wall (kept until the wall's size or the panel size changes).
@@ -379,6 +387,7 @@ final class WallOutputView: NSView {
         let s = controller.settings
         let (hello, frame, receiving) = controller.source()
         let state = WallSource.shared.prepare(frame: frame, hello: hello, now: now, cmd: cmd)
+        controller.updateScale()   // a show on a rig of another shape
         // the show stopped (or this rig has no LED wall): black within half a second, never a frozen picture
         let live: Float = receiving && state != nil ? 1 : 0
         fade += (live - fade) * min(1, dt * (live > fade ? 6 : 4))

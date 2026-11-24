@@ -19,24 +19,18 @@ final class WallSource {
         return (d, q)
     }()
 
-    /// The composed picture: 1280×720 (the stage samples it with mipmaps, the output fits it to the wall).
-    static let pictureW = 1280, pictureH = 720
+    /// The composed picture: twice the canvas (1280×720 for 16:9), the wall's shape, at most 2560 on its long side
+    /// (the stage samples it with mipmaps, the output fits it to the wall).
     private(set) var picture: MTLTexture?
     /// What the wall showed last.
     private(set) var state: WallState?
 
     /// The director's choice, or one scene tried out (the stage's LED wall menu).
     var force: WallScene = .auto { didSet { renderer.force = force } }
-    /// How much finer than 640×360 the CPU draws (WallOutputLayout.pictureScale: the output's wall).
-    var scale: Double = 1 {
-        didSet {
-            guard scale != oldValue else { return }
-            renderer = WallRenderer(scale: CGFloat(scale))
-            renderer.force = force
-            cpu = nil
-            state = nil
-        }
-    }
+    /// How much finer than its units the CPU draws (WallOutputLayout.pictureScale: the output's wall).
+    var scale: Double = 1 { didSet { if scale != oldValue { rebuild() } } }
+    /// The wall's shape, width over height: the show's rig (its pixels), 16:9 without them.
+    private(set) var aspect: Double = ScreenShape.defaultAspect { didSet { if aspect != oldValue { rebuild(); makePicture() } } }
     /// Seconds the picture runs ahead of the show's clock (the output's lead).
     var lead: Double = 0
 
@@ -62,11 +56,25 @@ final class WallSource {
             d.colorAttachments[0].pixelFormat = .rgba16Float
             composePipe = try gpu.device.makeRenderPipelineState(descriptor: d)
         } catch { print("wall shaders: \(error)") }
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Self.pictureW, height: Self.pictureH,
-                                                          mipmapped: true)
+        makePicture()
+    }
+
+    private func rebuild() {
+        renderer = WallRenderer(scale: CGFloat(scale), aspect: aspect)
+        renderer.force = force
+        cpu = nil
+        state = nil
+    }
+
+    private func makePicture() {
+        guard let gpu = Self.gpu else { return }
+        let c = WallRenderer.canvas(aspect), k = min(2, 2560 / max(c.w, c.h))
+        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Int((c.w * k).rounded()),
+                                                          height: Int((c.h * k).rounded()), mipmapped: true)
         td.usage = [.shaderRead, .renderTarget]
         td.storageMode = .private
         picture = gpu.device.makeTexture(descriptor: td)
+        dirty = true
     }
 
     /// Brings the picture up to date for this moment of the show and encodes its drawing into `cmd` (only when it
@@ -78,6 +86,7 @@ final class WallSource {
         lastTick = max(lastTick ?? now, now)
         // (a stage without a show, the rig editor's, leaves the picture to the ones that have one)
         guard let h = hello, h.screen, var f = frame, !f.lite, let gpu = Self.gpu else { return nil }
+        aspect = h.screenAspect
         pending += dt
         if lead != 0 {   // ahead of the lights: the clock and the beat move on, the plan is known in advance
             f.t += lead
@@ -117,7 +126,7 @@ final class WallSource {
         rp.colorAttachments[0].storeAction = .store
         guard let enc = cmd.makeRenderCommandEncoder(descriptor: rp) else { return }
         let p = s.palette + Array(repeating: s.palette.last ?? .one, count: max(0, 4 - s.palette.count))
-        var wp = WallParams(info: [s.level, s.psychedelic ? 1 : 0, Float(now - startTime), 0], bands: s.bands,
+        var wp = WallParams(info: [s.level, s.psychedelic ? 1 : 0, Float(now - startTime), Float(aspect)], bands: s.bands,
                             pal: (SIMD4(p[0], 1), SIMD4(p[1], 1), SIMD4(p[2], 1), SIMD4(p[3], 1)))
         enc.setRenderPipelineState(composePipe)
         enc.setFragmentTexture(cpu, index: 0)
@@ -136,7 +145,7 @@ enum WallShaders {
 #include <metal_stdlib>
 using namespace metal;
 
-struct WallParams { float4 info; float4 bands; float4 pal[4]; };   // info: x level, y psychedelic, z time
+struct WallParams { float4 info; float4 bands; float4 pal[4]; };   // info: x level, y psychedelic, z time, w aspect
 struct FSOut { float4 pos [[position]]; float2 uv; };
 
 vertex FSOut wall_fs_vertex(uint vid [[vertex_id]]) {
@@ -144,8 +153,8 @@ vertex FSOut wall_fs_vertex(uint vid [[vertex_id]]) {
     FSOut o; o.pos = float4(p * 2.0 - 1.0, 0, 1); o.uv = float2(p.x, 1.0 - p.y); return o;
 }
 
-float3 psychedelic(float2 uv, float t, float4 bands, constant float4 *pal) {
-    float2 p = (uv - 0.5) * float2(16.0 / 9.0, 1.0) * 2.0;
+float3 psychedelic(float2 uv, float t, float aspect, float4 bands, constant float4 *pal) {
+    float2 p = (uv - 0.5) * float2(aspect, 1.0) * 2.0;   // round on a wall of any shape
     // kaleidoscope: fold the angle into 6 slices, then a flowing plasma that the bass pushes outwards
     float a = atan2(p.y, p.x), r = length(p);
     float k = 3.14159 / 3.0;
@@ -167,7 +176,7 @@ float3 psychedelic(float2 uv, float t, float4 bands, constant float4 *pal) {
 // stage's bloom sees the rings; the output clamps)
 fragment float4 wall_compose(FSOut in [[stage_in]], texture2d<float> tex [[texture(0)]], constant WallParams &w [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
-    float3 c = w.info.y > 0.5 ? psychedelic(in.uv, w.info.z, w.bands, w.pal) : tex.sample(smp, in.uv).rgb;
+    float3 c = w.info.y > 0.5 ? psychedelic(in.uv, w.info.z, w.info.w > 0.0 ? w.info.w : 16.0 / 9.0, w.bands, w.pal) : tex.sample(smp, in.uv).rgb;
     return float4(c * w.info.x, 1);
 }
 

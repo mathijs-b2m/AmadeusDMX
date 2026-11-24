@@ -143,7 +143,7 @@ extension StageRenderer {
 
     func rebuildScenery(_ inp: StageInput) {
         let first = scenery == nil
-        let s = Scenery(fixtures: inp.fixtures, stage: inp.stage, screen: inp.screen, trusses: inp.trusses, selected: inp.selected)
+        let s = Scenery(fixtures: inp.fixtures, stage: inp.stage, screen: inp.screen, screenAspect: inp.screenAspect, trusses: inp.trusses, selected: inp.selected)
         scenery = s
         sceneryKey = inp.key
         sceneryCount = s.vertices.count

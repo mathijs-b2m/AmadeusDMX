@@ -59,3 +59,33 @@ import Testing
     t.save(d)
     #expect(WallOutputSettings.load(d) == t)
 }
+
+@Test func theWallsShapeComesFromItsPixels() throws {
+    #expect(ScreenShape.pixels(nil) == nil)
+    #expect(ScreenShape.pixels(.bool(true)) == nil)
+    let px = try #require(ScreenShape.pixels(.object(["pixels": .array([.number(768), .number(384)])])))
+    #expect(px.w == 768 && px.h == 384 && ScreenShape.aspect(px) == 2)
+    #expect(ScreenShape.aspect(nil) == 16.0 / 9.0)
+    #expect(ScreenShape.aspect((w: 10000, h: 10)) == 6)   // kept in range
+    // a tall wall stays under the ceiling, its shape kept; 16:9 and wider as always
+    let tall = ScreenShape.size(width: 5, aspect: 0.5, bottom: 1.4, ceiling: 6)
+    #expect(abs(tall.h - 4.3) < 1e-9 && abs(tall.w - 2.15) < 1e-9)
+    let wide = ScreenShape.size(width: 8, aspect: 16.0 / 9.0, bottom: 1.4, ceiling: 3)
+    #expect(wide.w == 8 && wide.h == 4.5)
+}
+
+@Test func theHelloCarriesTheWallsPixels() throws {
+    let json = #"{"type": "hello", "screen": true, "screen_px": [1536, 384]}"#
+    guard case .hello(let h) = try #require(FeedMessage.decode(Data(json.utf8))) else { Issue.record("not a hello"); return }
+    #expect(h.screenPx == [1536, 384] && h.screenAspect == 4)
+    guard case .hello(let old) = try #require(FeedMessage.decode(Data(#"{"type": "hello", "screen": true}"#.utf8))) else { return }
+    #expect(old.screenPx == nil && old.screenAspect == 16.0 / 9.0)
+}
+
+@Test func aLongWallIsDrawnFineEnoughButNotTooBig() {
+    #expect(WallOutputLayout.pictureScale(picture: nil, canvas: (640, 360)) == 1)
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 1920, h: 1080), canvas: (640, 360)) == 2)
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 768, h: 384), canvas: (720, 360)) == 1.5)
+    // a 4:1 ribbon of 2560 × 640: 1440 × 360 units at 2 would be 2 million pixels for the CPU
+    #expect(WallOutputLayout.pictureScale(picture: PixelRect(x: 0, y: 0, w: 2560, h: 640), canvas: (1440, 360)) == 1.5)
+}

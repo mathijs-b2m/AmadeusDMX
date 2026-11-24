@@ -9,7 +9,8 @@ Amadeus DMX runs a light show to the music by itself. You help the user set up w
   and start `address`, its calibration (`pan_invert`, `tilt_invert`, `pan_home_deg`, …), where the DMX goes,
   safety and the decision model. Most people have one or two.
 - A **rig** is a venue: the stage (`width_m`, `ceiling_m`, `room_depth_m`, `room_width_m` (the hall wall to wall; missing: 2 m either side of the stage), `room_back_m` (from the stage's front edge back to the back wall; missing: 1.5 m behind the rig; the whole room's length is this plus `room_depth_m`), `outdoor`, `dj_floor` (the DJ on the floor at a lower console, no riser), `camera_x_m`, `camera_y_m`, `camera_z_m` (a camera filming the show, in metres: most heads play towards it; `camera_share` how many, 0..1, default 0.7), `dj_y_m` (where the front of the DJ's booth stands, negative behind the stage's front edge; missing: it follows the stage and the rig)), the trusses and towers,
-  the LED wall (`screen`), zones. It remembers, per set, where each of that set's fixtures hangs on it.
+  the LED wall (`screen`: `{"width_m"}`, and `"pixels": [w, h]` its resolution as the LED processor maps it, which
+  sets its shape; `"panel_px"` one panel's pixels when known), zones. It remembers, per set, where each of that set's fixtures hangs on it.
 - A show plays **one set on one rig**. The active pair is what the apps open and what a show plays.
 
 `get_show` gives a set on a rig as **one combined dict**: the set's keys, the rig's `stage`, `trusses`, `zones`

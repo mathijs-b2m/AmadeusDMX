@@ -14,6 +14,7 @@ struct StageInput {
     var fixtures: [FixtureInfo]
     var stage: Stage
     var screen: Bool
+    var screenAspect: Double = ScreenShape.defaultAspect   // the LED wall's shape, width over height
     var hello: Hello?
     var trusses: [Truss] = []
     var selected: Set<String> = []   // "truss:ID" / "fixture:ID" (rig editor)
@@ -435,7 +436,7 @@ final class StageRenderer: NSObject, MTKViewDelegate {
                 enc.setRenderPipelineState(wallPipe)
                 enc.setDepthStencilState(solidDepth)
                 enc.setVertexBuffer(wb, offset: 0, index: 0)
-                var w = SIMD4<Float>(wallOn, 0, 0, 0)
+                var w = SIMD4<Float>(wallOn, Float(inp?.screenAspect ?? ScreenShape.defaultAspect), 0, 0)
                 enc.setFragmentTexture(WallSource.shared.picture, index: 0)
                 enc.setFragmentBytes(&w, length: MemoryLayout<SIMD4<Float>>.stride, index: 3)
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
