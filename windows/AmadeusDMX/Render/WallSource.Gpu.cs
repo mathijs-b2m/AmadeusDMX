@@ -213,7 +213,8 @@ public sealed partial class WallSource
         Vector3 P(int i) => pal[Math.Min(i, pal.Length - 1)];
         var wp = new WallParams
         {
-            Info = new(s.Level, s.Psychedelic ? 1 : 0, (float)(now - _startTime), (float)_aspect), Bands = s.Bands,
+            Info = new(s.Level, s.Psychedelic ? 1 : 0, (float)(now - _startTime), (float)_aspect),
+            Bands = new(s.Bands.X, s.Bands.Y, s.Bands.Z, s.Flash), Layer = s.Layer,
             Pal0 = new(P(0), 1), Pal1 = new(P(1), 1), Pal2 = new(P(2), 1), Pal3 = new(P(3), 1),
         };
         ctx.UpdateSubresource(in wp, _params!);

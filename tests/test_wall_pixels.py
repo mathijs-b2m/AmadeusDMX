@@ -85,3 +85,27 @@ def test_the_hang_sheet_tells_the_crew_the_pixels_and_panels():
     assert "768 × 384 pixels" in text and "6 × 3 panels of 128 px" in text and "on the front of wall" in text
     assert "aren't in the rig" in hangsheet.screen_text({"screen": True, "trusses": []})
     assert "behind the DJ" in hangsheet.screen_text({"screen": True, "trusses": []})
+
+
+def test_the_feed_says_when_the_lights_strobe():
+    from amadeus.engine.realism import Realism
+    from amadeus.engine.state import State
+    from amadeus.rig.loader import load_rig_dict
+
+    rig = festival()
+    rig["fixtures"] = [
+        {"id": f"h{k}", "fixture": "claypaky/sharpy", "universe": 1, "address": 1 + 20 * k} for k in range(4)
+    ]
+    for fid, spot in automount.automount(rig).items():
+        next(f for f in rig["fixtures"] if f["id"] == fid).update(spot)
+    loaded = load_rig_dict(rig)
+    feed = feedlib.Feed(loaded, Realism(loaded), 0.025)
+    ids = feed.ids
+    assert "strobe" not in feed.fixture_fields({e: State(dimmer=1.0) for e in ids})  # steady light: no word of it
+    half = {e: State(dimmer=1.0, strobe_hz=4.0 if k % 2 == 0 else 0.0, gate=0.0) for k, e in enumerate(ids)}
+    assert feed.fixture_fields(half)["strobe"] == [0.5, 0.0]  # half the rig strobes, dark this moment
+    lit = {e: State(dimmer=1.0, strobe_hz=4.0, gate=1.0) for e in ids}
+    assert feed.fixture_fields(lit)["strobe"] == [1.0, 1.0]
+    assert "strobe" not in feed.fixture_fields(
+        {e: State(dimmer=0.0, strobe_hz=4.0) for e in ids}
+    )  # dark lights don't count

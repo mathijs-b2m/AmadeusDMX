@@ -677,6 +677,9 @@ public sealed class Frame
     /// Per element: [dimmer, r, g, b, white, pan, tilt]
     public float[][] Fx { get; init; } = [];
     public float[] Bands { get; init; } = [];
+    /// While lights strobe: the share of the rig that does (X, 0..1) and its flash on the beat grid now (Y, 0 dark ..
+    /// 1 lit). The LED wall flashes with it.
+    public Vector2? Strobe { get; init; }
     public string?[] Beam { get; init; } = [];
     public Vector3?[] Dirs { get; init; } = [];
     public LaserBeam[]?[] Lz { get; init; } = [];
@@ -765,6 +768,7 @@ public sealed class Frame
         Bp = J.Val(c, "bp", J.Double),
         Fx = J.Ref(c, "fx", J.ArrayOf(J.ArrayOf(J.Float))) ?? [],
         Bands = J.Ref(c, "bands", J.ArrayOf(J.Float)) ?? [],
+        Strobe = J.Try(() => J.Ref(c, "strobe", J.ArrayOf(J.Float))) is { Length: >= 2 } st ? new Vector2(st[0], st[1]) : null,
         Beam = J.Ref(c, "beam", J.ArrayOf(J.OrNull(J.String))) ?? [],
         Dirs = J.Ref(c, "dirs", J.ArrayOf(Direction)) ?? [],
         Lz = J.Ref(c, "lz", J.ArrayOf(Beams)) ?? [],

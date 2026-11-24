@@ -6,7 +6,8 @@
 cbuffer WallParams : register(b0)
 {
     float4 info;        // x level, y psychedelic, z time, w aspect
-    float4 bands;
+    float4 bands;       // w: the flash
+    float4 layer;       // x mask, y beat pulse, z beat phase, w beat parity
     float4 pal[4];
 };
 
@@ -46,13 +47,45 @@ float3 psychedelic(float2 uv, float t, float aspect)
     return c;
 }
 
+// The overlay layer's mask, as a VJ lays one over the picture: where the beat's lift and the strobe's flash show.
+// 0 the whole wall, 1 bars across, 2 bars down, 3 blocks, 4 a diamond opening with the beat, 5 slashes, 6 a frame,
+// 7 the whole wall with the flash as the picture's negative. Bars, blocks and slashes swap places every beat.
+float layer_mask(float2 uv, float kind, float aspect, float u, float parity)
+{
+    float2 p = float2(uv.x * aspect, uv.y);   // in wall heights: the pattern is as coarse on any shape
+    float m = 1.0;
+    if (kind > 0.5 && kind < 1.5) m = fmod(floor(p.y * 8.0) + parity, 2.0) < 0.5 ? 1.0 : 0.0;
+    else if (kind > 1.5 && kind < 2.5) m = fmod(floor(p.x * 8.0) + parity, 2.0) < 0.5 ? 1.0 : 0.0;
+    else if (kind > 2.5 && kind < 3.5) m = fmod(floor(p.x * 4.0) + floor(p.y * 4.0) + parity, 2.0) < 0.5 ? 1.0 : 0.0;
+    else if (kind > 3.5 && kind < 4.5)
+    {
+        float d = abs(p.x - aspect * 0.5) + abs(p.y - 0.5), r = u * (aspect * 0.5 + 0.5);
+        m = abs(d - r) < 0.1 ? 1.0 : (d < r ? 0.3 : 0.0);
+    }
+    else if (kind > 4.5 && kind < 5.5) m = fmod(floor((p.x + (parity > 0.5 ? p.y : -p.y)) * 5.0 + 40.0), 2.0) < 0.5 ? 1.0 : 0.0;
+    else if (kind > 5.5 && kind < 6.5)
+    {
+        float e = min(min(p.x, aspect - p.x), min(p.y, 1.0 - p.y));
+        m = e < 0.06 ? 1.0 : 0.0;
+    }
+    return m;
+}
+
 // the picture as the wall shows it: the CPU's drawing or the psychedelic shader, at the wall's level (HDR: the
 // stage's bloom sees the rings; the output clamps)
 float4 wall_compose(FSOut i) : SV_Target
 {
     // both branches evaluated (a vector ?: in SM4 isn't short-circuit); the picture has one level, no gradients needed
     float3 picture = tex.SampleLevel(smp, i.uv, 0).rgb;
-    float3 c = info.y > 0.5 ? psychedelic(i.uv, info.z, info.w > 0.0 ? info.w : 16.0 / 9.0) : picture;
+    float aspect = info.w > 0.0 ? info.w : 16.0 / 9.0;
+    float3 c = info.y > 0.5 ? psychedelic(i.uv, info.z, aspect) : picture;
+    // the overlay layer: on the beat the picture lifts through the mask (and a breath of colour with it); when the
+    // lights strobe the mask flashes with them, near white with a touch of the palette, or as the picture's negative
+    float m = layer_mask(i.uv, layer.x, aspect, layer.z, layer.w);
+    c = c * (1.0 + 0.6 * layer.y * m) + pal[1].rgb * (0.1 * layer.y * m);
+    float3 white = lerp(pal[0].rgb, float3(1.0, 1.0, 1.0), 0.8);
+    float3 lit = layer.x > 6.5 ? white * (1.0 - saturate(c)) : white;
+    c = lerp(c, lit, saturate(bands.w) * m);
     return float4(c, 1);   // at full level: who shows it applies the wall's level (as light)
 }
 

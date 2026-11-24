@@ -4,7 +4,7 @@
 // -camera "Front of House" (a preset), -cameraYaw 180 (turned round the stage that many degrees from it), -inRoom YES,
 // -snapshotSize 1600x900. On a rig with an LED wall it also draws what the LED Wall Output sends: NAME-wall.png (the
 // show's picture) and NAME-card.png (the test card) on a display of -wallOutputSize 1920x1080, the wall at
-// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128, one scene with -wallScene runner. The app quits when done, before it starts
+// -wallRect X,Y,W,H (missing: the whole display), panels of -panelPx 128, one scene with -wallScene runner, one overlay mask with -wallMask 5. The app quits when done, before it starts
 // anything.
 import AmadeusKit
 import AppKit
@@ -68,7 +68,7 @@ enum StageSnapshot {
            case .frame(let bf)? = FeedMessage.decode(try Data(contentsOf: dir.appending(path: f0))) {
             // -wallBench YES: how long the CPU takes to draw one wall picture per scene, at 720p, 1080p and 4K
             for s in [2.0, 3.0, 6.0] {
-                for scene in [WallScene.runner, .dancer, .crowd, .pong, .words, .equalizer, .ambient] {
+                for scene in WallScene.allCases.filter { ![.auto, .off, .psychedelic].contains($0) } {
                     let w = WallRenderer(scale: CGFloat(s), aspect: hello.screenAspect)
                     w.force = scene
                     var f = bf
@@ -86,7 +86,7 @@ enum StageSnapshot {
                 let p = d.assumingMemoryBound(to: UInt8.self), n = w.pixelWidth * w.pixelHeight
                 return Double((0..<n).reduce(0) { $0 + Int(p[$1 * 4]) + Int(p[$1 * 4 + 1]) + Int(p[$1 * 4 + 2]) }) / Double(n * 3)
             }
-            for scene in [WallScene.runner, .dancer, .crowd, .pong, .words, .equalizer, .ambient] {
+            for scene in WallScene.allCases.filter { ![.auto, .off, .psychedelic].contains($0) } {
                 let w = WallRenderer(scale: 1, aspect: hello.screenAspect)
                 w.force = scene
                 var f = bf, t = 0.0, short = [Double](), long = [Double]()
@@ -102,6 +102,7 @@ enum StageSnapshot {
             }
             exit(0)
         }
+        if let mask = UserDefaults.standard.string(forKey: "wallMask").flatMap(Float.init) { WallRenderer.forceMask = mask }   // -wallMask 5
         if let scene = UserDefaults.standard.string(forKey: "wallScene").flatMap(WallScene.init(rawValue:)) {
             WallSource.shared.force = scene   // -wallScene runner: one scene on the wall
         }

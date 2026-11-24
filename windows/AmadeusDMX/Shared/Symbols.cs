@@ -53,7 +53,7 @@ public static class Symbols
         ["square.3.layers.3d.down.right"] = "", ["rectangle.stack"] = "", ["rectangle.dashed"] = "",
         ["square.dashed"] = "", ["rectangle.portrait"] = "", ["rectangle.slash"] = "", ["square.grid.3x2"] = "\uF0E2", ["rectangle.on.rectangle"] = "\uE8A7",
         ["circle.dashed"] = "", ["circle.dotted"] = "", ["circle.fill"] = "", ["largecircle.fill.circle"] = "",
-        ["circle.hexagongrid"] = "", ["line.diagonal"] = "", ["thermometer.medium"] = "", ["id.1"] = "",
+        ["triangle"] = "\uEDDB", ["barcode"] = "\uE8EF", ["mountain.2"] = "\uE9D2", ["pawprint"] = "\uE7FC", ["circle.circle"] = "\uECCB", ["circle.hexagongrid"] = "", ["line.diagonal"] = "", ["thermometer.medium"] = "", ["id.1"] = "",
         ["id.2"] = "",
         // the show page (knobs, genres, camera presets, LED wall)
         ["tv"] = "\uE7F4", ["paintpalette"] = "\uE790", ["bolt"] = "\uE945", ["cloud"] = "\uE753", ["guitars"] = "\uE8D6",

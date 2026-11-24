@@ -122,10 +122,11 @@ public struct UnderlayVertex(Vector3 pos, Vector2 uv, float alpha)
 public struct WallParams
 {
     public Vector4 Info;    // x level, y psychedelic, z time, w aspect
-    public Vector4 Bands;
+    public Vector4 Bands;   // w: the flash
+    public Vector4 Layer;   // x mask, y beat pulse, z beat phase, w beat parity
     public Vector4 Pal0, Pal1, Pal2, Pal3;   // HLSL: float4 pal[4]
 
-    public const int Size = 96;
+    public const int Size = 112;
 }
 
 /// The bloom's blur (Direct3D only: Metal used MPSImageGaussianBlur): x/y one texel along the pass's direction,

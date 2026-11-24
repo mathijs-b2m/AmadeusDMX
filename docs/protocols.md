@@ -64,6 +64,7 @@ picture or words). Frames point into this list.
 | `dirs` | per element: the head's beam direction (unit vector), computed back from its DMX pan/tilt |
 | `lz` | per element: the beams a laser draws, `[dx, dy, dz, r, g, b, brightness]` each |
 | `bands` | spectrum meters, 0..1 |
+| `strobe` | only while lights strobe: `[share, gate]`, the share of the rig's lights that strobe (0..1) and their flash on the beat grid now (0 dark .. 1 lit). The LED wall flashes with it; the set's flash limit and the show arc already hold it |
 | `decks` | live mode: each deck's track, volume, play state and preparation progress |
 | `link` | Amadeus Link: the link's health (offset, jitter, lost packets) |
 | `guard` | what the laser guard did this frame (laser id → note) |
