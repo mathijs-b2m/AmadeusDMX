@@ -25,6 +25,8 @@ public sealed class StageControls(StageSettings stage, AppModel model)
             wallMenu.Items.Clear();
             foreach (var (raw, title, symbol) in StageSettings.WallScenes)
                 wallMenu.Items.Add(UI.Choice(title, "wall", stage.WallScene == raw, () => stage.WallScene = raw, symbol));
+            wallMenu.Items.Add(UI.Separator());
+            wallMenu.Items.Add(UI.Item(L("LED Wall Output…"), () => LEDWallOutputWindow.Open(model), "rectangle.on.rectangle"));
         };
         wall.Flyout = wallMenu;
         wall.Bind(stage, nameof(StageSettings.WallScene), b => b.Content = UI.Icon(stage.WallScene == "auto" ? "tv" : stage.WallSymbol, 14));

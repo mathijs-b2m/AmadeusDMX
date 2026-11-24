@@ -1,11 +1,14 @@
 // The LED wall's picture (the native version of web/js/screen.js; mac/Sources/AmadeusDMX/Render/WallRenderer.swift).
 // The director picks a mode per phrase (decision.screen): off | ambient | figure | words | equalizer | psychedelic.
 // Figures are playful neon outlines on the beat: a runner, a dancer, a jumping crowd, pong. Into a drop the wall
-// counts 3-2-1 and shouts DROP!. Psychedelic is drawn by a shader on the wall itself; everything else here, with
-// SkiaSharp (the Mac draws with Core Graphics), into a 640×360 BGRA picture that the renderer puts on the wall.
+// counts 3-2-1 and shouts DROP!. Psychedelic is drawn by a shader (WallSource); everything else here, with
+// SkiaSharp (the Mac draws with Core Graphics), into a 640×360 BGRA picture (finer for a real LED wall: `scale`)
+// that WallSource puts on the GPU.
 //
 // Core Graphics → Skia: the CG context is flipped to y-down like a canvas; Skia is y-down already. CG's per-draw
 // shadow (the neon glow) is a drop-shadow image filter with sigma = blur / 2; setAlpha multiplies every paint.
+// The Mac multiplies a shadow's blur by `scale` (CG's shadows are in pixels, not units); Skia's image filters are in
+// the canvas's units already and scale with it, so here the blur stays as it is.
 using System.Diagnostics;
 using System.Numerics;
 using System.Text.RegularExpressions;
@@ -40,11 +43,16 @@ public static class WallScenes
     };
 }
 
-public readonly record struct WallOutput(float Level, bool Psychedelic, Vector3[] Palette, Vector4 Bands, WallScene Scene);
+public readonly record struct WallState(float Level, bool Psychedelic, Vector3[] Palette, Vector4 Bands, WallScene Scene);
 
 public sealed partial class WallRenderer : IDisposable
 {
+    /// The picture's own units: everything is drawn as if on 640×360.
     public const int W = 640, H = 360;
+    /// How much finer than 640×360 the bitmap is (a real LED wall wants more pixels than the 3D stage's wall).
+    public float Scale { get; }
+    public int PixelWidth => _bitmap.Width;
+    public int PixelHeight => _bitmap.Height;
     readonly SKBitmap _bitmap;
     readonly SKCanvas _canvas;
     public WallScene Force { get; set; } = WallScene.Auto;
@@ -58,12 +66,15 @@ public sealed partial class WallRenderer : IDisposable
     int _lastBeat = -1;
     static readonly Stopwatch Clock = Stopwatch.StartNew();
 
-    public WallRenderer()
+    public WallRenderer(float scale = 1)
     {
+        Scale = scale;
+        int w = (int)MathF.Round(W * scale, MidpointRounding.AwayFromZero), h = (int)MathF.Round(H * scale, MidpointRounding.AwayFromZero);
         // premultiplied BGRA, like the Mac's premultipliedFirst + byteOrder32Little (the texture is B8G8R8A8_UNORM)
-        _bitmap = new SKBitmap(new SKImageInfo(W, H, SKColorType.Bgra8888, SKAlphaType.Premul));
+        _bitmap = new SKBitmap(new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Premul));
         _canvas = new SKCanvas(_bitmap);
         _canvas.Clear(SKColors.Black);
+        _canvas.Scale(scale);   // in 640×360 units
     }
 
     public void Dispose()
@@ -73,7 +84,7 @@ public sealed partial class WallRenderer : IDisposable
         _fill.Dispose(); _stroke.Dispose();
     }
 
-    /// The picture: W×H BGRA (premultiplied), RowBytes per row.
+    /// The picture: PixelWidth × PixelHeight BGRA (premultiplied), RowBytes per row.
     public ReadOnlySpan<byte> Pixels => _bitmap.GetPixelSpan();
     public int RowBytes => _bitmap.RowBytes;
 
@@ -112,7 +123,7 @@ public sealed partial class WallRenderer : IDisposable
         return (mode, scene);
     }
 
-    public WallOutput Update(Frame f, Hello h, float dt)
+    public WallState Update(Frame f, Hello h, float dt)
     {
         var d = f.Phrase >= 0 && f.Phrase < h.Plan.Count ? h.Plan[f.Phrase] : null;
         var want = Wanted(f, d);
@@ -155,7 +166,7 @@ public sealed partial class WallRenderer : IDisposable
             target = _cur.Mode == "off" ? 0 : _cur.Mode == "ambient" ? 0.4f : 0.95f;
         }
         _level += (target * MathF.Min(1, wall * 2) * _fade - _level) * MathF.Min(1, dt * 10);
-        return new WallOutput(_level, _cur.Mode == "psychedelic", Palettes.Colors(d?.Palette), bandsV, _cur.Scene);
+        return new WallState(_level, _cur.Mode == "psychedelic", Palettes.Colors(d?.Palette), bandsV, _cur.Scene);
     }
 
     // MARK: drawing state (Core Graphics' graphics state, the parts the scenes use)
@@ -511,7 +522,7 @@ public sealed partial class WallRenderer : IDisposable
     static SKTypeface? _display, _mono;
 
     /// The Mac's HelveticaNeue-CondensedBlack and Menlo-Bold, or their nearest on Windows.
-    static SKTypeface Typeface(bool mono)
+    internal static SKTypeface Typeface(bool mono)
     {
         static SKTypeface? Find(string family, SKFontStyleWeight weight, SKFontStyleWidth width)
         {

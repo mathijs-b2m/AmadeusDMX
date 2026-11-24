@@ -51,7 +51,7 @@ public static class Symbols
         ["film.stack"] = "", ["chart.bar"] = "", ["building.2"] = "", ["building.columns"] = "",
         ["square.grid.2x2"] = "", ["square.grid.3x3"] = "", ["squareshape.split.3x3"] = "",
         ["square.3.layers.3d.down.right"] = "", ["rectangle.stack"] = "", ["rectangle.dashed"] = "",
-        ["square.dashed"] = "", ["rectangle.portrait"] = "", ["rectangle.slash"] = "",
+        ["square.dashed"] = "", ["rectangle.portrait"] = "", ["rectangle.slash"] = "", ["rectangle.on.rectangle"] = "\uE8A7",
         ["circle.dashed"] = "", ["circle.dotted"] = "", ["circle.fill"] = "", ["largecircle.fill.circle"] = "",
         ["circle.hexagongrid"] = "", ["line.diagonal"] = "", ["thermometer.medium"] = "", ["id.1"] = "",
         ["id.2"] = "",

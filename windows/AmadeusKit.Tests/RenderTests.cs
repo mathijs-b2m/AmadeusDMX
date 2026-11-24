@@ -195,7 +195,8 @@ public class RenderTests
         Assert.Equal(LineInstance.Size, HlslSize(common, "LineInstance"));
         Assert.Equal(GoboBeamInstance.Size, HlslSize(common, "GoboBeamInstance"));
         Assert.Equal(GoboDecalInstance.Size, HlslSize(common, "GoboDecalInstance"));
-        Assert.Equal(WallParams.Size, HlslSize(common, "WallParams"));
+        Assert.Equal(WallParams.Size, HlslSize(Shader("WallSource.hlsl"), "WallParams"));
+        Assert.Equal(16, HlslSize(common, "WallOn"));
         Assert.Equal(BlurParams.Size, HlslSize(common, "BlurParams"));
     }
 
@@ -223,6 +224,7 @@ public class RenderTests
         ("GoboBeam.hlsl", ["gobo_beam_vertex", "gobo_beam_fragment"]),
         ("GoboDecal.hlsl", ["gobo_decal_vertex", "gobo_decal_fragment"]),
         ("Wall.hlsl", ["wall_vertex", "wall_fragment"]),
+        ("WallSource.hlsl", ["wall_fs_vertex", "wall_compose", "wall_output"]),
         ("Underlay.hlsl", ["underlay_vertex", "underlay_fragment"]),
         ("Post.hlsl", ["fullscreen_vertex", "composite_fragment", "downsample_fragment", "blur_fragment"]),
     ];
@@ -300,7 +302,7 @@ public class RenderTests
         Assert.NotEmpty(f.Parts.V);
         Assert.Equal(0, f.Parts.V.Count % 3);
         Assert.True(f.U.Ambient.X + f.U.Ambient.Y + f.U.Ambient.Z > 0);
-        Assert.True(f.WallPictureChanged);   // the first show frame draws the wall's picture
+        Assert.Equal(1, f.WallOn);   // the first show frame draws the wall's picture (WallSource)
         Assert.All(f.Beams, b => Assert.True(float.IsFinite(b.ApexLen.W) && b.ApexLen.W > 0 && b.DirRadius.W > 0));
         Assert.Equal(12, r.ZoneEdges.Count);  // a box zone: 12 edges
         Assert.Equal(36, r.ZoneVertices.Count);
@@ -486,7 +488,7 @@ public class RenderTests
         foreach (var scene in new[] { WallScene.Runner, WallScene.Dancer, WallScene.Crowd, WallScene.Pong, WallScene.Words, WallScene.Equalizer, WallScene.Ambient })
         {
             using var w = new WallRenderer { Force = scene };
-            WallOutput o = default;
+            WallState o = default;
             for (var i = 0; i < 30; i++) o = w.Update(SceneSamples.Frame(inp, 30 + i * 0.05), inp.Hello!, 0.05f);
             Assert.Equal(scene, o.Scene);
             Assert.False(o.Psychedelic);
@@ -507,13 +509,70 @@ public class RenderTests
         using var w = new WallRenderer();
         // the phrase before the drop: 3-2-1 (the words scene draws the countdown)
         var before = new Frame { T = 14, Phrase = 0, Bp = 14 * 128 / 60.0, Fx = [], Bands = [0.5f, 0.5f] };
-        WallOutput o = default;
+        WallState o = default;
         for (var i = 0; i < 20; i++) o = w.Update(before, inp.Hello!, 0.05f);
         Assert.Equal(WallScene.Words, o.Scene);
         using var psy = new WallRenderer { Force = WallScene.Psychedelic };
         o = psy.Update(SceneSamples.Frame(inp), inp.Hello!, 0.1f);
         Assert.True(o.Psychedelic);
         Assert.Equal(4, o.Palette.Length);
+    }
+
+    [Fact]
+    public void TheWallIsDrawnOnceForTheAppAndOnlyForAShowWithAWall()
+    {
+        var inp = SceneSamples.Club();
+        var source = new WallSource();
+        var frame = SceneSamples.Frame(inp);
+        // no show, a rig without a wall, a status frame: nothing (and nothing changes)
+        Assert.Null(source.Update(null, inp.Hello, 10));
+        Assert.Null(source.Update(frame, new Hello { Screen = false }, 10));
+        Assert.Null(source.Update(new Frame { T = 1, Lite = true }, inp.Hello, 10));
+        Assert.Null(source.State);
+        Assert.NotNull(source.Update(frame, inp.Hello, 10));
+        var v = source.StateVersion;
+        // the same show frame again, from another stage or the output, in the same moment: shared
+        source.Update(frame, inp.Hello, 10.01);
+        Assert.Equal(v, source.StateVersion);
+        // a still show keeps the wall alive
+        source.Update(frame, inp.Hello, 10.01 + WallSource.UpdateInterval);
+        Assert.Equal(v + 1, source.StateVersion);
+        // finer for a real wall: drawn again from scratch
+        source.Scale = 1.5;
+        Assert.Null(source.State);
+        Assert.NotNull(source.Update(frame, inp.Hello, 11));
+        source.Force = WallScene.Psychedelic;
+        source.Update(SceneSamples.Frame(inp, 31), inp.Hello, 11.2);
+        Assert.True(source.Update(SceneSamples.Frame(inp, 31.1), inp.Hello, 11.3)!.Value.Psychedelic);
+    }
+
+    [Fact]
+    public void AFrameAheadKeepsEverythingButItsMoment()
+    {
+        var f = new Frame { T = 10, Phrase = 2, Bp = 20, Bands = [0.5f] };
+        var g = f.At(10.04, 20.08);
+        Assert.Equal((10.04, 20.08, 2), (g.T, g.Bp!.Value, g.Phrase));
+        Assert.Same(f.Bands, g.Bands);
+        Assert.Equal(10, f.T);   // the feed's frame stays as it came
+    }
+
+    [Fact]
+    public void TheTestCardHasItsCornersAndPanels()
+    {
+        var wall = new PixelRect(0, 0, 768, 384);
+        using var card = TestCard.Draw((768, 384), wall, 128);
+        Assert.Equal((768, 384), (card.Width, card.Height));
+        if (Environment.GetEnvironmentVariable("AMADEUS_WALL_PNGS") is { Length: > 0 } dir)
+        {
+            using var data = card.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(Path.Combine(dir, "wall-card.png"), data.ToArray());
+        }
+        static (int, int, int) Rgb(SkiaSharp.SKColor c) => (c.Red, c.Green, c.Blue);
+        Assert.Equal((255, 0, 0), Rgb(card.GetPixel(3, 3)));        // top left red
+        Assert.Equal((0, 255, 0), Rgb(card.GetPixel(764, 3)));      // top right green
+        Assert.Equal((0, 102, 255), Rgb(card.GetPixel(3, 380)));    // bottom left blue
+        Assert.Equal((255, 230, 0), Rgb(card.GetPixel(764, 380)));  // bottom right yellow
+        Assert.Equal((115, 115, 115), Rgb(card.GetPixel(128, 125)));  // a panel's edge
     }
 
     [Fact]
