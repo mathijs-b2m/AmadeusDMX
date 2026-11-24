@@ -677,9 +677,18 @@ final class WallRenderer {
         for r in rings.reversed() {   // far rings first
             let c = cols[((r.idx % cols.count) + cols.count) % cols.count]
             let hit = r.idx % 4 == 0 ? 1 + CGFloat(bass) * 0.8 : 1   // every fourth ring swells with the kick
-            neon(dim(c, Float(0.25 + 1.1 * r.s)), (1.2 + 5 * r.s) * hit)
             let p = CGMutablePath()
             p.addLines(between: r.pts); p.closeSubpath()
+            // the glow is a wide dim stroke under the line: a real glow round sixteen wall-sized rings costs too much
+            let k = Float(0.25 + 1.1 * r.s), width = (1.2 + 5 * r.s) * hit
+            if r.s > 0.3 {
+                flat(dim(c, k), 1)
+                for (wide, alpha) in [(7.0, 0.05), (4.6, 0.08), (3.0, 0.13), (1.9, 0.22)] as [(CGFloat, CGFloat)] {
+                    g.setStrokeColor(cg(dim(c, k), alpha)); g.setLineWidth(width * wide)
+                    g.addPath(p); g.strokePath()
+                }
+            }
+            flat(dim(c, k), width)
             g.addPath(p); g.strokePath()
         }
     }

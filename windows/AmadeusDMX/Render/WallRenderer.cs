@@ -851,9 +851,20 @@ public sealed partial class WallRenderer : IDisposable
             var r = rings[i];
             var c = cols[Mod(r.Idx, cols.Length)];
             var hit = Mod(r.Idx, 4) == 0 ? 1 + bass * 0.8 : 1;   // every fourth ring swells with the kick
-            Neon(Dim(c, (float)(0.25 + 1.1 * r.S)), (float)((1.2 + 5 * r.S) * hit));
             using var p = new SKPath();
             p.AddPoly(r.Pts, close: true);
+            // the glow is a wide dim stroke under the line: a real glow round sixteen wall-sized rings costs too much
+            float k = (float)(0.25 + 1.1 * r.S), width = (float)((1.2 + 5 * r.S) * hit);
+            if (r.S > 0.3)
+            {
+                Flat(Dim(c, k), 1);
+                foreach (var (wide, alpha) in new[] { (7.0f, 0.05f), (4.6f, 0.08f), (3.0f, 0.13f), (1.9f, 0.22f) })
+                {
+                    _g.Stroke = Cg(Dim(c, k), alpha); _g.LineWidth = width * wide;
+                    StrokePath(p);
+                }
+            }
+            Flat(Dim(c, k), width);
             StrokePath(p);
         }
     }
