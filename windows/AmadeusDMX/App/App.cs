@@ -42,6 +42,7 @@ public sealed partial class App : Application
         _model = new AppModel(updater);
         _window = new MainWindow(_model);
         _window.Closed += (_, _) => _model.Shutdown();  // the last window: the app quits, the lights black out
+        _model.WallOutput.Attach(_window);  // the LED wall output never covers the monitor this window is on
         updater?.Attach(_model, _window);  // after Shutdown: a background download installs once the engine is stopped
         // ended from outside (logoff, a terminal's Ctrl+C): stop the engine first, like a normal quit
         AppDomain.CurrentDomain.ProcessExit += (_, _) => _model.Shutdown();
@@ -99,6 +100,7 @@ public static class AppCommands
         show.Items.Add(new MenuFlyoutSeparator());
         show.Items.Add(Command(L("DMX Output"), window.OpenDMX, VirtualKey.D, Ctrl | Shift)
             .Follow(model, [nameof(AppModel.Workspace)], i => i.IsEnabled = model.Workspace is not null));
+        show.Items.Add(Command(L("LED Wall Output…"), () => LEDWallOutputWindow.Open(model), VirtualKey.L, Ctrl | Shift));
         show.Items.Add(new MenuFlyoutSeparator());
         foreach (var m in ShowModes.All)
             show.Items.Add(UI.Choice(m.Title(), "mode", model.Mode == m, () => model.SetMode(m), m.Symbol())

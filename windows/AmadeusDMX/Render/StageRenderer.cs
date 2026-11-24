@@ -2,7 +2,9 @@
 // and their projections, spots, lasers, flares and the LED wall into an HDR target, then bloom (a blur at half and quarter resolution) and a
 // tone curve into the window. What a frame shows is worked out on the CPU first (StageRenderer.State.cs,
 // PrepareFrame); this half puts it on the GPU. The view (StageView) owns the swap chain and presents; the render
-// self-test draws into a texture instead.
+// self-test draws into a texture instead. Every stage draws on the app's one device (SharedGpu, WallSource.Gpu.cs),
+// where the LED wall's picture is composed once for all of them and for the LED Wall Output; a frame holds the
+// device's lock while it draws (the output draws from a thread of its own).
 //
 // Metal → Direct3D 11: MTLRenderPipelineState = a vertex + pixel shader, input layout and blend state (Pipeline);
 // setVertexBytes = a dynamic buffer refilled per frame; MPSImageBilinearScale / MPSImageGaussianBlur /
@@ -97,12 +99,11 @@ public sealed partial class StageRenderer : IDisposable
     // the rig editor's drawings: a texture per page file (kept while it is drawn), the triangles per drawing
     readonly Dictionary<string, (ID3D11Texture2D Texture, ID3D11ShaderResourceView View)> _pages = [];
     readonly List<(ID3D11Buffer Buffer, int Count, ID3D11ShaderResourceView View)> _drawings = [];
-    ID3D11Texture2D? wallTexture;
-    ID3D11ShaderResourceView? wallView;
     Target? hdr, halfA, halfB, halfT, quarterA, quarterB, quarterT;
     ID3D11Texture2D? depthTexture;
     ID3D11DepthStencilView? depth;
-    ID3D11Buffer? uniformsBuffer, wallParamsBuffer, blurBuffer;
+    ID3D11Buffer? uniformsBuffer, wallOnBuffer, blurBuffer;
+    ID3D11Multithread? _multithread;   // the device's lock (this renderer's own reference)
     readonly DynamicBuffer _parts = new(BindFlags.VertexBuffer, SolidVertex.Size, false);
     // the instances: per-instance vertex data (input slot 1), which Direct3D 10's vertex shaders can read
     readonly DynamicBuffer _beams = new(BindFlags.VertexBuffer, BeamInstance.Size, false);
@@ -119,8 +120,8 @@ public sealed partial class StageRenderer : IDisposable
     GpuTimer? _timer;
     readonly StageFrame _frame = new();
 
-    /// Metal's init?(view:): a renderer on the default adapter (WARP, Windows's software renderer, when there is no
-    /// usable GPU), or nil when Direct3D 11 isn't available at all.
+    /// Metal's init?(view:): a renderer on the app's device (SharedGpu: the default adapter, or WARP, Windows's
+    /// software renderer, when there is no usable GPU), or nil when Direct3D 11 isn't available at all.
     public static StageRenderer? Make()
     {
         var r = new StageRenderer();
@@ -137,34 +138,20 @@ public sealed partial class StageRenderer : IDisposable
         }
     }
 
-    /// The highest feature level asked for: `-d3dFeatureLevel 10.0` (or 10.1, 11.0) tries the stage as older graphics
-    /// draw it, on any card (for testing).
-    static FeatureLevel[] Levels(string? cap)
-    {
-        FeatureLevel[] all = [FeatureLevel.Level_11_1, FeatureLevel.Level_11_0, FeatureLevel.Level_10_1, FeatureLevel.Level_10_0];
-        var max = cap switch { "10.0" or "10_0" => FeatureLevel.Level_10_0, "10.1" or "10_1" => FeatureLevel.Level_10_1, "11.0" or "11_0" => FeatureLevel.Level_11_0, _ => FeatureLevel.Level_11_1 };
-        return all.Where(l => l <= max).ToArray();
-    }
-
     void CreateDevice()
     {
-        var levels = Levels(Defaults.Standard.String("d3dFeatureLevel"));
-        var flags = DeviceCreationFlags.BgraSupport;
-        var dev = Defaults.Standard.Bool("d3dDebug") ? flags | DeviceCreationFlags.Debug : flags;
-        var hr = D3D11.D3D11CreateDevice(null, DriverType.Hardware, dev, levels, out var device, out var level, out var context);
-        if (hr.Failure && dev != flags) hr = D3D11.D3D11CreateDevice(null, DriverType.Hardware, flags, levels, out device, out level, out context);
-        if (hr.Failure) hr = D3D11.D3D11CreateDevice(null, DriverType.Warp, flags, levels, out device, out level, out context);
-        hr.CheckError();
-        Device = device!;
-        Context = context!;
-        FeatureLevel = level;
+        // the app's one device (the Mac's one Metal queue): the wall's picture is drawn there before any stage reads it;
+        // this renderer holds references of its own (released in ReleaseDevice, the device lives on)
+        var gpu = SharedGpu.Get();
+        Device = gpu.Device.QueryInterface<ID3D11Device>();
+        Context = Device.ImmediateContext;
+        FeatureLevel = gpu.FeatureLevel;
+        _multithread = Context.QueryInterfaceOrNull<ID3D11Multithread>() ?? Device.QueryInterfaceOrNull<ID3D11Multithread>();
+        using var held = Lock();
         BuildPipelines();
         BuildCone();
-        var td = new Texture2DDescription(Format.B8G8R8A8_UNorm, WallRenderer.W, WallRenderer.H, 1, 1, BindFlags.ShaderResource);
-        wallTexture = Device.CreateTexture2D(td);
-        wallView = Device.CreateShaderResourceView(wallTexture);
         uniformsBuffer = Device.CreateBuffer(new BufferDescription(Uniforms.Size, BindFlags.ConstantBuffer));
-        wallParamsBuffer = Device.CreateBuffer(new BufferDescription(WallParams.Size, BindFlags.ConstantBuffer));
+        wallOnBuffer = Device.CreateBuffer(new BufferDescription(16, BindFlags.ConstantBuffer));
         blurBuffer = Device.CreateBuffer(new BufferDescription(BlurParams.Size, BindFlags.ConstantBuffer));
         for (var i = 0; i < _stats.Length; i++)
             _stats[i] = Device.CreateTexture2D(new Texture2DDescription(Format.R16G16B16A16_Float, 1, 1, 1, 1, BindFlags.None,
@@ -175,15 +162,34 @@ public sealed partial class StageRenderer : IDisposable
     }
 
     /// The device was lost (a driver update, the GPU reset, a laptop switching GPUs): everything on the GPU is
-    /// made again; the scene uploads itself on the next frame.
+    /// made again, on the app's new device; the scene uploads itself on the next frame.
     public void ResetDevice()
     {
+        SharedGpu.Lost(Device);   // (nothing when another stage, or the output, already found it lost)
         ReleaseDevice();
         CreateDevice();
         Wake();
     }
 
     void ReleaseDevice()
+    {
+        using (Lock()) ReleaseResources();
+        _multithread?.Dispose();
+        _multithread = null;
+        Context?.Dispose();
+        Device?.Dispose();
+        Context = null!;
+        Device = null!;
+    }
+
+    /// Holds the device from the first state set to the last draw (SharedGpu.Lock, on this renderer's reference).
+    SharedGpu.Held Lock()
+    {
+        _multithread?.Enter();
+        return new SharedGpu.Held(_multithread);
+    }
+
+    void ReleaseResources()
     {
         ReleaseTargets();
         foreach (var p in new[] { solidPipe, beamPipe, spritePipe, decalPipe, linePipe, wallPipe, compositePipe, zonePipe, downsamplePipe, blurPipe,
@@ -197,24 +203,15 @@ public sealed partial class StageRenderer : IDisposable
         coneBuffer?.Dispose(); cappedConeBuffer?.Dispose(); sceneryBuffer?.Dispose(); zoneBuffer?.Dispose(); wallBuffer?.Dispose();
         coneBuffer = cappedConeBuffer = sceneryBuffer = zoneBuffer = wallBuffer = null;
         goboView?.Dispose(); goboTexture?.Dispose(); goboView = null; goboTexture = null;
-        wallView?.Dispose(); wallTexture?.Dispose(); wallView = null; wallTexture = null;
-        uniformsBuffer?.Dispose(); wallParamsBuffer?.Dispose(); blurBuffer?.Dispose();
-        uniformsBuffer = wallParamsBuffer = blurBuffer = null;
+        uniformsBuffer?.Dispose(); wallOnBuffer?.Dispose(); blurBuffer?.Dispose();
+        uniformsBuffer = wallOnBuffer = blurBuffer = null;
         foreach (var d in new[] { _parts, _beams, _sprites, _decals, _lines, _zoneEdges, _goboBeams, _goboDecals }) d.Dispose();
         for (var i = 0; i < _stats.Length; i++) { _stats[i]?.Dispose(); _stats[i] = null; }
         _timer?.Dispose(); _timer = null;
-        Context?.ClearState();
-        Context?.Dispose();
-        Device?.Dispose();
-        Context = null!;
-        Device = null!;
+        Context?.ClearState();   // (every draw on the shared context sets all the state it uses)
     }
 
-    public void Dispose()
-    {
-        ReleaseDevice();
-        _wall.Dispose();
-    }
+    public void Dispose() => ReleaseDevice();
 
     void ReleaseTargets()
     {
@@ -257,7 +254,13 @@ public sealed partial class StageRenderer : IDisposable
     public void Draw(ID3D11RenderTargetView target, Vector2 size, double? now = null)
     {
         var f = _frame;
-        PrepareFrame(f, now ?? Now(), size);
+        var t = now ?? Now();
+        PrepareFrame(f, t, size);
+        using var held = Lock();   // from here to the last draw: the output's thread draws on this device too
+        // the wall's picture, composed once for the app (only when it changed: the other stages and the output share
+        // it); none while this renderer is still on a lost device
+        var wallPicture = f.WallOn > 0 && SharedGpu.Current is { } gpu && gpu.Device.NativePointer == Device.NativePointer
+            ? WallSource.Shared.Compose(gpu, t) : null;
         EnsureTargets(f.Width, f.Height);
         var ctx = Context;
         UploadScenery();
@@ -270,8 +273,8 @@ public sealed partial class StageRenderer : IDisposable
 
         // the frame's buffers
         ctx.UpdateSubresource(in f.U, uniformsBuffer!);
-        ctx.UpdateSubresource(in f.Wp, wallParamsBuffer!);
-        if (f.WallPictureChanged) UploadWall();
+        var wallOn = new Vector4(wallPicture is null ? 0 : 1, 0, 0, 0);
+        ctx.UpdateSubresource(in wallOn, wallOnBuffer!);
         _parts.Upload(Device, ctx, (ReadOnlySpan<SolidVertex>)f.Parts.V.Span());
         _beams.Upload(Device, ctx, (ReadOnlySpan<BeamInstance>)f.Beams.Span());
         _sprites.Upload(Device, ctx, (ReadOnlySpan<SpriteInstance>)f.Sprites.Span());
@@ -308,9 +311,10 @@ public sealed partial class StageRenderer : IDisposable
         {
             Use(wallPipe!, solidDepth);
             ctx.IASetVertexBuffer(0, wallBuffer, WallVertex.Size);
-            ctx.PSSetShaderResource(0, wallView!);
-            ctx.PSSetConstantBuffer(1, wallParamsBuffer);
+            ctx.PSSetShaderResource(0, wallPicture!);   // nil while the wall is dark (wallOn.x 0)
+            ctx.PSSetConstantBuffer(1, wallOnBuffer);
             ctx.Draw(6, 0);
+            ctx.PSSetShaderResource(0, null!);
         }
         // the rig editor's drawings on the floor: over the floor and the deck, under everything standing on them
         if (_drawings.Count > 0)
@@ -459,13 +463,6 @@ public sealed partial class StageRenderer : IDisposable
             return 0.2126f * (float)px[0] + 0.7152f * (float)px[1] + 0.0722f * (float)px[2];
         }
         finally { Context.Unmap(slot, 0); }
-    }
-
-    unsafe void UploadWall()
-    {
-        var px = Wall.Pixels;
-        fixed (byte* p = px)
-            Context.UpdateSubresource(wallTexture!, 0, null, (IntPtr)p, (uint)Wall.RowBytes, 0);
     }
 
     void UploadScenery()

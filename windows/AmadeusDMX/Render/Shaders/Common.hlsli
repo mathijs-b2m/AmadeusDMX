@@ -7,7 +7,7 @@
 //
 // Bindings (Metal → Direct3D 11):
 //   Uniforms        buffer(1)  → cbuffer b0 (vertex and pixel)
-//   WallParams      buffer(3)  → cbuffer b1 (pixel)
+//   the wall's on   buffer(3)  → cbuffer b1 (pixel; WallParams is WallSource.hlsl's)
 //   BlurParams      (MPS blur) → cbuffer b2 (pixel)
 //   instances       buffer(2)  → per-instance vertex data in input slot 1 (INSTANCE0.., one float4 each; Direct3D 10's
 //                                vertex shaders can't read a StructuredBuffer)
@@ -27,11 +27,9 @@ cbuffer Uniforms : register(b0)
     float4 ambient;     // rgb: the colour the rig throws around the room; w: work light (rig preview)
 };
 
-cbuffer WallParams : register(b1)
+cbuffer WallOn : register(b1)
 {
-    float4 info;        // x level, y psychedelic, z time
-    float4 bands;
-    float4 pal[4];
+    float4 wallOn;      // x: 1 while the wall plays (a show on a rig with one), else 0
 };
 
 cbuffer BlurParams : register(b2)

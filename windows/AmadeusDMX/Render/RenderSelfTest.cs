@@ -1,6 +1,8 @@
 // `AmadeusDMX.exe -renderSelfTest [-d3dFeatureLevel 10.0]`: draws the sample club rig (SceneSamples) offscreen with the real renderer, from
 // three cameras, into PNGs in %TEMP% (amadeus-stage-*.png) with a report (amadeus-stage-selftest.txt), then quits
-// without starting the app. Exit code 0 when every picture was drawn and isn't empty. For checking the Direct3D half
+// without starting the app. It also draws what the LED Wall Output sends (the Mac's stage snapshot does too):
+// amadeus-wall.png (the show's picture) and amadeus-wall-card.png (the test card) on a monitor of 1920×1080, the wall
+// at -wallRect X,Y,W,H (missing: the whole monitor), panels of -panelPx 128. Exit code 0 when every picture was drawn and isn't empty. For checking the Direct3D half
 // on a Windows machine (the Mac checks the rest: RenderTests).
 using System.Diagnostics;
 using System.Globalization;
@@ -63,6 +65,7 @@ public static class RenderSelfTest
                            $"render scale {r.RenderScale:F2}, exposure {r.AutoExposure:F2}, wall {r.WallNow}");
             }
             report.Add($"GPU time (smoothed): {r.GpuMs:F2} ms per frame");
+            ok &= WallOutput(r, inp, frame, now, dir, report);
         }
         catch (Exception e)
         {
@@ -73,6 +76,45 @@ public static class RenderSelfTest
         File.WriteAllLines(Path.Combine(dir, "amadeus-stage-selftest.txt"), report);
         foreach (var line in report) Console.WriteLine(line);
         return ok ? 0 : 1;
+    }
+
+    /// What the LED Wall Output sends, for this show, into two PNGs: true when the picture isn't empty.
+    static bool WallOutput(StageRenderer r, StageInput inp, AmadeusKit.Frame frame, double now, string dir, List<string> report)
+    {
+        const int W = 1920, H = 1080;
+        var ints = Defaults.Standard.String("wallRect")?.Split(',').Select(v => int.TryParse(v.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0).ToArray();
+        var wall = WallOutputLayout.WallRect(ints is { Length: 4 } a ? new PixelRect(a[0], a[1], a[2], a[3]) : null, W, H);
+        var pic = WallOutputLayout.Fit(wall);
+        var panelPx = Defaults.Standard.Integer("panelPx") > 0 ? Defaults.Standard.Integer("panelPx") : 128;
+        WallSource.Shared.Scale = WallOutputLayout.PictureScale(pic.H);
+        var gpu = SharedGpu.Get();
+        using var drawer = new WallOutputDrawer();
+        using var tex = r.Device.CreateTexture2D(new Texture2DDescription(Format.B8G8R8A8_UNorm, W, H, 1, 1, BindFlags.RenderTarget | BindFlags.ShaderResource));
+        using var rtv = r.Device.CreateRenderTargetView(tex);
+        var ok = true;
+        foreach (var testCard in new[] { false, true })
+        {
+            for (var i = 0; i < 10; i++) WallSource.Shared.Update(frame, inp.Hello, now + i / 40.0);
+            (ID3D11Texture2D Texture, ID3D11ShaderResourceView View)? card = null;
+            using (gpu.Lock())
+            {
+                var picture = WallSource.Shared.Compose(gpu, now + 0.25);
+                if (testCard) card = WallOutputDrawer.CardTexture(gpu, (wall.W, wall.H), wall, panelPx);
+                drawer.Encode(gpu, rtv, wall, pic, 1, card?.View, picture, 0.7f);
+                gpu.Context.Flush();
+            }
+            card?.View.Dispose();
+            card?.Texture.Dispose();
+            var px = r.ReadPixels(tex, W, H);
+            var (varied, _) = Picture(px);
+            var name = testCard ? "amadeus-wall-card.png" : "amadeus-wall.png";
+            File.WriteAllBytes(Path.Combine(dir, name), Png(px, W, H));
+            var empty = varied < 0.01;
+            ok &= !empty || !testCard;   // the show's picture may be dark at this moment; the card never is
+            report.Add($"LED wall output: {name}, wall {wall.W}×{wall.H} at {wall.X},{wall.Y}, {varied:P1} of the pixels lit{(empty && testCard ? " — EMPTY" : "")}");
+        }
+        WallSource.Shared.Scale = 1;
+        return ok;
     }
 
     /// <summary>How much of a frame differs from its most common brightness (the background: clear colour, room

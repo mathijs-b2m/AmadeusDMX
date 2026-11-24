@@ -30,7 +30,7 @@
     <Compile Include="..\AmadeusDMX\Rig\Editor\EditorSelfTest.cs" Link="App\Rig\EditorSelfTest.cs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- the 3D stage's pure half (camera, packing, scenery, models, lights, pacing, the LED wall's picture): RenderTests -->
+    <!-- the 3D stage's pure half (camera, packing, scenery, models, lights, pacing, the LED wall's picture and test card): RenderTests -->
     <Compile Include="..\AmadeusDMX\Render\StageInput.cs" Link="Render\StageInput.cs" />
     <Compile Include="..\AmadeusDMX\Render\Camera.cs" Link="Render\Camera.cs" />
     <Compile Include="..\AmadeusDMX\Render\GPUTypes.cs" Link="Render\GPUTypes.cs" />
@@ -38,6 +38,8 @@
     <Compile Include="..\AmadeusDMX\Render\FixtureModels.cs" Link="Render\FixtureModels.cs" />
     <Compile Include="..\AmadeusDMX\Render\FramePacer.cs" Link="Render\FramePacer.cs" />
     <Compile Include="..\AmadeusDMX\Render\WallRenderer.cs" Link="Render\WallRenderer.cs" />
+    <Compile Include="..\AmadeusDMX\Render\WallSource.cs" Link="Render\WallSource.cs" />
+    <Compile Include="..\AmadeusDMX\Render\TestCard.cs" Link="Render\TestCard.cs" />
     <Compile Include="..\AmadeusDMX\Render\StageRenderer.State.cs" Link="Render\StageRenderer.State.cs" />
     <Compile Include="..\AmadeusDMX\Render\StageRenderer.Lights.cs" Link="Render\StageRenderer.Lights.cs" />
     <Compile Include="..\AmadeusDMX\Render\StageRenderer.Diagnostics.cs" Link="Render\StageRenderer.Diagnostics.cs" />

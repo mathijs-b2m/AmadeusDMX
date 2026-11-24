@@ -663,10 +663,12 @@ public sealed record HazePush
 
 public sealed class Frame
 {
-    public double T { get; init; }
+    double _t;
+    double? _bp;
+    public double T { get => _t; init => _t = value; }
     public int Phrase { get; init; }
     /// The beat position (beat index + phase), when the engine sends it.
-    public double? Bp { get; init; }
+    public double? Bp { get => _bp; init => _bp = value; }
     /// Per element: [dimmer, r, g, b, white, pan, tilt]
     public float[][] Fx { get; init; } = [];
     public float[] Bands { get; init; } = [];
@@ -697,6 +699,15 @@ public sealed class Frame
     public ArcStatus? Arc { get; init; }
 
     public Frame() { }
+
+    /// A copy at another moment of the show (Swift: `var f = frame; f.t = …; f.bp = …`), for the LED wall output's lead.
+    public Frame At(double t, double? bp)
+    {
+        var f = (Frame)MemberwiseClone();
+        f._t = t;
+        f._bp = bp;
+        return f;
+    }
 
     /// A still frame made in the app (the rig editor's light test): fixtures lit, heads pointed.
     public Frame(float[][] fx, Vector3?[] dirs)

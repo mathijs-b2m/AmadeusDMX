@@ -22,6 +22,8 @@ public sealed class AppModel : Observable
     /// Updates (NetSparkle; a release build only: App.cs gives it its updater).
     public Updates Updates { get; }
     public LiveFeed Feed { get; } = new();
+    /// The LED wall's picture on a monitor (the HDMI into the LED processor), or in a window.
+    public WallOutputController WallOutput { get; } = new();
     public SetupAPI Api { get; } = new(8181);
     public LinkBrowser Djs { get; } = new();
 
@@ -171,11 +173,13 @@ public sealed class AppModel : Observable
         {
             if (!Set(ref _mode, value)) return;
             Defaults.Standard.Set("showMode", value.RawValue());
-            Feed.Lite = !value.Renders3D();
+            UpdateFeedLite();
             Changed(nameof(SendArtNet));
         }
     }
     public bool SendArtNet => Mode.SendsDMX();
+    /// Status frames only while nothing draws the show (Perform mode, no LED wall output): the wall needs full frames.
+    void UpdateFeedLite() => Feed.Lite = !Mode.Renders3D() && !WallOutput.Settings.On;
     /// A mode change that needs the running show restarted, waiting for the operator's OK.
     ShowMode? _pendingMode;
     public ShowMode? PendingMode { get => _pendingMode; set => Set(ref _pendingMode, value); }
@@ -288,7 +292,14 @@ public sealed class AppModel : Observable
         EngineProcess.StopLeftover("setup");
         Workspace = Workspace.Locate(d.String("engineRoot"));
         Mode = ShowModes.Parse(d.String("showMode")) ?? (d.BoolIfSet("sendArtNet") == false ? ShowMode.Visualise : ShowMode.Both);
-        Feed.Lite = !Mode.Renders3D();
+        // the LED wall output reads the show on its own thread: LatestFrame is safe there, the hello a reference
+        WallOutput.Source = () =>
+        {
+            var hello = Feed.State == FeedState.Connected ? Feed.Hello : null;
+            return (hello, Feed.LatestFullFrame, (DateTime.UtcNow - Feed.LatestFrameArrival).TotalSeconds < 0.6);
+        };
+        WallOutput.OnToggle = _ => UpdateFeedLite();
+        UpdateFeedLite();
         ReloadSets();
         if (SectionExtensions.Parse(d.String("section")) is { } s) Section = s;  // -section rig
         if (d.String("editSet") is { } editSet && SetsOn(EditingRig).Contains(editSet))
