@@ -59,6 +59,23 @@ def test_a_section_is_one_model_in_one_place():
     assert len(secs) == 4
 
 
+def test_a_stand_in_plays_in_the_section_of_the_model_it_replaces():
+    """A beam hung in a broken spot's place, `plays_as` the spot: it plays with the spots and pairs with its mirror."""
+    rig = mixed_rig()
+    stand_in = next(f for f in rig["fixtures"] if f["id"] == "spotR")
+    stand_in["fixture"], stand_in["plays_as"] = BEAM, SPOT
+    secs = {frozenset(s["ids"]) for s in rig_sections(rig)}
+    assert frozenset({"spotL", "spotL2", "spotR2", "spotR"}) in secs
+    pairs = {frozenset(p) for s in rig_sections(rig) for p in s["pairs"]}
+    assert frozenset({"spotL", "spotR"}) in pairs
+
+
+def test_plays_as_an_unknown_model_is_ignored():
+    rig = mixed_rig()
+    next(f for f in rig["fixtures"] if f["id"] == "spotR")["plays_as"] = "nobody/no-such-fixture"
+    assert frozenset({"spotL", "spotL2", "spotR2", "spotR"}) in {frozenset(s["ids"]) for s in rig_sections(rig)}
+
+
 def test_every_fixture_pairs_with_its_mirror_image():
     pairs = {frozenset(p) for s in rig_sections(mixed_rig()) for p in s["pairs"]}
     assert pairs == {frozenset(p) for p in MIRRORS}

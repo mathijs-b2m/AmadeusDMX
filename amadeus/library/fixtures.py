@@ -253,6 +253,13 @@ def get(key: str) -> dict:
     return lib[key]
 
 
+def family(fx: dict) -> str:
+    """The model a fixture plays as: its own (`fixture`), or `plays_as` when it stands in for another model (a spare
+    for a broken one). The show groups, pairs and sections it with that model's fixtures; its DMX stays its own."""
+    stand_in = fx.get("plays_as")
+    return stand_in if stand_in and stand_in in library() else fx["fixture"]
+
+
 def channels(defn: dict, mode: str) -> list[dict]:
     if mode not in defn["modes"]:
         raise SystemExit(f"{defn['key']} has no mode '{mode}'. Modes: {', '.join(defn['modes'])}")

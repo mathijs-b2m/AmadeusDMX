@@ -195,7 +195,7 @@ class CinematicMixin:
         groups: dict[tuple, list[dict]] = {}
         for f in rig["fixtures"]:
             if f["id"] in by_fixture:
-                groups.setdefault((f["fixture"],), []).append(f)
+                groups.setdefault((fxlib.family(f),), []).append(f)
         split: list[list[dict]] = []
         for fs in groups.values():
             if len(fs) <= MAX_SECTION:
@@ -212,10 +212,10 @@ class CinematicMixin:
             cells = sorted([e for f in fs for e in by_fixture[f["id"]]], key=lambda e: e["x"])
             n_seg = min(MELODY_SEGMENTS, len(cells))
             segments = [[e["id"] for e in part] for part in np.array_split(np.array(cells, dtype=object), n_seg)]
-            phys = fxlib.get(fs[0]["fixture"]).get("physical", {})
+            phys = fxlib.get(fxlib.family(fs[0])).get("physical", {})
             kind = by_fixture[fs[0]["id"]][0]["kind"]
             sections.append({
-                "name": fs[0]["fixture"].split("/")[-1],
+                "name": fxlib.family(fs[0]).split("/")[-1],
                 "units": units,
                 "segments": segments,
                 "kind": kind,

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from amadeus.library import fixtures as fxlib
 from amadeus.rig import geometry
 
 KINDS = ("head", "par")  # what the show hands parts to (blinders, strobes and lasers play together anyway)
@@ -81,7 +82,7 @@ def rig_sections(rig: dict) -> list[dict]:
         f = fixtures[fid]
         x, y, z = np.mean([p for _, p in cells], axis=0)
         item = {"ids": [i for i, _ in cells], "x": float(x), "y": float(y), "z": float(z), "truss": f.get("truss")}
-        models.setdefault((f["fixture"], kind, f.get("mount", "stand"), f.get("group")), []).append(item)
+        models.setdefault((fxlib.family(f), kind, f.get("mount", "stand"), f.get("group")), []).append(item)
     mid = width / 2
     gap = max(PLACE_GAP_M, PLACE_GAP_WIDTH * width)
     mirror = max(MIRROR_GAP_M, MIRROR_GAP_WIDTH * width)
