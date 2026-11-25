@@ -167,7 +167,7 @@ class LightshowMixin(CinematicMixin):
         models: dict[str, list[dict]] = {}
         for f in rig["fixtures"]:
             if f["id"] in by_fixture:
-                models.setdefault(f["fixture"], []).append(f)
+                models.setdefault(fxlib.family(f), []).append(f)
         sections = []
         split = math.ceil(MIN_FAMILIES / max(len(models), 1))
         groups = []

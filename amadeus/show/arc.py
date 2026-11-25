@@ -550,7 +550,7 @@ class ShowArc:
         for e in els:  # pars, bars and other washes: per the rig's group, else per kind of fixture
             if e["kind"] not in ("head", "laser", "strobe", "blinder", "smoke", "inert") or e.get("uplight"):
                 fx = by_fixture[e["fixture"]]
-                washes.setdefault(fx.get("group") or fx["fixture"], []).append(e["id"])
+                washes.setdefault(fx.get("group") or fxlib.family(fx), []).append(e["id"])
         groups += sorted(washes.values(), key=len, reverse=True)  # the washes light the room first
         heads = [g["ids"] for g in head_groups(rig)]
         groups += sorted(heads, key=len)  # the biggest group of heads last: the night's reveal
