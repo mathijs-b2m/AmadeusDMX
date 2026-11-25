@@ -70,6 +70,28 @@ def test_a_stand_in_plays_in_the_section_of_the_model_it_replaces():
     assert frozenset({"spotL", "spotR"}) in pairs
 
 
+def test_a_stand_in_moves_and_colours_like_the_model_it_replaces():
+    """A spot hung in a beam's place, `plays_as` the beam: its moves are sized by the beam's motion and its colour is
+    the slot the beam's wheel would show (its own nearest to that), while its trajectory keeps its own motor."""
+    from amadeus.engine import motion as M
+    from amadeus.library import fixtures as fxlib
+
+    rig = mixed_rig()
+    stand_in = next(f for f in rig["fixtures"] if f["id"] == "beamR")
+    stand_in["fixture"], stand_in["plays_as"], stand_in["mode"] = SPOT, BEAM, fxlib.default_mode(fxlib.get(SPOT))
+    beam, spot = fxlib.get(BEAM), fxlib.get(SPOT)
+    assert M.plan_motion(stand_in, spot) == beam.get("motion", M.DEFAULT_MOTION)
+    assert M.plan_motion({"fixture": SPOT}, spot) == spot.get("motion", M.DEFAULT_MOTION)
+    e = Engine(*_show(rig))
+    heads = [h["id"] for h in e.heads]
+    assert e._reach(heads.index("beamR")) == e._reach(heads.index("beamL"))
+    assert "beamR" in e.wheel_as  # (both models have a colour wheel)
+    can = {tuple(fxlib.nearest_slot(spot, slot["rgb"])["rgb"]) for slot in beam["color_wheel"]["slots"]}
+    for t in np.arange(1.0, 60.0, 0.5):
+        c = e.render(float(t))[1]["beamR"]
+        assert (c.r, c.g, c.b) in can, t
+
+
 def test_plays_as_an_unknown_model_is_ignored():
     rig = mixed_rig()
     next(f for f in rig["fixtures"] if f["id"] == "spotR")["plays_as"] = "nobody/no-such-fixture"

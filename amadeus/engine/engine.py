@@ -89,6 +89,13 @@ class Engine(
         )
         defs = {f["id"]: fxlib.get(f["fixture"]) for f in rig["fixtures"]}
         self.wheels = {e["id"]: defs[e["fixture"]] for e in rig["elements"] if fxlib.has_wheel(defs[e["fixture"]])}
+        # a stand-in (`plays_as`) shows the colour the model it replaces would: that wheel's slot, then its own nearest
+        stand_ins = {f["id"]: fxlib.get(fxlib.family(f)) for f in rig["fixtures"] if fxlib.family(f) != f["fixture"]}
+        self.wheel_as = {
+            e["id"]: stand_ins[e["fixture"]]
+            for e in rig["elements"]
+            if e["fixture"] in stand_ins and fxlib.has_wheel(stand_ins[e["fixture"]])
+        }
         self.order = {f["id"]: i for i, f in enumerate(self.pars)}
         self.beats = analysis.beats
         self.downbeat_times = analysis.beats[analysis.downbeats] if len(analysis.downbeats) else analysis.beats[::4]
@@ -355,6 +362,9 @@ class Engine(
                 s.dimmer, s.white = 0.0, 0.0
         for eid in self.dark_high_risk:  # risk group 2/3 with real lights: dark (alpha software)
             states[eid].dimmer, states[eid].white = 0.0, 0.0
+        for eid, like in self.wheel_as.items():  # a stand-in: the colour the fixture it replaces can make
+            s = states[eid]
+            s.r, s.g, s.b = fxlib.nearest_slot(like, (s.r, s.g, s.b))["rgb"]
         for eid, defn in self.wheels.items():  # show only colours the wheel can actually make
             s = states[eid]
             # A mechanical wheel can't follow 70 ms white flashes: those become a dimmer bump instead.
