@@ -226,6 +226,14 @@ LOW_AIMS = {
 DEFAULT_MOTION = {"pan_speed_dps": 180, "tilt_speed_dps": 150, "accel_dps2": 600}  # conservative if unknown
 
 
+def plan_motion(fx: dict, defn: dict) -> dict:
+    """The motion a head's moves are sized by: a stand-in (`plays_as`) moves like the model it stands in for, so it
+    swings with them; where it really is (the trajectory) still follows its own motor."""
+    if fx.get("plays_as") and (family := fxlib.family(fx)) != fx["fixture"]:
+        return fxlib.get(family).get("motion") or defn.get("motion", DEFAULT_MOTION)
+    return defn.get("motion", DEFAULT_MOTION)
+
+
 def _slew(target: np.ndarray, vmax: float, amax: float, dt: float) -> np.ndarray:
     """Follow `target` like a motor: |velocity| <= vmax, |acceleration| <= amax, braking in time."""
     out = np.empty_like(target)
@@ -250,7 +258,7 @@ class MotionMixin:
         Distance with a triangular speed profile: accel * t^2 / 4, capped by top speed and 90°.
         """
         fx, defn = self.head_fx[j]
-        motion = defn.get("motion", DEFAULT_MOTION)
+        motion = plan_motion(fx, defn)
         period = float(np.median(np.diff(self.beats))) if len(self.beats) > 2 else 0.45
 
         def reach(vmax, acc, beats):
@@ -338,7 +346,7 @@ class MotionMixin:
         """Beats per turn of the twister: the level's (faster at a pace), doubled until the slowest head can make
         the circle."""
         beats = float(TWIST_BEATS[max(0, min(3, intensity))]) / max(pace, 1.0)
-        motions = [defn.get("motion", DEFAULT_MOTION) for _, defn in self.head_fx]
+        motions = [plan_motion(fx, defn) for fx, defn in self.head_fx]
         speed = min((min(m["pan_speed_dps"], m["tilt_speed_dps"]) for m in motions), default=1e9)
         accel = min(
             (min(m.get(f"{a}_accel_dps2", m["accel_dps2"]) for a in ("pan", "tilt")) for m in motions), default=1e9
@@ -466,8 +474,8 @@ class MotionMixin:
         return top, min(floor, top - 30.0)
 
     def _pour_fall_s(self, j: int, dist: float) -> float:
-        _, defn = self.head_fx[j]
-        motion = defn.get("motion", DEFAULT_MOTION)
+        fx, defn = self.head_fx[j]
+        motion = plan_motion(fx, defn)
         return _travel(dist, motion["tilt_speed_dps"], motion.get("tilt_accel_dps2", motion["accel_dps2"]))
 
     def _pour_period(self, d: Decision) -> float:
