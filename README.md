@@ -29,6 +29,12 @@ from a gentle warm-up to the final party bangers, beat-exact, phrase by phrase.
 
 <sub>The drop, live in the app: 60 moving heads, 10 lasers and an LED wall that counted it in. On the right, what the AI director chose for this phrase.</sub>
 
+<br><br>
+
+<a href="https://www.youtube.com/watch?v=g1pZq18wwTw"><img src="https://img.youtube.com/vi/g1pZq18wwTw/maxresdefault.jpg" alt="Watch Amadeus DMX run a real rig on YouTube" width="100%"></a>
+
+[![Watch Amadeus DMX run a real rig on YouTube](https://img.shields.io/badge/Watch_on_YouTube-first_video-ff0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=g1pZq18wwTw)
+
 </div>
 
 ---
