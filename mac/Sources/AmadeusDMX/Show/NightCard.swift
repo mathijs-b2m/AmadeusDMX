@@ -8,10 +8,16 @@ struct NightCard: View {
     @Environment(AppModel.self) private var model
     var arc: ArcStatus
     @AppStorage("nightCardOpen") private var open = false
+    @AppStorage("nightCardKnobsOpen") private var knobsOpen = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
+            // what is reached for most, there without opening the card: the stage and the intensity
+            if arc.on { StageRow(arc: arc, open: open, send: send) }
+            if let level = arc.level {
+                IntensityLevelRow(level: level, levels: arc.levels ?? 5, open: open, send: send)
+            }
             if open {
                 Divider()
                 if arc.lightshow != nil {
@@ -21,18 +27,15 @@ struct NightCard: View {
                     }
                     Divider()
                 }
-                if let level = arc.level {
-                    IntensityLevelRow(level: level, levels: arc.levels ?? 5, send: send)
-                    Divider()
-                }
                 if arc.on {
-                    StageStrip(arc: arc, send: send)
                     HeatRow(arc: arc)
-                    Divider()
-                    ForEach(Knob.sections, id: \.title) { sec in
-                        Text(sec.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                            .padding(.top, 2)
-                        ForEach(sec.knobs) { k in KnobRow(knob: k, arc: arc, send: send) }
+                    KnobsHeader(arc: arc, open: $knobsOpen)
+                    if knobsOpen {
+                        ForEach(Knob.sections, id: \.title) { sec in
+                            Text(sec.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                            ForEach(sec.knobs) { k in KnobRow(knob: k, arc: arc, send: send) }
+                        }
                     }
                     Divider()
                 }
@@ -45,9 +48,10 @@ struct NightCard: View {
             }
         }
         .padding(14)
-        .frame(width: open ? 340 : nil, alignment: .leading)
+        .frame(width: 340, alignment: .leading)
         .glassEffect(.regular, in: .rect(cornerRadius: 18))
         .animation(.snappy(duration: 0.2), value: open)
+        .animation(.snappy(duration: 0.2), value: knobsOpen)
     }
 
     private var header: some View {
@@ -57,7 +61,6 @@ struct NightCard: View {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         Text(arc.on ? arc.stageName : "Show Arc Off").font(.headline)
-                        if arc.locked { Image(systemName: "pin.fill").font(.caption).foregroundStyle(.orange) }
                         if arc.lightshow == true {
                             Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
                                 .help("Lightshow: every track played as a show piece")
@@ -69,11 +72,6 @@ struct NightCard: View {
                         if arc.haze != nil {
                             Image(systemName: "cloud.fog.fill").font(.caption).foregroundStyle(.orange)
                                 .help("You push the haze")
-                        }
-                        if let level = arc.level, level != 2 {
-                            Text("\(level)").font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundStyle(level > 2 ? Color.orange : Color.secondary)
-                                .help("Intensity level \(level) of \(arc.levels ?? 5)")
                         }
                         if !arc.manual.isEmpty {
                             Image(systemName: "hand.raised.fill").font(.caption).foregroundStyle(.orange)
@@ -94,7 +92,7 @@ struct NightCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("The night: its stage, countdown and the knobs the show arc turns")
+        .help(open ? "Close the night's card: the stage and the intensity stay" : "Open the night: the Lightshow, the knobs the show arc turns, the haze and the night's length")
     }
 
     private var clockText: String {
@@ -215,6 +213,7 @@ private struct LightshowRow: View {
 private struct IntensityLevelRow: View {
     var level: Int
     var levels: Int
+    var open: Bool
     var send: ([String: Any]) -> Void
 
     private var status: String {
@@ -228,19 +227,19 @@ private struct IntensityLevelRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Image(systemName: "flame").frame(width: 18).foregroundStyle(level > 2 ? Color.orange : Color.secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Intensity").font(.callout.weight(.semibold))
-                    Text(status).font(.caption).foregroundStyle(level > 2 ? Color.orange : Color.secondary)
+                Text("Intensity").font(.callout.weight(.semibold)).frame(width: 62, alignment: .leading)
+                Picker("Intensity", selection: Binding(get: { level }, set: { send(["level": $0]) })) {
+                    ForEach(1...max(levels, 1), id: \.self) { Text("\($0)").tag($0) }
                 }
-                Spacer()
+                .pickerStyle(.segmented).labelsHidden()
             }
-            Picker("Intensity", selection: Binding(get: { level }, set: { send(["level": $0]) })) {
-                ForEach(1...max(levels, 1), id: \.self) { Text("\($0)").tag($0) }
+            if open {
+                Text(status).font(.caption).foregroundStyle(level > 2 ? Color.orange : Color.secondary)
+                    .padding(.leading, 26)
             }
-            .pickerStyle(.segmented).labelsHidden()
         }
         .help("How hard the show plays, whatever the knobs say: 2 is the show as designed, 1 a step gentler, 5 really intense (a lot of strobing, every look harder, the heads twice as fast, very fast waves now and then). Within the set's flash limit. Re-plans the tracks in a few seconds")
     }
@@ -362,36 +361,59 @@ private struct HazeRow: View {
     }
 }
 
-/// The stages, named for the event: the one the music is in lit; click one to force it.
-private struct StageStrip: View {
+/// The stage the night is in, as a menu of the event's stages: pick one to go there now. Hold keeps the night
+/// in it. The menu's label is the stage the show plays in right now.
+private struct StageRow: View {
     var arc: ArcStatus
+    var open: Bool
     var send: ([String: Any]) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                ForEach(arc.stages, id: \.self) { s in
-                    let key = s.first ?? "", now = key == arc.stage
-                    Button { send(["stage": key]) } label: {
-                        Text(s.last ?? key).font(.caption2.weight(now ? .bold : .regular)).lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity, minHeight: 30)
-                            .background(now ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12),
-                                        in: .rect(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .help(now ? "The music is here" : "Go to this stage now (the arc carries on from there)")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "flag").frame(width: 18).foregroundStyle(arc.locked ? Color.orange : Color.secondary)
+                Text("Stage").font(.callout.weight(.semibold)).frame(width: 62, alignment: .leading)
+                Picker("Stage", selection: Binding(get: { arc.stage }, set: { send(["stage": $0]) })) {
+                    ForEach(arc.stages, id: \.self) { s in Text(s.last ?? "").tag(s.first ?? "") }
                 }
+                .labelsHidden().pickerStyle(.menu)
+                .help("The stage the night is in. Pick another to go there now (the arc carries on from there)")
+                Toggle(isOn: Binding(get: { arc.locked }, set: { send(["lock": $0]) })) {
+                    Label("Hold", systemImage: arc.locked ? "pin.fill" : "pin")
+                }
+                .toggleStyle(.button).controlSize(.small).tint(.orange)
+                .help(arc.locked ? "Held: the arc stays in this stage. Click to let the music decide again"
+                      : "Keep the night in this stage until you let go")
             }
-            HStack {
+            if open {
                 Text(arc.locked ? "Held: the arc stays in this stage" : "The music decides the stage")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Toggle("Hold", isOn: Binding(get: { arc.locked }, set: { send(["lock": $0]) }))
-                    .toggleStyle(.button).controlSize(.small)
-                    .help("Keep the night in this stage until you let go")
+                    .font(.caption).foregroundStyle(arc.locked ? Color.orange : Color.secondary)
+                    .padding(.leading, 26)
             }
         }
+    }
+}
+
+/// The knobs the show arc turns, folded away until asked for: they are set once, not played.
+private struct KnobsHeader: View {
+    var arc: ArcStatus
+    @Binding var open: Bool
+
+    var body: some View {
+        Button { open.toggle() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "slider.horizontal.3").frame(width: 18).foregroundStyle(.secondary)
+                Text("Knobs").font(.callout.weight(.semibold))
+                Text(arc.manual.isEmpty ? "the show arc turns them" : "you hold \(arc.manual.count)")
+                    .font(.caption).foregroundStyle(arc.manual.isEmpty ? Color.secondary : Color.orange)
+                Spacer()
+                Image(systemName: "chevron.down").font(.caption).rotationEffect(.degrees(open ? 180 : 0))
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("The knobs the show arc turns over the night: what is in play, the character, the reaction and the brightness. Take one over and it stays where you put it")
     }
 }
 
