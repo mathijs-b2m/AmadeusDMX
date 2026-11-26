@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from amadeus.audio import ramps
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director.arc import apply_arc, laser_star, song_arc
 from amadeus.director.decision import Decision
@@ -365,6 +366,7 @@ class RuleDirector:
             section = "groove"
         if self.style:
             section = self.style.section(a, i, section)
+        section = ramps.section(p, section)  # a tempo ramp builds (or winds down), however loud it is
 
         palettes = list(self.style.palettes) if self.style else DEFAULT_PALETTES
         palette = last.palette if last and last.palette in palettes else palettes[0 if self.style else 1]

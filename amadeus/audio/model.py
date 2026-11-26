@@ -40,6 +40,7 @@ class Phrase:
     part: str = ""
     vocal: float = -1.0  # share of the phrase a voice sings the lead (-1: not known, the track isn't separated)
     lift: float = 0.0  # a chorus that came in like a drop: its drop score (the jump), kept for the light's size
+    ramp: float = 0.0  # share of the phrase a tempo ramp plays (audio/ramps.py): + speeding up, − slowing down
 
 
 @dataclass

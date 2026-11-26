@@ -17,6 +17,7 @@ import math
 
 import numpy as np
 
+from amadeus.audio import ramps
 from amadeus.audio.model import Analysis
 from amadeus.director.decision import Decision
 
@@ -95,6 +96,8 @@ class LightshowDirector:
             section, palette = "buildup", "warm"
         else:
             section, palette = "groove", "warm" if rank >= 0.5 else "cool"
+        if (ramped := ramps.section(p, section)) != section:  # a tempo ramp builds (or winds down)
+            section, palette = ramped, "warm" if ramped == "buildup" else "ice"
         return Decision(
             i, p.start, p.end, section, palette,
             par_base="off", par_accent="pulse", trigger="accents", head_light="accents", movement="still",
