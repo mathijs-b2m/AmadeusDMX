@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from amadeus import aikey
+from amadeus.audio import ramps
 from amadeus.audio.model import DROP_THRESHOLD, Analysis
 from amadeus.director.arc import apply_arc, laser_star, song_arc
 from amadeus.director.decision import (
@@ -143,6 +144,10 @@ class OpenAIDirector:
             d.dynamics, guarded = "steady", True  # in a song the impact curve is for its real drops only
         if self.style and d.section != (form := self.style.section(a, i, d.section)):
             d.section, guarded = form, True  # the genre's own form (hardstyle: climax, build, break)
+        if d.section != (form := ramps.section(a.phrases[i], d.section)):
+            d.section, guarded = form, True  # a tempo ramp builds (or winds down), however loud it is
+            if form == "buildup" and d.dynamics in ("steady", "impact"):
+                d.dynamics = "rise"
 
         # High energy keeps moving: loud with a running kick (e.g. the phrases right after a drop).
         ph = a.phrases[i]

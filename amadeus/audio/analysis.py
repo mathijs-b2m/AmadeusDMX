@@ -15,7 +15,7 @@ import numpy as np
 import soundfile as sf
 
 from amadeus import paths, system
-from amadeus.audio import halftime, hardcore, hardstyle, sound
+from amadeus.audio import halftime, hardcore, hardstyle, ramps, sound
 from amadeus.audio.beats import (
     attack_offset,
     beat_kicks,
@@ -44,7 +44,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 49
+ANALYSIS_VERSION = 50
 HARD_AGREE = 0.5  # a hard track takes the one-tempo grid when this share of the tracker's beats is on it
 
 
@@ -220,6 +220,9 @@ def analyze(
         beat_times = grid
         beat_frames = np.round(beat_times * fps).astype(int)
     log(f"  beat grid: {'one tempo' if grid is not None else 'following the tempo'}")
+    found = ramps.find(feats["flux_all"], fps, beat_times)  # a part that speeds up or slows down off the grid
+    for r in found:
+        log(f"  tempo ramp {r.start:.1f}–{r.end:.1f} s: {r.bpm_from:.0f} → {r.bpm_to:.0f} BPM")
     audio, audio_sr = sf.read(str(path), dtype="float32", always_2d=True)
     # (a hard grid is on the kick's click already: the low end's gap before it would read as an early attack)
     heard = 0.0 if hard and grid is not None else attack_offset(audio.mean(axis=1), audio_sr, beat_times)
@@ -228,14 +231,22 @@ def analyze(
     beat_times = beat_times + heard  # onsets are noticed a little before they are loud: date them as heard
     onsets = {k: (t + heard, s) for k, (t, s) in onsets.items()}
     log(f"  beats on the attack: {heard * 1000:+.0f} ms")
-    onsets["kick"] = beat_kicks(feats["flux_kick"], beat_frames, fps, beat_times)
-    if hard:  # heard by the gap it leaves in the low end
-        onsets["kick"] = merge_kicks(onsets["kick"], pumping_kicks(feats["sub"], beat_frames, beat_times))
     accent_env = normalize(feats["flux_all"]) + normalize(
         np.maximum(0, np.diff(feats["bass"], prepend=feats["bass"][0]))
     )
     downbeat_idx = downbeats(beat_frames, accent_env, low, feats["chroma"], one_phase=hard and grid is not None)
+    for r in found:  # dated as heard, like the beats
+        r.start, r.end, r.beats = r.start + heard, r.end + heard, r.beats + heard
+    if found:  # the ramps' hits are the beats there; the bars elsewhere keep the phase the grid gave them
+        beat_times, bars = ramps.splice(beat_times, beat_times[downbeat_idx], found)
+        downbeat_idx = np.searchsorted(beat_times, bars)
+        beat_frames = np.round((beat_times - heard) * fps).astype(int)
+    onsets["kick"] = beat_kicks(feats["flux_kick"], beat_frames, fps, beat_times)
+    if hard:  # heard by the gap it leaves in the low end
+        onsets["kick"] = merge_kicks(onsets["kick"], pumping_kicks(feats["sub"], beat_frames, beat_times))
     phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets, full_kick=hard)
+    for p in phrases:
+        p.ramp = ramps.share(found, p.start, p.end)
     # the snare rolls into the drops (looked for from the drop before) and the pauses before them, on the
     # audio's own clock (not dated as heard)
     at = [i for i, p in enumerate(phrases) if i and p.drop_score >= DROP_THRESHOLD]
