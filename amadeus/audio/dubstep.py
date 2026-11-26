@@ -37,8 +37,9 @@ def judge(styles: np.ndarray, names: list[str]) -> dict:
 # Dubstep's drop plays its kick on the one and its snare on the three: a kick on a third of the beats, which the
 # usual rules call a break (all of Scary Monsters' drops came out breakdowns). Its levels tell the parts instead,
 # measured on the six Skrillex tracks: the drops at 59–93 loudness and 53–88 low end (percentiles of the track),
-# the builds into them 33–48, the breaks under 35 or without their low end.
-DROP_LOUD, DROP_LOW = 58, 50
+# the builds into them 33–48, the breaks under 35 or without their low end. Counted in half time (halftime.py) a
+# phrase is twice as long and may carry the build into its drop: 57.7 for "Right In"'s first drop, hence 55.
+DROP_LOUD, DROP_LOW = 55, 50
 BREAK_LOUD, BREAK_LOW = 35, 25
 
 
