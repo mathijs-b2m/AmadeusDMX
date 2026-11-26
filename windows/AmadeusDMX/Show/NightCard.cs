@@ -15,6 +15,8 @@ namespace AmadeusDMX;
 public sealed class NightCard(AppModel model)
 {
     bool _open = Defaults.Standard.Bool("nightCardOpen");
+    bool _knobsOpen = Defaults.Standard.Bool("nightCardKnobsOpen");
+    Button? _header;
     string? _shape;
     readonly List<Action<ArcStatus>> _updates = [];
     readonly Stack _body = UI.VStack(10);
@@ -23,12 +25,10 @@ public sealed class NightCard(AppModel model)
     // the header
     readonly FontIcon _moon = UI.Icon("moon.stars").Secondary();
     readonly TextBlock _title = UI.Text("", Font.Headline);
-    readonly FontIcon _pin = UI.Icon("pin.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _hand = UI.Icon("hand.raised.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _fog = UI.Icon("cloud.fog.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _sparkles = UI.Icon("sparkles", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
     readonly FontIcon _star = UI.Icon("star.circle.fill", Theme.Size(Font.Caption)).Foreground(Tint.Orange);
-    readonly TextBlock _level = UI.Text("", Font.Caption).Bold();
     readonly TextBlock _clock = UI.Text("", Font.Caption).Secondary();
     readonly TextBlock _countdown = UI.Text("", Font.Title2).Bold();
     readonly FontIcon _chevron = UI.Icon("chevron.down").Secondary();
@@ -43,13 +43,14 @@ public sealed class NightCard(AppModel model)
         {
             Content = UI.HStack(10,
                 _moon,
-                UI.VStack(1, UI.HStack(5, _title, _pin, _sparkles, _star, _level, _fog, _hand).Leading(), _clock.Leading()),
+                UI.VStack(1, UI.HStack(5, _title, _sparkles, _star, _fog, _hand).Leading(), _clock.Leading()),
                 UI.Spacer(8),
                 _countdown,
                 _chevron),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-        }.Borderless().Tooltip(L("The night: its stage, countdown and the knobs the show arc turns"));
+        }.Borderless();
+        _header = header;
         header.Padding = new Thickness(0);
         header.Click += (_, _) =>
         {
@@ -65,12 +66,14 @@ public sealed class NightCard(AppModel model)
     void Refresh()
     {
         if (Arc is not { } arc || _card is null) return;
-        var shape = $"{_open}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{arc.Level is not null}|{arc.Levels}|{string.Join(",", (arc.NamedShows ?? []).Select(n => $"{n.Key}={n.Title}={n.Genre}"))}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
+        var shape = $"{_open}|{_knobsOpen}|{arc.On}|{arc.Hazers > 0}|{arc.Lightshow is not null}|{arc.Level is not null}|{arc.Levels}|{string.Join(",", (arc.NamedShows ?? []).Select(n => $"{n.Key}={n.Title}={n.Genre}"))}|{string.Join(",", arc.Stages.Select(s => string.Join("=", s)))}|{string.Join(",", arc.Events.Select(e => string.Join("=", e)))}";
         if (shape != _shape)
         {
             _shape = shape;
             BuildBody(arc);
-            _card.Width = _open ? 340 : double.NaN;
+            _card.Width = 340;
+            _header?.Tooltip(_open ? L("Close the night's card: the stage and the intensity stay")
+                : L("Open the night: the Lightshow, the knobs the show arc turns, the haze and the night's length"));
             _chevron.RenderTransform = new RotateTransform { Angle = _open ? 180 : 0 };
         }
         UpdateHeader(arc);
@@ -81,15 +84,10 @@ public sealed class NightCard(AppModel model)
     {
         _moon.Glyph = Symbols.Glyph(arc.On ? "moon.stars" : "moon.zzz");
         _title.Text = Night.Title(arc);
-        _pin.Visible(arc.Locked);
         _hand.Visible(arc.Manual.Count > 0).Tooltip(Night.HeldHelp(arc));
         _fog.Visible(arc.Haze is not null).Tooltip(L("You push the haze"));
         _sparkles.Visible(arc.Lightshow == true).Tooltip(L("Lightshow: every track played as a show piece"));
         _star.Visible(arc.NamedShow is not null).Tooltip(arc.NamedShow is { } named ? L("Named show: {0}", named.Title) : "");
-        _level.Visible(arc.Level is { } lv && lv != 2);
-        _level.Text = arc.Level?.ToString() ?? "";
-        _level.Foreground(arc.Level > 2 ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush"));
-        _level.Tooltip(arc.Level is { } l ? L("Intensity level {0} of {1}", l, arc.Levels ?? 5) : "");
         _clock.Text = Night.Clock(arc);
         var left = Night.Countdown(arc);
         _countdown.Visible(left is not null);
@@ -102,7 +100,10 @@ public sealed class NightCard(AppModel model)
     {
         _body.Children.Clear();
         _updates.Clear();
-        _body.Visible(_open);
+        // what is reached for most, there without opening the card: the stage and the intensity
+        if (arc.On) _body.Children.Add(StageRow(arc));
+        if (arc.Level is not null) _body.Children.Add(LevelRow(arc));
+        _body.Visible(_body.Children.Count > 0);
         if (!_open) return;
         _body.Children.Add(UI.Divider());
         if (arc.Lightshow is not null)
@@ -111,21 +112,16 @@ public sealed class NightCard(AppModel model)
             if (arc.NamedShows is { Count: > 0 } shows) _body.Children.Add(NamedShowRow(shows));
             _body.Children.Add(UI.Divider());
         }
-        if (arc.Level is not null)
-        {
-            _body.Children.Add(LevelRow(arc));
-            _body.Children.Add(UI.Divider());
-        }
         if (arc.On)
         {
-            _body.Children.Add(StageStrip(arc));
             _body.Children.Add(HeatRow());
-            _body.Children.Add(UI.Divider());
-            foreach (var (title, knobs) in Knob.Sections)
-            {
-                _body.Children.Add(UI.Text(title.ToUpperInvariant(), Font.Caption2).Bold().Secondary().Margin(0, 2, 0, 0).Leading());
-                foreach (var k in knobs) _body.Children.Add(KnobRow(k));
-            }
+            _body.Children.Add(KnobsHeader());
+            if (_knobsOpen)
+                foreach (var (title, knobs) in Knob.Sections)
+                {
+                    _body.Children.Add(UI.Text(title.ToUpperInvariant(), Font.Caption2).Bold().Secondary().Margin(0, 2, 0, 0).Leading());
+                    foreach (var k in knobs) _body.Children.Add(KnobRow(k));
+                }
             _body.Children.Add(UI.Divider());
         }
         if (arc.Hazers > 0)
@@ -233,9 +229,11 @@ public sealed class NightCard(AppModel model)
             status.Foreground(tint);
             icon.Foreground(tint);
         });
-        var title = UI.Text(L("Intensity"), Font.Callout).Bold();
-        return UI.VStack(6, UI.HStack(8, icon, UI.VStack(1, title.Leading(), status.Wrap().Leading()).Grow()), picker)
-            .Tooltip(Night.LevelHelp);
+        var title = UI.Text(L("Intensity"), Font.Callout).Bold().Frame(width: 62);
+        // one line, there in the closed card too; what the level does is said in the open card
+        var row = UI.HStack(8, icon, title, picker.Grow());
+        status.Visible(_open);
+        return UI.VStack(4, row, status.Wrap().Leading().Margin(26, 0, 0, 0)).Tooltip(Night.LevelHelp);
     }
 
     // MARK: the DJ's named show: a fixed style for their whole set (Prydz Tomorrow …), per genre; None: the house
@@ -327,44 +325,67 @@ public sealed class NightCard(AppModel model)
         return UI.VStack(6, output, time, again, UI.HStack(status, UI.Spacer(), auto));
     }
 
-    // MARK: the stages, named for the event: the one the music is in lit; click one to force it
+    // MARK: the stage the night is in, as a menu of the event's stages: pick one to go there now; Hold keeps the
+    // night in it. What the menu shows is the stage the show plays in right now.
 
-    UIElement StageStrip(ArcStatus arc)
+    UIElement StageRow(ArcStatus arc)
     {
-        var strip = UI.HStack(4);
-        foreach (var s in arc.Stages)
-        {
-            var key = s.Count > 0 ? s[0] : "";
-            var label = UI.Text(s.Count > 0 ? s[^1] : key, Font.Caption2).Center().Wrap(2);
-            var b = new Button
-            {
-                Content = label,
-                MinHeight = 30,
-                Padding = new Thickness(4, 2, 4, 2),
-                BorderThickness = new Thickness(0),
-                CornerRadius = new CornerRadius(6),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch,
-            };
-            b.Click += (_, _) => Send(ArcMessage.Stage(key));
-            strip.Children.Add(b.Grow().Fill());
-            _updates.Add(a =>
-            {
-                var now = key == a.Stage;
-                label.FontWeight = now ? FontWeights.Bold : FontWeights.Normal;
-                b.Background(now ? Tint.Brush(Tint.Accent, 0.35) : ShowUI.Brush(Tone.Secondary, 0.12));  // the same colour: left alone (UI.Background)
-                b.Tooltip(now ? L("The music is here") : L("Go to this stage now (the arc carries on from there)"));
-            });
-        }
-        var held = UI.Text("", Font.Caption).Secondary();
-        var hold = new ToggleButton { Content = L("Hold") }.Small().Tooltip(L("Keep the night in this stage until you let go"));
+        var stages = arc.Stages.Select(s => (Key: s.Count > 0 ? s[0] : "", Title: s.Count > 0 ? s[^1] : "")).ToList();
+        var picker = UI.Picker(stages, stages.FirstOrDefault(s => s.Key == arc.Stage), s => s.Title, s => Send(ArcMessage.Stage(s.Key)))
+            .Tooltip(L("The stage the night is in. Pick another to go there now (the arc carries on from there)"));
+        picker.MinWidth = 0;
+        var icon = UI.Icon("pin.fill").Frame(width: 18);
+        var hold = new ToggleButton { Content = L("Hold") }.Small();
         hold.Click += (_, _) => Send(ArcMessage.Lock(hold.IsChecked == true));
+        var held = UI.Text("", Font.Caption);
+        held.Visible(_open);
         _updates.Add(a =>
         {
-            held.Text = a.Locked ? L("Held: the arc stays in this stage") : L("The music decides the stage");
+            picker.Select(stages.FirstOrDefault(s => s.Key == a.Stage));
             hold.IsChecked = a.Locked;
+            hold.Tooltip(a.Locked ? L("Held: the arc stays in this stage. Click to let the music decide again")
+                : L("Keep the night in this stage until you let go"));
+            var tint = a.Locked ? Tint.Brush(Tint.Orange) : Theme.Brush("TextFillColorSecondaryBrush");
+            icon.Foreground(tint);
+            held.Text = a.Locked ? L("Held: the arc stays in this stage") : L("The music decides the stage");
+            held.Foreground(tint);
         });
-        return UI.VStack(6, strip, UI.HStack(held, UI.Spacer(), hold));
+        var title = UI.Text(L("Stage"), Font.Callout).Bold().Frame(width: 62);
+        return UI.VStack(4, UI.HStack(8, icon, title, picker.Grow(), hold), held.Leading().Margin(26, 0, 0, 0));
+    }
+
+    // MARK: the knobs the show arc turns, folded away until asked for: they are set once, not played
+
+    UIElement KnobsHeader()
+    {
+        var held = UI.Text("", Font.Caption);
+        var chevron = UI.Icon("chevron.down", Theme.Size(Font.Caption)).Secondary();
+        chevron.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+        chevron.RenderTransform = new RotateTransform { Angle = _knobsOpen ? 180 : 0 };
+        var b = new Button
+        {
+            Content = UI.HStack(8,
+                UI.Icon("slider.horizontal.3").Secondary().Frame(width: 18),
+                UI.Text(L("Knobs"), Font.Callout).Bold(),
+                held,
+                UI.Spacer(),
+                chevron),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+        }.Borderless().Tooltip(L("The knobs the show arc turns over the night: what is in play, the character, the reaction and the brightness. Take one over and it stays where you put it"));
+        b.Padding = new Thickness(0);
+        b.Click += (_, _) =>
+        {
+            _knobsOpen = !_knobsOpen;
+            Defaults.Standard.Set("nightCardKnobsOpen", _knobsOpen);
+            Refresh();
+        };
+        _updates.Add(a =>
+        {
+            held.Text = a.Manual.Count == 0 ? L("the show arc turns them") : L("you hold {0}", a.Manual.Count);
+            held.Foreground(a.Manual.Count == 0 ? Theme.Brush("TextFillColorSecondaryBrush") : Tint.Brush(Tint.Orange));
+        });
+        return b;
     }
 
     // MARK: how hot the mix runs (what the stages are detected from)
