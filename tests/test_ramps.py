@@ -28,7 +28,7 @@ def _build(start=30.0, end=55.0, gap0=0.8, gap1=0.25):
 
 def _track(build_hits, kick_under=False):
     """A 150 BPM kick, quiet over the build unless `kick_under`, and the build's hits."""
-    kicks = GRID if kick_under else GRID[(GRID < build_hits[0] - 0.2) | (GRID > build_hits[-1] + 0.2)]
+    kicks = GRID if kick_under else GRID[(build_hits[0] - 0.2 > GRID) | (build_hits[-1] + 0.2 < GRID)]
     return np.maximum(_flux(kicks), _flux(build_hits, 0.9))
 
 

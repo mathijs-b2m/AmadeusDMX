@@ -64,7 +64,7 @@ def _chains(t: np.ndarray, s: np.ndarray) -> list[list[int]]:
     # every pair (i, j) of hits that can follow each other, j after i
     pairs = [(i, j) for i in range(n) for j in range(i + 1, n) if t[j] - t[i] <= MAX_GAP_S]
     into: dict[int, list[int]] = {}
-    for k, (i, j) in enumerate(pairs):
+    for k, (_i, j) in enumerate(pairs):
         into.setdefault(j, []).append(k)
     score = np.zeros(len(pairs))
     back = np.full(len(pairs), -1)
