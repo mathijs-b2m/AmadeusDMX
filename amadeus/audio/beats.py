@@ -62,6 +62,24 @@ def pumping_kicks(sub: np.ndarray, beat_frames: np.ndarray, beat_times: np.ndarr
     return np.asarray(times, dtype=float), np.asarray(strengths, dtype=np.float32)
 
 
+def whole_bars(kicks, beat_times: np.ndarray, downbeat_idx: np.ndarray):
+    """Of `pumping_kicks`, only those in bars where every beat has one: a four-on-the-floor kick under a big sub.
+
+    A big-room or techno kick has a long, low tail that runs into the sub, so `beat_kicks` can hear 0–0.3 of the beats
+    in a drop where all of them have one (and the part reads as a breakdown). The sub's gap at each beat hears it.
+    Outside the hard styles a bass line can leave a gap on a beat too, so a bar counts only when all four do:
+    checked against Demucs drum stems over ~400 tracks, 3 of 4 also took in bass lines (reggae, pop, latin)."""
+    t, s = kicks
+    keep = np.zeros(len(t), dtype=bool)
+    bars = np.asarray(beat_times)[downbeat_idx]
+    for i, t0 in enumerate(bars):
+        t1 = bars[i + 1] if i + 1 < len(bars) else np.inf
+        inside = (t >= t0 - 0.02) & (t < t1 - 0.02)
+        if inside.sum() >= 4:
+            keep |= inside
+    return t[keep], s[keep]
+
+
 def merge_kicks(a, b):
     """Two kick lists (times, strengths) as one, a beat in both kept once at its stronger strength."""
     t = np.concatenate([a[0], b[0]])

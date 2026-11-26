@@ -30,6 +30,7 @@ from amadeus.audio.beats import (
     set_bpm,
     strongest_tempo,
     track_beats,
+    whole_bars,
 )
 from amadeus.audio.features import (
     BANDS,
@@ -44,7 +45,7 @@ from amadeus.audio.model import DROP_THRESHOLD, Analysis, Phrase
 from amadeus.audio.phrases import build_phrases
 from amadeus.audio.rolls import fine_envelopes, snare_rolls
 
-ANALYSIS_VERSION = 50
+ANALYSIS_VERSION = 51
 HARD_AGREE = 0.5  # a hard track takes the one-tempo grid when this share of the tracker's beats is on it
 
 
@@ -242,8 +243,9 @@ def analyze(
         downbeat_idx = np.searchsorted(beat_times, bars)
         beat_frames = np.round((beat_times - heard) * fps).astype(int)
     onsets["kick"] = beat_kicks(feats["flux_kick"], beat_frames, fps, beat_times)
-    if hard:  # heard by the gap it leaves in the low end
-        onsets["kick"] = merge_kicks(onsets["kick"], pumping_kicks(feats["sub"], beat_frames, beat_times))
+    pumps = pumping_kicks(feats["sub"], beat_frames, beat_times)  # heard by the gap it leaves in the low end:
+    # every beat in a hard track (the kick IS the low end), else whole four-on-the-floor bars (a big-room kick's tail)
+    onsets["kick"] = merge_kicks(onsets["kick"], pumps if hard else whole_bars(pumps, beat_times, downbeat_idx))
     phrases = build_phrases(feats, fps, beat_times, downbeat_idx, onsets, full_kick=hard)
     for p in phrases:
         p.ramp = ramps.share(found, p.start, p.end)
