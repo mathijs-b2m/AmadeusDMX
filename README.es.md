@@ -31,6 +31,12 @@ desde un warm-up tranquilo hasta los últimos temazos de la fiesta, exacto al be
 
 <sub>El drop, en vivo en la app: 60 moving heads, 10 láseres y una pantalla LED que hizo la cuenta regresiva. A la derecha, lo que eligió el director IA para esta frase.</sub>
 
+<br><br>
+
+<a href="https://www.youtube.com/watch?v=g1pZq18wwTw"><img src="https://img.youtube.com/vi/g1pZq18wwTw/maxresdefault.jpg" alt="Mira Amadeus DMX con un rig real en YouTube" width="100%"></a>
+
+[![Mira Amadeus DMX con un rig real en YouTube](https://img.shields.io/badge/Ver_en_YouTube-primer_video-ff0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=g1pZq18wwTw)
+
 </div>
 
 ---
