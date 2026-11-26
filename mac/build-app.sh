@@ -26,9 +26,10 @@ for arg in "$@"; do
     *) echo "Unknown option $arg" >&2; exit 1 ;;
   esac
 done
-# a development build runs the engine from this checkout; a release has its own inside
+# a development build runs the engine from this checkout; a release has its own inside. ENGINE=… runs another
+# checkout's engine (a build from a git worktree: the main checkout has the sets, the rigs and the Python)
 ENGINE_ROOT=""
-[ "$RELEASE" = 1 ] || ENGINE_ROOT="  <key>AmadeusEngineRoot</key><string>${ROOT}</string>"
+[ "$RELEASE" = 1 ] || ENGINE_ROOT="  <key>AmadeusEngineRoot</key><string>${ENGINE:-$ROOT}</string>"
 
 # updates: only a release with a feed and the public update key (Sparkle stays off otherwise). Each app has its
 # feed: FEED_URL for Amadeus DMX, appcast-link.xml next to it for Amadeus Link (LINK_FEED_URL=… elsewhere).
