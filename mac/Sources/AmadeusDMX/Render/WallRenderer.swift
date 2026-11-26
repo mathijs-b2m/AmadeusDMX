@@ -2,7 +2,7 @@
 // (decision.screen): off | ambient | figure | words | equalizer | psychedelic. Figures are playful neon
 // outlines on the beat: a runner, a dancer, a jumping crowd, pong. The modes also bring abstract scenes: geometric
 // shapes among the figures, a scope for the equaliser, a starfield for ambient, a tunnel in drops (pick()). Into a
-// The music's style picks the family: the harder styles (hardstyle, hardcore, metal) get dark, sharp scenes (a wolf's
+// The music's style picks the family: the harder styles (hardstyle, hardcore, metal, dubstep) get dark, sharp scenes (a wolf's
 // head in facets, claws, jaws of spikes) and none of the playful figures; techno and the other club styles get hard
 // lines and a ridge landscape beside them. The wall flashes when the lights strobe (frame.strobe) and when blinders
 // and strobe lights fire: it is part of the light show. Into a
@@ -64,8 +64,8 @@ enum WallFamily {
 
     init(_ h: Hello) {
         let g = (h.style.isEmpty ? h.genre : h.style).lowercased()
-        self = ["hardstyle", "hardcore", "metal"].contains(g) ? .hard
-            : ["techno", "trance", "psytrance", "edm", "house", "dnb", "dubstep"].contains(g) ? .club : .other
+        self = ["hardstyle", "hardcore", "metal", "dubstep"].contains(g) ? .hard
+            : ["techno", "trance", "psytrance", "edm", "house", "dnb"].contains(g) ? .club : .other
     }
 }
 

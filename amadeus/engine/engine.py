@@ -26,6 +26,7 @@ from amadeus.engine import zones
 from amadeus.engine.blinders import BlindersMixin
 from amadeus.engine.cinematic import CinematicMixin
 from amadeus.engine.fog import FogMixin
+from amadeus.engine.growl import GrowlMixin
 from amadeus.engine.lasers import LasersMixin
 from amadeus.engine.lightshow import LightshowMixin
 from amadeus.engine.looks import DROP_DARK_FROM, XFADE, LooksMixin
@@ -57,6 +58,7 @@ def program_of(analysis: Analysis, plan: list[Decision]) -> str:
 class Engine(
     TimingMixin,
     LooksMixin,
+    GrowlMixin,
     BlindersMixin,
     MotionMixin,
     RingsMixin,
@@ -141,6 +143,8 @@ class Engine(
             self.dance_boom = self.dance_cha = (np.zeros(0), np.zeros(0, np.float32))
         # the drum kit (the drums trigger, rock): kick and snare from the separated drums when there are some
         self.kit = drums.kit(analysis) if any(d.trigger == "drums" for d in plan) else drums.Kit.empty()
+        # dubstep (the dubstep trigger): the growl for the main group, the half-time kick and snare for the others
+        self._init_growl(analysis, plan)
         self.hat_t, self.hat_s = analysis.onsets["hat"]
         self.acc_t, self.acc_s = analysis.onsets["accent"]
         self.lead_t, self.lead_s = analysis.onsets.get("lead", (np.zeros(0), np.zeros(0)))

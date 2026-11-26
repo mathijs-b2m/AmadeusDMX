@@ -70,6 +70,10 @@ PALETTES = {  # value: (description, RGB colours 0..1). Colour 0 = base, colour 
         "Turquoise, coral, mango, lime and hot pink: a beach party on the Caribbean coast, cumbia and tropical.",
         [(0.0, 0.75, 0.8), (1.0, 0.3, 0.25), (1.0, 0.6, 0.0), (0.45, 1.0, 0.1), (1.0, 0.0, 0.5)],
     ),
+    "toxic": (
+        "Acid green, violet, cyan and hot magenta: a bass-music rave, dubstep's growls.",
+        [(0.35, 1.0, 0.0), (0.55, 0.0, 1.0), (0.0, 0.9, 1.0), (1.0, 0.0, 0.6)],
+    ),
     "stage": (
         "Warm white, amber and deep blue. A concert stage: rock, live bands.",
         [(1.0, 0.85, 0.65), (1.0, 0.55, 0.1), (0.1, 0.2, 0.9), (1.0, 1.0, 1.0)],
@@ -146,6 +150,13 @@ TRIGGERS = [
         "The drum kit, for rock and metal: the rig plays kick and snare as two voices, whole groups each: some on "
         "the kick in the base colour, the others on the snare in the accent colour, ringing out with its reverb; "
         "a few lights flash on the guitar's strums.",
+    ),
+    (
+        "dubstep",
+        "Dubstep's layers, for dubstep and brostep: the main group of heads plays the drop's growl pulse by pulse, "
+        "every wobble, stab and yoy as a note (LED fixtures pulse with it, lamps hold its notes), a new colour with "
+        "each new sound; the other groups play the half-time drums, some on the kick in the base colour, the others "
+        "on the snare in the accent colour.",
     ),
     ("hats", "Hi-hats: an energetic groove; the lights still switch on the kick (never blinking per hat)."),
     ("accents", "Only big hits and impacts: sparse and dramatic."),

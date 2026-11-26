@@ -118,6 +118,42 @@ def uv_only(defn: dict) -> bool:
     return "uv" in attrs and not attrs & {"red", "green", "blue", "white", "cyan", "color_wheel"}
 
 
+# A lamp's light can't pulse with a growl: a discharge lamp (HMI, MSD, the 5R and 7R beams) is dimmed and cut by a
+# mechanical dimmer and shutter, a tungsten one (PAR 64, Sunstrip) glows up and down with its filament. The
+# libraries rarely say which source a fixture has (QLC+'s bulb type isn't kept, OFL's often missing), so the signs are
+# what is there: a lamp channel; the source named in its model or notes; a big plain-dimmer light with no colour of
+# its own. `physical.lamp` says it outright ("LED", "MSD Platinum 5R", "halogen"). Anything else: an LED.
+LAMP_WORDS = re.compile(
+    r"\b(halogen|tungsten|incandescent|discharge|xenon|hmi|hri|msd|msr|cdm|hpe|par ?64|sunstrip|\d{1,2}rx?|"
+    r"pointe|megapointe|bmfl|mythos|viper|mac ?(?:250|300|500|550|575|600|700|2000|iii))\b",
+    re.I,
+)
+LAMP_WATTS = 300  # a plain dimmer this strong, with no colour mixing: a tungsten lamp
+
+
+def lamp(defn: dict) -> str:
+    """Why a fixture's light comes from a lamp, not an LED ("": an LED, as far as anyone can tell)."""
+    said = str(defn.get("physical", {}).get("lamp", "") or "")
+    if said:
+        return "" if re.search(r"\bled\b", said, re.I) else said
+    attrs = {c["attr"] for m in defn.get("modes", {}).values() for c in m}
+    if any(a.startswith("lamp") for a in attrs):
+        return "a lamp channel"
+    words = " ".join(str(defn.get(k, "")) for k in ("manufacturer", "model", "source"))
+    if not re.search(r"\bled\b", words, re.I) and (m := LAMP_WORDS.search(words)):
+        return m.group(0)
+    watts = defn.get("physical", {}).get("watts", 0) or 0
+    colour = attrs & {"red", "green", "blue", "cyan", "magenta", "yellow", "white", "amber", "color_wheel"}
+    if defn.get("kind") not in MOVING and watts >= LAMP_WATTS and not colour and "dimmer" in attrs:
+        return f"a {watts} W plain dimmer"
+    return ""
+
+
+def led_dimmer(defn: dict) -> bool:
+    """Can the fixture's light follow fast pulses (an LED, dimmed electronically)?"""
+    return not lamp(defn)
+
+
 def is_moving(defn: dict) -> bool:
     return defn.get("kind") in MOVING
 

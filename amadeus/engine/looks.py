@@ -65,7 +65,7 @@ KICK_RUN_LEAD_S = 0.03
 
 # The kit (the drums trigger, rock): the same two voices by whole groups, the kick and the snare, the snare's light
 # ringing out with its reverb; the guitar's strums on the accent lights.
-TWO_VOICES = ("dembow", "drums", "cumbia")
+TWO_VOICES = ("dembow", "drums", "cumbia", "dubstep")  # (dubstep: and the growl, engine/growl.py)
 # Cumbia's swing (the cumbia trigger): boom-tac's two voices on the beat and its "and" (the cha), each section in its
 # own colour of the palette, every voice a step apart, all of them moving on to the next colour every bar (with little
 # colour variety, every DANCE_SLOW_BARS): a fiesta of colours that changes as the lights hit, never while they glow.
@@ -594,10 +594,11 @@ class LooksMixin:
             self._light_x = xs
         return self._light_x
 
-    def _kit_voices(self, t: float) -> tuple[float, float, float]:
+    def _kit_voices(self, t: float, kit=None) -> tuple[float, float, float]:
         """The kit's two voices, (kick, snare, 0): each drum as notes, the kick held as long as it sounds, the
-        snare released over its ring (its reverb). Where neither drum plays for a while both hold KIT_HOLD."""
-        k = self.kit
+        snare released over its ring (its reverb). Where neither drum plays for a while both hold KIT_HOLD.
+        `kit`: another kit than the band's (dubstep's half-time one)."""
+        k = self.kit if kit is None else kit
         kick, ki = note_env(k.kick_t, k.kick_s, t)
         snare, si = ring_env(k.snare_t, k.snare_s, k.snare_ring, t)
         last = max(float(k.kick_t[ki]) if ki >= 0 else -1e9, float(k.snare_t[si]) if si >= 0 else -1e9)
@@ -621,6 +622,8 @@ class LooksMixin:
         Whole groups: the pars, and the heads by the class of their group (overhead, front, towers …; with one
         class, by group), the units taking turns; one unit is split left/right. The roles hold all track long (a
         section of the orchestra keeps its part; swapping them reads as a blink at every phrase)."""
+        if d.trigger == "dubstep":
+            return self._dub_voice(eid)
         if "_voices" not in self.__dict__:
             classes = {}
             for g in self.groups:
@@ -636,6 +639,34 @@ class LooksMixin:
         if self._voices_one:
             return "both"
         return "boom" if self._voices.get(eid, 0) == 0 else "tac"
+
+    def _dub_voice(self, eid: str) -> str:
+        """Dubstep's voice of a light: "growl" for the main group (the class of heads with the most light, else the
+        pars), "boom" or "tac" for the others in turn; with only the main group, every other pair of it plays
+        "both" drums. Fixed for the whole track, like boom-tac's."""
+        if "_dub_voices" not in self.__dict__:
+            classes = {}
+            for g in self.groups:
+                classes.setdefault(g["cls"], []).extend(g["ids"])
+            heads = list(classes.values()) if len(classes) > 1 else [g["ids"] for g in self.groups]
+            heads = [u for u in heads if u]
+            light = {e["id"]: float(fxlib.get(fx["fixture"]).get("physical", {}).get("lumens", 1000) or 1000)
+                     for e, (fx, _) in zip(self.heads, self.head_fx)}  # fmt: skip
+            units = [u for u in [[p["id"] for p in self.pars], *heads] if u]
+            main = (
+                max(heads, key=lambda u: sum(light.get(e, 1000.0) for e in u)) if heads else units[0] if units else []
+            )
+            rest = [u for u in units if u is not main]
+            voices = {e: "growl" for e in main}
+            if not rest and len(main) > 1:  # one group: its pairs take turns, the growl and the drums
+                rank = {**self._x_rank(self.pars), **self._x_rank(self.heads)}
+                pair = {e: min(rank.get(e, 0), len(main) - 1 - rank.get(e, 0)) for e in main}
+                voices = {e: "growl" if pair[e] % 2 == 0 else "both" for e in main}
+            for k, u in enumerate(rest):
+                for e in u:
+                    voices[e] = "both" if len(rest) == 1 else ("boom" if k % 2 == 0 else "tac")
+            self._dub_voices = voices
+        return self._dub_voices.get(eid, "both")
 
     def _accents(self, d: Decision, t: float, out: dict, accent) -> None:
         """Accent lights flash on the synth's stabs, exactly on the note, in the accent colour (white in the
@@ -723,7 +754,11 @@ class LooksMixin:
         sections or mirrored pairs, so a model plays as one and left and right stay alike; of two lights one),
         shifting per phrase. None in calm parts or where the synth has no stabs; a single light plays both (_scene
         layers the stabs over its rhythm)."""
-        if d.section not in ACCENT_SECTIONS or d.trigger in ("dembow", "cumbia"):  # boom-tac: the tac is the accent
+        if d.section not in ACCENT_SECTIONS or d.trigger in (
+            "dembow",
+            "cumbia",
+            "dubstep",
+        ):  # boom-tac: the tac is the accent
             return set()
         if d.par_accent == "run" or d.head_light == "run":  # the run plays the accents (two rhythms on a light:
             return set()  # flicker)
@@ -886,6 +921,8 @@ class LooksMixin:
         dembow = d.trigger in TWO_VOICES  # two voices, by whole groups: boom-tac, or the kit's kick and snare
         if d.trigger == "drums":
             boom, tac, pause = self._kit_voices(t)
+        elif d.trigger == "dubstep":  # the half-time kit, the main group on the growl (engine/growl.py)
+            boom, tac, pause = self._kit_voices(t, self.dub_kit)
         else:
             boom, tac, pause = self._boom_tac(t, d.trigger) if dembow else (env, 0.0, 0.0)
         dance = d.trigger == "cumbia"  # cumbia: each section in its own colour, on to the next every bar
@@ -918,7 +955,13 @@ class LooksMixin:
             if dembow and a not in ("none", "melody"):  # boom-tac: this par's voice
                 low = min(base_level, BOOM_TAC_BASE) * (1 - (1 - BREATHER_GLOW) * pause)
                 voice = self._voice(d, f["id"])
-                if run is not None and f["id"] in run[0]:  # a kick run: the waterfall, then the landing
+                growl = self.growl_at(d, t, f["id"]) if voice == "growl" else None
+                if voice == "growl" and growl is None:  # the growl rests: the drums, with the others
+                    voice = "both"
+                if growl is not None:  # dubstep's main group: the growl, pulse by pulse, dark between
+                    dim, col = growl[0], cols[growl[1] % len(cols)]
+                    tac_voice = True  # (no kick flash on top: it plays the growl, not the kick)
+                elif run is not None and f["id"] in run[0]:  # a kick run: the waterfall, then the landing
                     v = run[0][f["id"]]
                     col = (base if voice == "boom" else acc) if run[1] else acc
                     dim = low + (1 - low) * v
@@ -1052,7 +1095,12 @@ class LooksMixin:
             elif grouping == "chase":  # one group lit per beat, in turn
                 dim *= 1.0 if beat % max(len(self.groups), 1) == self.hgroup[j]["g"] else 0.12
             voice = self._voice(d, f["id"]) if dembow and hl != "off" else ""
-            if voice:  # boom-tac: the head's group plays its voice (the tac in the accent colour)
+            growl = self.growl_at(d, t, f["id"]) if voice == "growl" else None
+            if voice == "growl" and growl is None:  # the growl rests: the drums, with the others
+                voice = "both"
+            if growl is not None:  # dubstep's main group: the growl, pulse by pulse, dark between
+                dim, col = growl[0], cols[growl[1] % len(cols)]
+            elif voice:  # boom-tac: the head's group plays its voice (the tac in the accent colour)
                 low = BOOM_TAC_HEAD_BASE * (1 - (1 - BREATHER_GLOW) * pause)
                 dim = low + (1 - low) * {"boom": boom, "tac": tac}.get(voice, max(boom, tac))
                 if dance:  # cumbia: its section's colour of the fiesta
@@ -1071,7 +1119,7 @@ class LooksMixin:
             st = State(dimmer=dim, r=col[0], g=col[1], b=col[2])
             if strobing:
                 st.strobe_hz, st.gate = self.head_strobe_rate(d), gate
-            if d.dynamics == "impact" and d.head_light != "off" and voice != "tac" and not strobing:  # (the boom's)
+            if d.dynamics == "impact" and d.head_light != "off" and voice not in ("tac", "growl") and not strobing:
                 st.white = flash * (dim if role["movement"] == "pour" else 1.0)  # (a pour waits dark at the floor)
                 if run is not None and f["id"] in run[0]:  # a kick run: only the group on its kick flashes
                     st.white *= run[0][f["id"]]
