@@ -517,6 +517,7 @@ class ShowArc:
         self.stage = 0
         self.stage_since = 0.0  # night time the stage began
         self.locked = False  # the operator holds the stage
+        self.picked = False  # the operator picked this stage: it stays, even outside its part of the night
         self.manual: dict[str, float] = {}
         self.lightshow = False  # the operator's show piece: every track played by the lightshow program
         self.named = ""  # the DJ's named show (director/style.py, NAMED): every track lit in it ("": none)
@@ -664,8 +665,8 @@ class ShowArc:
         out = {}
         for k, key in enumerate(STAGE_KEYS):
             lo, hi = ev["allowed"].get(key, _ANYWHERE)
-            if not lo <= share < hi:
-                continue
+            if not lo <= share < hi and not (self.picked and k == self.stage):
+                continue  # (a picked stage stays in the running: the music moves on from it in its own time)
             centre, likes = MOODS[key]
             v = -(((h - centre) / HEAT_WIDTH) ** 2) + TREND_WEIGHT * tr * likes
             plo, phi = ev["pull"].get(key, (9.0, 9.0))
@@ -689,7 +690,8 @@ class ShowArc:
             self.candidate, self.evidence = best, 0.0
         self.evidence += dt
         if self.evidence >= self._scaled(0.015, 45, 480) or STAGE_KEYS[self.stage] not in sc:
-            self._enter(best, now)  # (or at once: the night has passed the stage's place, e.g. the warm-up)
+            self._enter(best, now)
+            self.picked = False  # (or at once: the night has passed the stage's place, e.g. the warm-up)
 
     def title(self, stage: int | None = None) -> str:
         return EVENTS[self.event]["names"][self.stage if stage is None else stage]
@@ -702,6 +704,7 @@ class ShowArc:
 
     def _new_night(self, now: float):
         self.started, self.stage, self.stage_since, self.candidate, self.evidence = now, 0, 0.0, 0, 0.0
+        self.picked = False
         self.fast = self.slow = self.bpm_fast = self.bpm_slow = self.bpm_base = None
         self.revealed = set()  # every surprise back in the box
         self.countdowns, self.countdown_for = [], {}
@@ -1128,6 +1131,8 @@ class ShowArc:
             if self.started is None:
                 self._new_night(now)
             self._enter(STAGE_KEYS.index(msg["stage"]), now)
+            self.picked = True
+            self.save(now)
         if "lock" in msg:
             self.locked = bool(msg["lock"])
         if msg.get("event") in EVENTS:
@@ -1135,7 +1140,7 @@ class ShowArc:
         if "length_s" in msg:
             self.length = _ramp(float(msg["length_s"]), MIN_LENGTH_S, MAX_LENGTH_S)
         if msg.get("reset"):
-            self.started, self.stage, self.stage_since, self.locked = None, 0, 0.0, False
+            self.started, self.stage, self.stage_since, self.locked, self.picked = None, 0, 0.0, False, False
             self.revealed = set()
             self.fast = self.slow = self.bpm_fast = self.bpm_slow = self.bpm_base = None
         if "enabled" in msg:
@@ -1203,6 +1208,7 @@ class ShowArc:
             "stage": STAGE_KEYS[self.stage],
             "stage_since": self.stage_since,
             "locked": self.locked,
+            "picked": self.picked,
             "manual": self.manual,
             "lightshow": self.lightshow,
             "named": self.named,
@@ -1240,6 +1246,7 @@ class ShowArc:
         self.countdowns = [float(c) for c in d.get("countdowns") or []]
         self.stage = STAGE_KEYS.index(d["stage"]) if d.get("stage") in STAGE_KEYS else 0
         self.stage_since = float(d.get("stage_since", 0.0))
+        self.picked = bool(d.get("picked", False))
         self.fast, self.slow = (d.get("heat") or [None, None])[:2]
         self.bpm_fast, self.bpm_slow, self.bpm_base = (d.get("bpm") or [None, None, None])[:3]
 

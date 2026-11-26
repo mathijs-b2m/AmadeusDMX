@@ -66,6 +66,25 @@ def test_the_dj_picks_the_path(tmp_path):
     assert "finale" not in moods  # this DJ never went for a finale: none is made up
 
 
+def test_a_picked_stage_stays_outside_its_part_of_the_night(tmp_path):
+    """The operator picks the finale early in the night (its place is late): it is played, not undone at once;
+    the music moves on from it in its own time, and the night's own detection takes over from there."""
+    arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
+    arc.control({"length_s": 4 * 3600}, now=0.0)
+    playing = SimpleNamespace(intensity=2, section="groove")
+    for t in range(0, 9000, 10):  # 2.5 h in: building the floor
+        arc.observe(float(t), playing, 126)
+    assert STAGE_KEYS[arc.stage] != "finale"
+    arc.control({"stage": "finale"}, now=9000.0)
+    for t in range(9000, 9060, 10):
+        arc.observe(float(t), playing, 126)
+    assert STAGE_KEYS[arc.stage] == "finale" and arc.picked
+    assert ShowArc(load_rig(RIG), tmp_path / "arc.json", now=9060.0).picked  # (a restart keeps the pick)
+    for t in range(9060, 9060 + 1800, 10):  # half an hour of the same music later
+        arc.observe(float(t), playing, 126)
+    assert STAGE_KEYS[arc.stage] != "finale" and not arc.picked
+
+
 def test_events_have_their_own_character(tmp_path):
     """A wedding: dinner first and for longer, its own names, fewer specials and less smoke than a club."""
     arc = ShowArc(load_rig(RIG), tmp_path / "arc.json", now=0.0)
