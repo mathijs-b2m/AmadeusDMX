@@ -4,7 +4,7 @@ import numpy as np
 import soundfile as sf
 
 from amadeus.audio.analysis import analyze
-from amadeus.audio.beats import attack_offset, constant_grid, refine_beats
+from amadeus.audio.beats import attack_offset, constant_grid, refine_beats, whole_bars
 
 SR = 44100
 BEAT = 31 / 64  # 123.87 BPM: not a round number of analysis frames
@@ -85,3 +85,13 @@ def test_refine_beats_stays_near_the_tracker():
         env[b + 1], env[b + 2], env[b + 3] = 0.0, 0.5 + 1e-9, 1.0  # the top of the window, still rising
     t = refine_beats(frames, env, fps)
     assert np.all(np.abs(t * fps - frames) <= 3)
+
+
+def test_a_big_room_kick_is_heard_in_whole_bars_of_its_gaps():
+    """A big-room kick's long tail runs into the sub (`beat_kicks` misses it): its gap in the sub on every beat of a
+    bar hears it. A bar with a gap on only some beats is a bass line, not a kick."""
+    beats = np.arange(16) * 0.5
+    downbeats = np.arange(0, 16, 4)
+    pumps = np.concatenate([beats[0:4], beats[[4, 6]], beats[8:11]]), np.ones(9, dtype=np.float32)
+    t, s = whole_bars(pumps, beats, downbeats)
+    assert list(t) == list(beats[0:4]) and len(s) == 4  # bar 2 (two gaps) and bar 3 (three) are a bass line
