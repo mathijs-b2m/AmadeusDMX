@@ -380,6 +380,7 @@ public static class Genre
         "hardstyle" => "bolt.fill",
         "hardcore" => "figure.run",
         "cumbia" => "figure.dance",
+        "dubstep" => "waveform.path",
         "pop" or "latin" or "reggaeton" => "music.note",
         _ => "waveform",
     };

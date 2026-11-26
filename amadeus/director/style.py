@@ -38,7 +38,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
-from amadeus.audio import hardcore, hardstyle
+from amadeus.audio import dubstep, hardcore, hardstyle
 from amadeus.director.vocabulary import DEFAULT_PALETTES, PALETTES
 
 SWITCH_AFTER = 2  # a different genre this many tracks in a row becomes the set's genre
@@ -280,6 +280,57 @@ HARD_SHOW = {
     },
 }
 
+# Dubstep's show, per section. A drop is the growl (the dubstep trigger: the main heads on it, the other groups
+# on the kick and the snare), the pars dark between their hits, open beams that hit their spots with the drums.
+# A breakdown is dark and slow, one effect alone, so the next drop hits.
+_DUB_HIT = {"par_base": "off", "par_accent": "pulse", "beam_fx": "open", "layer_split": "none", "aim": "crowd"}
+DUB_SHOW = {
+    "drop": {
+        **_DUB_HIT,
+        "trigger": "dubstep",
+        "palette": ("toxic", "fire", "toxic", "neon"),
+        "head_light": "beat",
+        "head_color": "base",
+        "movement": ("bounce", "ballyhoo", "step_on_beat", "swing"),
+        "formation": ("mirror", "fan", "sync", "mirror"),
+        "grouping": ("unison", "per_group", "unison", "per_group"),
+        "dynamics": "impact",
+        "intensity": 3,
+    },
+    "groove": {
+        **_DUB_HIT,
+        "head_light": "beat",
+        "movement": ("step_on_beat", "swing", "bounce"),
+        "formation": ("mirror", "sync", "mirror"),
+    },
+    "buildup": {  # rises, the snare roll strobing into the drop (engine/rolls.py)
+        "par_base": "off",
+        "head_color": "white",
+        "beam_fx": "open",
+        "head_light": ("pulse", "strobe"),
+        "movement": ("tilt_wave", "swing"),
+        "formation": ("sync", "mirror"),
+        "dynamics": "rise",
+        "intensity": 2,
+    },
+    "breakdown": {
+        "palette": ("cool", "toxic"),
+        "par_base": "off",
+        "par_accent": "none",
+        "trigger": "bars",
+        "head_light": "steady",
+        "layer_split": "none",
+        "dynamics": "steady",
+        "intensity": 1,
+        "movement": ("sweep", "circle"),
+        "formation": ("fan", "mirror"),
+        "grouping": ("solo", "unison"),
+        "aim": ("sky", "crowd"),
+        "head_color": ("base", "white"),
+        "beam_fx": ("prism_spin", "open"),
+    },
+}
+
 STYLES: dict[str, Style] = {
     s.genre: s
     for s in [
@@ -419,11 +470,23 @@ STYLES: dict[str, Style] = {
         ),  # fmt: skip
         _style(
             "dubstep",
-            "Dubstep and bass music: heavy half-time weight. Hits on the backbeat, light that hits with the "
-            "wobble, dark between the hits; fiery and neon colours.",
-            ["fire", "neon", "cool"],
-            {"movement": {"figure8", "swing", "circle"}, "par_base": {"fade", "full"}},
-            {"movement": ("bounce", "nod", "step_on_beat"), "par_base": ("off", "dim")},
+            "Dubstep and brostep (Skrillex, Excision, Zomboy): the drop is a growl, a distorted bass that talks, "
+            "wobbles and stabs over half-time drums, a new sound every half bar. The rig plays it in layers, "
+            "whole groups each: the main heads on the growl, pulse by pulse, dark between its notes and a new "
+            "colour with each new sound; the other groups on the kick and on the snare. Big, hard moves that land "
+            "with the drums, open beams, toxic green, violet and fire. The build rises and strobes at its top; the "
+            "breakdown is calm and dark, one slow effect, so the drop hits.",
+            ["toxic", "fire", "neon", "cool"],
+            {"movement": {"figure8", "circle", "still"}, "par_base": {"fade", "full"}, "head_light": {"breathe"}},
+            {
+                "movement": ("bounce", "swing", "step_on_beat", "ballyhoo"),
+                "par_base": ("off", "dim"),
+                "head_light": ("beat", "pulse"),
+            },
+            beat="dubstep",
+            always=DUB_SHOW,
+            form=dubstep.form,
+            break_kick=0.2,  # (half time: the drop's kick is on a third of its beats)
         ),  # fmt: skip
         _style(
             "hiphop",

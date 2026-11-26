@@ -177,15 +177,8 @@ def _from_mix(a) -> Kit:
     return Kit(kt[ki], ks[ki], st[si], ss[si], np.full(len(si), DEFAULT_RING_S, np.float32))
 
 
-def kit(a) -> Kit:
-    """The kick and snare the lights play: from the separated drums when the track has been separated, put on
-    the analysis' clock (its kicks are dated as heard), else from the analysis' own onsets."""
-    try:
-        got = _cached(Path(a.path)) if a.path else None
-    except (OSError, ValueError):
-        got = None
-    if got is None or len(got.kick_t) + len(got.snare_t) < 16:
-        return _from_mix(a)
+def _on_clock(a, got: Kit) -> Kit:
+    """A stem's kit on the analysis' clock (its kicks are dated as heard)."""
     kt = np.asarray(a.onsets.get("kick", (np.zeros(0),))[0], float)
     shift = 0.0
     if len(kt) and len(got.kick_t):
@@ -196,3 +189,115 @@ def kit(a) -> Kit:
         if len(d) >= 8:
             shift = float(np.median(d))
     return Kit(got.kick_t + shift, got.kick_s, got.snare_t + shift, got.snare_s, got.snare_ring, "stem")
+
+
+def kit(a) -> Kit:
+    """The kick and snare the lights play: from the separated drums when the track has been separated, put on
+    the analysis' clock (its kicks are dated as heard), else from the analysis' own onsets."""
+    try:
+        got = _cached(Path(a.path)) if a.path else None
+    except (OSError, ValueError):
+        got = None
+    if got is None or len(got.kick_t) + len(got.snare_t) < 16:
+        return _from_mix(a)
+    return _on_clock(a, got)
+
+
+# ---------------------------------------------------------------- dubstep's kit
+
+# Dubstep's drums don't split into two clusters the way a band's do: the kick is a short punch with a sub under it,
+# the snare a wide noisy crack, and the separated drums carry some of the growl's grit too (Ashman's D fails on
+# all six Skrillex tracks tried). Each drum is found by its own band instead: the kick where the low end jumps out
+# of the dip before it to near its loud level, the snare where the crack does while the low end doesn't. Measured on
+# the drops (2026-11-26): Scary Monsters one kick and two snare hits a bar (half time), Kill Everybody and Rock n'
+# Roll a kick on every beat (complextro), the mix's own onsets put kicks and snares on every beat of all of them.
+DUB_JUMP_DB = 8.0  # a hit: its band jumps this much over its lowest point in RISE_S …
+DUB_NEAR_DB = 8.0  # … to within this much of the band's loud hits
+DUB_SNARE_NEAR_DB = 6.0  # (the snare: this much; claps, hats and the growl's grit under it)
+DUB_CRACK = (700, 4000)  # Hz: the snare's crack (the hats sit above it)
+DUB_CLAP_DB = 3.0  # a crack with a kick this close to the snares on their own is a snare too
+DUB_VERSION = 1
+
+
+def detect_half_time(drums: np.ndarray, sr: int) -> Kit:
+    """Dubstep's kick and snare in a separated drum track (times on its own clock)."""
+    from scipy.ndimage import minimum_filter1d, uniform_filter1d
+    from scipy.signal import find_peaks, stft
+
+    f, t, Z = stft(drums.astype(np.float32), sr, nperseg=1024, noverlap=1024 - HOP)
+    power = np.abs(Z) ** 2
+    del Z
+    fps = sr / HOP
+    low, crack = (10 * np.log10(power[(f >= lo) & (f < hi)].sum(0) + 1e-10) for lo, hi in ((30, 110), DUB_CRACK))
+    del power
+    w = max(2, int(RISE_S * fps) + 1)
+
+    def jump(e):
+        return e - minimum_filter1d(e, w, origin=(w - 1) // 2)
+
+    def loud(e):
+        return float(np.percentile(e[e > e.max() - 60], 95))
+
+    jl, jc = jump(low), jump(crack)
+    gap = max(1, int(0.12 * fps))
+    kp, _ = find_peaks(np.where((jl >= DUB_JUMP_DB) & (low >= loud(low) - DUB_NEAR_DB), jl, 0), distance=gap)
+    sp, _ = find_peaks(np.where((jc >= DUB_JUMP_DB) & (crack >= loud(crack) - DUB_SNARE_NEAR_DB), jc, 0), distance=gap)
+    # a crack with the kick is the kick's click, unless it is as loud as the snares on their own and jumps more than
+    # the low end does (a clap on the kick: four to the floor puts its snare on the kick's beats 2 and 4)
+    with_kick = np.array([np.abs(kp - p).min() <= w if len(kp) else False for p in sp], bool)
+    alone = sp[~with_kick]
+    ref = float(np.median([crack[p : p + w].max() for p in alone])) if len(alone) >= 8 else loud(crack)
+    top = np.array([crack[p : p + w].max() for p in sp]) if len(sp) else np.zeros(0)
+    clap = (top >= ref - DUB_CLAP_DB) & (jc[sp] >= jl[sp]) if len(sp) else np.zeros(0, bool)
+    sp = sp[~with_kick | clap]
+    look = max(1, int(LOOK_S * fps))
+
+    def drum(p, e, gap_s):
+        if not len(p):
+            return np.zeros(0), np.zeros(0, np.float32), np.zeros(0, int)
+        on, lvl = t[p], np.array([e[x : x + look].max() for x in p])
+        s = _strength(on, lvl)
+        ok = ~np.isnan(s)
+        keep = _thin(on[ok], s[ok], gap_s)
+        return on[ok][keep], s[ok][keep].astype(np.float32), p[ok][keep]
+
+    kt, ks, _ = drum(kp, low, KICK_GAP_S)
+    st, ss, si = drum(sp, crack, SNARE_GAP_S)
+    smooth = uniform_filter1d(crack, w)
+    rings = []
+    for k, p in enumerate(si):
+        nxt = si[k + 1] if k + 1 < len(si) else len(smooth)
+        top = smooth[p : p + look].max()
+        tail = smooth[p : min(nxt, p + int(RING_MAX_S * fps))]
+        below = np.flatnonzero(tail < top - RING_DB)
+        rings.append((below[0] if len(below) else len(tail)) / fps)
+    return Kit(kt, ks, st, ss, np.array(rings, np.float32), "stem")
+
+
+def half_time(a) -> Kit:
+    """Dubstep's kick and snare from the separated drums, on the analysis' clock (cached next to the parts); not
+    separated: the analysis' own onsets."""
+    from amadeus.audio import stems
+
+    try:
+        path = Path(a.path) if a.path else None
+        if path is None or not path.is_file():
+            return _from_mix(a)
+        f = stems._dir(path) / "kit-dub.npz"
+        got = None
+        if f.exists():
+            z = np.load(f)
+            if int(z["version"]) == DUB_VERSION:
+                got = Kit(z["kick_t"], z["kick_s"], z["snare_t"], z["snare_s"], z["snare_ring"], "stem")
+        if got is None:
+            drums = stems.cached_part(path, "drums")
+            if drums is None:
+                return _from_mix(a)
+            got = detect_half_time(drums, stems.STEM_SR)
+            system.save_npz(f, version=DUB_VERSION, kick_t=got.kick_t, kick_s=got.kick_s, snare_t=got.snare_t,
+                            snare_s=got.snare_s, snare_ring=got.snare_ring)  # fmt: skip
+    except (OSError, ValueError):
+        return _from_mix(a)
+    if len(got.kick_t) + len(got.snare_t) < 16:
+        return _from_mix(a)
+    return _on_clock(a, got)

@@ -49,7 +49,9 @@ def test_only_separated_drums_count(monkeypatch):
 
 
 def test_a_streamed_copys_id_is_no_part_of_the_title():
-    a = SimpleNamespace(path="/c/Disclosure, Flume - You & Me - Flume Remix [spotify-3W2ZcrRsInZbjWylOi6KhZ].00962f6f.decoded.wav")
+    a = SimpleNamespace(
+        path="/c/Disclosure, Flume - You & Me - Flume Remix [spotify-3W2ZcrRsInZbjWylOi6KhZ].00962f6f.decoded.wav"
+    )
     assert genre.artist_title(a, {}) == ("Disclosure, Flume", "You & Me - Flume Remix")
     a = SimpleNamespace(path="/c/Skrillex - Make It Bun Dem [streamed-3119f992faf0].d3ec939b.decoded.wav")
     assert genre.artist_title(a, {})[1] == "Make It Bun Dem"

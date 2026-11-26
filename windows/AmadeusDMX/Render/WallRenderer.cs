@@ -2,7 +2,7 @@
 // The director picks a mode per phrase (decision.screen): off | ambient | figure | words | equalizer | psychedelic.
 // Figures are playful neon outlines on the beat: a runner, a dancer, a jumping crowd, pong. The modes also bring
 // abstract scenes: geometric shapes among the figures, a scope for the equaliser, a starfield for ambient, a tunnel in
-// drops (Pick()). The music's style picks the family: the harder styles (hardstyle, hardcore, metal) get dark, sharp
+// drops (Pick()). The music's style picks the family: the harder styles (hardstyle, hardcore, metal, dubstep) get dark, sharp
 // scenes (a wolf's head in facets, claws, jaws of spikes) and none of the playful figures; techno and the other club
 // styles get hard lines and a ridge landscape beside theirs. The wall flashes when the lights strobe (frame.Strobe)
 // and when blinders and strobe lights fire: it is part of the light show. Into a drop the wall counts 3-2-1 and
@@ -34,8 +34,8 @@ public static class WallScenes
 
     public static string RawValue(this WallScene s) => s.ToString().ToLowerInvariant();
     public static WallScene? FromRawValue(string? raw) => AllCases.Cast<WallScene?>().FirstOrDefault(s => s!.Value.RawValue() == raw);
-    static readonly string[] HardStyles = ["hardstyle", "hardcore", "metal"];
-    static readonly string[] ClubStyles = ["techno", "trance", "psytrance", "edm", "house", "dnb", "dubstep"];
+    static readonly string[] HardStyles = ["hardstyle", "hardcore", "metal", "dubstep"];
+    static readonly string[] ClubStyles = ["techno", "trance", "psytrance", "edm", "house", "dnb"];
 
     public static WallFamily Family(Hello h)
     {

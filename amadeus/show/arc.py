@@ -412,7 +412,7 @@ def push_plan(plan: list, level: int) -> list:
     energetic phrase at full energy and hitting hard, but each its own way: a head light that hits keeps its own,
     a softer one takes the next of the hard ones in turn (strobe, hammer, flick, random, run...), the top of a
     build strobes, the pars and formations likewise; the heads twice as fast. Calm parts (an intro, a breakdown,
-    a verse) never strobe; the two-voice triggers (dembow, cumbia, drums) keep their own pars, a pour keeps its
+    a verse) never strobe; the voiced triggers (dembow, cumbia, drums, dubstep) keep their own pars, a pour keeps its
     own light. The waves of levels 4 and 5 are played on the frame (ShowArc._waves)."""
     from dataclasses import replace
 
@@ -421,7 +421,7 @@ def push_plan(plan: list, level: int) -> list:
     out, turns = [], {}  # (how many of each section so far: each the next hard one)
     for k, d in enumerate(plan):
         bright = d.intensity if d.brightness < 0 else d.brightness
-        own_pars = d.trigger in ("dembow", "cumbia", "drums")
+        own_pars = d.trigger in ("dembow", "cumbia", "drums", "dubstep")
         own_light = d.movement == "pour" or d.head_light == "off"
         if level < DEFAULT_LEVEL:
             out.append(

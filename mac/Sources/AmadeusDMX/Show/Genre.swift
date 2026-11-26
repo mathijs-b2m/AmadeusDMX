@@ -17,6 +17,7 @@ enum Genre {
         case "hardstyle": "bolt.fill"
         case "hardcore": "figure.run"
         case "cumbia": "figure.dance"
+        case "dubstep": "waveform.path"
         case "pop", "latin", "reggaeton": "music.note"
         default: "waveform"
         }

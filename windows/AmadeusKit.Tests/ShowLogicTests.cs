@@ -276,6 +276,7 @@ public class ShowLogicTests
         Assert.Equal("guitars", Genre.Symbol("metal"));
         Assert.Equal("waveform", Genre.Symbol("techno"));
         Assert.Equal("figure.dance", Genre.Symbol("cumbia"));
+        Assert.Equal("waveform.path", Genre.Symbol("dubstep"));
     }
 
     static EngineProcess.LogLine L(int id, string text, bool error = false) => new(id, DateTime.Now, text, error);

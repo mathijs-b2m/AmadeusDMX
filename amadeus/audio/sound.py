@@ -1,6 +1,6 @@
 """What a track sounds like to EffNet-Discogs (amadeus/audio/instruments.py), for the genre call: about two seconds
 of the mix at a time against 400 Discogs styles, boiled down to what disco.py, hardstyle.py, hardcore.py and cumbia.py
-need to know.
+need to know (and dubstep.py).
 
 Judged once per file (~1 s) and cached; nothing without the models (`amadeus instruments --download`).
 """
@@ -12,10 +12,10 @@ import json
 from pathlib import Path
 
 from amadeus import paths
-from amadeus.audio import cumbia, disco, hardcore, hardstyle
+from amadeus.audio import cumbia, disco, dubstep, hardcore, hardstyle
 
 CACHE = paths.CACHE / "styles"
-VERSION = 4  # (3: hardstyle and hardcore, heard in the same pass; 4: cumbia)
+VERSION = 5  # (3: hardstyle and hardcore, heard in the same pass; 4: cumbia; 5: dubstep)
 
 
 def _cached(path: Path) -> Path:
@@ -50,6 +50,7 @@ def facts(path: str | Path) -> dict:
         **hardstyle.judge(styles, names),
         **hardcore.judge(styles, names),
         **cumbia.judge(styles, names),
+        **dubstep.judge(styles, names),
     }
     CACHE.mkdir(parents=True, exist_ok=True)
     cached.write_text(json.dumps(out), encoding="utf-8")
