@@ -51,7 +51,9 @@ GENRES = {
     "cinematic": "film and game scores, trailer music, epic orchestral or hybrid: no steady groove, big dynamics",
     "classical": "classical music, orchestras, chamber music, opera, solo piano",
     "ambient": "atmospheric, beatless or nearly so, calm, chill-out, downtempo",
-    "edm": "festival and mainstage EDM: big room, electro house, future bass, commercial dance",
+    "edm": "festival and mainstage EDM: big room, electro house, commercial dance",
+    "chill": "future bass, melodic bass, chill electronic, chillstep: Flume, ODESZA, San Holo, Louis The Child; "
+    "half-time grooves under lush chords and chopped vocals, calm even where it drops",
     "house": "house, deep house, tech house, progressive house, disco house, french house",
     "techno": "techno, minimal, melodic techno, high-tech minimal, industrial techno",
     "trance": "trance, uplifting, progressive trance: euphoric leads and long breakdowns",
@@ -107,6 +109,7 @@ TAG_WORDS = {  # words in a file's genre tag → our word (first match wins: spe
     "urbano": "reggaeton", "latin trap": "reggaeton", "cumbia": "cumbia", "sonidera": "cumbia", "chicha": "cumbia",
     "dancehall": "latin", "disco house": "house",
     "disco": "disco", "boogie": "funk",
+    "future bass": "chill", "melodic bass": "chill", "chillstep": "chill", "chillwave": "chill",
     "soundtrack": "cinematic", "score": "cinematic", "cinematic": "cinematic", "trailer": "cinematic",
     "epic": "cinematic", "classical": "classical", "orchestra": "classical", "ambient": "ambient",
     "chill": "ambient", "downtempo": "ambient", "psy": "psytrance", "goa": "psytrance", "trance": "trance",
@@ -302,6 +305,7 @@ def from_tag(meta: dict) -> str | None:
 def artist_title(a: Analysis, meta: dict) -> tuple[str, str]:
     """The artist and the title: from the file's tags, else from its name ("Artist - Title")."""
     stem = re.sub(r"\.[0-9a-f]{8}\.decoded$", "", Path(a.path).stem)  # a decoded copy: the original's name
+    stem = re.sub(r"\s*\[(spotify|streamed)-[0-9A-Za-z]+\]$", "", stem)  # a streamed copy's id: no part of the title
     guess_artist, _, guess_title = stem.partition(" - ")
     if not guess_title:
         guess_artist, guess_title = "", stem
@@ -324,7 +328,8 @@ def from_model(artist: str, title: str) -> tuple[str, float] | None:
 
         from amadeus.director.llm import MODEL
 
-        q = {"type": "choice", "name": "genre", "instructions": "The genre of the track, from its artist and title.",
+        q = {"type": "choice", "name": "genre", "instructions": "The genre of the track, from its artist and title. A "
+         "remix is in the remixer's genre, not the original artist's.",
              "choices": [{"value": g, "description": d} for g, d in GENRES.items()]}  # fmt: skip
         r = OpenAI().decisions.create(model=MODEL, input=prompt, questions=[q])
         ans = next((x.model_dump() for x in r.answers if x.name == "genre"), {})

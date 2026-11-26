@@ -66,6 +66,7 @@ class Style:
     kick_grid: tuple = ()  # the sections where the kick is every beat, whatever the onsets say (engine: the kick)
     no_arc: bool = False  # its show keeps its size all through: every climax hits, the first as hard as the last
     short_hits: bool = False  # its hits are short shots, not notes held until the next kick (engine: the hits)
+    calm_drops: bool = False  # its misfits are swapped in every section: calm music stays calm where it drops
 
     def section(self, a, i: int, section: str) -> str:
         """The section of phrase i, by the genre's own form if it has one."""
@@ -118,7 +119,7 @@ class Style:
         if d.palette not in self.palettes:
             d.palette, changed = self.palettes[k % len(self.palettes)], True
         changed = self.own_look(d, history) or changed
-        if d.section not in ("groove", "verse", "chorus"):
+        if d.section not in ("groove", "verse", "chorus") and not self.calm_drops:
             return changed  # intros, breakdowns, bridges, buildups and drops: their own music decides
         for layer, bad in self.avoid.items():
             if getattr(d, layer, None) in bad:
@@ -373,6 +374,16 @@ STYLES: dict[str, Style] = {
             ["neon", "fire", "cool", "warm"],
             {"par_base": {"fade"}, "movement": {"still", "nod"}},
             {"par_base": ("dim", "off"), "movement": ("circle", "bounce", "ballyhoo")},
+        ),  # fmt: skip
+        _style(
+            "chill",
+            "Future bass and chill electronic: lush and calm, even where it drops. Warm and soft colours that swell "
+            "with the chords, slow sweeping and circling beams, the light breathing on the half-time snare rather "
+            "than hitting every beat; no strobing light, no per-beat moves, no fast spinning effects.",
+            ["warm", "cool", "gold", "ice"],
+            {**_CALM_AVOID, "par_base": {"off"}},
+            {**_CALM_PREFER, "par_base": ("dim", "fade")},
+            calm_drops=True,
         ),  # fmt: skip
         _style(
             "trance",

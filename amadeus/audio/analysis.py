@@ -15,7 +15,7 @@ import numpy as np
 import soundfile as sf
 
 from amadeus import paths, system
-from amadeus.audio import hardcore, hardstyle, sound
+from amadeus.audio import halftime, hardcore, hardstyle, sound
 from amadeus.audio.beats import (
     attack_offset,
     beat_kicks,
@@ -162,7 +162,10 @@ def analyze(
     path = readable_audio(path, cache_dir)
     npz_path, json_path = cache_paths(path, cache_dir, tempo)
     if npz_path.exists() and json_path.exists():
-        return _finish(_load(npz_path, json_path), path)
+        a = _load(npz_path, json_path)
+        if not tempo and halftime.heard(a):  # the separated drums play half time: the grid at half the tempo
+            return analyze(path, cache_dir, verbose, tempo="half")
+        return _finish(a, path)
 
     log = print if verbose else (lambda *a, **k: None)
     log(f"Analysing {path.name} …")
@@ -275,6 +278,9 @@ def analyze(
         bar_chroma=bar_chroma,
     )
     _save(a, npz_path, json_path)
+    if not tempo and halftime.heard(a):
+        log(f"  half time: the snare on every fourth beat, the kick sparse: {a.bpm / 2:.1f} BPM")
+        return analyze(path, cache_dir, verbose, tempo="half")
     return _finish(a, path)
 
 
